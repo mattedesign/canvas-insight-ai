@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import {
   ReactFlow,
   useNodesState,
@@ -15,6 +15,9 @@ import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { Button } from '@/components/ui/button';
+import { Undo2, Redo2 } from 'lucide-react';
 
 const nodeTypes = {
   image: ImageNode,
@@ -94,13 +97,95 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
 
+  const {
+    saveState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    setIsUpdating,
+  } = useUndoRedo(initialElements.nodes, initialElements.edges);
+
+  // Save state when nodes or edges change
+  useEffect(() => {
+    saveState(nodes, edges);
+  }, [nodes, edges, saveState]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        const previousState = undo();
+        if (previousState) {
+          setIsUpdating(true);
+          setNodes(previousState.nodes);
+          setEdges(previousState.edges);
+          setTimeout(() => setIsUpdating(false), 0);
+        }
+      } else if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+        event.preventDefault();
+        const nextState = redo();
+        if (nextState) {
+          setIsUpdating(true);
+          setNodes(nextState.nodes);
+          setEdges(nextState.edges);
+          setTimeout(() => setIsUpdating(false), 0);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, setNodes, setEdges, setIsUpdating]);
+
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
 
   return (
-    <div className="h-full w-full bg-background">
+    <div className="h-full w-full bg-background relative">
+      {/* Undo/Redo Controls */}
+      <div className="absolute top-4 left-4 z-10 flex gap-2">
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => {
+            const previousState = undo();
+            if (previousState) {
+              setIsUpdating(true);
+              setNodes(previousState.nodes);
+              setEdges(previousState.edges);
+              setTimeout(() => setIsUpdating(false), 0);
+            }
+          }}
+          disabled={!canUndo}
+          className="bg-background/90 backdrop-blur-sm"
+          title="Undo (Ctrl+Z)"
+        >
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => {
+            const nextState = redo();
+            if (nextState) {
+              setIsUpdating(true);
+              setNodes(nextState.nodes);
+              setEdges(nextState.edges);
+              setTimeout(() => setIsUpdating(false), 0);
+            }
+          }}
+          disabled={!canRedo}
+          className="bg-background/90 backdrop-blur-sm"
+          title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+        >
+          <Redo2 className="h-4 w-4" />
+        </Button>
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
