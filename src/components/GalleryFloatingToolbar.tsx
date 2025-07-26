@@ -21,7 +21,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ChatPanel } from './ChatPanel';
 
-export type GalleryToolMode = 'hand' | 'cursor' | 'draw';
+export type GalleryToolMode = 'cursor' | 'draw';
 
 interface GalleryFloatingToolbarProps {
   onZoomIn: () => void;
@@ -46,7 +46,7 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
   onAddComment,
   showAnnotations,
   zoomLevel,
-  currentTool = 'hand'
+  currentTool = 'cursor'
 }) => {
   const { toast } = useToast();
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -85,7 +85,7 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
       case 'draw':
         return <PenTool className="h-4 w-4" />;
       default:
-        return <Hand className="h-4 w-4" />;
+        return <MousePointer className="h-4 w-4" />;
     }
   };
 
@@ -96,7 +96,7 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
       case 'draw':
         return 'Draw';
       default:
-        return 'View'; // Changed from 'Move' to 'View' for gallery context
+        return 'Cursor';
     }
   };
 
@@ -116,13 +116,6 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="bg-background/95 backdrop-blur-sm">
-                  <DropdownMenuItem onClick={() => onToolChange('hand')} className="gap-2">
-                    <Hand className="h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>View Mode</span>
-                      <span className="text-xs text-muted-foreground">Pan, zoom, and interact with annotations</span>
-                    </div>
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onToolChange('cursor')} className="gap-2">
                     <MousePointer className="h-4 w-4" />
                     <div className="flex flex-col">

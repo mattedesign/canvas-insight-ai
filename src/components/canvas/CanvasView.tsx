@@ -49,7 +49,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onImageSelect,
   onGenerateConcept
 }) => {
-  const [currentTool, setCurrentTool] = useState<ToolMode>('hand');
+  const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
   const { toast } = useToast();
   // Generate initial nodes and edges
@@ -227,7 +227,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleToolChange = useCallback((tool: ToolMode) => {
     setCurrentTool(tool);
     const toolMessages = {
-      hand: 'Hand/Move tool - Pan around the canvas',
       cursor: 'Cursor tool - Select and move artboards',
       draw: 'Draw tool - Paint regions for inpainting feedback'
     };
@@ -309,8 +308,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        panOnDrag={currentTool === 'hand'}
-        panOnScroll={currentTool === 'hand'}
+        panOnDrag={true}
+        panOnScroll={true}
         zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick={currentTool !== 'draw'}

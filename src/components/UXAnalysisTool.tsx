@@ -19,7 +19,7 @@ export const UXAnalysisTool: React.FC = () => {
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-  const [galleryTool, setGalleryTool] = useState<'hand' | 'cursor' | 'draw'>('hand');
+  const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -121,7 +121,7 @@ export const UXAnalysisTool: React.FC = () => {
     event.target.value = '';
   }, [handleImageUpload]);
 
-  const handleGalleryToolChange = useCallback((tool: 'hand' | 'cursor' | 'draw') => {
+  const handleGalleryToolChange = useCallback((tool: 'cursor' | 'draw') => {
     setGalleryTool(tool);
   }, []);
 

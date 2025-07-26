@@ -21,7 +21,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ChatPanel } from './ChatPanel';
 
-export type ToolMode = 'hand' | 'cursor' | 'draw';
+export type ToolMode = 'cursor' | 'draw';
 
 interface FloatingToolbarProps {
   onToolChange: (tool: ToolMode) => void;
@@ -130,7 +130,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       case 'draw':
         return <PenTool className="h-4 w-4" />;
       default:
-        return <Hand className="h-4 w-4" />;
+        return <MousePointer className="h-4 w-4" />;
     }
   };
 
@@ -141,7 +141,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       case 'draw':
         return 'Draw';
       default:
-        return 'Move';
+        return 'Cursor';
     }
   };
 
@@ -159,13 +159,6 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="bg-background/95 backdrop-blur-sm">
-              <DropdownMenuItem onClick={() => onToolChange('hand')} className="gap-2">
-                <Hand className="h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Hand/Move</span>
-                  <span className="text-xs text-muted-foreground">Default pan mode</span>
-                </div>
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onToolChange('cursor')} className="gap-2">
                 <MousePointer className="h-4 w-4" />
                 <div className="flex flex-col">
