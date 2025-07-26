@@ -18,6 +18,8 @@ interface SidebarProps {
   analyses: UXAnalysis[];
   selectedView: 'gallery' | 'summary';
   onViewChange: (view: 'gallery' | 'summary') => void;
+  selectedImageId: string | null;
+  onImageSelect: (imageId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -25,7 +27,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   uploadedImages,
   analyses,
   selectedView,
-  onViewChange
+  onViewChange,
+  selectedImageId,
+  onImageSelect,
 }) => {
   const sidebarIcons = [
     { icon: Plus, label: 'Add', active: false },
@@ -61,7 +65,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      {/* Analytics Summary */}
+      {/* Image List */}
+      {uploadedImages.length > 0 && selectedView === 'gallery' && (
+        <div className="flex flex-col space-y-2 mt-8 max-h-64 overflow-y-auto">
+          {uploadedImages.map((image) => (
+            <button
+              key={image.id}
+              onClick={() => onImageSelect(image.id)}
+              className={`
+                w-10 h-10 rounded-lg overflow-hidden border-2 transition-all
+                ${selectedImageId === image.id
+                  ? 'border-primary' 
+                  : 'border-transparent hover:border-muted-foreground'
+                }
+              `}
+              title={image.name}
+            >
+              <img 
+                src={image.url} 
+                alt={image.name}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* View Toggle */}
       {analyses.length > 0 && (
         <div className="flex flex-col space-y-2 mt-8">
           <button

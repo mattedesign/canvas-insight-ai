@@ -32,6 +32,12 @@ All colors MUST be HSL.
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 138 76% 97%;
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 186 100% 31%;
@@ -102,6 +108,12 @@ All colors MUST be HSL.
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+
+    --warning: 48 96% 53%;
+    --warning-foreground: 38 92% 50%;
+
+    --success: 150 100% 30%;
+    --success-foreground: 150 100% 90%;
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
