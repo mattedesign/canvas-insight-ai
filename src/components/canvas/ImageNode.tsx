@@ -3,6 +3,8 @@ import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Eye } from 'lucide-react';
 import { DrawingOverlay } from '../DrawingOverlay';
 import { useToast } from '@/hooks/use-toast';
 import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay';
@@ -106,6 +108,18 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     }
   }, [id, fitView, onViewChange, onImageSelect, image.id, image.name, toast]);
 
+  const handleViewSingle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent double-click from firing
+    if (onViewChange && onImageSelect) {
+      onViewChange('gallery');
+      onImageSelect(image.id);
+      toast({
+        title: "Switched to Gallery View",
+        description: `Now viewing ${image.name} in detail`,
+      });
+    }
+  }, [onViewChange, onImageSelect, image.id, image.name, toast]);
+
   const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {
     toast({
       title: "Drawing Completed",
@@ -162,11 +176,25 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
       </div>
       
       <div className="p-4">
-        <h3 className="font-semibold text-foreground mb-2 truncate">
-          {image.name}
-        </h3>
-        <div className="text-sm text-muted-foreground mb-3">
-          {image.dimensions.width} × {image.dimensions.height}px
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-foreground mb-2 truncate">
+              {image.name}
+            </h3>
+            <div className="text-sm text-muted-foreground mb-3">
+              {image.dimensions.width} × {image.dimensions.height}px
+            </div>
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleViewSingle}
+            className="ml-3 flex-shrink-0"
+            title="View in single image mode"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
         </div>
         
         {analysis && (
