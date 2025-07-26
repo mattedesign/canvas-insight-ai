@@ -166,11 +166,30 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     saveState(nodes, edges);
   }, [nodes, edges, saveState]);
 
-  // Update nodes when annotations toggle
+  // Update nodes when initialElements change (including currentTool)
   useEffect(() => {
     setNodes(initialElements.nodes);
     setEdges(initialElements.edges);
   }, [initialElements.nodes, initialElements.edges, setNodes, setEdges]);
+
+  // Update existing nodes with current tool when tool changes
+  useEffect(() => {
+    setNodes(currentNodes => 
+      currentNodes.map(node => {
+        if (node.type === 'image') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              currentTool,
+              showAnnotations
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, [currentTool, showAnnotations, setNodes]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
