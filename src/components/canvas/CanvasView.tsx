@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
   useNodesState,
@@ -10,12 +10,15 @@ import {
   Background,
   Controls,
   MiniMap,
+  NodeSelectionChange,
+  OnSelectionChangeParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { useArtboardZoom } from '@/hooks/useArtboardZoom';
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
 
@@ -96,6 +99,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
+  const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
 
   const {
     saveState,
@@ -105,6 +109,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     canRedo,
     setIsUpdating,
   } = useUndoRedo(initialElements.nodes, initialElements.edges);
+
+  // Initialize artboard zoom functionality
+  useArtboardZoom({ selectedNodes });
 
   // Save state when nodes or edges change
   useEffect(() => {
@@ -142,6 +149,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
+  );
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
+      setSelectedNodes(selectedNodes);
+    },
+    []
   );
 
   return (
@@ -192,11 +206,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
         panOnDrag
-        panOnScroll
-        zoomOnScroll
+        panOnScroll={selectedNodes.length === 0} // Disable global scroll zoom when artboard selected
+        zoomOnScroll={selectedNodes.length === 0} // Disable global scroll zoom when artboard selected
         zoomOnPinch
         zoomOnDoubleClick
         selectionOnDrag={false}
