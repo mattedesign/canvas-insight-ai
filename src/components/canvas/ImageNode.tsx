@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Handle, Position } from '@xyflow/react';
-import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
+import React, { useState, useCallback } from 'react';
+import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -15,14 +14,15 @@ interface ImageNodeData {
 
 interface ImageNodeProps {
   data: ImageNodeData;
+  id?: string;
 }
 
-export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
+export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const { image, analysis, showAnnotations = true } = data;
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const { toast } = useToast();
-  const transformRef = useRef<ReactZoomPanPinchRef>(null);
+  const { fitView } = useReactFlow();
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -69,6 +69,12 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
     });
   }, [toast]);
 
+  const handleDoubleClick = useCallback(() => {
+    if (id) {
+      fitView({ nodes: [{ id }], duration: 800, maxZoom: 1 });
+    }
+  }, [id, fitView]);
+
   const activeAnnotation = analysis?.visualAnnotations.find(a => a.id === activeCommentId);
   const relatedSuggestions = analysis?.suggestions.filter(s => 
     s.relatedAnnotations.includes(activeCommentId || '')
@@ -76,28 +82,14 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
   
   
   return (
-    <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg">
+    <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg" onDoubleClick={handleDoubleClick}>
       <div className="relative image-container">
-        <TransformWrapper
-          ref={transformRef}
-          initialScale={1}
-          minScale={0.5}
-          maxScale={3}
-          centerOnInit={true}
-          doubleClick={{
-            disabled: false,
-            mode: 'reset'
-          }}
-        >
-          <TransformComponent>
-            <img
-              src={image.url}
-              alt={image.name}
-              className="w-full h-auto object-contain"
-              style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
-            />
-          </TransformComponent>
-        </TransformWrapper>
+        <img
+          src={image.url}
+          alt={image.name}
+          className="w-full h-auto object-contain"
+          style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
+        />
         
         {/* Annotation Markers */}
         {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => (
