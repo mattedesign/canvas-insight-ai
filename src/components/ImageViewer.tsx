@@ -151,6 +151,103 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     }
   }, [onViewChange]);
 
+  // Image content component that's shared between different wrappers
+  const ImageContent = useCallback(({ zoomIn, zoomOut, resetTransform }: any) => (
+    <>
+      <div 
+        className="relative max-w-full max-h-full image-container w-full h-full flex items-center justify-center"
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          handleImageDoubleClick();
+        }}
+      >
+        <div className="relative">
+          <img
+            src={analysis.imageUrl}
+            alt={analysis.imageName}
+            className="max-w-full max-h-full object-contain cursor-pointer select-none"
+            style={{ maxWidth: '100%', height: 'auto' }}
+            title="Double-click to switch to canvas view"
+            draggable={false}
+          />
+          
+          {/* Annotation Markers */}
+          {showAnnotations && analysis.visualAnnotations.map((annotation) => (
+            <AnnotationMarker
+              key={annotation.id}
+              annotation={annotation}
+              isSelected={selectedAnnotations.includes(annotation.id)}
+              onClick={handleAnnotationClick}
+            />
+          ))}
+
+          {/* Active Comment */}
+          {activeAnnotation && (
+            <AnnotationComment
+              annotation={activeAnnotation}
+              position={commentPosition}
+              onClose={handleCloseComment}
+              onRequestAnalysis={handleRequestAnalysis}
+              onGenerateVariation={handleGenerateVariation}
+              relatedSuggestions={relatedSuggestions}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Gallery Floating Toolbar */}
+      <GalleryFloatingToolbar
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onReset={resetTransform}
+        onDelete={handleDelete}
+        onToggleAnnotations={handleToggleAnnotations}
+        onToolChange={onToolChange}
+        onAddComment={onAddComment}
+        showAnnotations={showAnnotations}
+        zoomLevel={zoomLevel}
+        currentTool={currentTool}
+      />
+    </>
+  ), [
+    analysis,
+    showAnnotations,
+    selectedAnnotations,
+    activeAnnotation,
+    commentPosition,
+    handleAnnotationClick,
+    handleCloseComment,
+    handleRequestAnalysis,
+    handleGenerateVariation,
+    relatedSuggestions,
+    handleDelete,
+    handleToggleAnnotations,
+    onToolChange,
+    onAddComment,
+    zoomLevel,
+    currentTool,
+    handleImageDoubleClick
+  ]);
+
+  // Cursor mode: Simple container with no zoom/pan interference
+  if (currentTool === 'cursor') {
+    // Create mock zoom functions for the toolbar
+    const mockZoomIn = () => toast({ title: "Zoom", description: "Zoom controls disabled in cursor mode" });
+    const mockZoomOut = () => toast({ title: "Zoom", description: "Zoom controls disabled in cursor mode" });
+    const mockReset = () => toast({ title: "Reset", description: "Reset disabled in cursor mode" });
+    
+    return (
+      <div className="w-full h-full bg-muted/20 relative overflow-hidden">
+        <ImageContent 
+          zoomIn={mockZoomIn}
+          zoomOut={mockZoomOut}
+          resetTransform={mockReset}
+        />
+      </div>
+    );
+  }
+
+  // Hand mode and Draw mode: Use TransformWrapper
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
@@ -165,74 +262,24 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           mode: "reset"
         }}
         panning={{
-          disabled: currentTool === 'cursor',
+          disabled: currentTool === 'draw',
           velocityDisabled: true
         }}
         wheel={{
-          disabled: currentTool === 'cursor'
+          disabled: currentTool === 'draw'
         }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-
-            <TransformComponent
-              wrapperClass="w-full h-full"
-              contentClass="w-full h-full flex items-center justify-center"
-            >
-              <div 
-                className="relative max-w-full max-h-full image-container"
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  handleImageDoubleClick();
-                }}
-              >
-                <img
-                  src={analysis.imageUrl}
-                  alt={analysis.imageName}
-                  className="max-w-full max-h-full object-contain cursor-pointer select-none"
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                  title="Double-click to switch to canvas view"
-                  draggable={false}
-                />
-                
-                {/* Annotation Markers */}
-                {showAnnotations && analysis.visualAnnotations.map((annotation) => (
-                  <AnnotationMarker
-                    key={annotation.id}
-                    annotation={annotation}
-                    isSelected={selectedAnnotations.includes(annotation.id)}
-                    onClick={handleAnnotationClick}
-                  />
-                ))}
-
-                {/* Active Comment */}
-                {activeAnnotation && (
-                  <AnnotationComment
-                    annotation={activeAnnotation}
-                    position={commentPosition}
-                    onClose={handleCloseComment}
-                    onRequestAnalysis={handleRequestAnalysis}
-                    onGenerateVariation={handleGenerateVariation}
-                    relatedSuggestions={relatedSuggestions}
-                  />
-                )}
-              </div>
-            </TransformComponent>
-
-            {/* Gallery Floating Toolbar */}
-            <GalleryFloatingToolbar
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-              onReset={resetTransform}
-              onDelete={handleDelete}
-              onToggleAnnotations={handleToggleAnnotations}
-              onToolChange={onToolChange}
-              onAddComment={onAddComment}
-              showAnnotations={showAnnotations}
-              zoomLevel={zoomLevel}
-              currentTool={currentTool}
+          <TransformComponent
+            wrapperClass="w-full h-full"
+            contentClass="w-full h-full"
+          >
+            <ImageContent 
+              zoomIn={zoomIn}
+              zoomOut={zoomOut}
+              resetTransform={resetTransform}
             />
-          </>
+          </TransformComponent>
         )}
       </TransformWrapper>
     </div>
