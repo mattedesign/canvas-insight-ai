@@ -18,6 +18,7 @@ export const UXAnalysisTool: React.FC = () => {
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [galleryTool, setGalleryTool] = useState<'hand' | 'cursor' | 'draw'>('hand');
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -94,6 +95,15 @@ export const UXAnalysisTool: React.FC = () => {
     event.target.value = '';
   }, [handleImageUpload]);
 
+  const handleGalleryToolChange = useCallback((tool: 'hand' | 'cursor' | 'draw') => {
+    setGalleryTool(tool);
+  }, []);
+
+  const handleAddComment = useCallback(() => {
+    // This could open a comment mode or show a toast
+    console.log('Add comment mode activated');
+  }, []);
+
 
   const showGalleryView = selectedView === 'gallery';
   const showCanvasView = selectedView === 'canvas';
@@ -168,6 +178,9 @@ export const UXAnalysisTool: React.FC = () => {
                   }}
                   showAnnotations={showAnnotations}
                   onToggleAnnotations={handleToggleAnnotations}
+                  onToolChange={handleGalleryToolChange}
+                  onAddComment={handleAddComment}
+                  currentTool={galleryTool}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">

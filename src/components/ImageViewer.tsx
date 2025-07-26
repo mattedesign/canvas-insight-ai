@@ -13,6 +13,9 @@ interface ImageViewerProps {
   onDeleteImage?: () => void;
   showAnnotations?: boolean;
   onToggleAnnotations?: () => void;
+  onToolChange?: (tool: 'hand' | 'cursor' | 'draw') => void;
+  onAddComment?: () => void;
+  currentTool?: 'hand' | 'cursor' | 'draw';
 }
 
 const AnnotationMarker: React.FC<{
@@ -54,6 +57,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   onDeleteImage,
   showAnnotations = true,
   onToggleAnnotations,
+  onToolChange,
+  onAddComment,
+  currentTool = 'hand',
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
@@ -187,8 +193,11 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
               onReset={resetTransform}
               onDelete={handleDelete}
               onToggleAnnotations={handleToggleAnnotations}
+              onToolChange={onToolChange}
+              onAddComment={onAddComment}
               showAnnotations={showAnnotations}
               zoomLevel={zoomLevel}
+              currentTool={currentTool}
             />
           </>
         )}
