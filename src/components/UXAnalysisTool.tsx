@@ -14,7 +14,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 export const UXAnalysisTool: React.FC = () => {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
-  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('gallery');
+  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('canvas');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
@@ -95,39 +95,37 @@ export const UXAnalysisTool: React.FC = () => {
       <div className="flex-1 relative">
         {showSummaryView ? (
           <SummaryDashboard analyses={analyses} />
+        ) : uploadedImages.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <ImageUploadZone onImageUpload={handleImageUpload} />
+          </div>
         ) : showCanvasView ? (
           <CanvasView uploadedImages={uploadedImages} analyses={analyses} />
         ) : (
-          uploadedImages.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <ImageUploadZone onImageUpload={handleImageUpload} />
-            </div>
-          ) : (
-            <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-              <ResizablePanel defaultSize={70} minSize={50}>
-                {selectedAnalysis ? (
-                  <ImageViewer
-                    analysis={selectedAnalysis}
-                    selectedAnnotations={viewerState.selectedAnnotations}
-                    onAnnotationClick={handleAnnotationClick}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    <p>Select an image to view details</p>
-                  </div>
-                )}
-              </ResizablePanel>
-              
-              <ResizableHandle withHandle />
-              
-              <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
-                <ContextualPanel
+          <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+            <ResizablePanel defaultSize={70} minSize={50}>
+              {selectedAnalysis ? (
+                <ImageViewer
                   analysis={selectedAnalysis}
                   selectedAnnotations={viewerState.selectedAnnotations}
+                  onAnnotationClick={handleAnnotationClick}
                 />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <p>Select an image to view details</p>
+                </div>
+              )}
+            </ResizablePanel>
+            
+            <ResizableHandle withHandle />
+            
+            <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
+              <ContextualPanel
+                analysis={selectedAnalysis}
+                selectedAnnotations={viewerState.selectedAnnotations}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
       </div>
     </div>
