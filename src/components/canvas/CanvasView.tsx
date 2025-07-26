@@ -67,7 +67,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         data: { 
           image,
           analysis,
-          showAnnotations
+          showAnnotations,
+          currentTool
         },
       };
       nodes.push(imageNode);
@@ -101,7 +102,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, showAnnotations, showAnalysis]);
+  }, [uploadedImages, analyses, showAnnotations, showAnalysis, currentTool]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
@@ -162,8 +163,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const handleToolChange = useCallback((tool: ToolMode) => {
     setCurrentTool(tool);
+    const toolMessages = {
+      hand: 'Hand/Move tool - Pan around the canvas',
+      cursor: 'Cursor tool - Select and move artboards',
+      draw: 'Draw tool - Paint regions for inpainting feedback'
+    };
     toast({
-      description: `Switched to ${tool} tool`,
+      description: toolMessages[tool],
     });
   }, [toast]);
 

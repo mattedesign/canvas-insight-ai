@@ -177,7 +177,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
                 <PenTool className="h-4 w-4" />
                 <div className="flex flex-col">
                   <span>Draw</span>
-                  <span className="text-xs text-muted-foreground">Drawing/annotation mode</span>
+                  <span className="text-xs text-muted-foreground">Paint regions for inpainting</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>

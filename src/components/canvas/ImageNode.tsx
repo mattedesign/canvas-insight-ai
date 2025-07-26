@@ -3,13 +3,15 @@ import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { AnnotationComment } from '@/components/AnnotationComment';
+import { AnnotationComment } from '../AnnotationComment';
+import { DrawingOverlay } from '../DrawingOverlay';
 import { useToast } from '@/hooks/use-toast';
 
 interface ImageNodeData {
   image: UploadedImage;
   analysis?: UXAnalysis;
   showAnnotations?: boolean;
+  currentTool?: 'hand' | 'cursor' | 'draw';
 }
 
 interface ImageNodeProps {
@@ -18,7 +20,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'hand' } = data;
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const { toast } = useToast();
@@ -75,6 +77,13 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     }
   }, [id, fitView]);
 
+  const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {
+    toast({
+      title: "Drawing Completed",
+      description: "Region marked for inpainting feedback",
+    });
+  }, [toast]);
+
   const activeAnnotation = analysis?.visualAnnotations.find(a => a.id === activeCommentId);
   const relatedSuggestions = analysis?.suggestions.filter(s => 
     s.relatedAnnotations.includes(activeCommentId || '')
@@ -89,6 +98,14 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           alt={image.name}
           className="w-full h-auto object-contain"
           style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
+        />
+
+        {/* Drawing Overlay for Draw Mode */}
+        <DrawingOverlay
+          imageUrl={image.url}
+          imageDimensions={image.dimensions}
+          isDrawMode={currentTool === 'draw'}
+          onDrawingComplete={handleDrawingComplete}
         />
         
         {/* Annotation Markers */}
