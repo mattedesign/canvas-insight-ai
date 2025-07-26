@@ -13,7 +13,8 @@ import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
-import { ConceptNode } from './ConceptNode';
+import { ConceptImageNode } from './ConceptImageNode';
+import { ConceptDetailsNode } from './ConceptDetailsNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +26,8 @@ import { Undo2, Redo2 } from 'lucide-react';
 const nodeTypes = {
   image: ImageNode,
   analysisCard: AnalysisCardNode,
-  concept: ConceptNode,
+  conceptImage: ConceptImageNode,
+  conceptDetails: ConceptDetailsNode,
 };
 
 interface CanvasViewProps {
@@ -118,25 +120,47 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         // Add concept nodes for this analysis
         const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
         conceptsForAnalysis.forEach((concept, conceptIndex) => {
-          const conceptXPosition = rightmostXPosition + (conceptIndex * (340 + horizontalSpacing));
-          const conceptNode: Node = {
-            id: `concept-${concept.id}`,
-            type: 'concept',
-            position: { x: conceptXPosition, y: yOffset },
+          const baseConceptXPosition = rightmostXPosition + (conceptIndex * (800 + horizontalSpacing));
+          
+          // Create concept image node (artboard)
+          const conceptImageNode: Node = {
+            id: `concept-image-${concept.id}`,
+            type: 'conceptImage',
+            position: { x: baseConceptXPosition, y: yOffset },
             data: { concept },
           };
-          nodes.push(conceptNode);
+          nodes.push(conceptImageNode);
 
-          // Create edge connecting analysis card to concept
-          const conceptEdge: Edge = {
-            id: `edge-${analysis.id}-${concept.id}`,
+          // Create concept details node (positioned to the right of image)
+          const conceptDetailsNode: Node = {
+            id: `concept-details-${concept.id}`,
+            type: 'conceptDetails',
+            position: { x: baseConceptXPosition + 400 + horizontalSpacing, y: yOffset },
+            data: { concept },
+          };
+          nodes.push(conceptDetailsNode);
+
+          // Create edge connecting analysis card to concept image
+          const conceptImageEdge: Edge = {
+            id: `edge-${analysis.id}-${concept.id}-image`,
             source: `card-${analysis.id}`,
-            target: `concept-${concept.id}`,
+            target: `concept-image-${concept.id}`,
             type: 'smoothstep',
             animated: true,
             style: { stroke: 'hsl(var(--secondary))' },
           };
-          edges.push(conceptEdge);
+          edges.push(conceptImageEdge);
+
+          // Create edge connecting concept image to concept details
+          const conceptDetailsEdge: Edge = {
+            id: `edge-${concept.id}-image-details`,
+            source: `concept-image-${concept.id}`,
+            target: `concept-details-${concept.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--accent))' },
+          };
+          edges.push(conceptDetailsEdge);
         });
       }
 
