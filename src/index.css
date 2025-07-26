@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Annotation overlay portal styles */
+body > .fixed {
+  pointer-events: none;
+}
+
+body > .fixed.pointer-events-auto {
+  pointer-events: auto;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

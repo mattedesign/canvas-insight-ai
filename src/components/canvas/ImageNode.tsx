@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { AnnotationComment } from '../AnnotationComment';
 import { DrawingOverlay } from '../DrawingOverlay';
 import { useToast } from '@/hooks/use-toast';
+import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -21,10 +21,11 @@ interface ImageNodeProps {
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const { image, analysis, showAnnotations = true, currentTool = 'hand' } = data;
-  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
-  const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const { toast } = useToast();
   const { fitView } = useReactFlow();
+  const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
+  const { calculateGlobalPosition } = useGlobalCoordinates();
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -38,24 +39,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         return 'bg-primary border-primary-foreground';
     }
   };
-
-  const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const imageRect = event.currentTarget.closest('.image-container')?.getBoundingClientRect();
-    
-    if (imageRect) {
-      setCommentPosition({
-        x: rect.left - imageRect.left,
-        y: rect.top - imageRect.top
-      });
-    }
-    
-    setActiveCommentId(annotation.id === activeCommentId ? null : annotation.id);
-  }, [activeCommentId]);
-
-  const handleCloseComment = useCallback(() => {
-    setActiveCommentId(null);
-  }, []);
 
   const handleRequestAnalysis = useCallback(async (prompt: string) => {
     toast({
@@ -71,6 +54,43 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     });
   }, [toast]);
 
+  const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
+    // If this annotation is already active, hide it
+    if (activeAnnotation?.annotation.id === annotation.id) {
+      hideAnnotation();
+      return;
+    }
+
+    const markerElement = event.currentTarget as HTMLElement;
+    const imageContainer = imageContainerRef.current;
+    
+    if (imageContainer) {
+      const markerRect = markerElement.getBoundingClientRect();
+      const globalPosition = calculateGlobalPosition(
+        imageContainer,
+        markerRect.left - imageContainer.getBoundingClientRect().left,
+        markerRect.top - imageContainer.getBoundingClientRect().top
+      );
+
+      const relatedSuggestions = analysis?.suggestions.filter(s => 
+        s.relatedAnnotations.includes(annotation.id)
+      ) || [];
+
+      showAnnotation({
+        annotation,
+        position: globalPosition,
+        relatedSuggestions,
+        onRequestAnalysis: handleRequestAnalysis,
+        onGenerateVariation: handleGenerateVariation
+      });
+    }
+  }, [activeAnnotation, hideAnnotation, calculateGlobalPosition, analysis, showAnnotation, handleRequestAnalysis, handleGenerateVariation]);
+
+  const handleCloseComment = useCallback(() => {
+    hideAnnotation();
+  }, [hideAnnotation]);
+
+
   const handleDoubleClick = useCallback(() => {
     if (id) {
       fitView({ nodes: [{ id }], duration: 800, maxZoom: 1 });
@@ -84,15 +104,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     });
   }, [toast]);
 
-  const activeAnnotation = analysis?.visualAnnotations.find(a => a.id === activeCommentId);
-  const relatedSuggestions = analysis?.suggestions.filter(s => 
-    s.relatedAnnotations.includes(activeCommentId || '')
-  ) || [];
   
   
   return (
     <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg" onDoubleClick={handleDoubleClick}>
-      <div className="relative image-container">
+      <div className="relative image-container" ref={imageContainerRef}>
         <img
           src={image.url}
           alt={image.name}
@@ -122,17 +138,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           />
         ))}
 
-        {/* Active Comment */}
-        {activeAnnotation && (
-          <AnnotationComment
-            annotation={activeAnnotation}
-            position={commentPosition}
-            onClose={handleCloseComment}
-            onRequestAnalysis={handleRequestAnalysis}
-            onGenerateVariation={handleGenerateVariation}
-            relatedSuggestions={relatedSuggestions}
-          />
-        )}
         
         {analysis && (
           <div className="absolute top-2 right-2 z-10">

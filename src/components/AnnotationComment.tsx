@@ -78,7 +78,7 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
 
   return (
     <div 
-      className="absolute z-50 animate-scale-in"
+      className="fixed z-50 animate-scale-in pointer-events-auto"
       style={{
         left: position.x + 20,
         top: position.y,

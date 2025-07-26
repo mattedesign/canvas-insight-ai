@@ -16,6 +16,7 @@ import { AnalysisCardNode } from './AnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
+import { AnnotationOverlayProvider } from '../AnnotationOverlay';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -196,7 +197,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
 
   return (
-    <div className="h-full w-full bg-background relative">
+    <AnnotationOverlayProvider>
+      <div className="h-full w-full bg-background relative">
       {/* Undo/Redo Controls */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <Button
@@ -269,6 +271,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           currentTool={currentTool}
         />
       </ReactFlow>
-    </div>
+      </div>
+    </AnnotationOverlayProvider>
   );
 };
