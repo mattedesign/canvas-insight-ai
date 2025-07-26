@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { UploadedImage, UXAnalysis } from '@/types/ux-analysis';
+import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { AnnotationComment } from '@/components/AnnotationComment';
+import { useToast } from '@/hooks/use-toast';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -16,6 +18,9 @@ interface ImageNodeProps {
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
   const { image, analysis, showAnnotations = true } = data;
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
+  const { toast } = useToast();
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -29,11 +34,48 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
         return 'bg-primary border-primary-foreground';
     }
   };
+
+  const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const imageRect = event.currentTarget.closest('.image-container')?.getBoundingClientRect();
+    
+    if (imageRect) {
+      setCommentPosition({
+        x: rect.left - imageRect.left,
+        y: rect.top - imageRect.top
+      });
+    }
+    
+    setActiveCommentId(annotation.id === activeCommentId ? null : annotation.id);
+  }, [activeCommentId]);
+
+  const handleCloseComment = useCallback(() => {
+    setActiveCommentId(null);
+  }, []);
+
+  const handleRequestAnalysis = useCallback(async (prompt: string) => {
+    toast({
+      title: "Analysis Requested",
+      description: "AI is analyzing your request and will provide insights shortly.",
+    });
+  }, [toast]);
+
+  const handleGenerateVariation = useCallback(async (prompt: string) => {
+    toast({
+      title: "Generating Variation", 
+      description: "Creating a new design variation based on your request.",
+    });
+  }, [toast]);
+
+  const activeAnnotation = analysis?.visualAnnotations.find(a => a.id === activeCommentId);
+  const relatedSuggestions = analysis?.suggestions.filter(s => 
+    s.relatedAnnotations.includes(activeCommentId || '')
+  ) || [];
   
   
   return (
     <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg">
-      <div className="relative">
+      <div className="relative image-container">
         <img
           src={image.url}
           alt={image.name}
@@ -45,18 +87,27 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
         {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => (
           <div
             key={annotation.id}
-            className={`absolute w-3 h-3 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 ${getMarkerColor(annotation.type)}`}
+            className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 ${getMarkerColor(annotation.type)}`}
             style={{
               left: `${annotation.x}%`,
               top: `${annotation.y}%`,
             }}
             title={annotation.title}
-            onClick={() => {
-              // Open annotation details - for now just log
-              console.log('Annotation clicked:', annotation);
-            }}
+            onClick={(e) => handleAnnotationClick(annotation, e)}
           />
         ))}
+
+        {/* Active Comment */}
+        {activeAnnotation && (
+          <AnnotationComment
+            annotation={activeAnnotation}
+            position={commentPosition}
+            onClose={handleCloseComment}
+            onRequestAnalysis={handleRequestAnalysis}
+            onGenerateVariation={handleGenerateVariation}
+            relatedSuggestions={relatedSuggestions}
+          />
+        )}
         
         {analysis && (
           <div className="absolute top-2 right-2">
