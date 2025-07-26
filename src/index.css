@@ -159,3 +159,19 @@ All colors MUST be HSL.
 .react-flow__node.dragging {
   cursor: grabbing;
 }
+
+/* Animation utilities */
+@keyframes scale-in {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}

@@ -1,8 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
+import { AnnotationComment } from './AnnotationComment';
+import { useToast } from '@/hooks/use-toast';
 
 interface ImageViewerProps {
   analysis: UXAnalysis;
@@ -13,7 +15,7 @@ interface ImageViewerProps {
 const AnnotationMarker: React.FC<{
   annotation: AnnotationPoint;
   isSelected: boolean;
-  onClick: () => void;
+  onClick: (annotation: AnnotationPoint, event: React.MouseEvent) => void;
 }> = ({ annotation, isSelected, onClick }) => {
   const getMarkerColor = () => {
     switch (annotation.type) {
@@ -35,7 +37,7 @@ const AnnotationMarker: React.FC<{
         left: `${annotation.x}%`,
         top: `${annotation.y}%`,
       }}
-      onClick={onClick}
+      onClick={(e) => onClick(annotation, e)}
       title={annotation.title}
     />
   );
@@ -46,6 +48,51 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   selectedAnnotations,
   onAnnotationClick,
 }) => {
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
+  const { toast } = useToast();
+
+  const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const imageRect = event.currentTarget.closest('.image-container')?.getBoundingClientRect();
+    
+    if (imageRect) {
+      setCommentPosition({
+        x: rect.left - imageRect.left,
+        y: rect.top - imageRect.top
+      });
+    }
+    
+    setActiveCommentId(annotation.id === activeCommentId ? null : annotation.id);
+    onAnnotationClick(annotation.id);
+  }, [activeCommentId, onAnnotationClick]);
+
+  const handleCloseComment = useCallback(() => {
+    setActiveCommentId(null);
+  }, []);
+
+  const handleRequestAnalysis = useCallback(async (prompt: string) => {
+    // Simulate AI analysis request
+    toast({
+      title: "Analysis Requested",
+      description: "AI is analyzing your request and will provide insights shortly.",
+    });
+    // Here you would integrate with your AI analysis service
+  }, [toast]);
+
+  const handleGenerateVariation = useCallback(async (prompt: string) => {
+    // Simulate variation generation
+    toast({
+      title: "Generating Variation",
+      description: "Creating a new design variation based on your request.",
+    });
+    // Here you would integrate with your design generation service
+  }, [toast]);
+
+  const activeAnnotation = analysis.visualAnnotations.find(a => a.id === activeCommentId);
+  const relatedSuggestions = analysis.suggestions.filter(s => 
+    s.relatedAnnotations.includes(activeCommentId || '')
+  );
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
@@ -88,7 +135,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
               wrapperClass="w-full h-full"
               contentClass="w-full h-full flex items-center justify-center"
             >
-              <div className="relative max-w-full max-h-full">
+              <div className="relative max-w-full max-h-full image-container">
                 <img
                   src={analysis.imageUrl}
                   alt={analysis.imageName}
@@ -102,9 +149,21 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
                     key={annotation.id}
                     annotation={annotation}
                     isSelected={selectedAnnotations.includes(annotation.id)}
-                    onClick={() => onAnnotationClick(annotation.id)}
+                    onClick={handleAnnotationClick}
                   />
                 ))}
+
+                {/* Active Comment */}
+                {activeAnnotation && (
+                  <AnnotationComment
+                    annotation={activeAnnotation}
+                    position={commentPosition}
+                    onClose={handleCloseComment}
+                    onRequestAnalysis={handleRequestAnalysis}
+                    onGenerateVariation={handleGenerateVariation}
+                    relatedSuggestions={relatedSuggestions}
+                  />
+                )}
               </div>
             </TransformComponent>
           </>
