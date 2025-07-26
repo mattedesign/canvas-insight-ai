@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { icon: Bell, label: 'Notifications', active: false },
     { icon: RotateCcw, label: 'History', active: false },
     { icon: Gem, label: 'Assets', active: false },
+    { icon: User, label: 'Profile', active: false },
   ];
 
   return (
@@ -155,12 +156,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      {/* User Avatar - Static, no active state */}
-      <div className="mt-auto">
-        <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-          <User className="w-5 h-5 text-primary-foreground" />
-        </div>
-      </div>
     </div>
   );
 };
