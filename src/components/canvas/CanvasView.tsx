@@ -10,15 +10,13 @@ import {
   Background,
   Controls,
   MiniMap,
-  NodeSelectionChange,
-  OnSelectionChangeParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
-import { ArtboardZoomHandler } from '@/hooks/useArtboardZoom';
+
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
 
@@ -99,7 +97,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
-  const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
+  
 
   const {
     saveState,
@@ -148,12 +146,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     [setEdges],
   );
 
-  const onSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: OnSelectionChangeParams) => {
-      setSelectedNodes(selectedNodes);
-    },
-    []
-  );
 
   return (
     <div className="h-full w-full bg-background relative">
@@ -203,19 +195,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
         panOnDrag
-        panOnScroll={selectedNodes.length === 0} // Disable global scroll zoom when artboard selected
-        zoomOnScroll={selectedNodes.length === 0} // Disable global scroll zoom when artboard selected
+        panOnScroll
+        zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick
         selectionOnDrag={false}
         className="bg-background"
         proOptions={{ hideAttribution: true }}
       >
-        <ArtboardZoomHandler selectedNodes={selectedNodes} />
+        
         <Background color="hsl(var(--muted))" />
         <Controls className="bg-background border border-border" />
         <MiniMap 
