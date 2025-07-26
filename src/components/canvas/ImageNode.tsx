@@ -12,6 +12,8 @@ interface ImageNodeData {
   analysis?: UXAnalysis;
   showAnnotations?: boolean;
   currentTool?: 'hand' | 'cursor' | 'draw';
+  onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
+  onImageSelect?: (imageId: string) => void;
 }
 
 interface ImageNodeProps {
@@ -20,7 +22,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'hand' } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'hand', onViewChange, onImageSelect } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
@@ -92,10 +94,17 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
 
   const handleDoubleClick = useCallback(() => {
-    if (id) {
+    if (onViewChange && onImageSelect) {
+      onViewChange('gallery');
+      onImageSelect(image.id);
+      toast({
+        title: "Switched to Gallery View",
+        description: `Now viewing ${image.name} in detail`,
+      });
+    } else if (id) {
       fitView({ nodes: [{ id }], duration: 800, maxZoom: 1 });
     }
-  }, [id, fitView]);
+  }, [id, fitView, onViewChange, onImageSelect, image.id, image.name, toast]);
 
   const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {
     toast({

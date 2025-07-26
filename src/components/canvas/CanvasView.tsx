@@ -31,6 +31,8 @@ interface CanvasViewProps {
   analyses: UXAnalysis[];
   showAnnotations: boolean;
   onToggleAnnotations?: () => void;
+  onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
+  onImageSelect?: (imageId: string) => void;
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
@@ -38,6 +40,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   analyses,
   showAnnotations,
   onToggleAnnotations,
+  onViewChange,
+  onImageSelect
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('hand');
   const [showAnalysis, setShowAnalysis] = useState(true);
@@ -69,7 +73,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           image,
           analysis,
           showAnnotations,
-          currentTool
+          currentTool,
+          onViewChange,
+          onImageSelect
         },
       };
       nodes.push(imageNode);

@@ -138,6 +138,8 @@ export const UXAnalysisTool: React.FC = () => {
             analyses={analyses} 
             showAnnotations={showAnnotations}
             onToggleAnnotations={handleToggleAnnotations}
+            onViewChange={setSelectedView}
+            onImageSelect={handleImageSelect}
           />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="w-full h-full">
@@ -147,6 +149,7 @@ export const UXAnalysisTool: React.FC = () => {
                   analysis={selectedAnalysis}
                   selectedAnnotations={viewerState.selectedAnnotations}
                   onAnnotationClick={handleAnnotationClick}
+                  onViewChange={setSelectedView}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">

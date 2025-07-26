@@ -1,6 +1,6 @@
 import React, { memo, useState, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Grid3X3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { AnnotationComment } from './AnnotationComment';
@@ -10,6 +10,7 @@ interface ImageViewerProps {
   analysis: UXAnalysis;
   selectedAnnotations: string[];
   onAnnotationClick: (annotationId: string) => void;
+  onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
 }
 
 const AnnotationMarker: React.FC<{
@@ -47,6 +48,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   analysis,
   selectedAnnotations,
   onAnnotationClick,
+  onViewChange,
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
@@ -117,6 +119,17 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           <>
             {/* Controls */}
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+              {onViewChange && (
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => onViewChange('canvas')}
+                  className="bg-background/90 backdrop-blur-sm"
+                  title="Back to Canvas View"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 size="icon"
                 variant="outline"

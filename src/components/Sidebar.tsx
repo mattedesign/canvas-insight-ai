@@ -83,10 +83,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onViewChange('gallery')}
             className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
               ${selectedView === 'gallery'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }
             `}
             title="Gallery View"
@@ -97,10 +97,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onViewChange('canvas')}
             className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
               ${selectedView === 'canvas'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }
             `}
             title="Canvas View"
@@ -111,10 +111,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onViewChange('summary')}
             className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
               ${selectedView === 'summary'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }
             `}
             title="Summary View"
@@ -130,10 +130,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onToggleAnnotations}
             className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
               ${showAnnotations
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }
             `}
             title={showAnnotations ? "Hide Annotations" : "Show Annotations"}
