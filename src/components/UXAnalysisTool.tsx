@@ -7,13 +7,14 @@ import { Sidebar } from './Sidebar';
 import { SummaryDashboard } from './summary/SummaryDashboard';
 import { ImageViewer } from './ImageViewer';
 import { ContextualPanel } from './ContextualPanel';
+import { CanvasView } from './canvas/CanvasView';
 import { useImageViewer } from '@/hooks/useImageViewer';
 
 
 export const UXAnalysisTool: React.FC = () => {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
-  const [selectedView, setSelectedView] = useState<'gallery' | 'summary'>('gallery');
+  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('gallery');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
@@ -75,6 +76,7 @@ export const UXAnalysisTool: React.FC = () => {
   }, [toggleAnnotation]);
 
   const showGalleryView = selectedView === 'gallery';
+  const showCanvasView = selectedView === 'canvas';
   const showSummaryView = selectedView === 'summary';
   const selectedAnalysis = selectedImageId ? analyses.find(a => a.imageId === selectedImageId) : null;
 
@@ -93,6 +95,8 @@ export const UXAnalysisTool: React.FC = () => {
       <div className="flex-1 relative">
         {showSummaryView ? (
           <SummaryDashboard analyses={analyses} />
+        ) : showCanvasView ? (
+          <CanvasView uploadedImages={uploadedImages} analyses={analyses} />
         ) : (
           uploadedImages.length === 0 ? (
             <div className="h-full flex items-center justify-center">

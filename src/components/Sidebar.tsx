@@ -8,7 +8,8 @@ import {
   Plus,
   Eye,
   BarChart3,
-  Trash2
+  Trash2,
+  Network
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 
@@ -16,8 +17,8 @@ interface SidebarProps {
   onClearCanvas: () => void;
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
-  selectedView: 'gallery' | 'summary';
-  onViewChange: (view: 'gallery' | 'summary') => void;
+  selectedView: 'gallery' | 'canvas' | 'summary';
+  onViewChange: (view: 'gallery' | 'canvas' | 'summary') => void;
   selectedImageId: string | null;
   onImageSelect: (imageId: string) => void;
 }
@@ -66,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Image List */}
-      {uploadedImages.length > 0 && selectedView === 'gallery' && (
+      {uploadedImages.length > 0 && (selectedView === 'gallery' || selectedView === 'canvas') && (
         <div className="flex flex-col space-y-2 mt-8 max-h-64 overflow-y-auto">
           {uploadedImages.map((image) => (
             <button
@@ -103,8 +104,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
               }
             `}
+            title="Gallery View"
           >
             <Eye className="w-5 h-5" />
+          </button>
+          
+          <button
+            onClick={() => onViewChange('canvas')}
+            className={`
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              ${selectedView === 'canvas'
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+              }
+            `}
+            title="Canvas View"
+          >
+            <Network className="w-5 h-5" />
           </button>
           
           <button
@@ -116,6 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
               }
             `}
+            title="Summary View"
           >
             <BarChart3 className="w-5 h-5" />
           </button>
