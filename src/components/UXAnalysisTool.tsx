@@ -17,6 +17,7 @@ import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { ImageUploadZone } from './ImageUploadZone';
 import { Sidebar } from './Sidebar';
+import { SummaryDashboard } from './summary/SummaryDashboard';
 import { ImageNode } from './nodes/ImageNode';
 import { SuggestionNode } from './nodes/SuggestionNode';
 import { AnnotationNode } from './nodes/AnnotationNode';
@@ -108,6 +109,9 @@ export const UXAnalysisTool: React.FC = () => {
     setAnalyses([]);
   }, [setNodes, setEdges]);
 
+  const showGalleryView = selectedView === 'gallery';
+  const showSummaryView = selectedView === 'summary';
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
@@ -119,53 +123,60 @@ export const UXAnalysisTool: React.FC = () => {
       />
       
       <div className="flex-1 relative">
-        {nodes.length === 0 ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <ImageUploadZone onImageUpload={handleImageUpload} />
-          </div>
-        ) : null}
-
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          style={{ backgroundColor: 'hsl(var(--canvas-bg))' }}
-          attributionPosition="bottom-left"
-        >
-          <Controls />
-          <Background gap={20} size={1} color="hsl(var(--border))" />
-          
-          {nodes.length > 0 && (
-            <Panel position="top-right" className="bg-card border rounded-lg p-4 shadow-md">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedView('gallery')}
-                  className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                    selectedView === 'gallery' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground hover:bg-accent'
-                  }`}
-                >
-                  Gallery
-                </button>
-                <button
-                  onClick={() => setSelectedView('summary')}
-                  className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                    selectedView === 'summary' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground hover:bg-accent'
-                  }`}
-                >
-                  Summary
-                </button>
+        {/* Show Summary Dashboard or Canvas */}
+        {showSummaryView ? (
+          <SummaryDashboard analyses={analyses} />
+        ) : (
+          <>
+            {nodes.length === 0 ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center">
+                <ImageUploadZone onImageUpload={handleImageUpload} />
               </div>
-            </Panel>
-          )}
-        </ReactFlow>
+            ) : null}
+
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              fitView
+              style={{ backgroundColor: 'hsl(var(--canvas-bg))' }}
+              attributionPosition="bottom-left"
+            >
+              <Controls />
+              <Background gap={20} size={1} color="hsl(var(--border))" />
+              
+              {nodes.length > 0 && (
+                <Panel position="top-right" className="bg-card border rounded-lg p-4 shadow-md">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedView('gallery')}
+                      className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                        showGalleryView
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      Gallery
+                    </button>
+                    <button
+                      onClick={() => setSelectedView('summary')}
+                      className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                        showSummaryView
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      Summary
+                    </button>
+                  </div>
+                </Panel>
+              )}
+            </ReactFlow>
+          </>
+        )}
       </div>
     </div>
   );
