@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
@@ -74,6 +74,19 @@ export const UXAnalysisTool: React.FC = () => {
   const handleAnnotationClick = useCallback((annotationId: string) => {
     toggleAnnotation(annotationId);
   }, [toggleAnnotation]);
+
+  // Handle escape key to close overlay (deselect image)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selectedImageId) {
+        setSelectedImageId(null);
+        clearAnnotations();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedImageId, clearAnnotations]);
 
   const showGalleryView = selectedView === 'gallery';
   const showCanvasView = selectedView === 'canvas';
