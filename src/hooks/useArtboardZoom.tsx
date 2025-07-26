@@ -1,12 +1,12 @@
-import { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { useReactFlow, Node } from '@xyflow/react';
 
-interface UseArtboardZoomProps {
+interface ArtboardZoomHandlerProps {
   selectedNodes: Node[];
 }
 
-export const useArtboardZoom = ({ selectedNodes }: UseArtboardZoomProps) => {
-  const { setViewport, getViewport, getNode } = useReactFlow();
+export const ArtboardZoomHandler: React.FC<ArtboardZoomHandlerProps> = ({ selectedNodes }) => {
+  const { setViewport, getViewport } = useReactFlow();
   const wheelHandlerRef = useRef<((event: WheelEvent) => void) | null>(null);
 
   const zoomToArtboard = useCallback((node: Node, zoomDelta: number) => {
@@ -88,5 +88,5 @@ export const useArtboardZoom = ({ selectedNodes }: UseArtboardZoomProps) => {
     };
   }, [handleWheel, selectedNodes]);
 
-  return { zoomToArtboard };
+  return null; // This component doesn't render anything
 };

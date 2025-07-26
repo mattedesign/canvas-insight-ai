@@ -18,7 +18,7 @@ import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
-import { useArtboardZoom } from '@/hooks/useArtboardZoom';
+import { ArtboardZoomHandler } from '@/hooks/useArtboardZoom';
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
 
@@ -109,9 +109,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     canRedo,
     setIsUpdating,
   } = useUndoRedo(initialElements.nodes, initialElements.edges);
-
-  // Initialize artboard zoom functionality
-  useArtboardZoom({ selectedNodes });
 
   // Save state when nodes or edges change
   useEffect(() => {
@@ -218,6 +215,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         className="bg-background"
         proOptions={{ hideAttribution: true }}
       >
+        <ArtboardZoomHandler selectedNodes={selectedNodes} />
         <Background color="hsl(var(--muted))" />
         <Controls className="bg-background border border-border" />
         <MiniMap 
