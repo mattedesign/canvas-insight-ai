@@ -17,6 +17,7 @@ export const UXAnalysisTool: React.FC = () => {
   const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('canvas');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
+  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -80,6 +81,19 @@ export const UXAnalysisTool: React.FC = () => {
     toggleAnnotation(annotationId);
   }, [toggleAnnotation]);
 
+  const handleAddImages = useCallback(() => {
+    fileInputRef?.click();
+  }, [fileInputRef]);
+
+  const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      handleImageUpload(files);
+    }
+    // Reset input value to allow selecting the same file again
+    event.target.value = '';
+  }, [handleImageUpload]);
+
 
   const showGalleryView = selectedView === 'gallery';
   const showCanvasView = selectedView === 'canvas';
@@ -88,8 +102,19 @@ export const UXAnalysisTool: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Hidden file input */}
+      <input
+        ref={setFileInputRef}
+        type="file"
+        accept="image/*,.html"
+        multiple
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+      
       <Sidebar 
         onClearCanvas={handleClearCanvas}
+        onAddImages={handleAddImages}
         uploadedImages={uploadedImages}
         analyses={analyses}
         selectedView={selectedView}

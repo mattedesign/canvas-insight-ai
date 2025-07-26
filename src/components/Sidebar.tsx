@@ -17,6 +17,7 @@ import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 
 interface SidebarProps {
   onClearCanvas: () => void;
+  onAddImages: () => void;
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
   selectedView: 'gallery' | 'canvas' | 'summary';
@@ -29,6 +30,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   onClearCanvas,
+  onAddImages,
   uploadedImages,
   analyses,
   selectedView,
@@ -59,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {sidebarIcons.map((item, index) => (
           <button
             key={index}
+            onClick={item.label === 'Add' ? onAddImages : undefined}
             className={`
               w-10 h-10 rounded-lg flex items-center justify-center transition-all
               ${item.active 
@@ -66,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
               }
             `}
+            title={item.label === 'Add' ? 'Add Images' : item.label}
           >
             <item.icon className="w-5 h-5" />
           </button>
