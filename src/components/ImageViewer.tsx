@@ -38,12 +38,16 @@ const AnnotationMarker: React.FC<{
 
   return (
     <div
-      className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 ${getMarkerColor()}`}
+      className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-10 ${getMarkerColor()}`}
       style={{
         left: `${annotation.x}%`,
         top: `${annotation.y}%`,
+        pointerEvents: 'auto', // Ensure annotations can be clicked
       }}
-      onClick={(e) => onClick(annotation, e)}
+      onClick={(e) => {
+        e.stopPropagation(); // Prevent event bubbling
+        onClick(annotation, e);
+      }}
       title={annotation.title}
     />
   );
@@ -138,6 +142,12 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     }
   }, [onToggleAnnotations]);
 
+  const handleImageDoubleClick = useCallback(() => {
+    if (onViewChange) {
+      onViewChange('canvas');
+    }
+  }, [onViewChange]);
+
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
@@ -146,6 +156,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         maxScale={5}
         centerOnInit
         onTransformed={handleZoomChange}
+        disabled={currentTool === 'draw'} // Only disable pan/zoom when drawing
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
@@ -158,8 +169,10 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
                 <img
                   src={analysis.imageUrl}
                   alt={analysis.imageName}
-                  className="max-w-full max-h-full object-contain"
+                  className="max-w-full max-h-full object-contain cursor-pointer"
                   style={{ maxWidth: '100%', height: 'auto' }}
+                  onDoubleClick={handleImageDoubleClick}
+                  title="Double-click to switch to canvas view"
                 />
                 
                 {/* Annotation Markers */}

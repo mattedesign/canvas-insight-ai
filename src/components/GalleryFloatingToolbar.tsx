@@ -96,7 +96,7 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
       case 'draw':
         return 'Draw';
       default:
-        return 'Move';
+        return 'View'; // Changed from 'Move' to 'View' for gallery context
     }
   };
 
@@ -119,8 +119,8 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
                   <DropdownMenuItem onClick={() => onToolChange('hand')} className="gap-2">
                     <Hand className="h-4 w-4" />
                     <div className="flex flex-col">
-                      <span>Hand/Move</span>
-                      <span className="text-xs text-muted-foreground">Pan and navigate</span>
+                      <span>View Mode</span>
+                      <span className="text-xs text-muted-foreground">Pan, zoom, and interact with annotations</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onToolChange('cursor')} className="gap-2">
