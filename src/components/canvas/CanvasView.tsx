@@ -264,6 +264,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         elementsSelectable={currentTool === 'cursor'}
         className={`bg-background tool-${currentTool}`}
         proOptions={{ hideAttribution: true }}
+        zoomActivationKeyCode={['Meta', 'Control']}
       >
         
         <Background color="hsl(var(--muted))" />
