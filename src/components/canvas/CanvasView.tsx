@@ -8,14 +8,14 @@ import {
   Edge,
   Node,
   Background,
-  Controls,
-  MiniMap,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
+import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -29,13 +29,18 @@ interface CanvasViewProps {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
   showAnnotations: boolean;
+  onToggleAnnotations?: () => void;
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
   uploadedImages,
   analyses,
   showAnnotations,
+  onToggleAnnotations,
 }) => {
+  const [currentTool, setCurrentTool] = useState<ToolMode>('hand');
+  const [showAnalysis, setShowAnalysis] = useState(true);
+  const { toast } = useToast();
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
     const nodes: Node[] = [];
@@ -67,8 +72,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       };
       nodes.push(imageNode);
 
-      // Create analysis card node if analysis exists
-      if (analysis) {
+      // Create analysis card node if analysis exists and showAnalysis is true
+      if (analysis && showAnalysis) {
         const cardXPosition = 50 + displayWidth + horizontalSpacing;
         const cardNode: Node = {
           id: `card-${analysis.id}`,
@@ -96,7 +101,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, showAnnotations]);
+  }, [uploadedImages, analyses, showAnnotations, showAnalysis]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
@@ -155,6 +160,34 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     [setEdges],
   );
 
+  const handleToolChange = useCallback((tool: ToolMode) => {
+    setCurrentTool(tool);
+    toast({
+      description: `Switched to ${tool} tool`,
+    });
+  }, [toast]);
+
+  const handleToggleAnnotations = useCallback(() => {
+    onToggleAnnotations?.();
+    toast({
+      description: `Annotations ${showAnnotations ? 'hidden' : 'shown'}`,
+    });
+  }, [onToggleAnnotations, showAnnotations, toast]);
+
+  const handleToggleAnalysis = useCallback(() => {
+    setShowAnalysis(prev => !prev);
+    toast({
+      description: `Analysis ${showAnalysis ? 'hidden' : 'shown'}`,
+    });
+  }, [showAnalysis, toast]);
+
+  const handleAddComment = useCallback(() => {
+    toast({
+      title: "Add Comment Mode",
+      description: "Click on an artboard to add a new annotation",
+    });
+  }, [toast]);
+
 
   return (
     <div className="h-full w-full bg-background relative">
@@ -206,24 +239,30 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        panOnDrag
-        panOnScroll
+        panOnDrag={currentTool === 'hand'}
+        panOnScroll={currentTool === 'hand'}
         zoomOnScroll
         zoomOnPinch
-        zoomOnDoubleClick
-        selectionOnDrag={false}
-        className="bg-background"
+        zoomOnDoubleClick={currentTool !== 'draw'}
+        selectionOnDrag={currentTool === 'cursor'}
+        className={`bg-background tool-${currentTool}`}
         proOptions={{ hideAttribution: true }}
       >
         
         <Background color="hsl(var(--muted))" />
-        <Controls className="bg-background border border-border" />
-        {/* MiniMap hidden for now - can be made optional in display settings later */}
-        {/* <MiniMap 
-          className="bg-background border border-border" 
-          nodeColor="hsl(var(--primary))"
-        /> */}
+        {/* Custom controls are now in FloatingToolbar */}
       </ReactFlow>
+
+      {/* Floating Toolbar */}
+      <FloatingToolbar
+        onToolChange={handleToolChange}
+        onToggleAnnotations={handleToggleAnnotations}
+        onToggleAnalysis={handleToggleAnalysis}
+        onAddComment={handleAddComment}
+        showAnnotations={showAnnotations}
+        showAnalysis={showAnalysis}
+        currentTool={currentTool}
+      />
     </div>
   );
 };

@@ -160,6 +160,23 @@ All colors MUST be HSL.
   cursor: grabbing;
 }
 
+/* Tool Mode Cursor Styles */
+.react-flow__pane.tool-hand {
+  cursor: grab;
+}
+
+.react-flow__pane.tool-hand:active {
+  cursor: grabbing;
+}
+
+.react-flow__pane.tool-cursor {
+  cursor: default;
+}
+
+.react-flow__pane.tool-draw {
+  cursor: crosshair;
+}
+
 /* Animation utilities */
 @keyframes scale-in {
   0% {

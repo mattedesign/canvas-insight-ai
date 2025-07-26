@@ -133,7 +133,12 @@ export const UXAnalysisTool: React.FC = () => {
             <ImageUploadZone onImageUpload={handleImageUpload} />
           </div>
         ) : showCanvasView ? (
-          <CanvasView uploadedImages={uploadedImages} analyses={analyses} showAnnotations={showAnnotations} />
+          <CanvasView 
+            uploadedImages={uploadedImages} 
+            analyses={analyses} 
+            showAnnotations={showAnnotations}
+            onToggleAnnotations={handleToggleAnnotations}
+          />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="w-full h-full">
             <ResizablePanel defaultSize={70} minSize={50}>

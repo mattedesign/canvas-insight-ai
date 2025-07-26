@@ -1,0 +1,272 @@
+import React, { useState, useCallback } from 'react';
+import { useReactFlow } from '@xyflow/react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Hand, 
+  MousePointer, 
+  PenTool, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw,
+  Maximize,
+  MessageSquarePlus,
+  MessageCircle,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Target
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { ChatPanel } from './ChatPanel';
+
+export type ToolMode = 'hand' | 'cursor' | 'draw';
+
+interface FloatingToolbarProps {
+  onToolChange: (tool: ToolMode) => void;
+  onToggleAnnotations: () => void;
+  onToggleAnalysis: () => void;
+  onAddComment: () => void;
+  showAnnotations: boolean;
+  showAnalysis: boolean;
+  currentTool: ToolMode;
+}
+
+export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
+  onToolChange,
+  onToggleAnnotations,
+  onToggleAnalysis,
+  onAddComment,
+  showAnnotations,
+  showAnalysis,
+  currentTool
+}) => {
+  const { zoomIn, zoomOut, zoomTo, fitView, getZoom } = useReactFlow();
+  const { toast } = useToast();
+  const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  // Update zoom level when zoom changes
+  React.useEffect(() => {
+    const updateZoom = () => {
+      const currentZoom = getZoom();
+      setZoomLevel(Math.round(currentZoom * 100));
+    };
+    
+    // Update immediately
+    updateZoom();
+    
+    // Set up an interval to check zoom changes
+    const interval = setInterval(updateZoom, 100);
+    return () => clearInterval(interval);
+  }, [getZoom]);
+
+  const handleZoomIn = useCallback(() => {
+    zoomIn();
+    toast({ description: "Zoomed in" });
+  }, [zoomIn, toast]);
+
+  const handleZoomOut = useCallback(() => {
+    zoomOut();
+    toast({ description: "Zoomed out" });
+  }, [zoomOut, toast]);
+
+  const handleZoomTo100 = useCallback(() => {
+    zoomTo(1);
+    setZoomLevel(100);
+    toast({ description: "Zoom set to 100%" });
+  }, [zoomTo, toast]);
+
+  const handleZoomTo200 = useCallback(() => {
+    zoomTo(2);
+    setZoomLevel(200);
+    toast({ description: "Zoom set to 200%" });
+  }, [zoomTo, toast]);
+
+  const handleFitView = useCallback(() => {
+    fitView({ duration: 800, padding: 0.1 });
+    toast({ description: "Fit to view" });
+  }, [fitView, toast]);
+
+  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.key) {
+        case '+':
+        case '=':
+          event.preventDefault();
+          handleZoomIn();
+          break;
+        case '-':
+          event.preventDefault();
+          handleZoomOut();
+          break;
+        case '0':
+          event.preventDefault();
+          handleZoomTo100();
+          break;
+        case '1':
+          event.preventDefault();
+          handleFitView();
+          break;
+        case '2':
+          event.preventDefault();
+          handleZoomTo200();
+          break;
+      }
+    }
+  }, [handleZoomIn, handleZoomOut, handleZoomTo100, handleFitView, handleZoomTo200]);
+
+  React.useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardShortcuts);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcuts);
+  }, [handleKeyboardShortcuts]);
+
+  const getToolIcon = () => {
+    switch (currentTool) {
+      case 'cursor':
+        return <MousePointer className="h-4 w-4" />;
+      case 'draw':
+        return <PenTool className="h-4 w-4" />;
+      default:
+        return <Hand className="h-4 w-4" />;
+    }
+  };
+
+  const getToolLabel = () => {
+    switch (currentTool) {
+      case 'cursor':
+        return 'Cursor';
+      case 'draw':
+        return 'Draw';
+      default:
+        return 'Move';
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="flex items-center bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-lg p-2 gap-1">
+          {/* Move Tool Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 px-3 gap-1">
+                {getToolIcon()}
+                <span className="text-xs font-medium">{getToolLabel()}</span>
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-background/95 backdrop-blur-sm">
+              <DropdownMenuItem onClick={() => onToolChange('hand')} className="gap-2">
+                <Hand className="h-4 w-4" />
+                <div className="flex flex-col">
+                  <span>Hand/Move</span>
+                  <span className="text-xs text-muted-foreground">Default pan mode</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onToolChange('cursor')} className="gap-2">
+                <MousePointer className="h-4 w-4" />
+                <div className="flex flex-col">
+                  <span>Cursor</span>
+                  <span className="text-xs text-muted-foreground">Select and move artboards</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onToolChange('draw')} className="gap-2">
+                <PenTool className="h-4 w-4" />
+                <div className="flex flex-col">
+                  <span>Draw</span>
+                  <span className="text-xs text-muted-foreground">Drawing/annotation mode</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          {/* Zoom Controls */}
+          <DropdownMenu open={isZoomMenuOpen} onOpenChange={setIsZoomMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 px-3 gap-1">
+                <span className="text-xs font-medium">{zoomLevel}%</span>
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="bg-background/95 backdrop-blur-sm w-48">
+              <DropdownMenuItem onClick={handleZoomIn} className="gap-2">
+                <ZoomIn className="h-4 w-4" />
+                <span>Zoom in</span>
+                <span className="ml-auto text-xs text-muted-foreground">⌘+</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleZoomOut} className="gap-2">
+                <ZoomOut className="h-4 w-4" />
+                <span>Zoom out</span>
+                <span className="ml-auto text-xs text-muted-foreground">⌘-</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleZoomTo100} className="gap-2">
+                <RotateCcw className="h-4 w-4" />
+                <span>Zoom to 100%</span>
+                <span className="ml-auto text-xs text-muted-foreground">⌘0</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleZoomTo200} className="gap-2">
+                <Target className="h-4 w-4" />
+                <span>Zoom to 200%</span>
+                <span className="ml-auto text-xs text-muted-foreground">⌘2</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleFitView} className="gap-2">
+                <Maximize className="h-4 w-4" />
+                <span>Zoom to fit</span>
+                <span className="ml-auto text-xs text-muted-foreground">⌘1</span>
+              </DropdownMenuItem>
+              <Separator className="my-1" />
+              <DropdownMenuItem onClick={onToggleAnnotations} className="gap-2">
+                {showAnnotations ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                <span>Annotations</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {showAnnotations ? 'On' : 'Off'}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleAnalysis} className="gap-2">
+                {showAnalysis ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                <span>Analysis</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {showAnalysis ? 'On' : 'Off'}
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          {/* Add Comment Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={onAddComment}
+            title="Add comment"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+          </Button>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          {/* Chat Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => setIsChatOpen(true)}
+            title="Open chat"
+          >
+            <MessageCircle className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Chat Panel */}
+      <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+    </>
+  );
+};
