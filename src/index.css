@@ -138,3 +138,24 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* React Flow Canvas Cursor Styles */
+.react-flow__pane {
+  cursor: grab;
+}
+
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node:hover {
+  cursor: move;
+}
+
+.react-flow__node.dragging {
+  cursor: grabbing;
+}

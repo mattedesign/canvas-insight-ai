@@ -194,6 +194,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        panOnDrag
+        selectionOnDrag={false}
         className="bg-background"
         proOptions={{ hideAttribution: true }}
       >
