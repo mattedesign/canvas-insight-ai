@@ -197,17 +197,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
             View
           </Button>
         </div>
-        
-        {analysis && (
-          <div className="space-y-2">
-            <div className="text-sm text-muted-foreground">
-              Issues: {analysis.summary.keyIssues.length}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Suggestions: {analysis.suggestions.length}
-            </div>
-          </div>
-        )}
       </div>
       
       {analysis && (
