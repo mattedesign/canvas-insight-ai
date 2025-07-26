@@ -13,7 +13,7 @@ interface ImageNodeData {
   image: UploadedImage;
   analysis?: UXAnalysis;
   showAnnotations?: boolean;
-  currentTool?: 'hand' | 'cursor' | 'draw';
+  currentTool?: 'cursor' | 'draw';
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
 }
@@ -24,7 +24,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'hand', onViewChange, onImageSelect } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
