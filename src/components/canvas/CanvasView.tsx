@@ -10,9 +10,10 @@ import {
   Background,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
+import { ConceptNode } from './ConceptNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
@@ -24,24 +25,29 @@ import { Undo2, Redo2 } from 'lucide-react';
 const nodeTypes = {
   image: ImageNode,
   analysisCard: AnalysisCardNode,
+  concept: ConceptNode,
 };
 
 interface CanvasViewProps {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
+  generatedConcepts: GeneratedConcept[];
   showAnnotations: boolean;
   onToggleAnnotations?: () => void;
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
+  onGenerateConcept?: (analysisId: string) => Promise<void>;
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
   uploadedImages,
   analyses,
+  generatedConcepts,
   showAnnotations,
   onToggleAnnotations,
   onViewChange,
-  onImageSelect
+  onImageSelect,
+  onGenerateConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('hand');
   const [showAnalysis, setShowAnalysis] = useState(true);
@@ -80,14 +86,19 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       };
       nodes.push(imageNode);
 
+      let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
+
       // Create analysis card node if analysis exists and showAnalysis is true
       if (analysis && showAnalysis) {
-        const cardXPosition = 50 + displayWidth + horizontalSpacing;
+        const cardXPosition = rightmostXPosition;
         const cardNode: Node = {
           id: `card-${analysis.id}`,
           type: 'analysisCard',
           position: { x: cardXPosition, y: yOffset },
-          data: { analysis },
+          data: { 
+            analysis,
+            onGenerateConcept
+          },
         };
         nodes.push(cardNode);
 
@@ -101,6 +112,32 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           style: { stroke: 'hsl(var(--primary))' },
         };
         edges.push(edge);
+
+        rightmostXPosition += 400 + horizontalSpacing; // Card width + spacing
+
+        // Add concept nodes for this analysis
+        const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+        conceptsForAnalysis.forEach((concept, conceptIndex) => {
+          const conceptXPosition = rightmostXPosition + (conceptIndex * (340 + horizontalSpacing));
+          const conceptNode: Node = {
+            id: `concept-${concept.id}`,
+            type: 'concept',
+            position: { x: conceptXPosition, y: yOffset },
+            data: { concept },
+          };
+          nodes.push(conceptNode);
+
+          // Create edge connecting analysis card to concept
+          const conceptEdge: Edge = {
+            id: `edge-${analysis.id}-${concept.id}`,
+            source: `card-${analysis.id}`,
+            target: `concept-${concept.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--secondary))' },
+          };
+          edges.push(conceptEdge);
+        });
       }
 
       // Calculate spacing for next image based on current image height
@@ -109,7 +146,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, showAnnotations, showAnalysis, currentTool]);
+  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);

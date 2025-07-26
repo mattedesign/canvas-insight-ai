@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { UXAnalysis } from '@/types/ux-analysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, CheckCircle, Lightbulb } from 'lucide-react';
+import { AlertCircle, CheckCircle, Lightbulb, Sparkles, Loader2 } from 'lucide-react';
 
 interface AnalysisCardNodeData {
   analysis: UXAnalysis;
+  onGenerateConcept?: (analysisId: string) => Promise<void>;
 }
 
 interface AnalysisCardNodeProps {
@@ -15,7 +17,8 @@ interface AnalysisCardNodeProps {
 }
 
 export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
-  const { analysis } = data;
+  const { analysis, onGenerateConcept } = data;
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -27,6 +30,19 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     if (score >= 80) return 'default';
     if (score >= 60) return 'secondary';
     return 'destructive';
+  };
+
+  const handleGenerateConcept = async () => {
+    if (!onGenerateConcept || isGenerating) return;
+    
+    setIsGenerating(true);
+    try {
+      await onGenerateConcept(analysis.id);
+    } catch (error) {
+      console.error('Failed to generate concept:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -107,7 +123,35 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
             {analysis.suggestions.length}
           </Badge>
         </div>
+        
+        {/* Generate Concept Button */}
+        <div className="pt-2">
+          <Button 
+            onClick={handleGenerateConcept} 
+            disabled={isGenerating}
+            className="w-full"
+            variant="default"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Improved Concept
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
+      
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="bg-primary border-2 border-background"
+      />
     </Card>
   );
 };

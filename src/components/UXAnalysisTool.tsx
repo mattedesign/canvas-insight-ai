@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
-import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { ImageUploadZone } from './ImageUploadZone';
 import { Sidebar } from './Sidebar';
@@ -14,6 +14,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 export const UXAnalysisTool: React.FC = () => {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
+  const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
   const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('canvas');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
@@ -62,9 +63,34 @@ export const UXAnalysisTool: React.FC = () => {
     }
   }, [selectedImageId]);
 
+  const handleGenerateConcept = useCallback(async (analysisId: string) => {
+    // Simulate concept generation with mock data
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate AI processing time
+    
+    const conceptId = `concept-${Date.now()}`;
+    const mockConcept: GeneratedConcept = {
+      id: conceptId,
+      analysisId,
+      imageUrl: `https://picsum.photos/400/300?random=${Date.now()}`, // Mock generated image
+      title: "Enhanced User Experience Design",
+      description: "An improved version of the interface with better accessibility, clearer visual hierarchy, and enhanced user flow based on the analysis suggestions.",
+      improvements: [
+        "Improved color contrast for better accessibility",
+        "Simplified navigation structure",
+        "Enhanced visual hierarchy with better typography",
+        "Optimized button placement and sizing",
+        "Added clear call-to-action elements"
+      ],
+      createdAt: new Date()
+    };
+    
+    setGeneratedConcepts(prev => [...prev, mockConcept]);
+  }, []);
+
   const handleClearCanvas = useCallback(() => {
     setUploadedImages([]);
     setAnalyses([]);
+    setGeneratedConcepts([]);
     setSelectedImageId(null);
     clearAnnotations();
   }, [clearAnnotations]);
@@ -145,11 +171,13 @@ export const UXAnalysisTool: React.FC = () => {
         ) : showCanvasView ? (
           <CanvasView 
             uploadedImages={uploadedImages} 
-            analyses={analyses} 
+            analyses={analyses}
+            generatedConcepts={generatedConcepts}
             showAnnotations={showAnnotations}
             onToggleAnnotations={handleToggleAnnotations}
             onViewChange={setSelectedView}
             onImageSelect={handleImageSelect}
+            onGenerateConcept={handleGenerateConcept}
           />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="w-full h-full">

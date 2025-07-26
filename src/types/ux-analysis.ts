@@ -45,6 +45,16 @@ export interface AnalysisSummary {
   strengths: string[];
 }
 
+export interface GeneratedConcept {
+  id: string;
+  analysisId: string;
+  imageUrl: string;
+  title: string;
+  description: string;
+  improvements: string[];
+  createdAt: Date;
+}
+
 export interface UXAnalysis {
   id: string;
   imageId: string;
