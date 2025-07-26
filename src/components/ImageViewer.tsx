@@ -37,18 +37,21 @@ const AnnotationMarker: React.FC<{
   };
 
   return (
-    <div
-      className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-10 ${getMarkerColor()}`}
+    <button
+      className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-20 ${getMarkerColor()}`}
       style={{
         left: `${annotation.x}%`,
         top: `${annotation.y}%`,
-        pointerEvents: 'auto', // Ensure annotations can be clicked
       }}
       onClick={(e) => {
-        e.stopPropagation(); // Prevent event bubbling
+        e.preventDefault();
+        e.stopPropagation();
         onClick(annotation, e);
       }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
       title={annotation.title}
+      type="button"
     />
   );
 };
@@ -156,7 +159,18 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         maxScale={5}
         centerOnInit
         onTransformed={handleZoomChange}
-        disabled={currentTool === 'draw'} // Only disable pan/zoom when drawing
+        disabled={currentTool === 'draw'}
+        doubleClick={{
+          disabled: false,
+          mode: "reset"
+        }}
+        panning={{
+          disabled: currentTool === 'cursor',
+          velocityDisabled: true
+        }}
+        wheel={{
+          disabled: currentTool === 'cursor'
+        }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
@@ -165,14 +179,20 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
               wrapperClass="w-full h-full"
               contentClass="w-full h-full flex items-center justify-center"
             >
-              <div className="relative max-w-full max-h-full image-container">
+              <div 
+                className="relative max-w-full max-h-full image-container"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  handleImageDoubleClick();
+                }}
+              >
                 <img
                   src={analysis.imageUrl}
                   alt={analysis.imageName}
-                  className="max-w-full max-h-full object-contain cursor-pointer"
+                  className="max-w-full max-h-full object-contain cursor-pointer select-none"
                   style={{ maxWidth: '100%', height: 'auto' }}
-                  onDoubleClick={handleImageDoubleClick}
                   title="Double-click to switch to canvas view"
+                  draggable={false}
                 />
                 
                 {/* Annotation Markers */}
