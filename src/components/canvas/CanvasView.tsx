@@ -36,10 +36,17 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const edges: Edge[] = [];
     
     let yOffset = 0;
-    const spacing = 400;
+    const horizontalSpacing = 100;
+    const minVerticalSpacing = 150;
 
     uploadedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);
+      
+      // Calculate image display dimensions (considering max-height: 80vh constraint)
+      const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.8);
+      const scaleFactor = maxDisplayHeight / image.dimensions.height;
+      const displayWidth = Math.min(image.dimensions.width * scaleFactor, 800); // max-width constraint
+      const displayHeight = maxDisplayHeight;
       
       // Create image node
       const imageNode: Node = {
@@ -55,10 +62,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
       // Create analysis card node if analysis exists
       if (analysis) {
+        const cardXPosition = 50 + displayWidth + horizontalSpacing;
         const cardNode: Node = {
           id: `card-${analysis.id}`,
           type: 'analysisCard',
-          position: { x: 400, y: yOffset },
+          position: { x: cardXPosition, y: yOffset },
           data: { analysis },
         };
         nodes.push(cardNode);
@@ -75,7 +83,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         edges.push(edge);
       }
 
-      yOffset += spacing;
+      // Calculate spacing for next image based on current image height
+      const nextSpacing = Math.max(displayHeight + minVerticalSpacing, 400);
+      yOffset += nextSpacing;
     });
 
     return { nodes, edges };
