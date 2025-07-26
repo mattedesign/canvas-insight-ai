@@ -51,6 +51,10 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
               top: `${annotation.y}%`,
             }}
             title={annotation.title}
+            onClick={() => {
+              // Open annotation details - for now just log
+              console.log('Annotation clicked:', annotation);
+            }}
           />
         ))}
         
