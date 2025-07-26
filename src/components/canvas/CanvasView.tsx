@@ -251,18 +251,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         
         <Background color="hsl(var(--muted))" />
         {/* Custom controls are now in FloatingToolbar */}
+        
+        {/* Floating Toolbar - Must be inside ReactFlow for useReactFlow hook */}
+        <FloatingToolbar
+          onToolChange={handleToolChange}
+          onToggleAnnotations={handleToggleAnnotations}
+          onToggleAnalysis={handleToggleAnalysis}
+          onAddComment={handleAddComment}
+          showAnnotations={showAnnotations}
+          showAnalysis={showAnalysis}
+          currentTool={currentTool}
+        />
       </ReactFlow>
-
-      {/* Floating Toolbar */}
-      <FloatingToolbar
-        onToolChange={handleToolChange}
-        onToggleAnnotations={handleToggleAnnotations}
-        onToggleAnalysis={handleToggleAnalysis}
-        onAddComment={handleAddComment}
-        showAnnotations={showAnnotations}
-        showAnalysis={showAnalysis}
-        currentTool={currentTool}
-      />
     </div>
   );
 };
