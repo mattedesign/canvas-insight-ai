@@ -61,7 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {sidebarIcons.map((item, index) => (
           <button
             key={index}
-            onClick={item.label === 'Add' ? onAddImages : undefined}
+            onClick={
+              item.label === 'Add' ? onAddImages :
+              item.label === 'Grid' ? () => onViewChange('canvas') :
+              undefined
+            }
             className={`
               w-10 h-10 rounded-lg flex items-center justify-center transition-all
               ${item.active 
@@ -69,7 +73,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
               }
             `}
-            title={item.label === 'Add' ? 'Add Images' : item.label}
+            title={
+              item.label === 'Add' ? 'Add Images' :
+              item.label === 'Grid' ? 'Canvas View' :
+              item.label
+            }
           >
             <item.icon className="w-5 h-5" />
           </button>

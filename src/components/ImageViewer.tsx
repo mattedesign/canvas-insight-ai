@@ -1,9 +1,8 @@
 import React, { memo, useState, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { ZoomIn, ZoomOut, RotateCcw, Grid3X3 } from 'lucide-react';
-import { Button } from './ui/button';
 import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { AnnotationComment } from './AnnotationComment';
+import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 
 interface ImageViewerProps {
@@ -11,6 +10,9 @@ interface ImageViewerProps {
   selectedAnnotations: string[];
   onAnnotationClick: (annotationId: string) => void;
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
+  onDeleteImage?: () => void;
+  showAnnotations?: boolean;
+  onToggleAnnotations?: () => void;
 }
 
 const AnnotationMarker: React.FC<{
@@ -49,9 +51,13 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   selectedAnnotations,
   onAnnotationClick,
   onViewChange,
+  onDeleteImage,
+  showAnnotations = true,
+  onToggleAnnotations,
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
+  const [zoomLevel, setZoomLevel] = useState(100);
   const { toast } = useToast();
 
   const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
@@ -107,6 +113,25 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   const relatedSuggestions = analysis.suggestions.filter(s => 
     s.relatedAnnotations.includes(activeCommentId || '')
   );
+
+  const handleZoomChange = useCallback((ref: any) => {
+    if (ref?.state?.scale) {
+      setZoomLevel(Math.round(ref.state.scale * 100));
+    }
+  }, []);
+
+  const handleDelete = useCallback(() => {
+    if (onDeleteImage) {
+      onDeleteImage();
+    }
+  }, [onDeleteImage]);
+
+  const handleToggleAnnotations = useCallback(() => {
+    if (onToggleAnnotations) {
+      onToggleAnnotations();
+    }
+  }, [onToggleAnnotations]);
+
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
@@ -114,47 +139,10 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         minScale={0.1}
         maxScale={5}
         centerOnInit
+        onTransformed={handleZoomChange}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            {/* Controls */}
-            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-              {onViewChange && (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => onViewChange('canvas')}
-                  className="bg-background/90 backdrop-blur-sm"
-                  title="Back to Canvas View"
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => zoomIn()}
-                className="bg-background/90 backdrop-blur-sm"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => zoomOut()}
-                className="bg-background/90 backdrop-blur-sm"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={() => resetTransform()}
-                className="bg-background/90 backdrop-blur-sm"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
 
             <TransformComponent
               wrapperClass="w-full h-full"
@@ -169,7 +157,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
                 />
                 
                 {/* Annotation Markers */}
-                {analysis.visualAnnotations.map((annotation) => (
+                {showAnnotations && analysis.visualAnnotations.map((annotation) => (
                   <AnnotationMarker
                     key={annotation.id}
                     annotation={annotation}
@@ -191,6 +179,17 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
                 )}
               </div>
             </TransformComponent>
+
+            {/* Gallery Floating Toolbar */}
+            <GalleryFloatingToolbar
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onReset={resetTransform}
+              onDelete={handleDelete}
+              onToggleAnnotations={handleToggleAnnotations}
+              showAnnotations={showAnnotations}
+              zoomLevel={zoomLevel}
+            />
           </>
         )}
       </TransformWrapper>

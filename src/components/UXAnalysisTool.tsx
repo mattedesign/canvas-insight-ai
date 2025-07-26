@@ -150,6 +150,24 @@ export const UXAnalysisTool: React.FC = () => {
                   selectedAnnotations={viewerState.selectedAnnotations}
                   onAnnotationClick={handleAnnotationClick}
                   onViewChange={setSelectedView}
+                  onDeleteImage={() => {
+                    // Handle image deletion
+                    const imageIndex = uploadedImages.findIndex(img => img.id === selectedImageId);
+                    const analysisIndex = analyses.findIndex(a => a.imageId === selectedImageId);
+                    
+                    if (imageIndex !== -1) {
+                      setUploadedImages(prev => prev.filter((_, index) => index !== imageIndex));
+                    }
+                    if (analysisIndex !== -1) {
+                      setAnalyses(prev => prev.filter((_, index) => index !== analysisIndex));
+                    }
+                    
+                    // Select next available image or null
+                    const remainingImages = uploadedImages.filter(img => img.id !== selectedImageId);
+                    setSelectedImageId(remainingImages.length > 0 ? remainingImages[0].id : null);
+                  }}
+                  showAnnotations={showAnnotations}
+                  onToggleAnnotations={handleToggleAnnotations}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
