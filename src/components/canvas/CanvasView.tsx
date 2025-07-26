@@ -253,6 +253,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         zoomOnPinch
         zoomOnDoubleClick={currentTool !== 'draw'}
         selectionOnDrag={currentTool === 'cursor'}
+        nodesDraggable={currentTool === 'cursor'}
+        nodesConnectable={currentTool === 'cursor'}
+        elementsSelectable={currentTool === 'cursor'}
         className={`bg-background tool-${currentTool}`}
         proOptions={{ hideAttribution: true }}
       >
