@@ -94,34 +94,36 @@ export const UXAnalysisTool: React.FC = () => {
         {showSummaryView ? (
           <SummaryDashboard analyses={analyses} />
         ) : (
-          <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-            <ResizablePanel defaultSize={70} minSize={50}>
-              {uploadedImages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <ImageUploadZone onImageUpload={handleImageUpload} />
-                </div>
-              ) : selectedAnalysis ? (
-                <ImageViewer
+          uploadedImages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <ImageUploadZone onImageUpload={handleImageUpload} />
+            </div>
+          ) : (
+            <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+              <ResizablePanel defaultSize={70} minSize={50}>
+                {selectedAnalysis ? (
+                  <ImageViewer
+                    analysis={selectedAnalysis}
+                    selectedAnnotations={viewerState.selectedAnnotations}
+                    onAnnotationClick={handleAnnotationClick}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <p>Select an image to view details</p>
+                  </div>
+                )}
+              </ResizablePanel>
+              
+              <ResizableHandle withHandle />
+              
+              <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
+                <ContextualPanel
                   analysis={selectedAnalysis}
                   selectedAnnotations={viewerState.selectedAnnotations}
-                  onAnnotationClick={handleAnnotationClick}
                 />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <p>Select an image to view details</p>
-                </div>
-              )}
-            </ResizablePanel>
-            
-            <ResizableHandle withHandle />
-            
-            <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
-              <ContextualPanel
-                analysis={selectedAnalysis}
-                selectedAnnotations={viewerState.selectedAnnotations}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )
         )}
       </div>
     </div>
