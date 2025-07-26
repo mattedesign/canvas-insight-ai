@@ -187,13 +187,14 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           </div>
           
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={handleViewSingle}
             className="ml-3 flex-shrink-0"
             title="View in single image mode"
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-4 w-4 mr-1" />
+            View
           </Button>
         </div>
         
