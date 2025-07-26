@@ -17,12 +17,13 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
   const { image, analysis } = data;
   
   return (
-    <Card className="w-80 overflow-hidden bg-background border-border shadow-lg">
+    <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg">
       <div className="relative">
         <img
           src={image.url}
           alt={image.name}
-          className="w-full h-48 object-cover"
+          className="w-full h-auto object-contain"
+          style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
         />
         {analysis && (
           <div className="absolute top-2 right-2">
