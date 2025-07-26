@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
@@ -88,6 +88,18 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     });
     // Here you would integrate with your design generation service
   }, [toast]);
+
+  // Handle escape key to close active annotation comment
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && activeCommentId) {
+        setActiveCommentId(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [activeCommentId]);
 
   const activeAnnotation = analysis.visualAnnotations.find(a => a.id === activeCommentId);
   const relatedSuggestions = analysis.suggestions.filter(s => 
