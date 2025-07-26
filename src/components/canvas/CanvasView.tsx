@@ -119,23 +119,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
         // Add concept nodes for this analysis
         const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+        let currentConceptXPosition = rightmostXPosition;
+        
         conceptsForAnalysis.forEach((concept, conceptIndex) => {
-          const baseConceptXPosition = rightmostXPosition + (conceptIndex * (800 + horizontalSpacing));
-          
           // Create concept image node (artboard)
           const conceptImageNode: Node = {
             id: `concept-image-${concept.id}`,
             type: 'conceptImage',
-            position: { x: baseConceptXPosition, y: yOffset },
+            position: { x: currentConceptXPosition, y: yOffset },
             data: { concept },
           };
           nodes.push(conceptImageNode);
 
           // Create concept details node (positioned to the right of image)
+          const conceptDetailsXPosition = currentConceptXPosition + 400 + horizontalSpacing;
           const conceptDetailsNode: Node = {
             id: `concept-details-${concept.id}`,
             type: 'conceptDetails',
-            position: { x: baseConceptXPosition + 400 + horizontalSpacing, y: yOffset },
+            position: { x: conceptDetailsXPosition, y: yOffset },
             data: { concept },
           };
           nodes.push(conceptDetailsNode);
@@ -147,7 +148,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             target: `concept-image-${concept.id}`,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: 'hsl(var(--secondary))' },
+            style: { stroke: 'hsl(var(--primary))' },
           };
           edges.push(conceptImageEdge);
 
@@ -158,9 +159,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             target: `concept-details-${concept.id}`,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: 'hsl(var(--accent))' },
+            style: { stroke: 'hsl(var(--primary))' },
           };
           edges.push(conceptDetailsEdge);
+
+          // Update position for next concept (if any)
+          currentConceptXPosition = conceptDetailsXPosition + 400 + horizontalSpacing;
         });
       }
 
