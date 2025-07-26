@@ -9,7 +9,9 @@ import {
   Eye,
   BarChart3,
   Trash2,
-  Network
+  Network,
+  MapPin,
+  EyeOff
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 
@@ -21,6 +23,8 @@ interface SidebarProps {
   onViewChange: (view: 'gallery' | 'canvas' | 'summary') => void;
   selectedImageId: string | null;
   onImageSelect: (imageId: string) => void;
+  showAnnotations: boolean;
+  onToggleAnnotations: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -31,6 +35,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onViewChange,
   selectedImageId,
   onImageSelect,
+  showAnnotations,
+  onToggleAnnotations,
 }) => {
   const sidebarIcons = [
     { icon: Plus, label: 'Add', active: false },
@@ -110,6 +116,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Summary View"
           >
             <BarChart3 className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Annotation Toggle */}
+      {analyses.length > 0 && (
+        <div className="mt-4">
+          <button
+            onClick={onToggleAnnotations}
+            className={`
+              w-10 h-10 rounded-lg flex items-center justify-center transition-all
+              ${showAnnotations
+                ? 'bg-sidebar-accent text-sidebar-primary-foreground'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+              }
+            `}
+            title={showAnnotations ? "Hide Annotations" : "Show Annotations"}
+          >
+            {showAnnotations ? <MapPin className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
           </button>
         </div>
       )}

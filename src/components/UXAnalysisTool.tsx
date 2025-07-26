@@ -16,6 +16,7 @@ export const UXAnalysisTool: React.FC = () => {
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('canvas');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -71,6 +72,10 @@ export const UXAnalysisTool: React.FC = () => {
     clearAnnotations();
   }, [clearAnnotations]);
 
+  const handleToggleAnnotations = useCallback(() => {
+    setShowAnnotations(prev => !prev);
+  }, []);
+
   const handleAnnotationClick = useCallback((annotationId: string) => {
     toggleAnnotation(annotationId);
   }, [toggleAnnotation]);
@@ -91,6 +96,8 @@ export const UXAnalysisTool: React.FC = () => {
         onViewChange={setSelectedView}
         selectedImageId={selectedImageId}
         onImageSelect={handleImageSelect}
+        showAnnotations={showAnnotations}
+        onToggleAnnotations={handleToggleAnnotations}
       />
       
       <div className="flex-1 relative">
@@ -101,7 +108,7 @@ export const UXAnalysisTool: React.FC = () => {
             <ImageUploadZone onImageUpload={handleImageUpload} />
           </div>
         ) : showCanvasView ? (
-          <CanvasView uploadedImages={uploadedImages} analyses={analyses} />
+          <CanvasView uploadedImages={uploadedImages} analyses={analyses} showAnnotations={showAnnotations} />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="w-full h-full">
             <ResizablePanel defaultSize={70} minSize={50}>

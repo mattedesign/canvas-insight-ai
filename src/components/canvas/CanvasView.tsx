@@ -28,11 +28,13 @@ const nodeTypes = {
 interface CanvasViewProps {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
+  showAnnotations: boolean;
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
   uploadedImages,
   analyses,
+  showAnnotations,
 }) => {
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
@@ -59,7 +61,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         position: { x: 50, y: yOffset },
         data: { 
           image,
-          analysis 
+          analysis,
+          showAnnotations
         },
       };
       nodes.push(imageNode);
@@ -93,7 +96,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses]);
+  }, [uploadedImages, analyses, showAnnotations]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
@@ -112,6 +115,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   useEffect(() => {
     saveState(nodes, edges);
   }, [nodes, edges, saveState]);
+
+  // Update nodes when annotations toggle
+  useEffect(() => {
+    setNodes(initialElements.nodes);
+    setEdges(initialElements.edges);
+  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges]);
 
   // Handle keyboard shortcuts
   useEffect(() => {

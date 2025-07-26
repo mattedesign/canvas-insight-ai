@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 interface ImageNodeData {
   image: UploadedImage;
   analysis?: UXAnalysis;
+  showAnnotations?: boolean;
 }
 
 interface ImageNodeProps {
@@ -14,7 +15,21 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
-  const { image, analysis } = data;
+  const { image, analysis, showAnnotations = true } = data;
+
+  const getMarkerColor = (type: string) => {
+    switch (type) {
+      case 'issue':
+        return 'bg-destructive border-destructive-foreground';
+      case 'suggestion':
+        return 'bg-yellow-500 border-yellow-600';
+      case 'success':
+        return 'bg-green-500 border-green-600';
+      default:
+        return 'bg-primary border-primary-foreground';
+    }
+  };
+  
   
   return (
     <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg">
@@ -25,6 +40,20 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
           className="w-full h-auto object-contain"
           style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
         />
+        
+        {/* Annotation Markers */}
+        {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => (
+          <div
+            key={annotation.id}
+            className={`absolute w-3 h-3 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 ${getMarkerColor(annotation.type)}`}
+            style={{
+              left: `${annotation.x}%`,
+              top: `${annotation.y}%`,
+            }}
+            title={annotation.title}
+          />
+        ))}
+        
         {analysis && (
           <div className="absolute top-2 right-2">
             <Badge 
