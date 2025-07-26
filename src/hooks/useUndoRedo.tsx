@@ -29,7 +29,7 @@ export const useUndoRedo = (initialNodes: Node[], initialEdges: Edge[]) => {
     }
     
     history.current = newHistory;
-  }, [currentIndex]);
+  }, []); // Remove currentIndex dependency to prevent infinite loops
 
   const undo = useCallback(() => {
     if (currentIndex > 0) {
