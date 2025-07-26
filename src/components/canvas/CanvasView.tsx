@@ -218,10 +218,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         
         <Background color="hsl(var(--muted))" />
         <Controls className="bg-background border border-border" />
-        <MiniMap 
+        {/* MiniMap hidden for now - can be made optional in display settings later */}
+        {/* <MiniMap 
           className="bg-background border border-border" 
           nodeColor="hsl(var(--primary))"
-        />
+        /> */}
       </ReactFlow>
     </div>
   );
