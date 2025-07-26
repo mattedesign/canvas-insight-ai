@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Handle, Position } from '@xyflow/react';
+import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { UploadedImage, UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -21,6 +22,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const { toast } = useToast();
+  const transformRef = useRef<ReactZoomPanPinchRef>(null);
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -76,12 +78,26 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
   return (
     <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg">
       <div className="relative image-container">
-        <img
-          src={image.url}
-          alt={image.name}
-          className="w-full h-auto object-contain"
-          style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
-        />
+        <TransformWrapper
+          ref={transformRef}
+          initialScale={1}
+          minScale={0.5}
+          maxScale={3}
+          centerOnInit={true}
+          doubleClick={{
+            disabled: false,
+            mode: 'reset'
+          }}
+        >
+          <TransformComponent>
+            <img
+              src={image.url}
+              alt={image.name}
+              className="w-full h-auto object-contain"
+              style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
+            />
+          </TransformComponent>
+        </TransformWrapper>
         
         {/* Annotation Markers */}
         {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => (
@@ -110,7 +126,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data }) => {
         )}
         
         {analysis && (
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 z-10">
             <Badge 
               variant={analysis.summary.overallScore >= 80 ? 'default' : 
                      analysis.summary.overallScore >= 60 ? 'secondary' : 'destructive'}
