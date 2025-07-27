@@ -36,8 +36,9 @@ export const UXAnalysisTool: React.FC = () => {
 
       // Get actual image dimensions
       const img = new Image();
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
         img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error('Failed to load image'));
         img.src = imageUrl;
       });
 
