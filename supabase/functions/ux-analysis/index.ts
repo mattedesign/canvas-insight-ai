@@ -13,23 +13,33 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 interface AnalysisRequest {
   type: 'ANALYZE_IMAGE' | 'ANALYZE_GROUP' | 'GENERATE_CONCEPT'
   payload: any
+  aiModel?: 'openai' | 'google-vision' | 'claude-vision' | 'auto'
 }
 
-async function analyzeImage(payload: { imageId: string; imageUrl: string; imageName: string; userContext?: string }) {
-  console.log('Analyzing image:', payload)
+async function analyzeImage(payload: { imageId: string; imageUrl: string; imageName: string; userContext?: string }, aiModel = 'auto') {
+  console.log('Analyzing image:', payload);
+  console.log('Using AI model:', aiModel);
   
   try {
-    // Get OpenAI API key from environment
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    
     let analysisResult;
     
-    if (openaiApiKey) {
-      console.log('Using OpenAI for real AI analysis');
-      analysisResult = await performAIAnalysis(payload, openaiApiKey);
-    } else {
-      console.log('OpenAI API key not found, using mock analysis');
-      analysisResult = generateMockAnalysisData();
+    // Determine which AI model to use
+    const selectedModel = aiModel === 'auto' ? await selectBestModel() : aiModel;
+    console.log('Selected AI model:', selectedModel);
+    
+    switch (selectedModel) {
+      case 'google-vision':
+        analysisResult = await performGoogleVisionAnalysis(payload);
+        break;
+      case 'claude-vision':
+        analysisResult = await performClaudeVisionAnalysis(payload);
+        break;
+      case 'openai':
+        analysisResult = await performOpenAIAnalysis(payload);
+        break;
+      default:
+        console.log('No AI models available, using mock analysis');
+        analysisResult = generateMockAnalysisData();
     }
 
     // Get the actual image record ID from database using the client-side imageId
@@ -59,7 +69,11 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         visual_annotations: analysisResult.visualAnnotations,
         suggestions: analysisResult.suggestions,
         summary: analysisResult.summary,
-        metadata: analysisResult.metadata
+        metadata: {
+          ...analysisResult.metadata,
+          aiModel: selectedModel,
+          analysisTimestamp: new Date().toISOString()
+        }
       })
       .select()
       .single();
@@ -82,7 +96,8 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         suggestions: analysis.suggestions,
         summary: analysis.summary,
         metadata: analysis.metadata,
-        createdAt: analysis.created_at
+        createdAt: analysis.created_at,
+        aiModel: selectedModel
       }
     };
 
@@ -90,6 +105,105 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
     console.error('Error in analysis, falling back to mock:', error);
     return generateMockAnalysisResponse(payload);
   }
+}
+
+async function selectBestModel(): Promise<string> {
+  // Check which AI models are available based on API keys
+  const hasGoogleVision = !!Deno.env.get('GOOGLE_VISION_API_KEY');
+  const hasClaudeVision = !!Deno.env.get('ANTHROPIC_API_KEY');
+  const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
+  
+  console.log('Available AI models:', { hasGoogleVision, hasClaudeVision, hasOpenAI });
+  
+  // Priority order: Claude (best for UX analysis) > Google Vision (good for object detection) > OpenAI (text-based)
+  if (hasClaudeVision) {
+    return 'claude-vision';
+  } else if (hasGoogleVision) {
+    return 'google-vision';
+  } else if (hasOpenAI) {
+    return 'openai';
+  }
+  
+  return 'mock';
+}
+
+async function performGoogleVisionAnalysis(payload: any) {
+  console.log('Performing Google Vision analysis');
+  
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/google-vision-analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        imageUrl: payload.imageUrl,
+        userContext: payload.userContext,
+        features: ['labels', 'text', 'faces', 'objects', 'web']
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Vision API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Google Vision analysis failed');
+    }
+
+    return result.analysis;
+  } catch (error) {
+    console.error('Google Vision analysis failed:', error);
+    throw error;
+  }
+}
+
+async function performClaudeVisionAnalysis(payload: any) {
+  console.log('Performing Claude Vision analysis');
+  
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/claude-vision-analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        imageUrl: payload.imageUrl,
+        userContext: payload.userContext,
+        analysisType: 'comprehensive'
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Claude Vision API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Claude Vision analysis failed');
+    }
+
+    return result.analysis;
+  } catch (error) {
+    console.error('Claude Vision analysis failed:', error);
+    throw error;
+  }
+}
+
+async function performOpenAIAnalysis(payload: any) {
+  console.log('Performing OpenAI analysis');
+  
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    throw new Error('OpenAI API key not available');
+  }
+  
+  return await performAIAnalysis(payload, openaiApiKey);
 }
 
 async function performAIAnalysis(payload: any, apiKey: string) {
@@ -577,14 +691,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type, payload }: AnalysisRequest = await req.json()
+    const { type, payload, aiModel }: AnalysisRequest = await req.json()
     
-    console.log(`Processing ${type} request`)
+    console.log(`Processing ${type} request with AI model: ${aiModel || 'auto'}`)
     
     let result
     switch (type) {
       case 'ANALYZE_IMAGE':
-        result = await analyzeImage(payload)
+        result = await analyzeImage(payload, aiModel)
         break
       case 'ANALYZE_GROUP':
         result = await analyzeGroup(payload)

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import { AuthProvider } from "./context/AuthContext";
+import { AIProvider } from "./context/AIContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
@@ -23,7 +24,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
+      <AuthProvider>
+        <AIProvider>
           <AppProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -61,7 +63,8 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppProvider>
-        </AuthProvider>
+        </AIProvider>
+      </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

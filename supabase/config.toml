@@ -2,3 +2,9 @@ project_id = "sdcmbfdtafkzpimwjpij"
 
 [functions.ux-analysis]
 verify_jwt = false
+
+[functions.google-vision-analysis]
+verify_jwt = false
+
+[functions.claude-vision-analysis]
+verify_jwt = false
