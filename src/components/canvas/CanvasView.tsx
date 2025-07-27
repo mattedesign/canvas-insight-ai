@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   ReactFlow,
   useNodesState,
@@ -63,6 +64,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
+  const isMobile = useIsMobile();
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
@@ -309,13 +311,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleToolChange = useCallback((tool: ToolMode) => {
     setCurrentTool(tool);
     const toolMessages = {
-      cursor: 'Cursor tool - Select and move artboards',
+      cursor: isMobile ? 'Cursor tool - Select artboards (dragging disabled on mobile)' : 'Cursor tool - Select and move artboards',
       draw: 'Draw tool - Paint regions for inpainting feedback'
     };
     toast({
       description: toolMessages[tool],
     });
-  }, [toast]);
+  }, [toast, isMobile]);
 
   const handleToggleAnnotations = useCallback(() => {
     onToggleAnnotations?.();
@@ -384,6 +386,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         currentTool={currentTool}
         showAnnotations={showAnnotations}
         showAnalysis={showAnalysis}
+        isMobile={isMobile}
         handleToolChange={handleToolChange}
         handleToggleAnnotations={handleToggleAnnotations}
         handleToggleAnalysis={handleToggleAnalysis}
@@ -416,6 +419,7 @@ const CanvasContent: React.FC<any> = ({
   currentTool,
   showAnnotations,
   showAnalysis,
+  isMobile,
   handleToolChange,
   handleToggleAnnotations,
   handleToggleAnalysis,
@@ -436,6 +440,9 @@ const CanvasContent: React.FC<any> = ({
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
+  
+  // Disable node dragging on mobile/tablet screens (768px and under)
+  const isNodeDraggingEnabled = currentTool === 'cursor' && !isPanningDisabled && !isMobile;
 
   return (
     <div className="h-full w-full bg-background relative">
@@ -499,11 +506,11 @@ const CanvasContent: React.FC<any> = ({
         zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick={currentTool !== 'draw'}
-        selectionOnDrag={currentTool === 'cursor' && !isPanningDisabled}
-        nodesDraggable={currentTool === 'cursor' && !isPanningDisabled}
+        selectionOnDrag={isNodeDraggingEnabled}
+        nodesDraggable={isNodeDraggingEnabled}
         nodesConnectable={currentTool === 'cursor'}
         elementsSelectable={currentTool === 'cursor'}
-        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''}`}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''}`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
       >
