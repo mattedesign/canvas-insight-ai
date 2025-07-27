@@ -1,11 +1,14 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { GeneratedConcept } from '@/types/ux-analysis';
+import { GeneratedConcept, UploadedImage } from '@/types/ux-analysis';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles } from 'lucide-react';
 
 interface ConceptImageNodeData {
   concept: GeneratedConcept;
+  originalImage?: UploadedImage;
+  displayWidth?: number;
+  displayHeight?: number;
 }
 
 interface ConceptImageNodeProps {
@@ -13,7 +16,7 @@ interface ConceptImageNodeProps {
 }
 
 export const ConceptImageNode: React.FC<ConceptImageNodeProps> = ({ data }) => {
-  const { concept } = data;
+  const { concept, originalImage, displayWidth, displayHeight } = data;
   
   return (
     <div className="relative bg-background border border-border rounded-lg shadow-lg overflow-hidden">
@@ -23,8 +26,14 @@ export const ConceptImageNode: React.FC<ConceptImageNodeProps> = ({ data }) => {
         className="bg-primary border-2 border-background"
       />
       
-      {/* Concept Image - Main artboard area */}
-      <div className="relative w-80 h-60">
+      {/* Concept Image - Main artboard area - use original image dimensions */}
+      <div 
+        className="relative" 
+        style={{ 
+          width: displayWidth ? `${displayWidth}px` : '320px',
+          height: displayHeight ? `${displayHeight}px` : '240px'
+        }}
+      >
         <img 
           src={concept.imageUrl} 
           alt={concept.title}

@@ -241,7 +241,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             id: `concept-image-${concept.id}`,
             type: 'conceptImage',
             position: { x: currentConceptXPosition, y: yOffset },
-            data: { concept },
+            data: { 
+              concept,
+              originalImage: image,
+              displayWidth,
+              displayHeight
+            },
           };
           nodes.push(conceptImageNode);
 
@@ -461,7 +466,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 position: { x: currentConceptXPosition, y: currentY },
                 parentId: `group-container-${group.id}`,
                 extent: 'parent',
-                data: { concept },
+                data: { 
+                  concept,
+                  originalImage: image,
+                  displayWidth,
+                  displayHeight
+                },
               };
               nodes.push(conceptImageNode);
 
@@ -578,7 +588,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 position: { x: currentConceptXPosition, y: currentY },
                 parentId: `group-container-${group.id}`,
                 extent: 'parent',
-                data: { concept },
+                data: { 
+                  concept,
+                  originalImage: image,
+                  displayWidth,
+                  displayHeight
+                },
               };
               nodes.push(conceptImageNode);
 
