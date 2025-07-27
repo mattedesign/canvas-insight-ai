@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isOnUploadScreen = uploadedImages.length === 0;
   
   const sidebarIcons = [
-    { icon: BarChart3, label: 'Dashboard', active: selectedView === 'summary' },
+    { icon: BarChart3, label: 'Dashboard', active: selectedView === 'summary' && uploadedImages.length > 0 },
     { icon: Plus, label: 'Add', active: isOnUploadScreen },
     { icon: Folder, label: 'Previous', active: false },
     { icon: Bell, label: 'Notifications', active: false },
