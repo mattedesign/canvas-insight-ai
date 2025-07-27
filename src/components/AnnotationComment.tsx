@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageSquare, Sparkles, RefreshCw, Send } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { AnnotationPoint, Suggestion } from '@/types/ux-analysis';
+import { AnnotationConnectionLine } from './AnnotationConnectionLine';
 
 interface AnnotationCommentProps {
   annotation: AnnotationPoint;
@@ -27,6 +28,8 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   const [userPrompt, setUserPrompt] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [dialogSize, setDialogSize] = useState({ width: 320, height: 400 });
 
   // Smart positioning to keep dialog in viewport
   const calculateOptimalPosition = () => {
@@ -88,6 +91,14 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
 
   const optimalPosition = calculateOptimalPosition();
 
+  // Update dialog size when rendered
+  useEffect(() => {
+    if (dialogRef.current) {
+      const rect = dialogRef.current.getBoundingClientRect();
+      setDialogSize({ width: rect.width, height: rect.height });
+    }
+  }, [relatedSuggestions]);
+
   const handleRequestAnalysis = async () => {
     if (!userPrompt.trim()) return;
     setIsAnalyzing(true);
@@ -137,24 +148,24 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   };
 
   return (
-    <div 
-      className="fixed z-[60] animate-scale-in pointer-events-auto annotation-dialog"
-      style={{
-        left: optimalPosition.dialogX,
-        top: optimalPosition.dialogY,
-        transform: optimalPosition.transformX
-      }}
-    >
-      {/* Connection line */}
-      {optimalPosition.connectorSide !== 'center' && (
-        <div 
-          className="absolute w-5 h-0.5 bg-primary/60 z-10"
-          style={{
-            left: optimalPosition.connectorSide === 'right' ? '100%' : `-${optimalPosition.connectorPosition}px`,
-            top: '20px'
-          }}
-        />
-      )}
+    <>
+      {/* Dynamic connection line */}
+      <AnnotationConnectionLine
+        markerPosition={position}
+        dialogPosition={{ x: optimalPosition.dialogX, y: optimalPosition.dialogY }}
+        dialogSize={dialogSize}
+        isVisible={true}
+      />
+      
+      <div 
+        ref={dialogRef}
+        className="fixed z-[60] animate-scale-in pointer-events-auto annotation-dialog"
+        style={{
+          left: optimalPosition.dialogX,
+          top: optimalPosition.dialogY,
+          transform: optimalPosition.transformX
+        }}
+      >
       
       <Card className="w-80 bg-popover/95 backdrop-blur-sm border-border shadow-2xl border-2">
         {/* Visual indicator for active annotation */}
@@ -268,6 +279,7 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
           </div>
         </div>
       </Card>
-    </div>
+      </div>
+    </>
   );
 };
