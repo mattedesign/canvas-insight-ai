@@ -273,22 +273,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       const analysisSpacing = 100;
       
       if (displayMode === 'standard') {
-        // Horizontal layout: images side by side with their analysis cards to the right
-        let currentX = padding;
-        let maxHeight = 0;
+        // Vertical stacking: each image+analysis pair stacked vertically
+        let maxWidth = 0;
+        let totalHeight = padding + 60; // Header space
         
         groupImages.forEach((image, imageIndex) => {
-          const maxDisplayHeight = Math.min(image.dimensions.height, 250);
+          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 300);
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          maxHeight = Math.max(maxHeight, displayHeight);
-          currentX += displayWidth + 320 + imageSpacing; // Include analysis card width
+          // Width needed for this pair: image + analysis card + spacing
+          const pairWidth = displayWidth + 320 + 20; // analysis card width + spacing
+          maxWidth = Math.max(maxWidth, pairWidth);
+          totalHeight += displayHeight + 20; // vertical spacing between pairs
         });
         
-        containerWidth = Math.max(currentX + padding - imageSpacing, 400);
-        containerHeight = maxHeight + padding * 2 + 60;
+        containerWidth = Math.max(maxWidth + padding * 2, 400);
+        containerHeight = totalHeight + padding;
       } else {
         // Stacked layout: images vertically with analysis cards to the right
         let maxWidth = 0;
@@ -330,66 +332,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       
       // Position images and their individual analysis cards inside the container
       if (displayMode === 'standard') {
-        let currentX = padding;
-        groupImages.forEach((image, imageIndex) => {
-          const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, 250);
-          const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 300);
-          
-          // Image node - positioned relative to group origin
-          const imageNode: Node = {
-            id: `image-${image.id}`,
-            type: 'image',
-            position: { x: 50 + currentX, y: yOffset + padding + 60 },
-            parentId: `group-container-${group.id}`,
-            extent: 'parent',
-            data: { 
-              image,
-              analysis,
-              showAnnotations,
-              currentTool,
-              onViewChange: stableCallbacks.onViewChange,
-              onImageSelect: stableCallbacks.onImageSelect,
-              onToggleSelection: stableCallbacks.onToggleSelection,
-              isSelected: stableCallbacks.isSelected(image.id)
-            },
-          };
-          nodes.push(imageNode);
-          
-          // Individual analysis card for this image
-          if (analysis && showAnalysis) {
-            const analysisNode: Node = {
-              id: `group-image-analysis-${image.id}`,
-              type: 'analysisCard',
-              position: { x: 50 + currentX + displayWidth + 20, y: yOffset + padding + 60 },
-              parentId: `group-container-${group.id}`,
-              extent: 'parent',
-              data: { 
-                analysis,
-                onGenerateConcept: stableCallbacks.onGenerateConcept,
-                isGeneratingConcept
-              },
-            };
-            nodes.push(analysisNode);
-            
-            // Create edge connecting image to its analysis
-            const edge: Edge = {
-              id: `edge-group-image-${image.id}-analysis`,
-              source: `image-${image.id}`,
-              target: `group-image-analysis-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))' },
-            };
-            edges.push(edge);
-          }
-          
-          currentX += displayWidth + 320 + imageSpacing;
-        });
-      } else {
-        // Stacked layout
-        let currentY = padding + 60;
+        // Vertical stacking of horizontal pairs
+        let currentY = 60; // Start below header
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
@@ -397,11 +341,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          // Image node - positioned relative to group origin
+          // Image node - positioned relative to group container origin
           const imageNode: Node = {
             id: `image-${image.id}`,
             type: 'image',
-            position: { x: 50 + padding, y: yOffset + currentY },
+            position: { x: padding, y: currentY },
             parentId: `group-container-${group.id}`,
             extent: 'parent',
             data: { 
@@ -417,12 +361,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           nodes.push(imageNode);
           
-          // Individual analysis card for this image
+          // Individual analysis card for this image - to the right of the image
           if (analysis && showAnalysis) {
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: 50 + padding + displayWidth + 20, y: yOffset + currentY },
+              position: { x: padding + displayWidth + 20, y: currentY },
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
@@ -445,7 +389,68 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          currentY += displayHeight + imageSpacing;
+          // Move to next vertical position
+          currentY += displayHeight + 20;
+        });
+      } else {
+        // Stacked layout (alternative mode)
+        let currentY = 60;
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / image.dimensions.height;
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const displayHeight = maxDisplayHeight;
+          
+          // Image node - positioned relative to group container origin
+          const imageNode: Node = {
+            id: `image-${image.id}`,
+            type: 'image',
+            position: { x: padding, y: currentY },
+            parentId: `group-container-${group.id}`,
+            extent: 'parent',
+            data: { 
+              image,
+              analysis,
+              showAnnotations,
+              currentTool,
+              onViewChange: stableCallbacks.onViewChange,
+              onImageSelect: stableCallbacks.onImageSelect,
+              onToggleSelection: stableCallbacks.onToggleSelection,
+              isSelected: stableCallbacks.isSelected(image.id)
+            },
+          };
+          nodes.push(imageNode);
+          
+          // Individual analysis card for this image
+          if (analysis && showAnalysis) {
+            const analysisNode: Node = {
+              id: `group-image-analysis-${image.id}`,
+              type: 'analysisCard',
+              position: { x: padding + displayWidth + 20, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                isGeneratingConcept
+              },
+            };
+            nodes.push(analysisNode);
+            
+            // Create edge connecting image to its analysis
+            const edge: Edge = {
+              id: `edge-group-image-${image.id}-analysis`,
+              source: `image-${image.id}`,
+              target: `group-image-analysis-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(edge);
+          }
+          
+          currentY += displayHeight + 20;
         });
       }
       
