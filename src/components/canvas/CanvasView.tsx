@@ -660,7 +660,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           data: {
             group,
             onSubmitPrompt: onSubmitGroupPrompt,
-            isLoading: groupSessions.some(s => s.status === 'processing'),
+            isLoading: false,
           },
         };
         nodes.push(promptCollectionNode);
@@ -677,12 +677,57 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         };
         edges.push(edge);
       } else {
-        // Show analysis results for completed sessions
+        // Handle different session states
+        const pendingSessions = groupSessions.filter(s => s.status === 'pending');
+        const processingSessions = groupSessions.filter(s => s.status === 'processing');
         const completedAnalyses = groupAnalysesForGroup.filter(analysis => {
           const session = groupSessions.find(s => s.id === analysis.sessionId);
           return session?.status === 'completed';
         });
         
+        // Show prompt collection nodes for pending sessions (including forks)
+        pendingSessions.forEach((session, index) => {
+          const promptCollectionNode: Node = {
+            id: `group-prompt-${session.id}`,
+            type: 'groupPromptCollection',
+            position: { x: rightmostXPosition, y: yOffset + (index * 120) },
+            data: {
+              group,
+              onSubmitPrompt: onSubmitGroupPrompt,
+              isLoading: false,
+            },
+          };
+          nodes.push(promptCollectionNode);
+          
+          // Create edge connecting container to prompt collection
+          const edge: Edge = {
+            id: `edge-group-${group.id}-prompt-${session.id}`,
+            source: `group-container-${group.id}`,
+            sourceHandle: 'analysis',
+            target: `group-prompt-${session.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+          };
+          edges.push(edge);
+        });
+        
+        // Show processing sessions
+        processingSessions.forEach((session, index) => {
+          const promptCollectionNode: Node = {
+            id: `group-prompt-processing-${session.id}`,
+            type: 'groupPromptCollection',
+            position: { x: rightmostXPosition + 420, y: yOffset + (index * 120) },
+            data: {
+              group,
+              onSubmitPrompt: onSubmitGroupPrompt,
+              isLoading: true,
+            },
+          };
+          nodes.push(promptCollectionNode);
+        });
+        
+        // Show completed analysis results
         if (completedAnalyses.length > 0) {
           // Show most recent completed analysis
           const latestAnalysis = completedAnalyses.sort((a, b) => 
@@ -692,7 +737,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const analysisResultsNode: Node = {
             id: `group-results-${latestAnalysis.id}`,
             type: 'groupAnalysisResults',
-            position: { x: rightmostXPosition, y: yOffset },
+            position: { x: rightmostXPosition + 840, y: yOffset },
             data: {
               analysis: latestAnalysis,
               groupName: group.name,
@@ -720,15 +765,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           edges.push(edge);
           
-          rightmostXPosition += 400 + 100; // Space for next node
-          
           // Show additional analysis branches if any
           const otherAnalyses = completedAnalyses.filter(analysis => analysis.id !== latestAnalysis.id);
           otherAnalyses.forEach((analysis, index) => {
             const branchNode: Node = {
               id: `group-branch-${analysis.id}`,
               type: 'groupAnalysisResults',
-              position: { x: rightmostXPosition, y: yOffset + (index + 1) * 150 },
+              position: { x: rightmostXPosition + 840, y: yOffset + (index + 1) * 150 },
               data: {
                 analysis,
                 groupName: group.name,
@@ -755,34 +798,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             };
             edges.push(branchEdge);
           });
-        } else {
-          // Show processing or pending session
-          const processingSession = groupSessions.find(s => s.status === 'processing');
-          if (processingSession) {
-            const promptCollectionNode: Node = {
-              id: `group-prompt-${group.id}`,
-              type: 'groupPromptCollection',
-              position: { x: rightmostXPosition, y: yOffset },
-              data: {
-                group,
-                onSubmitPrompt: onSubmitGroupPrompt,
-                isLoading: true,
-              },
-            };
-            nodes.push(promptCollectionNode);
-            
-            // Create edge connecting container to prompt collection
-            const edge: Edge = {
-              id: `edge-group-${group.id}-prompt`,
-              source: `group-container-${group.id}`,
-              sourceHandle: 'analysis',
-              target: `group-prompt-${group.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
-            };
-            edges.push(edge);
-          }
         }
       }
       
