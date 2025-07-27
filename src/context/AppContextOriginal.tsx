@@ -1,11 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { generateMockGroupAnalysis } from '@/data/mockGroupAnalysis';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { useAuth } from '@/context/AuthContext';
-import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
-import { useToast } from '@/hooks/use-toast';
 
 interface AppContextType {
   // State
@@ -22,10 +19,6 @@ interface AppContextType {
   galleryTool: 'cursor' | 'draw';
   isGeneratingConcept: boolean;
   viewerState: ReturnType<typeof useImageViewer>['state'];
-  
-  // Migration state
-  isLoading: boolean;
-  isSyncing: boolean;
   
   // Actions
   handleImageUpload: (files: File[]) => Promise<void>;
@@ -46,9 +39,6 @@ interface AppContextType {
   handleCreateFork: (sessionId: string) => void;
   toggleAnnotation: (annotationId: string) => void;
   clearAnnotations: () => void;
-  
-  // Migration actions
-  syncToDatabase: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -62,10 +52,6 @@ export const useAppContext = () => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
-  // Existing state
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
@@ -78,79 +64,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
   const [isGeneratingConcept, setIsGeneratingConcept] = useState<boolean>(false);
-  
-  // Migration state
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
-
-  // Load data from database when user authenticates
-  useEffect(() => {
-    if (user && !isLoading) {
-      loadDataFromDatabase();
-    } else if (!user) {
-      // Reset project ID when user logs out
-      ProjectService.resetProject();
-    }
-  }, [user]);
-
-  const loadDataFromDatabase = async () => {
-    setIsLoading(true);
-    try {
-      const result = await DataMigrationService.loadAllFromDatabase();
-      if (result.success && result.data) {
-        setUploadedImages(result.data.uploadedImages);
-        setAnalyses(result.data.analyses);
-        setImageGroups(result.data.imageGroups);
-        setGroupAnalysesWithPrompts(result.data.groupAnalysesWithPrompts);
-        setGeneratedConcepts(result.data.generatedConcepts);
-        setGroupAnalyses(result.data.groupAnalyses);
-        setGroupPromptSessions(result.data.groupPromptSessions);
-      }
-    } catch (error) {
-      console.error('Failed to load data from database:', error);
-      toast({
-        title: "Loading failed",
-        description: "Could not load your data. You can continue working and sync later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const syncToDatabase = async () => {
-    if (!user) return;
-    
-    setIsSyncing(true);
-    try {
-      const result = await DataMigrationService.migrateAllToDatabase({
-        uploadedImages,
-        analyses,
-        imageGroups,
-        groupAnalysesWithPrompts
-      });
-      
-      if (result.success) {
-        toast({
-          title: "Synced successfully",
-          description: "Your data has been saved to the cloud.",
-        });
-      } else {
-        throw new Error('Sync failed');
-      }
-    } catch (error) {
-      console.error('Failed to sync to database:', error);
-      toast({
-        title: "Sync failed",
-        description: "Could not save your data. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const handleImageUpload = useCallback(async (files: File[]) => {
     const newImages: UploadedImage[] = [];
@@ -192,12 +106,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!selectedImageId && newImages.length > 0) {
       setSelectedImageId(newImages[0].id);
     }
-
-    // Auto-sync to database if user is authenticated
-    if (user) {
-      setTimeout(() => syncToDatabase(), 1000);
-    }
-  }, [selectedImageId, user]);
+  }, [selectedImageId]);
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
     setIsGeneratingConcept(true);
@@ -282,12 +191,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     
     setImageGroups(prev => [...prev, newGroup]);
-    
-    // Auto-sync to database if user is authenticated
-    if (user) {
-      setTimeout(() => syncToDatabase(), 1000);
-    }
-  }, [imageGroups.length, user]);
+    // Note: No longer auto-generating analysis - waiting for prompt submission
+  }, [imageGroups.length]);
 
   const handleUngroup = useCallback((groupId: string) => {
     setImageGroups(prev => prev.filter(group => group.id !== groupId));
@@ -380,11 +285,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setGroupPromptSessions(prev => 
         prev.map(s => s.id === sessionId ? { ...s, status: 'completed' } : s)
       );
-
-      // Auto-sync to database if user is authenticated
-      if (user) {
-        setTimeout(() => syncToDatabase(), 1000);
-      }
       
     } catch (error) {
       // Update session status to error
@@ -392,7 +292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map(s => s.id === sessionId ? { ...s, status: 'error' } : s)
       );
     }
-  }, [user]);
+  }, []);
 
   const handleEditGroupPrompt = useCallback((sessionId: string) => {
     const session = groupPromptSessions.find(s => s.id === sessionId);
@@ -447,8 +347,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     galleryTool,
     isGeneratingConcept,
     viewerState,
-    isLoading,
-    isSyncing,
     
     // Actions
     handleImageUpload,
@@ -469,7 +367,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleCreateFork,
     toggleAnnotation,
     clearAnnotations,
-    syncToDatabase,
   };
 
   return (
