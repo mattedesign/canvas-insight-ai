@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 export const UXAnalysisTool: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
@@ -26,6 +27,22 @@ export const UXAnalysisTool: React.FC = () => {
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
   const [isGeneratingConcept, setIsGeneratingConcept] = useState<boolean>(false);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
+
+  // Handle navigation from other pages requesting upload screen
+  useEffect(() => {
+    const state = location.state as { showUpload?: boolean } | null;
+    if (state?.showUpload) {
+      // Clear any existing data and show upload screen
+      setUploadedImages([]);
+      setAnalyses([]);
+      setGeneratedConcepts([]);
+      setSelectedImageId(null);
+      setSelectedView('gallery');
+      clearAnnotations();
+      // Clear the navigation state to prevent this from running again
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, location.pathname, navigate, clearAnnotations]);
 
   const handleImageUpload = useCallback(async (files: File[]) => {
     const newImages: UploadedImage[] = [];

@@ -42,8 +42,8 @@ const Projects = () => {
   };
 
   const handleAddImages = () => {
-    // Navigate to main app
-    navigate('/');
+    // Navigate to main app with upload state
+    navigate('/', { state: { showUpload: true } });
   };
 
   const handleNavigateToPreviousAnalyses = () => {
