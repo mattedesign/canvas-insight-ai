@@ -27,7 +27,6 @@ import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { GroupCreationDialog } from '../GroupCreationDialog';
-import { ForkCreationDialog } from '../ForkCreationDialog';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -96,9 +95,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(true);
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
-  const [selectedSessionData, setSelectedSessionData] = useState<{groupName?: string, originalPrompt?: string}>({});
   
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
@@ -141,25 +137,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, [groups, toast]);
 
-  // Fork creation handler
+  // Fork creation handler - directly create fork without modal
   const handleCreateForkClick = useCallback((sessionId: string) => {
-    // Find the session data to get context
-    const sessionData = groupAnalysesWithPrompts.find(s => s.sessionId === sessionId);
-    const group = imageGroups.find(g => g.id === sessionData?.groupId);
-    setSelectedSessionId(sessionId);
-    setSelectedSessionData({
-      groupName: group?.name || '',
-      originalPrompt: sessionData?.prompt || ''
-    });
-    setIsForkDialogOpen(true);
-  }, [groupAnalysesWithPrompts, imageGroups]);
-
-  const handleForkCreation = useCallback(async (sessionId: string, forkName: string, forkDescription: string) => {
     if (onCreateFork) {
-      await onCreateFork(sessionId);
+      onCreateFork(sessionId);
       toast({
         title: "Fork Created",
-        description: `Created new analysis branch: "${forkName}"`,
+        description: "Created new analysis branch - add your prompt to continue",
       });
     }
   }, [onCreateFork, toast]);
@@ -954,11 +938,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setIsGroupDialogOpen={setIsGroupDialogOpen}
         handleGroupCreation={handleGroupCreation}
         uploadedImages={uploadedImages}
-        isForkDialogOpen={isForkDialogOpen}
-        setIsForkDialogOpen={setIsForkDialogOpen}
-        handleForkCreation={handleForkCreation}
-        selectedSessionId={selectedSessionId}
-        selectedSessionData={selectedSessionData}
       />
     </AnnotationOverlayProvider>
   );
@@ -992,11 +971,6 @@ interface CanvasContentProps {
   setIsGroupDialogOpen: (open: boolean) => void;
   handleGroupCreation: (name: string, description: string, color: string) => void;
   uploadedImages: UploadedImage[];
-  isForkDialogOpen: boolean;
-  setIsForkDialogOpen: (open: boolean) => void;
-  handleForkCreation: (sessionId: string, forkName: string, forkDescription: string) => Promise<void>;
-  selectedSessionId: string;
-  selectedSessionData: {groupName?: string, originalPrompt?: string};
 }
 
 const CanvasContent: React.FC<CanvasContentProps> = ({
@@ -1026,11 +1000,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   setIsGroupDialogOpen,
   handleGroupCreation,
   uploadedImages,
-  isForkDialogOpen,
-  setIsForkDialogOpen,
-  handleForkCreation,
-  selectedSessionId,
-  selectedSessionData,
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
@@ -1132,16 +1101,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         onClose={() => setIsGroupDialogOpen(false)}
         onCreateGroup={handleGroupCreation}
         selectedImages={uploadedImages.filter(img => multiSelection.state.selectedIds.includes(img.id))}
-      />
-      
-      {/* Fork Creation Dialog */}
-      <ForkCreationDialog
-        isOpen={isForkDialogOpen}
-        onClose={() => setIsForkDialogOpen(false)}
-        onCreateFork={handleForkCreation}
-        sessionId={selectedSessionId}
-        originalPrompt={selectedSessionData.originalPrompt}
-        groupName={selectedSessionData.groupName}
       />
     </div>
   );
