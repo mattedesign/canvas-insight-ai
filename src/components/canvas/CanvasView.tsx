@@ -232,7 +232,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, multiSelection]);
+  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, multiSelection.toggleSelection, multiSelection.isSelected]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
