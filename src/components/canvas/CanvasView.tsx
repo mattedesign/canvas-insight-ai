@@ -236,7 +236,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         let currentConceptXPosition = rightmostXPosition;
         
         conceptsForAnalysis.forEach((concept, conceptIndex) => {
-          // Create concept image node (artboard)
+          // Create concept image node (artboard) - use same dimensions as original image
           const conceptImageNode: Node = {
             id: `concept-image-${concept.id}`,
             type: 'conceptImage',
@@ -245,8 +245,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           nodes.push(conceptImageNode);
 
-          // Create concept details node (positioned to the right of image)
-          const conceptDetailsXPosition = currentConceptXPosition + 400 + horizontalSpacing;
+          // Create concept details node (positioned to the right of concept image)
+          const conceptDetailsXPosition = currentConceptXPosition + displayWidth + horizontalSpacing;
           const conceptDetailsNode: Node = {
             id: `concept-details-${concept.id}`,
             type: 'conceptDetails',
@@ -277,7 +277,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           edges.push(conceptDetailsEdge);
 
-          // Update position for next concept (if any)
+          // Update position for next concept (if any) - use original image width + spacing + details width
           currentConceptXPosition = conceptDetailsXPosition + 400 + horizontalSpacing;
         });
       }
@@ -320,8 +320,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           if (analysis) {
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
             if (conceptsForAnalysis.length > 0) {
-              // Each concept adds: concept image (400px) + spacing (100px) + concept details (400px) + spacing (100px)
-              const conceptWidth = conceptsForAnalysis.length * (400 + 100 + 400 + 100);
+              // Each concept adds: concept image (original width) + spacing + concept details (400px) + spacing
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + 100 + 400 + 100);
               pairWidth += conceptWidth;
             }
           }
@@ -353,8 +353,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           if (analysis) {
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
             if (conceptsForAnalysis.length > 0) {
-              // Each concept adds: concept image (400px) + spacing (100px) + concept details (400px) + spacing (100px)
-              const conceptWidth = conceptsForAnalysis.length * (400 + 100 + 400 + 100);
+              // Each concept adds: concept image (original width) + spacing + concept details (400px) + spacing
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + 100 + 400 + 100);
               pairWidth += conceptWidth;
             }
           }
@@ -454,7 +454,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             let currentConceptXPosition = padding + displayWidth + horizontalSpacing + 400 + 100; // After analysis card
             
             conceptsForAnalysis.forEach((concept, conceptIndex) => {
-              // Create concept image node (artboard)
+              // Create concept image node (artboard) - use same dimensions as original image
               const conceptImageNode: Node = {
                 id: `concept-image-${concept.id}`,
                 type: 'conceptImage',
@@ -466,7 +466,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               nodes.push(conceptImageNode);
 
               // Create concept details node (positioned to the right of concept image)
-              const conceptDetailsXPosition = currentConceptXPosition + 400 + 100;
+              const conceptDetailsXPosition = currentConceptXPosition + displayWidth + 100;
               const conceptDetailsNode: Node = {
                 id: `concept-details-${concept.id}`,
                 type: 'conceptDetails',
@@ -499,7 +499,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               };
               edges.push(conceptDetailsEdge);
 
-              // Update position for next concept (if any)
+              // Update position for next concept (if any) - use original image width + spacing + details width
               currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
             });
           }
@@ -571,7 +571,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             let currentConceptXPosition = padding + displayWidth + horizontalSpacing + 400 + 100; // After analysis card
             
             conceptsForAnalysis.forEach((concept, conceptIndex) => {
-              // Create concept image node (artboard)
+              // Create concept image node (artboard) - use same dimensions as original image
               const conceptImageNode: Node = {
                 id: `concept-image-${concept.id}`,
                 type: 'conceptImage',
@@ -583,7 +583,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               nodes.push(conceptImageNode);
 
               // Create concept details node (positioned to the right of concept image)
-              const conceptDetailsXPosition = currentConceptXPosition + 400 + 100;
+              const conceptDetailsXPosition = currentConceptXPosition + displayWidth + 100;
               const conceptDetailsNode: Node = {
                 id: `concept-details-${concept.id}`,
                 type: 'conceptDetails',
@@ -616,7 +616,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               };
               edges.push(conceptDetailsEdge);
 
-              // Update position for next concept (if any)
+              // Update position for next concept (if any) - use original image width + spacing + details width
               currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
             });
           }
