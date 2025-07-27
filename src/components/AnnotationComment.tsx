@@ -152,7 +152,10 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
       {/* Dynamic connection line */}
       <AnnotationConnectionLine
         markerPosition={position}
-        dialogPosition={{ x: optimalPosition.dialogX, y: optimalPosition.dialogY }}
+        dialogPosition={{ 
+          x: optimalPosition.dialogX + (window.pageXOffset || document.documentElement.scrollLeft), 
+          y: optimalPosition.dialogY + (window.pageYOffset || document.documentElement.scrollTop)
+        }}
         dialogSize={dialogSize}
         isVisible={true}
         annotationId={annotation.id}

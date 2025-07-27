@@ -25,7 +25,6 @@ export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> =
   // Find the actual annotation marker element and track its position
   const updateMarkerPosition = useCallback(() => {
     const markerElements = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
-    console.log(`Looking for marker with ID: ${annotationId}`, markerElements.length);
     
     if (markerElements.length > 0) {
       const markerElement = markerElements[0] as HTMLElement;
@@ -33,17 +32,15 @@ export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> =
       const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
       const scrollY = window.pageYOffset || document.documentElement.scrollTop;
       
-      const newPosition = {
+      setActualMarkerPosition({
         x: rect.left + rect.width / 2 + scrollX,
         y: rect.top + rect.height / 2 + scrollY
-      };
-      
-      console.log('Updated marker position:', newPosition);
-      setActualMarkerPosition(newPosition);
+      });
     } else {
-      console.warn(`No marker found with annotation ID: ${annotationId}`);
+      // Fallback to the provided marker position
+      setActualMarkerPosition(markerPosition);
     }
-  }, [annotationId]);
+  }, [annotationId, markerPosition]);
 
   // Update viewport size and marker position on resize and scroll
   useEffect(() => {
@@ -59,19 +56,16 @@ export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> =
       updateMarkerPosition();
     };
 
-    // Initial position update
-    updateMarkerPosition();
+    // Initial position update with a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(updateMarkerPosition, 100);
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleScroll, true); // Use capture to catch all scroll events
-    
-    // Use animation frame for smooth updates
-    const animationId = requestAnimationFrame(updateMarkerPosition);
+    window.addEventListener('scroll', handleScroll, true);
     
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleScroll, true);
-      cancelAnimationFrame(animationId);
+      clearTimeout(timeoutId);
     };
   }, [updateMarkerPosition]);
 
@@ -146,7 +140,7 @@ export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> =
   return (
     <svg
       ref={svgRef}
-      className="fixed top-0 left-0 pointer-events-none z-[55]"
+      className="fixed top-0 left-0 pointer-events-none z-[58]"
       style={{
         width: viewportSize.width,
         height: viewportSize.height
