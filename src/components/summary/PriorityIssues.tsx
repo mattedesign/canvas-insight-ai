@@ -1,12 +1,14 @@
 import React from 'react';
 import { AlertTriangle, Clock, Zap, ArrowRight } from 'lucide-react';
 import { UXAnalysis, Suggestion } from '@/types/ux-analysis';
+import { DashboardMetrics } from '@/services/DashboardService';
 
 interface PriorityIssuesProps {
   analyses: UXAnalysis[];
+  metrics?: DashboardMetrics;
 }
 
-export const PriorityIssues: React.FC<PriorityIssuesProps> = ({ analyses }) => {
+export const PriorityIssues: React.FC<PriorityIssuesProps> = ({ analyses, metrics }) => {
   // Aggregate all suggestions and prioritize them
   const allSuggestions: (Suggestion & { designName: string })[] = [];
   

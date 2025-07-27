@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { SummaryDashboard } from '@/components/summary/SummaryDashboard';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ const Dashboard = () => {
     handleImageSelect,
     handleToggleAnnotations
   } = useAppContext();
+
+  const { metrics, loading, error, refreshMetrics } = useDashboardMetrics();
 
   const handleAddImages = () => {
     navigate('/upload');
@@ -41,7 +44,13 @@ const Dashboard = () => {
       />
       
       <div className="flex-1">
-        <SummaryDashboard analyses={analyses} />
+        <SummaryDashboard 
+          analyses={analyses}
+          metrics={metrics}
+          loading={loading}
+          error={error}
+          onRefresh={refreshMetrics}
+        />
       </div>
     </div>
   );

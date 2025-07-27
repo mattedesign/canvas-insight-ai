@@ -1,12 +1,14 @@
 import React from 'react';
 import { CheckSquare, Clock, Zap, Download, ArrowRight } from 'lucide-react';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { DashboardMetrics } from '@/services/DashboardService';
 
 interface ActionPlanProps {
   analyses: UXAnalysis[];
+  metrics?: DashboardMetrics;
 }
 
-export const ActionPlan: React.FC<ActionPlanProps> = ({ analyses }) => {
+export const ActionPlan: React.FC<ActionPlanProps> = ({ analyses, metrics }) => {
   // Generate action plan based on all analyses
   const allSuggestions = analyses.flatMap(analysis => analysis.suggestions);
   

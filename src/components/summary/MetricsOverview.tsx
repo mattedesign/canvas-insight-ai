@@ -1,29 +1,28 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Zap } from 'lucide-react';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { DashboardMetrics } from '@/services/DashboardService';
 
 interface MetricsOverviewProps {
   analyses: UXAnalysis[];
+  metrics?: DashboardMetrics;
 }
 
-export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses }) => {
-  // Calculate aggregate metrics
-  const totalSuggestions = analyses.reduce((sum, analysis) => sum + analysis.suggestions.length, 0);
-  const totalAnnotations = analyses.reduce((sum, analysis) => sum + analysis.visualAnnotations.length, 0);
-  const avgScore = Math.round(
+export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metrics: dashboardMetrics }) => {
+  // Use database metrics if available, otherwise calculate from analyses
+  const totalSuggestions = dashboardMetrics?.totalSuggestions || analyses.reduce((sum, analysis) => sum + analysis.suggestions.length, 0);
+  const avgScore = dashboardMetrics?.averageScore || Math.round(
     analyses.reduce((sum, analysis) => sum + analysis.summary.overallScore, 0) / analyses.length
   );
-  const totalIssues = analyses.reduce((sum, analysis) => sum + analysis.summary.keyIssues.length, 0);
-
-  const highImpactSuggestions = analyses.reduce((sum, analysis) => 
+  const totalIssues = dashboardMetrics?.totalIssues || analyses.reduce((sum, analysis) => sum + analysis.summary.keyIssues.length, 0);
+  const accessibilityScore = dashboardMetrics?.categoryScores.accessibility || Math.round(
+    analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.accessibility, 0) / analyses.length
+  );
+  const highImpactSuggestions = dashboardMetrics?.issueDistribution.high || analyses.reduce((sum, analysis) => 
     sum + analysis.suggestions.filter(s => s.impact === 'high').length, 0
   );
 
-  const accessibilityScore = Math.round(
-    analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.accessibility, 0) / analyses.length
-  );
-
-  const metrics = [
+  const metricsData = [
     {
       title: 'Overall UX Score',
       value: avgScore,
@@ -62,7 +61,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses }) =>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {metrics.map((metric, index) => (
+      {metricsData.map((metric, index) => (
         <div key={index} className="bg-card border border-border rounded-lg p-6 shadow-card">
           <div className="flex items-start justify-between">
             <div className="space-y-1">

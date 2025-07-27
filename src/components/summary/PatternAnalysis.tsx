@@ -2,12 +2,14 @@ import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { TrendingUp, RefreshCw, Users } from 'lucide-react';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { DashboardMetrics } from '@/services/DashboardService';
 
 interface PatternAnalysisProps {
   analyses: UXAnalysis[];
+  metrics?: DashboardMetrics;
 }
 
-export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({ analyses }) => {
+export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({ analyses, metrics }) => {
   // Analyze common issues across designs
   const issueFrequency: Record<string, number> = {};
   

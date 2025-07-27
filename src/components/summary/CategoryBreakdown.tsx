@@ -1,12 +1,14 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { DashboardMetrics } from '@/services/DashboardService';
 
 interface CategoryBreakdownProps {
   analyses: UXAnalysis[];
+  metrics?: DashboardMetrics;
 }
 
-export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses }) => {
+export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, metrics }) => {
   // Calculate average scores by category
   const categoryData = [
     {
