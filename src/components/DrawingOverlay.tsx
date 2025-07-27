@@ -6,6 +6,7 @@ interface DrawingOverlayProps {
   imageDimensions: { width: number; height: number };
   isDrawMode: boolean;
   onDrawingComplete: (drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => void;
+  isPanningDisabled?: boolean;
 }
 
 export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
@@ -13,6 +14,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   imageDimensions,
   isDrawMode,
   onDrawingComplete,
+  isPanningDisabled = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -160,7 +162,11 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       {/* Drawing Canvas */}
       <canvas
         ref={canvasRef}
-        className={`absolute top-0 left-0 w-full h-full ${isDrawMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+        className={`absolute top-0 left-0 w-full h-full ${
+          isDrawMode && !isPanningDisabled 
+            ? 'pointer-events-auto cursor-crosshair' 
+            : 'pointer-events-none'
+        }`}
         style={{ 
           zIndex: isDrawMode ? 10 : 1,
         }}

@@ -5,7 +5,7 @@ import { AnnotationComment } from './AnnotationComment';
 import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
-import { useImageTransform } from '@/hooks/useImageTransform';
+
 
 interface ImageViewerProps {
   analysis: UXAnalysis;
@@ -21,44 +21,6 @@ interface ImageViewerProps {
   imageDimensions?: { width: number; height: number };
 }
 
-const AnnotationMarker: React.FC<{
-  annotation: AnnotationPoint;
-  isSelected: boolean;
-  onClick: (annotation: AnnotationPoint, event: React.MouseEvent) => void;
-}> = ({ annotation, isSelected, onClick }) => {
-  const getMarkerColor = () => {
-    switch (annotation.type) {
-      case 'issue':
-        return isSelected ? 'bg-destructive border-destructive-foreground' : 'bg-destructive/80 border-destructive';
-      case 'suggestion':
-        return isSelected ? 'bg-warning border-warning-foreground' : 'bg-warning/80 border-warning';
-      case 'success':
-        return isSelected ? 'bg-success border-success-foreground' : 'bg-success/80 border-success';
-      default:
-        return isSelected ? 'bg-primary border-primary-foreground' : 'bg-primary/80 border-primary';
-    }
-  };
-
-  return (
-    <button
-      className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-20 ${getMarkerColor()}`}
-      style={{
-        left: `${annotation.x}%`,
-        top: `${annotation.y}%`,
-      }}
-      data-annotation-id={annotation.id}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick(annotation, e);
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onMouseUp={(e) => e.stopPropagation()}
-      title={annotation.title}
-      type="button"
-    />
-  );
-};
 
 export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   analysis,
@@ -77,14 +39,55 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const {
-    zoomIn,
-    zoomOut,
-    resetTransform,
-    setTransformRef,
-    handleTransformChange,
-    getZoomLevel,
-  } = useImageTransform();
+  // Remove useImageTransform hook that was interfering with TransformWrapper
+  const transformRef = useRef<any>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  // AnnotationMarker component moved inside to access activeCommentId
+  const AnnotationMarker: React.FC<{
+    annotation: AnnotationPoint;
+    isSelected: boolean;
+    onClick: (annotation: AnnotationPoint, event: React.MouseEvent) => void;
+  }> = ({ annotation, isSelected, onClick }) => {
+    const getMarkerColor = () => {
+      switch (annotation.type) {
+        case 'issue':
+          return isSelected ? 'bg-destructive border-destructive-foreground' : 'bg-destructive/80 border-destructive';
+        case 'suggestion':
+          return isSelected ? 'bg-warning border-warning-foreground' : 'bg-warning/80 border-warning';
+        case 'success':
+          return isSelected ? 'bg-success border-success-foreground' : 'bg-success/80 border-success';
+        default:
+          return isSelected ? 'bg-primary border-primary-foreground' : 'bg-primary/80 border-primary';
+      }
+    };
+
+    return (
+      <button
+        className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-20 ${getMarkerColor()}`}
+        style={{
+          left: `${annotation.x}%`,
+          top: `${annotation.y}%`,
+        }}
+        data-annotation-id={annotation.id}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick(annotation, e);
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          // Only prevent default if this annotation is not the active one
+          if (annotation.id !== activeCommentId) {
+            e.preventDefault();
+          }
+        }}
+        onMouseUp={(e) => e.stopPropagation()}
+        title={annotation.title}
+        type="button"
+      />
+    );
+  };
 
   const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
     const markerRect = event.currentTarget.getBoundingClientRect();
@@ -208,6 +211,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
             imageDimensions={imageDimensions}
             isDrawMode={currentTool === 'draw'}
             onDrawingComplete={handleDrawingComplete}
+            isPanningDisabled={!!activeCommentId}
           />
 
           {/* Active Comment */}
@@ -235,7 +239,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         onToolChange={onToolChange}
         onAddComment={onAddComment}
         showAnnotations={showAnnotations}
-        zoomLevel={getZoomLevel()}
+        zoomLevel={zoomLevel}
         currentTool={currentTool}
       />
       
@@ -261,7 +265,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     handleToggleAnnotations,
     onToolChange,
     onAddComment,
-    getZoomLevel,
+    zoomLevel,
     currentTool,
     handleImageDoubleClick
   ]);
@@ -270,7 +274,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
-        ref={setTransformRef}
         initialScale={1}
         minScale={0.1}
         maxScale={5}
@@ -284,12 +287,13 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           velocityDisabled: false,
           disabled: !!activeCommentId, // Disable panning when annotation dialog is open
         }}
-        onInit={() => {
+        onInit={(ref) => {
+          transformRef.current = ref;
           console.log('TransformWrapper initialized');
         }}
         onTransformed={(ref, state) => {
           console.log('Transform changed:', { scale: state.scale, activeCommentId });
-          handleTransformChange(ref);
+          setZoomLevel(Math.round(state.scale * 100));
         }}
         doubleClick={{
           disabled: false,
