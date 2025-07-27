@@ -65,6 +65,37 @@ export interface ImageGroup {
   createdAt: Date;
 }
 
+export interface GroupPromptSession {
+  id: string;
+  groupId: string;
+  prompt: string;
+  isCustom: boolean;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  parentSessionId?: string; // For branching/forking
+  createdAt: Date;
+}
+
+export interface GroupAnalysisWithPrompt {
+  id: string;
+  sessionId: string;
+  groupId: string;
+  prompt: string;
+  summary: {
+    overallScore: number;
+    consistency: number;
+    thematicCoherence: number;
+    userFlowContinuity: number;
+  };
+  insights: string[];
+  recommendations: string[];
+  patterns: {
+    commonElements: string[];
+    designInconsistencies: string[];
+    userJourneyGaps: string[];
+  };
+  createdAt: Date;
+}
+
 export interface GroupAnalysis {
   id: string;
   groupId: string;

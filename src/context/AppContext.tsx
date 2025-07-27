@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { generateMockGroupAnalysis } from '@/data/mockGroupAnalysis';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -11,6 +11,8 @@ interface AppContextType {
   generatedConcepts: GeneratedConcept[];
   imageGroups: ImageGroup[];
   groupAnalyses: GroupAnalysis[];
+  groupPromptSessions: GroupPromptSession[];
+  groupAnalysesWithPrompts: GroupAnalysisWithPrompt[];
   groupDisplayModes: Record<string, 'standard' | 'stacked'>;
   selectedImageId: string | null;
   showAnnotations: boolean;
@@ -31,6 +33,9 @@ interface AppContextType {
   handleUngroup: (groupId: string) => void;
   handleDeleteGroup: (groupId: string) => void;
   handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => void;
+  handleSubmitGroupPrompt: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
+  handleEditGroupPrompt: (sessionId: string) => void;
+  handleCreateFork: (sessionId: string) => void;
   toggleAnnotation: (annotationId: string) => void;
   clearAnnotations: () => void;
 }
@@ -51,6 +56,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
   const [imageGroups, setImageGroups] = useState<ImageGroup[]>([]);
   const [groupAnalyses, setGroupAnalyses] = useState<GroupAnalysis[]>([]);
+  const [groupPromptSessions, setGroupPromptSessions] = useState<GroupPromptSession[]>([]);
+  const [groupAnalysesWithPrompts, setGroupAnalysesWithPrompts] = useState<GroupAnalysisWithPrompt[]>([]);
   const [groupDisplayModes, setGroupDisplayModes] = useState<Record<string, 'standard' | 'stacked'>>({});
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
@@ -177,22 +184,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       color,
       createdAt: new Date(),
     };
-
-    // Generate group analysis
-    const groupAnalysis = generateMockGroupAnalysis(groupId, name);
     
     setImageGroups(prev => [...prev, newGroup]);
-    setGroupAnalyses(prev => [...prev, groupAnalysis]);
+    // Note: No longer auto-generating analysis - waiting for prompt submission
   }, []);
 
   const handleUngroup = useCallback((groupId: string) => {
     setImageGroups(prev => prev.filter(group => group.id !== groupId));
     setGroupAnalyses(prev => prev.filter(analysis => analysis.groupId !== groupId));
+    setGroupPromptSessions(prev => prev.filter(session => session.groupId !== groupId));
+    setGroupAnalysesWithPrompts(prev => prev.filter(analysis => analysis.groupId !== groupId));
   }, []);
 
   const handleDeleteGroup = useCallback((groupId: string) => {
     setImageGroups(prev => prev.filter(group => group.id !== groupId));
     setGroupAnalyses(prev => prev.filter(analysis => analysis.groupId !== groupId));
+    setGroupPromptSessions(prev => prev.filter(session => session.groupId !== groupId));
+    setGroupAnalysesWithPrompts(prev => prev.filter(analysis => analysis.groupId !== groupId));
     setGroupDisplayModes(prev => {
       const newModes = { ...prev };
       delete newModes[groupId];
@@ -207,6 +215,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   }, []);
 
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+    const sessionId = `session-${Date.now()}`;
+    
+    // Create prompt session
+    const session: GroupPromptSession = {
+      id: sessionId,
+      groupId,
+      prompt,
+      isCustom,
+      status: 'processing',
+      createdAt: new Date(),
+    };
+    
+    setGroupPromptSessions(prev => [...prev, session]);
+    
+    try {
+      // Simulate AI processing
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Create analysis with prompt
+      const analysisId = `analysis-${Date.now()}`;
+      const analysis: GroupAnalysisWithPrompt = {
+        id: analysisId,
+        sessionId,
+        groupId,
+        prompt,
+        summary: {
+          overallScore: 75 + Math.floor(Math.random() * 20),
+          consistency: 70 + Math.floor(Math.random() * 25),
+          thematicCoherence: 80 + Math.floor(Math.random() * 15),
+          userFlowContinuity: 65 + Math.floor(Math.random() * 30),
+        },
+        insights: [
+          'Visual hierarchy is consistently applied across all screens',
+          'Color palette maintains brand consistency throughout the group',
+          'Typography scale follows design system guidelines',
+          'Navigation patterns are coherent and intuitive',
+        ],
+        recommendations: [
+          'Consider standardizing button sizes across all screens',
+          'Implement consistent spacing patterns for better visual rhythm',
+          'Align call-to-action placement for improved user flow',
+        ],
+        patterns: {
+          commonElements: ['Primary buttons', 'Navigation bar', 'Card components', 'Form inputs'],
+          designInconsistencies: ['Button sizes', 'Icon styles', 'Shadow depths'],
+          userJourneyGaps: ['Missing back navigation', 'Unclear progress indicators'],
+        },
+        createdAt: new Date(),
+      };
+      
+      setGroupAnalysesWithPrompts(prev => [...prev, analysis]);
+      
+      // Update session status
+      setGroupPromptSessions(prev => 
+        prev.map(s => s.id === sessionId ? { ...s, status: 'completed' } : s)
+      );
+      
+    } catch (error) {
+      // Update session status to error
+      setGroupPromptSessions(prev => 
+        prev.map(s => s.id === sessionId ? { ...s, status: 'error' } : s)
+      );
+    }
+  }, []);
+
+  const handleEditGroupPrompt = useCallback((sessionId: string) => {
+    const session = groupPromptSessions.find(s => s.id === sessionId);
+    if (session) {
+      // Create new session for editing (branching)
+      const newSessionId = `session-${Date.now()}`;
+      const newSession: GroupPromptSession = {
+        id: newSessionId,
+        groupId: session.groupId,
+        prompt: session.prompt,
+        isCustom: true,
+        status: 'pending',
+        parentSessionId: sessionId,
+        createdAt: new Date(),
+      };
+      
+      setGroupPromptSessions(prev => [...prev, newSession]);
+    }
+  }, [groupPromptSessions]);
+
+  const handleCreateFork = useCallback((sessionId: string) => {
+    const session = groupPromptSessions.find(s => s.id === sessionId);
+    if (session) {
+      // Create new session as a fork
+      const newSessionId = `session-${Date.now()}`;
+      const newSession: GroupPromptSession = {
+        id: newSessionId,
+        groupId: session.groupId,
+        prompt: '',
+        isCustom: true,
+        status: 'pending',
+        parentSessionId: sessionId,
+        createdAt: new Date(),
+      };
+      
+      setGroupPromptSessions(prev => [...prev, newSession]);
+    }
+  }, [groupPromptSessions]);
+
   const value: AppContextType = {
     // State
     uploadedImages,
@@ -214,6 +326,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     generatedConcepts,
     imageGroups,
     groupAnalyses,
+    groupPromptSessions,
+    groupAnalysesWithPrompts,
     groupDisplayModes,
     selectedImageId,
     showAnnotations,
@@ -234,6 +348,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleUngroup,
     handleDeleteGroup,
     handleGroupDisplayModeChange,
+    handleSubmitGroupPrompt,
+    handleEditGroupPrompt,
+    handleCreateFork,
     toggleAnnotation,
     clearAnnotations,
   };

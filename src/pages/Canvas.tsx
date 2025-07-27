@@ -12,6 +12,8 @@ const Canvas = () => {
     generatedConcepts,
     imageGroups,
     groupAnalyses,
+    groupPromptSessions,
+    groupAnalysesWithPrompts,
     groupDisplayModes,
     selectedImageId,
     showAnnotations,
@@ -23,7 +25,10 @@ const Canvas = () => {
     handleCreateGroup,
     handleUngroup,
     handleDeleteGroup,
-    handleGroupDisplayModeChange
+    handleGroupDisplayModeChange,
+    handleSubmitGroupPrompt,
+    handleEditGroupPrompt,
+    handleCreateFork
   } = useAppContext();
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
@@ -91,6 +96,8 @@ const Canvas = () => {
           generatedConcepts={generatedConcepts}
           imageGroups={imageGroups}
           groupAnalyses={groupAnalyses}
+          groupPromptSessions={groupPromptSessions}
+          groupAnalysesWithPrompts={groupAnalysesWithPrompts}
           groupDisplayModes={groupDisplayModes}
           showAnnotations={showAnnotations}
           onToggleAnnotations={handleToggleAnnotations}
@@ -101,6 +108,9 @@ const Canvas = () => {
           onUngroup={handleUngroup}
           onDeleteGroup={handleDeleteGroup}
           onGroupDisplayModeChange={handleGroupDisplayModeChange}
+          onSubmitGroupPrompt={handleSubmitGroupPrompt}
+          onEditGroupPrompt={handleEditGroupPrompt}
+          onCreateFork={handleCreateFork}
           isGeneratingConcept={isGeneratingConcept}
         />
       </div>

@@ -11,7 +11,7 @@ import {
   Background,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { ConceptImageNode } from './ConceptImageNode';
@@ -19,6 +19,8 @@ import { ConceptDetailsNode } from './ConceptDetailsNode';
 import { GroupNode } from './GroupNode';
 import { GroupContainerNode } from './GroupContainerNode';
 import { GroupAnalysisCardNode } from './GroupAnalysisCardNode';
+import { GroupPromptCollectionNode } from './GroupPromptCollectionNode';
+import { GroupAnalysisResultsNode } from './GroupAnalysisResultsNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
@@ -37,6 +39,8 @@ const nodeTypes = {
   group: GroupNode,
   groupContainer: GroupContainerNode,
   groupAnalysisCard: GroupAnalysisCardNode,
+  groupPromptCollection: GroupPromptCollectionNode,
+  groupAnalysisResults: GroupAnalysisResultsNode,
 };
 
 interface CanvasViewProps {
@@ -45,6 +49,8 @@ interface CanvasViewProps {
   generatedConcepts: GeneratedConcept[];
   imageGroups?: ImageGroup[];
   groupAnalyses?: GroupAnalysis[];
+  groupPromptSessions?: GroupPromptSession[];
+  groupAnalysesWithPrompts?: GroupAnalysisWithPrompt[];
   groupDisplayModes?: Record<string, 'standard' | 'stacked'>;
   showAnnotations: boolean;
   onToggleAnnotations?: () => void;
@@ -55,6 +61,9 @@ interface CanvasViewProps {
   onUngroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
   onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
+  onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
+  onEditGroupPrompt?: (sessionId: string) => void;
+  onCreateFork?: (sessionId: string) => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -64,6 +73,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   generatedConcepts,
   imageGroups = [],
   groupAnalyses = [],
+  groupPromptSessions = [],
+  groupAnalysesWithPrompts = [],
   groupDisplayModes = {},
   showAnnotations,
   onToggleAnnotations,
@@ -74,6 +85,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onUngroup,
   onDeleteGroup,
   onGroupDisplayModeChange,
+  onSubmitGroupPrompt,
+  onEditGroupPrompt,
+  onCreateFork,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -436,44 +450,152 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         });
       }
       
-      // Create group-level analysis card (positioned outside the container)
-      const groupAnalysis = groupAnalyses.find(ga => ga.groupId === group.id);
-      if (groupAnalysis) {
-        const analysisCardNode: Node = {
-          id: `group-analysis-${group.id}`,
-          type: 'groupAnalysisCard',
-          position: { x: 50 + containerWidth + 100, y: yOffset },
+      // Group analysis workflow: Check for prompt sessions and analysis results
+      const groupSessions = groupPromptSessions.filter(session => session.groupId === group.id);
+      const groupAnalysesForGroup = groupAnalysesWithPrompts.filter(analysis => analysis.groupId === group.id);
+      
+      let rightmostXPosition = 50 + containerWidth + 100;
+      
+      if (groupSessions.length === 0) {
+        // No sessions yet - show prompt collection node
+        const promptCollectionNode: Node = {
+          id: `group-prompt-${group.id}`,
+          type: 'groupPromptCollection',
+          position: { x: rightmostXPosition, y: yOffset },
           data: {
-            analysis: groupAnalysis,
-            groupName: group.name,
-            onViewDetails: (analysisId: string) => {
-              toast({
-                title: "Group Analysis Details",
-                description: `Viewing detailed analysis for group "${group.name}"`,
-              });
-            },
+            group,
+            onSubmitPrompt: onSubmitGroupPrompt,
+            isLoading: groupSessions.some(s => s.status === 'processing'),
           },
         };
-        nodes.push(analysisCardNode);
+        nodes.push(promptCollectionNode);
         
-        // Create edge connecting container to group analysis card
+        // Create edge connecting container to prompt collection
         const edge: Edge = {
-          id: `edge-group-${group.id}-analysis`,
+          id: `edge-group-${group.id}-prompt`,
           source: `group-container-${group.id}`,
           sourceHandle: 'analysis',
-          target: `group-analysis-${group.id}`,
+          target: `group-prompt-${group.id}`,
           type: 'smoothstep',
           animated: true,
           style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
         };
         edges.push(edge);
+      } else {
+        // Show analysis results for completed sessions
+        const completedAnalyses = groupAnalysesForGroup.filter(analysis => {
+          const session = groupSessions.find(s => s.id === analysis.sessionId);
+          return session?.status === 'completed';
+        });
+        
+        if (completedAnalyses.length > 0) {
+          // Show most recent completed analysis
+          const latestAnalysis = completedAnalyses.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          
+          const analysisResultsNode: Node = {
+            id: `group-results-${latestAnalysis.id}`,
+            type: 'groupAnalysisResults',
+            position: { x: rightmostXPosition, y: yOffset },
+            data: {
+              analysis: latestAnalysis,
+              groupName: group.name,
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: onCreateFork,
+              onViewDetails: (analysisId: string) => {
+                toast({
+                  title: "Group Analysis Details",
+                  description: `Viewing detailed analysis for group "${group.name}"`,
+                });
+              },
+            },
+          };
+          nodes.push(analysisResultsNode);
+          
+          // Create edge connecting container to analysis results
+          const edge: Edge = {
+            id: `edge-group-${group.id}-results`,
+            source: `group-container-${group.id}`,
+            sourceHandle: 'analysis',
+            target: `group-results-${latestAnalysis.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+          };
+          edges.push(edge);
+          
+          rightmostXPosition += 400 + 100; // Space for next node
+          
+          // Show additional analysis branches if any
+          const otherAnalyses = completedAnalyses.filter(analysis => analysis.id !== latestAnalysis.id);
+          otherAnalyses.forEach((analysis, index) => {
+            const branchNode: Node = {
+              id: `group-branch-${analysis.id}`,
+              type: 'groupAnalysisResults',
+              position: { x: rightmostXPosition, y: yOffset + (index + 1) * 150 },
+              data: {
+                analysis,
+                groupName: group.name,
+                onEditPrompt: onEditGroupPrompt,
+                onCreateFork: onCreateFork,
+                onViewDetails: (analysisId: string) => {
+                  toast({
+                    title: "Group Analysis Details",
+                    description: `Viewing detailed analysis for group "${group.name}"`,
+                  });
+                },
+              },
+            };
+            nodes.push(branchNode);
+            
+            // Create edge for branch
+            const branchEdge: Edge = {
+              id: `edge-group-${group.id}-branch-${analysis.id}`,
+              source: `group-results-${latestAnalysis.id}`,
+              target: `group-branch-${analysis.id}`,
+              type: 'smoothstep',
+              animated: false,
+              style: { stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '3,3' },
+            };
+            edges.push(branchEdge);
+          });
+        } else {
+          // Show processing or pending session
+          const processingSession = groupSessions.find(s => s.status === 'processing');
+          if (processingSession) {
+            const promptCollectionNode: Node = {
+              id: `group-prompt-${group.id}`,
+              type: 'groupPromptCollection',
+              position: { x: rightmostXPosition, y: yOffset },
+              data: {
+                group,
+                onSubmitPrompt: onSubmitGroupPrompt,
+                isLoading: true,
+              },
+            };
+            nodes.push(promptCollectionNode);
+            
+            // Create edge connecting container to prompt collection
+            const edge: Edge = {
+              id: `edge-group-${group.id}-prompt`,
+              source: `group-container-${group.id}`,
+              sourceHandle: 'analysis',
+              target: `group-prompt-${group.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+            };
+            edges.push(edge);
+          }
+        }
       }
       
       yOffset += containerHeight + 100; // Space between groups
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
+  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupPromptSessions, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, onSubmitGroupPrompt, onEditGroupPrompt, onCreateFork, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
