@@ -14,7 +14,234 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      group_analyses: {
+        Row: {
+          created_at: string | null
+          group_id: string | null
+          id: string
+          insights: Json
+          is_custom: boolean | null
+          parent_analysis_id: string | null
+          patterns: Json
+          prompt: string
+          recommendations: Json
+          summary: Json
+        }
+        Insert: {
+          created_at?: string | null
+          group_id?: string | null
+          id?: string
+          insights?: Json
+          is_custom?: boolean | null
+          parent_analysis_id?: string | null
+          patterns?: Json
+          prompt: string
+          recommendations?: Json
+          summary?: Json
+        }
+        Update: {
+          created_at?: string | null
+          group_id?: string | null
+          id?: string
+          insights?: Json
+          is_custom?: boolean | null
+          parent_analysis_id?: string | null
+          patterns?: Json
+          prompt?: string
+          recommendations?: Json
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_analyses_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "image_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_analyses_parent_analysis_id_fkey"
+            columns: ["parent_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "group_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_images: {
+        Row: {
+          group_id: string
+          image_id: string
+        }
+        Insert: {
+          group_id: string
+          image_id: string
+        }
+        Update: {
+          group_id?: string
+          image_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_images_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "image_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      image_groups: {
+        Row: {
+          color: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          position: Json
+          project_id: string | null
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          position: Json
+          project_id?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          position?: Json
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_groups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      images: {
+        Row: {
+          dimensions: Json
+          filename: string
+          id: string
+          original_name: string
+          project_id: string | null
+          storage_path: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          dimensions: Json
+          filename: string
+          id?: string
+          original_name: string
+          project_id?: string | null
+          storage_path: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          dimensions?: Json
+          filename?: string
+          id?: string
+          original_name?: string
+          project_id?: string | null
+          storage_path?: string
+          uploaded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "images_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ux_analyses: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_id: string | null
+          metadata: Json
+          suggestions: Json
+          summary: Json
+          user_context: string | null
+          visual_annotations: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_id?: string | null
+          metadata?: Json
+          suggestions?: Json
+          summary?: Json
+          user_context?: string | null
+          visual_annotations?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_id?: string | null
+          metadata?: Json
+          suggestions?: Json
+          summary?: Json
+          user_context?: string | null
+          visual_annotations?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ux_analyses_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
