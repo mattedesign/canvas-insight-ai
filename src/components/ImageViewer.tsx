@@ -5,6 +5,7 @@ import { AnnotationComment } from './AnnotationComment';
 import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
+import { useImageTransform } from '@/hooks/useImageTransform';
 
 interface ImageViewerProps {
   analysis: UXAnalysis;
@@ -73,8 +74,15 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
-  const [zoomLevel, setZoomLevel] = useState(100);
   const { toast } = useToast();
+  const {
+    zoomIn,
+    zoomOut,
+    resetTransform,
+    setTransformRef,
+    handleTransformChange,
+    getZoomLevel,
+  } = useImageTransform();
 
   const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -138,11 +146,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     s.relatedAnnotations.includes(activeCommentId || '')
   );
 
-  const handleZoomChange = useCallback((ref: any) => {
-    if (ref?.state?.scale) {
-      setZoomLevel(Math.round(ref.state.scale * 100));
-    }
-  }, []);
+  // This will be handled by the useImageTransform hook now
 
   const handleDelete = useCallback(() => {
     if (onDeleteImage) {
@@ -224,7 +228,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         onToolChange={onToolChange}
         onAddComment={onAddComment}
         showAnnotations={showAnnotations}
-        zoomLevel={zoomLevel}
+        zoomLevel={getZoomLevel()}
         currentTool={currentTool}
       />
     </>
@@ -243,60 +247,50 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     handleToggleAnnotations,
     onToolChange,
     onAddComment,
-    zoomLevel,
+    getZoomLevel,
     currentTool,
     handleImageDoubleClick
   ]);
 
-  // Cursor mode: Simple container with no zoom/pan interference
-  if (currentTool === 'cursor') {
-    // Create mock zoom functions for the toolbar
-    const mockZoomIn = () => toast({ title: "Zoom", description: "Zoom controls disabled in cursor mode" });
-    const mockZoomOut = () => toast({ title: "Zoom", description: "Zoom controls disabled in cursor mode" });
-    const mockReset = () => toast({ title: "Reset", description: "Reset disabled in cursor mode" });
-    
-    return (
-      <div className="w-full h-full bg-muted/20 relative overflow-hidden">
-        <ImageContent 
-          zoomIn={mockZoomIn}
-          zoomOut={mockZoomOut}
-          resetTransform={mockReset}
-        />
-      </div>
-    );
-  }
-
-  // Draw mode: Use TransformWrapper
+  // Unified zoom/pan for both cursor and draw modes
   return (
     <div className="w-full h-full bg-muted/20 relative overflow-hidden">
       <TransformWrapper
+        ref={setTransformRef}
         initialScale={1}
         minScale={0.1}
         maxScale={5}
         centerOnInit
-        onTransformed={handleZoomChange}
-        disabled={currentTool === 'draw'}
-        doubleClick={{
-          disabled: false,
-          mode: "reset"
+        onTransformed={handleTransformChange}
+        limitToBounds={false}
+        wheel={{
+          step: 0.1,
+          smoothStep: 0.002,
         }}
         panning={{
-          disabled: currentTool === 'draw',
-          velocityDisabled: true
+          velocityDisabled: false,
+          disabled: false,
         }}
-        wheel={{
-          disabled: currentTool === 'draw'
+        doubleClick={{
+          disabled: false,
+          mode: "zoomIn",
+          step: 0.7
+        }}
+        velocityAnimation={{
+          sensitivity: 1,
+          animationTime: 200,
+          animationType: "easeOut"
         }}
       >
-        {({ zoomIn, zoomOut, resetTransform }) => (
+        {({ zoomIn: wrapperZoomIn, zoomOut: wrapperZoomOut, resetTransform: wrapperResetTransform }) => (
           <TransformComponent
             wrapperClass="w-full h-full"
-            contentClass="w-full h-full"
+            contentClass="w-full h-full flex items-center justify-center"
           >
             <ImageContent 
-              zoomIn={zoomIn}
-              zoomOut={zoomOut}
-              resetTransform={resetTransform}
+              zoomIn={wrapperZoomIn}
+              zoomOut={wrapperZoomOut}
+              resetTransform={wrapperResetTransform}
             />
           </TransformComponent>
         )}
