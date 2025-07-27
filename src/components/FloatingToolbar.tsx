@@ -147,7 +147,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
 
   return (
     <>
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 z-50 pb-4">
         <div className="flex items-center bg-background/95 backdrop-blur-sm border border-border rounded-xl shadow-lg p-2 gap-1">
           {/* Move Tool Dropdown */}
           <DropdownMenu>
