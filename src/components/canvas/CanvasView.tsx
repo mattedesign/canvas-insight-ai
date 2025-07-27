@@ -36,8 +36,7 @@ const nodeTypes = {
   analysisCard: AnalysisCardNode,
   conceptImage: ConceptImageNode,
   conceptDetails: ConceptDetailsNode,
-  group: GroupNode,
-  groupContainer: GroupContainerNode,
+  group: GroupContainerNode,
   groupAnalysisCard: GroupAnalysisCardNode,
   groupPromptCollection: GroupPromptCollectionNode,
   groupAnalysisResults: GroupAnalysisResultsNode,
@@ -309,15 +308,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         containerHeight = totalHeight + padding;
       }
       
-      // Create group container node
+      // Create group container node using React Flow's built-in group type
       const containerNode: Node = {
         id: `group-container-${group.id}`,
-        type: 'groupContainer',
+        type: 'group',
         position: { x: 50, y: yOffset },
-        draggable: true,
         style: { 
           width: containerWidth,
           height: containerHeight,
+          borderColor: group.color,
         },
         data: {
           group,
@@ -338,11 +337,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 300);
           
-          // Image node
+          // Image node - positioned relative to group origin
           const imageNode: Node = {
             id: `image-${image.id}`,
             type: 'image',
-            position: { x: currentX, y: padding + 60 },
+            position: { x: 50 + currentX, y: yOffset + padding + 60 },
             parentId: `group-container-${group.id}`,
             extent: 'parent',
             data: { 
@@ -363,7 +362,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: currentX + displayWidth + 20, y: padding + 60 },
+              position: { x: 50 + currentX + displayWidth + 20, y: yOffset + padding + 60 },
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
@@ -398,11 +397,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          // Image node
+          // Image node - positioned relative to group origin
           const imageNode: Node = {
             id: `image-${image.id}`,
             type: 'image',
-            position: { x: padding, y: currentY },
+            position: { x: 50 + padding, y: yOffset + currentY },
             parentId: `group-container-${group.id}`,
             extent: 'parent',
             data: { 
@@ -423,7 +422,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: padding + displayWidth + 20, y: currentY },
+              position: { x: 50 + padding + displayWidth + 20, y: yOffset + currentY },
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 

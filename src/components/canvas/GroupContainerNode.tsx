@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { ImageGroup } from '@/types/ux-analysis';
 import { Button } from '@/components/ui/button';
@@ -24,14 +24,7 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
   };
 
   return (
-    <div 
-      className={`group-container ${selected ? 'selected' : ''}`}
-      style={{ 
-        borderColor: group.color,
-        minWidth: '300px',
-        minHeight: '200px'
-      }}
-    >
+    <>
       {/* Group header */}
       <div className="group-header">
         <div className="flex items-center gap-2">
@@ -68,11 +61,6 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
         </div>
       </div>
 
-      {/* Content area for images */}
-      <div className="group-content">
-        {/* Images will be positioned as child nodes */}
-      </div>
-
       {/* Connection handle for analysis card */}
       <Handle 
         type="source" 
@@ -80,6 +68,6 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
         id="analysis"
         className="group-analysis-handle"
       />
-    </div>
+    </>
   );
 };

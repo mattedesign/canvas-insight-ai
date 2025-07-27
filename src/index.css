@@ -256,15 +256,15 @@ All colors MUST be HSL.
   animation: group-pulse 2s infinite;
 }
 
-/* Group Container Styles */
-.group-container {
+/* React Flow Group Node Styles */
+.react-flow__node-group {
   @apply border-2 border-dashed bg-background/50 backdrop-blur-sm rounded-lg;
   @apply hover:border-primary transition-colors duration-200;
   border-color: var(--border);
   cursor: move;
 }
 
-.group-container.selected {
+.react-flow__node-group.selected {
   @apply border-primary bg-primary/5;
   box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
 }
@@ -310,15 +310,15 @@ All colors MUST be HSL.
   position: relative !important;
 }
 
-/* Group container node specific styling */
-.react-flow__node-groupContainer {
+/* Enhanced React Flow group node styling */
+.react-flow__node-group {
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   box-shadow: none;
 }
 
-.react-flow__node-groupContainer.selected {
+.react-flow__node-group.selected {
   box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
 }
 
