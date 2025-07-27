@@ -33,16 +33,19 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const { calculateGlobalPosition } = useGlobalCoordinates();
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
-  const getMarkerColor = (type: string) => {
+  const getMarkerColor = (type: string, isActive: boolean = false) => {
+    const baseClasses = isActive ? 'ring-2 ring-primary ring-offset-1 scale-125' : '';
+    const baseSize = isActive ? 'w-5 h-5' : 'w-4 h-4';
+    
     switch (type) {
       case 'issue':
-        return 'bg-destructive border-destructive-foreground';
+        return `${baseSize} bg-destructive border-destructive-foreground ${baseClasses}`;
       case 'suggestion':
-        return 'bg-yellow-500 border-yellow-600';
+        return `${baseSize} bg-yellow-500 border-yellow-600 ${baseClasses}`;
       case 'success':
-        return 'bg-green-500 border-green-600';
+        return `${baseSize} bg-green-500 border-green-600 ${baseClasses}`;
       default:
-        return 'bg-primary border-primary-foreground';
+        return `${baseSize} bg-primary border-primary-foreground ${baseClasses}`;
     }
   };
 
@@ -161,18 +164,21 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         />
         
         {/* Annotation Markers */}
-        {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => (
-          <div
-            key={annotation.id}
-            className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 ${getMarkerColor(annotation.type)}`}
-            style={{
-              left: `${annotation.x}%`,
-              top: `${annotation.y}%`,
-            }}
-            title={annotation.title}
-            onClick={(e) => handleAnnotationClick(annotation, e)}
-          />
-        ))}
+        {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => {
+          const isActive = activeAnnotation?.annotation.id === annotation.id;
+          return (
+            <div
+              key={annotation.id}
+              className={`absolute rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110 z-10 ${getMarkerColor(annotation.type, isActive)}`}
+              style={{
+                left: `${annotation.x}%`,
+                top: `${annotation.y}%`,
+              }}
+              title={annotation.title}
+              onClick={(e) => handleAnnotationClick(annotation, e)}
+            />
+          );
+        })}
 
         
         {analysis && (

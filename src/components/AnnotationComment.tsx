@@ -28,6 +28,66 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Smart positioning to keep dialog in viewport
+  const calculateOptimalPosition = () => {
+    const dialogWidth = 320; // w-80 = 20rem = 320px
+    const dialogHeight = 400; // Estimated height for the dialog
+    const margin = 20; // Minimum margin from viewport edges
+    const connectorOffset = 20; // Distance from annotation marker
+    
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: window.pageXOffset || document.documentElement.scrollLeft,
+      scrollY: window.pageYOffset || document.documentElement.scrollTop
+    };
+
+    let dialogX = position.x + connectorOffset;
+    let dialogY = position.y;
+    let transformX = 'none';
+    let connectorSide = 'left';
+    let connectorPosition = connectorOffset;
+
+    // Check if dialog would overflow on the right
+    if (dialogX + dialogWidth + margin > viewport.scrollX + viewport.width) {
+      // Position on the left side of the annotation
+      dialogX = position.x - connectorOffset;
+      transformX = 'translateX(-100%)';
+      connectorSide = 'right';
+      connectorPosition = 0;
+    }
+
+    // Check if dialog would overflow on the left  
+    if (dialogX - (transformX === 'translateX(-100%)' ? dialogWidth : 0) < viewport.scrollX + margin) {
+      // Center horizontally if both sides would overflow
+      dialogX = viewport.scrollX + viewport.width / 2;
+      transformX = 'translateX(-50%)';
+      connectorSide = 'center';
+    }
+
+    // Check if dialog would overflow at the bottom
+    if (dialogY + dialogHeight + margin > viewport.scrollY + viewport.height) {
+      // Position above the annotation
+      dialogY = position.y - dialogHeight - 10;
+    }
+
+    // Check if dialog would overflow at the top
+    if (dialogY < viewport.scrollY + margin) {
+      // Position at the top with margin
+      dialogY = viewport.scrollY + margin;
+    }
+
+    return {
+      dialogX,
+      dialogY,
+      transformX,
+      connectorSide,
+      connectorPosition
+    };
+  };
+
+  const optimalPosition = calculateOptimalPosition();
+
   const handleRequestAnalysis = async () => {
     if (!userPrompt.trim()) return;
     setIsAnalyzing(true);
@@ -78,23 +138,28 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
 
   return (
     <div 
-      className="fixed z-50 animate-scale-in pointer-events-auto"
+      className="fixed z-[60] animate-scale-in pointer-events-auto annotation-dialog"
       style={{
-        left: position.x + 20,
-        top: position.y,
-        transform: position.x > window.innerWidth / 2 ? 'translateX(-100%)' : 'none'
+        left: optimalPosition.dialogX,
+        top: optimalPosition.dialogY,
+        transform: optimalPosition.transformX
       }}
     >
       {/* Connection line */}
-      <div 
-        className="absolute w-5 h-0.5 bg-border"
-        style={{
-          left: position.x > window.innerWidth / 2 ? '100%' : '-20px',
-          top: '20px'
-        }}
-      />
+      {optimalPosition.connectorSide !== 'center' && (
+        <div 
+          className="absolute w-5 h-0.5 bg-primary/60 z-10"
+          style={{
+            left: optimalPosition.connectorSide === 'right' ? '100%' : `-${optimalPosition.connectorPosition}px`,
+            top: '20px'
+          }}
+        />
+      )}
       
-      <Card className="w-80 bg-background border-border shadow-lg">
+      <Card className="w-80 bg-popover/95 backdrop-blur-sm border-border shadow-2xl border-2">
+        {/* Visual indicator for active annotation */}
+        <div className="absolute -left-1 top-4 w-1 h-8 bg-primary rounded-r-sm animate-pulse" />
+        
         {/* Header */}
         <div className="flex items-center justify-between p-4 pb-2">
           <div className="flex items-center gap-2">

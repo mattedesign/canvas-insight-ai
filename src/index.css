@@ -11,6 +11,41 @@ body > .fixed.pointer-events-auto {
   pointer-events: auto;
 }
 
+/* Annotation dialog styles */
+.annotation-dialog {
+  z-index: 9999 !important;
+}
+
+/* Active annotation marker pulse animation */
+@keyframes annotation-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.annotation-marker-active {
+  animation: annotation-pulse 2s ease-in-out infinite;
+}
+
+/* Scale in animation for annotation dialogs */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
@@ -186,21 +221,7 @@ All colors MUST be HSL.
   cursor: crosshair;
 }
 
-/* Animation utilities */
-@keyframes scale-in {
-  0% {
-    transform: scale(0.95);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-scale-in {
-  animation: scale-in 0.2s ease-out;
-}
+/* Animation utilities - scale-in already defined above */
 
 /* Group Node Styles */
 .group-node {
