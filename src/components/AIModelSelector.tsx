@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Brain, Eye, Lightbulb, Zap, CheckCircle, AlertCircle } from 'lucide-react';
+import { Brain, Eye, Lightbulb, Zap, CheckCircle, AlertCircle, Palette } from 'lucide-react';
 
 interface AIModel {
-  id: 'auto' | 'claude-vision' | 'google-vision' | 'openai';
+  id: 'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai';
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -53,6 +53,16 @@ const aiModels: AIModel[] = [
     strengths: ['Object detection', 'Text recognition', 'Face detection'],
     bestFor: ['Content analysis', 'Layout detection', 'Image elements'],
     status: 'available'
+  },
+  {
+    id: 'stability-ai',
+    name: 'Stability AI',
+    description: 'Advanced image generation and visual concept enhancement capabilities',
+    icon: <Palette className="h-5 w-5 text-orange-600" />,
+    strengths: ['Image generation', 'Visual concepts', 'Design enhancement'],
+    bestFor: ['Concept generation', 'Visual improvements', 'Design mockups'],
+    status: 'available',
+    badge: 'Creative'
   },
   {
     id: 'openai',

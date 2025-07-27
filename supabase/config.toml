@@ -6,5 +6,8 @@ verify_jwt = false
 [functions.google-vision-analysis]
 verify_jwt = false
 
-[functions.claude-vision-analysis]
+[functions.claude-vision-analysis] 
+verify_jwt = false
+
+[functions.stability-ai-analysis]
 verify_jwt = false

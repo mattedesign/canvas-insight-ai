@@ -3,13 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface AIContextType {
-  selectedAIModel: 'auto' | 'claude-vision' | 'google-vision' | 'openai';
-  setSelectedAIModel: (model: 'auto' | 'claude-vision' | 'google-vision' | 'openai') => void;
+  selectedAIModel: 'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai';
+  setSelectedAIModel: (model: 'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai') => void;
   isAnalyzing: boolean;
   analyzeImageWithAI: (imageId: string, imageUrl: string, imageName: string, userContext?: string) => Promise<any>;
   availableModels: {
     'claude-vision': boolean;
     'google-vision': boolean;
+    'stability-ai': boolean;
     'openai': boolean;
   };
 }
@@ -25,11 +26,12 @@ export const useAI = () => {
 };
 
 export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedAIModel, setSelectedAIModel] = useState<'auto' | 'claude-vision' | 'google-vision' | 'openai'>('auto');
+  const [selectedAIModel, setSelectedAIModel] = useState<'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai'>('auto');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [availableModels, setAvailableModels] = useState({
     'claude-vision': true, // Assume available, will be checked by backend
     'google-vision': true,
+    'stability-ai': true,
     'openai': true
   });
   
@@ -45,7 +47,8 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     
     const modelName = selectedAIModel === 'auto' ? 'Smart Selection' : 
                      selectedAIModel === 'claude-vision' ? 'Claude Vision' :
-                     selectedAIModel === 'google-vision' ? 'Google Vision' : 'OpenAI';
+                     selectedAIModel === 'google-vision' ? 'Google Vision' : 
+                     selectedAIModel === 'stability-ai' ? 'Stability AI' : 'OpenAI';
 
     toast({
       title: "AI Analysis Started",

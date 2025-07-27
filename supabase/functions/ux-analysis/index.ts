@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 interface AnalysisRequest {
   type: 'ANALYZE_IMAGE' | 'ANALYZE_GROUP' | 'GENERATE_CONCEPT'
   payload: any
-  aiModel?: 'openai' | 'google-vision' | 'claude-vision' | 'auto'
+  aiModel?: 'openai' | 'google-vision' | 'claude-vision' | 'stability-ai' | 'auto'
 }
 
 async function analyzeImage(payload: { imageId: string; imageUrl: string; imageName: string; userContext?: string }, aiModel = 'auto') {
@@ -33,6 +33,9 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         break;
       case 'claude-vision':
         analysisResult = await performClaudeVisionAnalysis(payload);
+        break;
+      case 'stability-ai':
+        analysisResult = await performStabilityAIAnalysis(payload);
         break;
       case 'openai':
         analysisResult = await performOpenAIAnalysis(payload);
@@ -111,13 +114,16 @@ async function selectBestModel(): Promise<string> {
   // Check which AI models are available based on API keys
   const hasGoogleVision = !!Deno.env.get('GOOGLE_VISION_API_KEY');
   const hasClaudeVision = !!Deno.env.get('ANTHROPIC_API_KEY');
+  const hasStabilityAI = !!Deno.env.get('STABILITY_API_KEY');
   const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
   
-  console.log('Available AI models:', { hasGoogleVision, hasClaudeVision, hasOpenAI });
+  console.log('Available AI models:', { hasGoogleVision, hasClaudeVision, hasStabilityAI, hasOpenAI });
   
-  // Priority order: Claude (best for UX analysis) > Google Vision (good for object detection) > OpenAI (text-based)
+  // Priority order: Claude (best for UX analysis) > Stability AI (concept generation) > Google Vision (object detection) > OpenAI (text-based)
   if (hasClaudeVision) {
     return 'claude-vision';
+  } else if (hasStabilityAI) {
+    return 'stability-ai';
   } else if (hasGoogleVision) {
     return 'google-vision';
   } else if (hasOpenAI) {
@@ -191,6 +197,40 @@ async function performClaudeVisionAnalysis(payload: any) {
     return result.analysis;
   } catch (error) {
     console.error('Claude Vision analysis failed:', error);
+    throw error;
+  }
+}
+
+async function performStabilityAIAnalysis(payload: any) {
+  console.log('Performing Stability.ai analysis');
+  
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/stability-ai-analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        imageUrl: payload.imageUrl,
+        imageName: payload.imageName,
+        userContext: payload.userContext
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stability.ai API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Stability.ai analysis failed');
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('Stability.ai analysis failed:', error);
     throw error;
   }
 }
