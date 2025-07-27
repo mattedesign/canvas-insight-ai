@@ -102,11 +102,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   const handleDoubleClick = useCallback(() => {
     if (onViewChange && onImageSelect) {
-      onViewChange('gallery');
+      // No longer switching to gallery - stay on canvas with image selected
       onImageSelect(image.id);
       toast({
-        title: "Switched to Gallery View",
-        description: `Now viewing ${image.name} in detail`,
+        title: "Image Selected",
+        description: `Now viewing ${image.name} - use "View Full Analysis" for details`,
       });
     } else if (id) {
       fitView({ nodes: [{ id }], duration: 800, maxZoom: 1 });
@@ -116,11 +116,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const handleViewSingle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent double-click from firing
     if (onViewChange && onImageSelect) {
-      onViewChange('gallery');
+      // No longer switching to gallery - stay on canvas with image selected
       onImageSelect(image.id);
       toast({
-        title: "Switched to Gallery View",
-        description: `Now viewing ${image.name} in detail`,
+        title: "Image Selected",
+        description: `Now viewing ${image.name} - use "View Full Analysis" for details`,
       });
     }
   }, [onViewChange, onImageSelect, image.id, image.name, toast]);

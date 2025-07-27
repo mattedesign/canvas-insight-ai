@@ -51,7 +51,8 @@ const Canvas = () => {
 
   const handleViewChange = (view: 'gallery' | 'canvas' | 'summary') => {
     if (view === 'gallery') {
-      navigate('/gallery');
+      // Gallery route removed - stay on canvas
+      return;
     } else if (view === 'summary') {
       navigate('/dashboard');
     }
