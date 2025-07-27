@@ -287,8 +287,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const pairWidth = displayWidth + 100 + 400; // 100px spacing + 400px analysis card
           maxWidth = Math.max(maxWidth, pairWidth);
           
-          // Use double the scaled image height as the minimum vertical space to over-correct
-          const minVerticalSpace = Math.max(displayHeight * 2, 400); // At least 400px or double image height
+          // Use triple the scaled image height as the minimum vertical space to over-correct
+          const minVerticalSpace = Math.max(displayHeight * 3, 500); // At least 500px or triple image height
           totalHeight += minVerticalSpace;
         });
         
@@ -307,8 +307,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           
           maxWidth = Math.max(maxWidth, displayWidth + 100 + 400); // Include analysis card
           
-          // Use double the scaled image height as the minimum vertical space for stacked mode
-          const minVerticalSpace = Math.max(displayHeight * 2, 300); // At least 300px or double image height
+          // Use triple the scaled image height as the minimum vertical space for stacked mode
+          const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
           totalHeight += minVerticalSpace;
         });
         
@@ -395,8 +395,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          // Move to next vertical position using double the image height to over-correct
-          const minVerticalSpace = Math.max(displayHeight * 2, 400); // At least 400px or double image height
+          // Move to next vertical position using triple the image height to over-correct
+          const minVerticalSpace = Math.max(displayHeight * 3, 500); // At least 500px or triple image height
           currentY += minVerticalSpace;
         });
       } else {
@@ -457,8 +457,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          // Move to next vertical position using double the image height for stacked mode
-          const minVerticalSpace = Math.max(displayHeight * 2, 300); // At least 300px or double image height
+          // Move to next vertical position using triple the image height for stacked mode
+          const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
           currentY += minVerticalSpace;
         });
       }
