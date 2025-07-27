@@ -359,6 +359,13 @@ describe('Image Upload Feature Parity', () => {
 - Network request optimization validation
 - Canvas performance benchmarks
 
+#### AI Boundary Testing
+- **Explicit Scope Validation**: Every AI decision must be validated against defined requirements
+- **Permission Request Triggers**: Out-of-scope changes must trigger explicit user approval
+- **Hallucination Detection**: Output validation through structured comparison with expected results
+- **Consistent Behavior**: AI responses must be deterministic across different inputs
+- **Feature Boundary Enforcement**: Strict validation that no undefined functionality is added
+
 ---
 
 ## AI Rules of Engagement
