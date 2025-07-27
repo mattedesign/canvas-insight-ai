@@ -37,17 +37,17 @@ const Projects = () => {
   ];
 
   const handleClearCanvas = () => {
-    // Navigate to main app
-    navigate('/');
+    // Navigate to dashboard
+    navigate('/dashboard');
   };
 
   const handleAddImages = () => {
-    // Navigate to main app with upload state
-    navigate('/', { state: { showUpload: true } });
+    // Navigate to upload
+    navigate('/upload');
   };
 
   const handleNavigateToPreviousAnalyses = () => {
-    // Already on projects page, do nothing or refresh
+    // Already on projects page, do nothing
   };
 
   return (

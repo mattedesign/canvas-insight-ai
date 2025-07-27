@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   BarChart3, 
   Plus, 
@@ -37,12 +38,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleAnnotations,
   onNavigateToPreviousAnalyses,
 }) => {
-  const isOnUploadScreen = uploadedImages.length === 0 && selectedView === 'gallery';
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const isOnUploadScreen = location.pathname === '/upload';
+  const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
+  const isOnProjects = location.pathname === '/projects';
+  
   
   const sidebarIcons = [
-    { icon: BarChart3, label: 'Dashboard', active: selectedView === 'summary' && uploadedImages.length > 0 },
+    { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Plus, label: 'Add', active: isOnUploadScreen },
-    { icon: Folder, label: 'Previous', active: false },
+    { icon: Folder, label: 'Previous', active: isOnProjects },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: false },
     { icon: User, label: 'Profile', active: false },
@@ -61,9 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             key={index}
             onClick={
-              item.label === 'Dashboard' ? () => onViewChange('summary') :
-              item.label === 'Add' ? onAddImages :
-              item.label === 'Previous' ? onNavigateToPreviousAnalyses :
+              item.label === 'Dashboard' ? () => navigate('/dashboard') :
+              item.label === 'Add' ? () => navigate('/upload') :
+              item.label === 'Previous' ? () => navigate('/projects') :
               undefined
             }
             className={`
