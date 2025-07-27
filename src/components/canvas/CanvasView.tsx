@@ -283,8 +283,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
-          // Width needed for this pair: image + spacing + analysis card
-          const pairWidth = displayWidth + 100 + 400; // 100px spacing + 400px analysis card
+          // Width needed for this pair: image + proportional spacing + analysis card
+          const horizontalSpacing = Math.max(displayWidth * 0.5, 150); // At least 150px or half image width
+          const pairWidth = displayWidth + horizontalSpacing + 400; // proportional spacing + 400px analysis card
           maxWidth = Math.max(maxWidth, pairWidth);
           
           // Use triple the scaled image height as the minimum vertical space to over-correct
@@ -305,7 +306,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          maxWidth = Math.max(maxWidth, displayWidth + 100 + 400); // Include analysis card
+          maxWidth = Math.max(maxWidth, displayWidth + Math.max(displayWidth * 0.5, 120) + 400); // Include proportional spacing
           
           // Use triple the scaled image height as the minimum vertical space for stacked mode
           const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
@@ -367,12 +368,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           nodes.push(imageNode);
           
-          // Individual analysis card for this image - with proper spacing like ungrouped
+          // Individual analysis card for this image - with proportional spacing
           if (analysis && showAnalysis) {
+            const horizontalSpacing = Math.max(displayWidth * 0.5, 150); // At least 150px or half image width
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: padding + displayWidth + 100, y: currentY }, // 100px spacing like ungrouped
+              position: { x: padding + displayWidth + horizontalSpacing, y: currentY }, // proportional spacing
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
@@ -429,12 +431,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           nodes.push(imageNode);
           
-          // Individual analysis card for this image
+          // Individual analysis card for this image - with proportional spacing for stacked mode
           if (analysis && showAnalysis) {
+            const horizontalSpacing = Math.max(displayWidth * 0.5, 120); // At least 120px or half image width
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: padding + displayWidth + 100, y: currentY },
+              position: { x: padding + displayWidth + horizontalSpacing, y: currentY },
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
