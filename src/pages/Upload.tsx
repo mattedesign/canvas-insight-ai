@@ -27,8 +27,8 @@ const Upload = () => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
       handleImageUpload(files).then(() => {
-        // Navigate to gallery after upload
-        navigate('/gallery');
+        // Navigate to canvas after upload
+        navigate('/canvas');
       });
     }
     // Reset input value to allow selecting the same file again
@@ -41,7 +41,7 @@ const Upload = () => {
 
   const handleUploadComplete = useCallback(async (files: File[]) => {
     await handleImageUpload(files);
-    navigate('/gallery');
+    navigate('/canvas');
   }, [handleImageUpload, navigate]);
 
   return (
