@@ -2,13 +2,14 @@ import React from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { ImageGroup } from '@/types/ux-analysis';
 import { Button } from '@/components/ui/button';
-import { LayoutGrid, Layers } from 'lucide-react';
+import { LayoutGrid, Layers, Edit2 } from 'lucide-react';
 
 interface GroupContainerNodeData {
   group: ImageGroup;
   displayMode: 'standard' | 'stacked';
   onUngroup?: (groupId: string) => void;
   onDelete?: (groupId: string) => void;
+  onEdit?: (groupId: string) => void;
   onDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
 }
 
@@ -16,7 +17,7 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
   data,
   selected 
 }) => {
-  const { group, displayMode = 'standard', onUngroup, onDelete, onDisplayModeChange } = data as unknown as GroupContainerNodeData;
+  const { group, displayMode = 'standard', onUngroup, onDelete, onEdit, onDisplayModeChange } = data as unknown as GroupContainerNodeData;
 
   const handleDisplayModeToggle = () => {
     const newMode = displayMode === 'standard' ? 'stacked' : 'standard';
@@ -40,6 +41,15 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
           </Button>
         </div>
         <div className="group-actions">
+          {onEdit && (
+            <button 
+              onClick={() => onEdit(group.id)}
+              className="group-action-btn"
+              title="Edit group"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+          )}
           {onUngroup && (
             <button 
               onClick={() => onUngroup(group.id)}

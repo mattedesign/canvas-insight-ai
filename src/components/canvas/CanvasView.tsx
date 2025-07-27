@@ -26,7 +26,7 @@ import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
-import { GroupCreationDialog } from '../GroupCreationDialog';
+
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -56,9 +56,10 @@ interface CanvasViewProps {
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
   onGenerateConcept?: (analysisId: string) => Promise<void>;
-  onCreateGroup?: (name: string, description: string, color: string, imageIds: string[]) => void;
+  onCreateGroup?: (imageIds: string[]) => void;
   onUngroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
+  onEditGroup?: (groupId: string) => void;
   onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
   onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   onEditGroupPrompt?: (sessionId: string) => void;
@@ -84,6 +85,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onCreateGroup,
   onUngroup,
   onDeleteGroup,
+  onEditGroup,
   onGroupDisplayModeChange,
   onSubmitGroupPrompt,
   onEditGroupPrompt,
@@ -94,7 +96,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
   const [groups, setGroups] = useState<ImageGroup[]>([]);
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  
   
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
@@ -386,6 +388,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           displayMode,
           onUngroup,
           onDeleteGroup,
+          onEdit: onEditGroup,
           onDisplayModeChange: onGroupDisplayModeChange,
         },
       };
@@ -888,24 +891,22 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     if (multiSelection.state.selectedIds.length < 2) {
       toast({
         title: "Select Multiple Images",
-        description: "Please select at least 2 images to create a group",
-        variant: "destructive"
+        description: "Please select at least 2 images to create a group.",
+        variant: "destructive",
       });
       return;
     }
-    setIsGroupDialogOpen(true);
-  }, [multiSelection.state.selectedIds.length, toast]);
-
-  const handleGroupCreation = useCallback((name: string, description: string, color: string) => {
-    onCreateGroup?.(name, description, color, multiSelection.state.selectedIds);
+    
+    // Directly create group without dialog
+    onCreateGroup?.(multiSelection.state.selectedIds);
     multiSelection.clearSelection();
-    setIsGroupDialogOpen(false);
     
     toast({
       title: "Group Created",
-      description: `Successfully created group "${name}" with ${multiSelection.state.selectedIds.length} images`,
+      description: `Successfully created group with ${multiSelection.state.selectedIds.length} images`,
     });
   }, [onCreateGroup, multiSelection, toast]);
+
 
 
 
@@ -934,9 +935,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setNodes={setNodes}
         setEdges={setEdges}
         setIsUpdating={setIsUpdating}
-        isGroupDialogOpen={isGroupDialogOpen}
-        setIsGroupDialogOpen={setIsGroupDialogOpen}
-        handleGroupCreation={handleGroupCreation}
         uploadedImages={uploadedImages}
       />
     </AnnotationOverlayProvider>
@@ -967,9 +965,6 @@ interface CanvasContentProps {
   setNodes: any;
   setEdges: any;
   setIsUpdating: any;
-  isGroupDialogOpen: boolean;
-  setIsGroupDialogOpen: (open: boolean) => void;
-  handleGroupCreation: (name: string, description: string, color: string) => void;
   uploadedImages: UploadedImage[];
 }
 
@@ -996,9 +991,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   setNodes,
   setEdges,
   setIsUpdating,
-  isGroupDialogOpen,
-  setIsGroupDialogOpen,
-  handleGroupCreation,
   uploadedImages,
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
@@ -1094,14 +1086,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           hasMultiSelection={multiSelection.state.isMultiSelectMode}
         />
       </ReactFlow>
-      
-      {/* Group Creation Dialog */}
-      <GroupCreationDialog
-        isOpen={isGroupDialogOpen}
-        onClose={() => setIsGroupDialogOpen(false)}
-        onCreateGroup={handleGroupCreation}
-        selectedImages={uploadedImages.filter(img => multiSelection.state.selectedIds.includes(img.id))}
-      />
     </div>
   );
 };

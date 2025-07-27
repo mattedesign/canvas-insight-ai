@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
+import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,6 +27,7 @@ const Canvas = () => {
     handleCreateGroup,
     handleUngroup,
     handleDeleteGroup,
+    handleEditGroup,
     handleGroupDisplayModeChange,
     handleSubmitGroupPrompt,
     handleEditGroupPrompt,
@@ -35,6 +37,8 @@ const Canvas = () => {
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [groupEditDialogOpen, setGroupEditDialogOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
@@ -69,6 +73,16 @@ const Canvas = () => {
   const handleCloseAnalysisPanel = () => {
     setAnalysisPanelOpen(false);
     setSelectedAnalysisId(null);
+  };
+
+  const handleOpenGroupEdit = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setGroupEditDialogOpen(true);
+  };
+
+  const handleCloseGroupEdit = () => {
+    setGroupEditDialogOpen(false);
+    setSelectedGroupId(null);
   };
 
   // Redirect to upload if no images
@@ -126,6 +140,7 @@ const Canvas = () => {
           onCreateGroup={handleCreateGroup}
           onUngroup={handleUngroup}
           onDeleteGroup={handleDeleteGroup}
+          onEditGroup={handleOpenGroupEdit}
           onGroupDisplayModeChange={handleGroupDisplayModeChange}
           onSubmitGroupPrompt={handleSubmitGroupPrompt}
           onEditGroupPrompt={handleEditGroupPrompt}
@@ -143,6 +158,17 @@ const Canvas = () => {
         }) || null : null}
         isOpen={analysisPanelOpen}
         onClose={handleCloseAnalysisPanel}
+      />
+      
+      <GroupEditDialog
+        isOpen={groupEditDialogOpen}
+        onClose={handleCloseGroupEdit}
+        onUpdateGroup={handleEditGroup}
+        group={selectedGroupId ? imageGroups.find(g => g.id === selectedGroupId) || null : null}
+        groupImages={selectedGroupId ? uploadedImages.filter(img => {
+          const group = imageGroups.find(g => g.id === selectedGroupId);
+          return group && group.imageIds.includes(img.id);
+        }) : []}
       />
     </div>
   );

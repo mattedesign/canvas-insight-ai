@@ -29,9 +29,10 @@ interface AppContextType {
   handleAnnotationClick: (annotationId: string) => void;
   handleGalleryToolChange: (tool: 'cursor' | 'draw') => void;
   handleAddComment: () => void;
-  handleCreateGroup: (name: string, description: string, color: string, imageIds: string[]) => void;
+  handleCreateGroup: (imageIds: string[]) => void;
   handleUngroup: (groupId: string) => void;
   handleDeleteGroup: (groupId: string) => void;
+  handleEditGroup: (groupId: string, name: string, description: string, color: string) => void;
   handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => void;
   handleSubmitGroupPrompt: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   handleEditGroupPrompt: (sessionId: string) => void;
@@ -173,12 +174,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log('Add comment mode activated');
   }, []);
 
-  const handleCreateGroup = useCallback((name: string, description: string, color: string, imageIds: string[]) => {
+  const handleCreateGroup = useCallback((imageIds: string[]) => {
     const groupId = `group-${Date.now()}`;
+    const groupNumber = imageGroups.length + 1;
+    const defaultColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    const color = defaultColors[(groupNumber - 1) % defaultColors.length];
+    
     const newGroup: ImageGroup = {
       id: groupId,
-      name,
-      description,
+      name: `Group ${groupNumber}`,
+      description: '',
       imageIds,
       position: { x: 100, y: 100 }, // Default position, will be calculated in canvas
       color,
@@ -187,7 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setImageGroups(prev => [...prev, newGroup]);
     // Note: No longer auto-generating analysis - waiting for prompt submission
-  }, []);
+  }, [imageGroups.length]);
 
   const handleUngroup = useCallback((groupId: string) => {
     setImageGroups(prev => prev.filter(group => group.id !== groupId));
@@ -206,6 +211,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       delete newModes[groupId];
       return newModes;
     });
+  }, []);
+
+  const handleEditGroup = useCallback((groupId: string, name: string, description: string, color: string) => {
+    setImageGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, name, description, color }
+        : group
+    ));
   }, []);
 
   const handleGroupDisplayModeChange = useCallback((groupId: string, mode: 'standard' | 'stacked') => {
@@ -347,6 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleCreateGroup,
     handleUngroup,
     handleDeleteGroup,
+    handleEditGroup,
     handleGroupDisplayModeChange,
     handleSubmitGroupPrompt,
     handleEditGroupPrompt,
