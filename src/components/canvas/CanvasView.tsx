@@ -45,6 +45,7 @@ interface CanvasViewProps {
   generatedConcepts: GeneratedConcept[];
   imageGroups?: ImageGroup[];
   groupAnalyses?: GroupAnalysis[];
+  groupDisplayModes?: Record<string, 'standard' | 'stacked'>;
   showAnnotations: boolean;
   onToggleAnnotations?: () => void;
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
@@ -53,6 +54,7 @@ interface CanvasViewProps {
   onCreateGroup?: (name: string, description: string, color: string, imageIds: string[]) => void;
   onUngroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
+  onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -62,6 +64,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   generatedConcepts,
   imageGroups = [],
   groupAnalyses = [],
+  groupDisplayModes = {},
   showAnnotations,
   onToggleAnnotations,
   onViewChange,
@@ -70,6 +73,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onCreateGroup,
   onUngroup,
   onDeleteGroup,
+  onGroupDisplayModeChange,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -243,81 +247,196 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       yOffset += nextSpacing;
     });
 
-    // Process image groups with containers and analysis cards
+    // Process image groups with containers and individual analysis cards
     imageGroups.forEach((group, groupIndex) => {
       const groupImages = uploadedImages.filter(img => group.imageIds.includes(img.id));
+      const displayMode = groupDisplayModes[group.id] || 'standard';
       
-      // Calculate container dimensions based on contained images
+      // Calculate container dimensions based on display mode
       let containerWidth = 0;
       let containerHeight = 0;
       const padding = 32;
       const imageSpacing = 20;
+      const analysisSpacing = 100;
       
-      // Simple layout: arrange images in a row within the container
-      let currentX = padding;
-      let maxHeight = 0;
-      
-      groupImages.forEach((image, imageIndex) => {
-        const maxDisplayHeight = Math.min(image.dimensions.height, 300); // Smaller in groups
-        const scaleFactor = maxDisplayHeight / image.dimensions.height;
-        const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
-        const displayHeight = maxDisplayHeight;
+      if (displayMode === 'standard') {
+        // Horizontal layout: images side by side with their analysis cards to the right
+        let currentX = padding;
+        let maxHeight = 0;
         
-        maxHeight = Math.max(maxHeight, displayHeight);
-        currentX += displayWidth + imageSpacing;
-      });
-      
-      containerWidth = Math.max(currentX + padding - imageSpacing, 200);
-      containerHeight = maxHeight + padding * 2 + 50; // Extra space for group title
+        groupImages.forEach((image, imageIndex) => {
+          const maxDisplayHeight = Math.min(image.dimensions.height, 250);
+          const scaleFactor = maxDisplayHeight / image.dimensions.height;
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 300);
+          const displayHeight = maxDisplayHeight;
+          
+          maxHeight = Math.max(maxHeight, displayHeight);
+          currentX += displayWidth + 320 + imageSpacing; // Include analysis card width
+        });
+        
+        containerWidth = Math.max(currentX + padding - imageSpacing, 400);
+        containerHeight = maxHeight + padding * 2 + 60;
+      } else {
+        // Stacked layout: images vertically with analysis cards to the right
+        let maxWidth = 0;
+        let totalHeight = padding + 60; // Header space
+        
+        groupImages.forEach((image, imageIndex) => {
+          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / image.dimensions.height;
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const displayHeight = maxDisplayHeight;
+          
+          maxWidth = Math.max(maxWidth, displayWidth + 320 + imageSpacing); // Include analysis card
+          totalHeight += displayHeight + imageSpacing;
+        });
+        
+        containerWidth = Math.max(maxWidth + padding * 2, 400);
+        containerHeight = totalHeight + padding;
+      }
       
       // Create group container node
       const containerNode: Node = {
         id: `group-container-${group.id}`,
         type: 'groupContainer',
         position: { x: 50, y: yOffset },
+        draggable: true,
         style: { 
           width: containerWidth,
           height: containerHeight,
         },
         data: {
           group,
+          displayMode,
           onUngroup,
           onDeleteGroup,
+          onDisplayModeChange: onGroupDisplayModeChange,
         },
       };
       nodes.push(containerNode);
       
-      // Position images inside the container
-      let imageX = padding;
-      groupImages.forEach((image, imageIndex) => {
-        const analysis = analyses.find(a => a.imageId === image.id);
-        const maxDisplayHeight = Math.min(image.dimensions.height, 300);
-        const scaleFactor = maxDisplayHeight / image.dimensions.height;
-        const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
-        
-        const imageNode: Node = {
-          id: `image-${image.id}`,
-          type: 'image',
-          position: { x: imageX, y: padding + 50 }, // Offset for group title
-          parentId: `group-container-${group.id}`,
-          extent: 'parent',
-          data: { 
-            image,
-            analysis,
-            showAnnotations,
-            currentTool,
-            onViewChange: stableCallbacks.onViewChange,
-            onImageSelect: stableCallbacks.onImageSelect,
-            onToggleSelection: stableCallbacks.onToggleSelection,
-            isSelected: stableCallbacks.isSelected(image.id)
-          },
-        };
-        nodes.push(imageNode);
-        
-        imageX += displayWidth + imageSpacing;
-      });
+      // Position images and their individual analysis cards inside the container
+      if (displayMode === 'standard') {
+        let currentX = padding;
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const maxDisplayHeight = Math.min(image.dimensions.height, 250);
+          const scaleFactor = maxDisplayHeight / image.dimensions.height;
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 300);
+          
+          // Image node
+          const imageNode: Node = {
+            id: `image-${image.id}`,
+            type: 'image',
+            position: { x: currentX, y: padding + 60 },
+            parentId: `group-container-${group.id}`,
+            extent: 'parent',
+            data: { 
+              image,
+              analysis,
+              showAnnotations,
+              currentTool,
+              onViewChange: stableCallbacks.onViewChange,
+              onImageSelect: stableCallbacks.onImageSelect,
+              onToggleSelection: stableCallbacks.onToggleSelection,
+              isSelected: stableCallbacks.isSelected(image.id)
+            },
+          };
+          nodes.push(imageNode);
+          
+          // Individual analysis card for this image
+          if (analysis && showAnalysis) {
+            const analysisNode: Node = {
+              id: `group-image-analysis-${image.id}`,
+              type: 'analysisCard',
+              position: { x: currentX + displayWidth + 20, y: padding + 60 },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                isGeneratingConcept
+              },
+            };
+            nodes.push(analysisNode);
+            
+            // Create edge connecting image to its analysis
+            const edge: Edge = {
+              id: `edge-group-image-${image.id}-analysis`,
+              source: `image-${image.id}`,
+              target: `group-image-analysis-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(edge);
+          }
+          
+          currentX += displayWidth + 320 + imageSpacing;
+        });
+      } else {
+        // Stacked layout
+        let currentY = padding + 60;
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / image.dimensions.height;
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const displayHeight = maxDisplayHeight;
+          
+          // Image node
+          const imageNode: Node = {
+            id: `image-${image.id}`,
+            type: 'image',
+            position: { x: padding, y: currentY },
+            parentId: `group-container-${group.id}`,
+            extent: 'parent',
+            data: { 
+              image,
+              analysis,
+              showAnnotations,
+              currentTool,
+              onViewChange: stableCallbacks.onViewChange,
+              onImageSelect: stableCallbacks.onImageSelect,
+              onToggleSelection: stableCallbacks.onToggleSelection,
+              isSelected: stableCallbacks.isSelected(image.id)
+            },
+          };
+          nodes.push(imageNode);
+          
+          // Individual analysis card for this image
+          if (analysis && showAnalysis) {
+            const analysisNode: Node = {
+              id: `group-image-analysis-${image.id}`,
+              type: 'analysisCard',
+              position: { x: padding + displayWidth + 20, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                isGeneratingConcept
+              },
+            };
+            nodes.push(analysisNode);
+            
+            // Create edge connecting image to its analysis
+            const edge: Edge = {
+              id: `edge-group-image-${image.id}-analysis`,
+              source: `image-${image.id}`,
+              target: `group-image-analysis-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(edge);
+          }
+          
+          currentY += displayHeight + imageSpacing;
+        });
+      }
       
-      // Create group analysis card
+      // Create group-level analysis card (positioned outside the container)
       const groupAnalysis = groupAnalyses.find(ga => ga.groupId === group.id);
       if (groupAnalysis) {
         const analysisCardNode: Node = {
@@ -337,7 +456,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         };
         nodes.push(analysisCardNode);
         
-        // Create edge connecting container to analysis card
+        // Create edge connecting container to group analysis card
         const edge: Edge = {
           id: `edge-group-${group.id}-analysis`,
           source: `group-container-${group.id}`,
@@ -354,7 +473,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks]);
+  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);

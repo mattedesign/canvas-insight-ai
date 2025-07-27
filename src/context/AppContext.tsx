@@ -11,6 +11,7 @@ interface AppContextType {
   generatedConcepts: GeneratedConcept[];
   imageGroups: ImageGroup[];
   groupAnalyses: GroupAnalysis[];
+  groupDisplayModes: Record<string, 'standard' | 'stacked'>;
   selectedImageId: string | null;
   showAnnotations: boolean;
   galleryTool: 'cursor' | 'draw';
@@ -29,6 +30,7 @@ interface AppContextType {
   handleCreateGroup: (name: string, description: string, color: string, imageIds: string[]) => void;
   handleUngroup: (groupId: string) => void;
   handleDeleteGroup: (groupId: string) => void;
+  handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => void;
   toggleAnnotation: (annotationId: string) => void;
   clearAnnotations: () => void;
 }
@@ -49,6 +51,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
   const [imageGroups, setImageGroups] = useState<ImageGroup[]>([]);
   const [groupAnalyses, setGroupAnalyses] = useState<GroupAnalysis[]>([]);
+  const [groupDisplayModes, setGroupDisplayModes] = useState<Record<string, 'standard' | 'stacked'>>({});
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
@@ -190,6 +193,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleDeleteGroup = useCallback((groupId: string) => {
     setImageGroups(prev => prev.filter(group => group.id !== groupId));
     setGroupAnalyses(prev => prev.filter(analysis => analysis.groupId !== groupId));
+    setGroupDisplayModes(prev => {
+      const newModes = { ...prev };
+      delete newModes[groupId];
+      return newModes;
+    });
+  }, []);
+
+  const handleGroupDisplayModeChange = useCallback((groupId: string, mode: 'standard' | 'stacked') => {
+    setGroupDisplayModes(prev => ({
+      ...prev,
+      [groupId]: mode
+    }));
   }, []);
 
   const value: AppContextType = {
@@ -199,6 +214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     generatedConcepts,
     imageGroups,
     groupAnalyses,
+    groupDisplayModes,
     selectedImageId,
     showAnnotations,
     galleryTool,
@@ -217,6 +233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleCreateGroup,
     handleUngroup,
     handleDeleteGroup,
+    handleGroupDisplayModeChange,
     toggleAnnotation,
     clearAnnotations,
   };

@@ -261,15 +261,18 @@ All colors MUST be HSL.
   @apply border-2 border-dashed bg-background/50 backdrop-blur-sm rounded-lg;
   @apply hover:border-primary transition-colors duration-200;
   border-color: var(--border);
+  cursor: move;
 }
 
 .group-container.selected {
   @apply border-primary bg-primary/5;
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
 }
 
 .group-header {
-  @apply flex items-center justify-between p-4 border-b border-dashed;
+  @apply flex items-center justify-between p-3 border-b border-dashed;
   border-color: var(--border);
+  background: hsl(var(--background) / 0.8);
 }
 
 .group-title {
@@ -283,11 +286,12 @@ All colors MUST be HSL.
 .group-action-btn {
   @apply w-6 h-6 flex items-center justify-center text-xs rounded;
   @apply hover:bg-muted text-muted-foreground hover:text-foreground;
-  @apply transition-colors duration-150;
+  @apply transition-colors duration-150 cursor-pointer;
 }
 
 .group-content {
-  @apply p-4;
+  @apply p-2;
+  min-height: 100px;
 }
 
 .group-analysis-card {
@@ -297,6 +301,25 @@ All colors MUST be HSL.
 .group-analysis-handle {
   background: hsl(var(--primary)) !important;
   border-color: hsl(var(--primary)) !important;
+  width: 12px !important;
+  height: 8px !important;
+}
+
+/* Ensure parent-child relationship styling */
+.react-flow__node[data-parent] {
+  position: relative !important;
+}
+
+/* Group container node specific styling */
+.react-flow__node-groupContainer {
+  border-radius: 8px;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+}
+
+.react-flow__node-groupContainer.selected {
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
 }
 
 /* Keyboard shortcut hints */

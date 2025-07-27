@@ -1,31 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { ImageGroup } from '@/types/ux-analysis';
+import { Button } from '@/components/ui/button';
+import { LayoutGrid, Layers } from 'lucide-react';
 
 interface GroupContainerNodeData {
   group: ImageGroup;
+  displayMode: 'standard' | 'stacked';
   onUngroup?: (groupId: string) => void;
   onDelete?: (groupId: string) => void;
+  onDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
 }
 
 export const GroupContainerNode: React.FC<NodeProps> = ({ 
   data,
   selected 
 }) => {
-  const { group, onUngroup, onDelete } = data as unknown as GroupContainerNodeData;
+  const { group, displayMode = 'standard', onUngroup, onDelete, onDisplayModeChange } = data as unknown as GroupContainerNodeData;
+
+  const handleDisplayModeToggle = () => {
+    const newMode = displayMode === 'standard' ? 'stacked' : 'standard';
+    onDisplayModeChange?.(group.id, newMode);
+  };
 
   return (
     <div 
       className={`group-container ${selected ? 'selected' : ''}`}
       style={{ 
         borderColor: group.color,
-        minWidth: '200px',
-        minHeight: '150px'
+        minWidth: '300px',
+        minHeight: '200px'
       }}
     >
       {/* Group header */}
       <div className="group-header">
-        <h3 className="group-title">{group.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="group-title">{group.name}</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDisplayModeToggle}
+            className="h-6 w-6 p-0"
+            title={`Switch to ${displayMode === 'standard' ? 'stacked' : 'side-by-side'} view`}
+          >
+            {displayMode === 'standard' ? <Layers className="w-3 h-3" /> : <LayoutGrid className="w-3 h-3" />}
+          </Button>
+        </div>
         <div className="group-actions">
           {onUngroup && (
             <button 

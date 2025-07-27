@@ -12,6 +12,7 @@ const Canvas = () => {
     generatedConcepts,
     imageGroups,
     groupAnalyses,
+    groupDisplayModes,
     selectedImageId,
     showAnnotations,
     isGeneratingConcept,
@@ -21,7 +22,8 @@ const Canvas = () => {
     handleGenerateConcept,
     handleCreateGroup,
     handleUngroup,
-    handleDeleteGroup
+    handleDeleteGroup,
+    handleGroupDisplayModeChange
   } = useAppContext();
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
@@ -89,6 +91,7 @@ const Canvas = () => {
           generatedConcepts={generatedConcepts}
           imageGroups={imageGroups}
           groupAnalyses={groupAnalyses}
+          groupDisplayModes={groupDisplayModes}
           showAnnotations={showAnnotations}
           onToggleAnnotations={handleToggleAnnotations}
           onViewChange={handleViewChange}
@@ -97,6 +100,7 @@ const Canvas = () => {
           onCreateGroup={handleCreateGroup}
           onUngroup={handleUngroup}
           onDeleteGroup={handleDeleteGroup}
+          onGroupDisplayModeChange={handleGroupDisplayModeChange}
           isGeneratingConcept={isGeneratingConcept}
         />
       </div>
