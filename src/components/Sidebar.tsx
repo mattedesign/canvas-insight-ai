@@ -7,9 +7,11 @@ import {
   Bell, 
   Crown, 
   User,
-  Trash2
+  Trash2,
+  LogOut
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
+import { useAuth } from '@/context/AuthContext';
 
 interface SidebarProps {
   onClearCanvas: () => void;
@@ -40,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { signOut, user } = useAuth();
   
   const isOnUploadScreen = location.pathname === '/upload';
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
@@ -97,9 +100,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 
 
-      {/* Clear Canvas */}
-      {uploadedImages.length > 0 && (
-        <div className="mt-auto">
+      {/* Bottom Actions */}
+      <div className="mt-auto flex flex-col space-y-2">
+        {/* Clear Canvas */}
+        {uploadedImages.length > 0 && (
           <button
             onClick={onClearCanvas}
             className="w-10 h-10 rounded-lg flex items-center justify-center text-sidebar-foreground hover:bg-destructive hover:text-destructive-foreground transition-all"
@@ -107,8 +111,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Trash2 className="w-5 h-5" />
           </button>
-        </div>
-      )}
+        )}
+        
+        {/* Logout */}
+        <button
+          onClick={() => signOut()}
+          className="w-10 h-10 rounded-lg flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all"
+          title={`Sign out (${user?.email})`}
+        >
+          <LogOut className="w-5 h-5" />
+        </button>
+      </div>
 
     </div>
   );

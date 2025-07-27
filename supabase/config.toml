@@ -1,1 +1,4 @@
 project_id = "sdcmbfdtafkzpimwjpij"
+
+[functions.ux-analysis]
+verify_jwt = false
