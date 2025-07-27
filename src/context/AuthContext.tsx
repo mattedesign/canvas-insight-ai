@@ -3,13 +3,23 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+interface SubscriptionInfo {
+  subscribed: boolean;
+  subscription_tier: string;
+  subscription_end: string | null;
+  analysis_count: number;
+  analysis_limit: number;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  subscription: SubscriptionInfo | null;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  checkSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,15 +36,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const { toast } = useToast();
+
+  const checkSubscription = async () => {
+    if (!session) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      
+      if (error) throw error;
+      setSubscription(data);
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+      // Set default free tier on error
+      setSubscription({
+        subscribed: false,
+        subscription_tier: 'free',
+        subscription_end: null,
+        analysis_count: 0,
+        analysis_limit: 10
+      });
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Check subscription on sign in
+        if (session?.user && event === 'SIGNED_IN') {
+          // Add slight delay to ensure session is fully established
+          setTimeout(() => {
+            checkSubscription();
+          }, 1000);
+        }
+        
+        // Clear subscription on sign out
+        if (event === 'SIGNED_OUT') {
+          setSubscription(null);
+        }
       }
     );
 
@@ -43,6 +92,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Check subscription if user is authenticated
+      if (session?.user) {
+        setTimeout(() => {
+          checkSubscription();
+        }, 1000);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -156,9 +212,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     loading,
+    subscription,
     signUp,
     signIn,
     signOut,
+    checkSubscription,
   };
 
   return (

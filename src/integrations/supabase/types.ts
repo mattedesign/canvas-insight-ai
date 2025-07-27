@@ -500,6 +500,48 @@ export type Database = {
         }
         Relationships: []
       }
+      subscribers: {
+        Row: {
+          analysis_count: number | null
+          analysis_limit: number | null
+          created_at: string
+          email: string
+          id: string
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          analysis_count?: number | null
+          analysis_limit?: number | null
+          created_at?: string
+          email: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          analysis_count?: number | null
+          analysis_limit?: number | null
+          created_at?: string
+          email?: string
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_events: {
         Row: {
           created_at: string
@@ -535,6 +577,7 @@ export type Database = {
       }
       ux_analyses: {
         Row: {
+          counted_towards_limit: boolean | null
           created_at: string | null
           id: string
           image_id: string | null
@@ -545,6 +588,7 @@ export type Database = {
           visual_annotations: Json
         }
         Insert: {
+          counted_towards_limit?: boolean | null
           created_at?: string | null
           id?: string
           image_id?: string | null
@@ -555,6 +599,7 @@ export type Database = {
           visual_annotations?: Json
         }
         Update: {
+          counted_towards_limit?: boolean | null
           created_at?: string | null
           id?: string
           image_id?: string | null

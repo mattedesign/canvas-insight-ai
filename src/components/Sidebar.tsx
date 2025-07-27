@@ -19,8 +19,8 @@ interface SidebarProps {
   onAddImages: () => void;
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
-  selectedView: 'gallery' | 'canvas' | 'summary';
-  onViewChange: (view: 'gallery' | 'canvas' | 'summary') => void;
+  selectedView: 'gallery' | 'canvas' | 'summary' | 'subscription';
+  onViewChange: (view: 'gallery' | 'canvas' | 'summary' | 'subscription') => void;
   selectedImageId: string | null;
   onImageSelect: (imageId: string) => void;
   showAnnotations: boolean;
