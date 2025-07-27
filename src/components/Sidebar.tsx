@@ -7,6 +7,7 @@ import {
   Bell, 
   Crown, 
   User,
+  Activity,
   Trash2,
   LogOut
 } from 'lucide-react';
@@ -47,12 +48,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isOnUploadScreen = location.pathname === '/upload';
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   const isOnProjects = location.pathname === '/projects';
+  const isOnAnalytics = location.pathname === '/analytics';
   
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Plus, label: 'Add', active: isOnUploadScreen },
     { icon: Folder, label: 'Previous', active: isOnProjects },
+    { icon: Activity, label: 'Analytics', active: isOnAnalytics },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: false },
     { icon: User, label: 'Profile', active: false },
@@ -74,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Dashboard' ? () => navigate('/dashboard') :
               item.label === 'Add' ? () => navigate('/upload') :
               item.label === 'Previous' ? () => navigate('/projects') :
+              item.label === 'Analytics' ? () => navigate('/analytics') :
               undefined
             }
             className={`
@@ -87,6 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Add' ? 'Add Images' :
               item.label === 'Previous' ? 'Previous Analyses' :
+              item.label === 'Analytics' ? 'System Analytics' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :
               item.label === 'Profile' ? 'Profile' :
