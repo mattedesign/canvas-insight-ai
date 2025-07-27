@@ -268,14 +268,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Calculate container dimensions based on display mode
       let containerWidth = 0;
       let containerHeight = 0;
-      const padding = 32;
+      const padding = 32; // Consistent 32px padding on all sides
+      const headerHeight = 60; // Space for group title
       const imageSpacing = 20;
       const analysisSpacing = 100;
       
       if (displayMode === 'standard') {
         // Vertical stacking: each image+analysis pair stacked vertically
         let maxWidth = 0;
-        let totalHeight = 60 + padding; // Header space
+        let totalHeight = headerHeight + padding; // Header space + top padding
         
         groupImages.forEach((image, imageIndex) => {
           const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
@@ -293,12 +294,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           totalHeight += minVerticalSpace;
         });
         
-        containerWidth = Math.max(maxWidth + padding * 2, 600);
-        containerHeight = totalHeight + padding;
+        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
+        containerHeight = totalHeight + padding; // Bottom padding
       } else {
         // Alternative stacked layout
         let maxWidth = 0;
-        let totalHeight = 60 + padding; // Header space
+        let totalHeight = headerHeight + padding; // Header space + top padding
         
         groupImages.forEach((image, imageIndex) => {
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
@@ -313,8 +314,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           totalHeight += minVerticalSpace;
         });
         
-        containerWidth = Math.max(maxWidth + padding * 2, 600);
-        containerHeight = totalHeight + padding;
+        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
+        containerHeight = totalHeight + padding; // Bottom padding
       }
       
       // Create group container node using React Flow's built-in group type
@@ -340,7 +341,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Position images and their individual analysis cards inside the container
       if (displayMode === 'standard') {
         // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
-        let currentY = 60; // Start below header
+        let currentY = headerHeight; // Start below header, padding will be added by image positioning
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
@@ -403,7 +404,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         });
       } else {
         // Alternative stacked layout
-        let currentY = 60;
+        let currentY = headerHeight; // Start below header, padding will be added by image positioning
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
