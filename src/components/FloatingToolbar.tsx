@@ -16,7 +16,8 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
-  Target
+  Target,
+  Group
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ChatPanel } from './ChatPanel';
@@ -28,9 +29,11 @@ interface FloatingToolbarProps {
   onToggleAnnotations: () => void;
   onToggleAnalysis: () => void;
   onAddComment: () => void;
+  onCreateGroup?: () => void;
   showAnnotations: boolean;
   showAnalysis: boolean;
   currentTool: ToolMode;
+  hasMultiSelection?: boolean;
 }
 
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
@@ -38,9 +41,11 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   onToggleAnnotations,
   onToggleAnalysis,
   onAddComment,
+  onCreateGroup,
   showAnnotations,
   showAnalysis,
-  currentTool
+  currentTool,
+  hasMultiSelection = false
 }) => {
   const { zoomIn, zoomOut, zoomTo, fitView, getZoom } = useReactFlow();
   const { toast } = useToast();
@@ -231,6 +236,24 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           </DropdownMenu>
 
           <Separator orientation="vertical" className="h-6" />
+
+          {/* Group Creation Button */}
+          {onCreateGroup && (
+            <>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                onClick={onCreateGroup}
+                disabled={!hasMultiSelection}
+                title="Create group from selected images"
+              >
+                <Group className="h-4 w-4" />
+              </Button>
+              
+              <Separator orientation="vertical" className="h-6" />
+            </>
+          )}
 
           {/* Add Comment Button */}
           <Button 

@@ -201,3 +201,41 @@ All colors MUST be HSL.
 .animate-scale-in {
   animation: scale-in 0.2s ease-out;
 }
+
+/* Group Node Styles */
+.group-node {
+  position: relative;
+}
+
+.group-node .react-flow__handle {
+  visibility: hidden;
+}
+
+/* Multi-selection feedback */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px hsl(var(--primary));
+}
+
+/* Improved node interaction */
+.react-flow__node[data-selectable="true"]:hover {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.5);
+}
+
+/* Group creation animation */
+@keyframes group-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+.group-selected {
+  animation: group-pulse 2s infinite;
+}
+
+/* Keyboard shortcut hints */
+.keyboard-hint {
+  @apply text-xs text-muted-foreground;
+}

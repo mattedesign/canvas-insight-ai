@@ -10,15 +10,18 @@ import {
   Background,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { ConceptImageNode } from './ConceptImageNode';
 import { ConceptDetailsNode } from './ConceptDetailsNode';
+import { GroupNode } from './GroupNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 import { AnnotationOverlayProvider } from '../AnnotationOverlay';
+import { GroupCreationDialog } from '../GroupCreationDialog';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -28,6 +31,7 @@ const nodeTypes = {
   analysisCard: AnalysisCardNode,
   conceptImage: ConceptImageNode,
   conceptDetails: ConceptDetailsNode,
+  group: GroupNode,
 };
 
 interface CanvasViewProps {
@@ -55,7 +59,39 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
+  const [groups, setGroups] = useState<ImageGroup[]>([]);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const { toast } = useToast();
+  const multiSelection = useMultiSelection();
+
+  // Group management handlers
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    toast({
+      description: "Group deleted successfully",
+    });
+  }, [toast]);
+
+  const handleViewGroup = useCallback((groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      multiSelection.selectMultiple(group.imageIds);
+      toast({
+        description: `Viewing group "${group.name}"`,
+      });
+    }
+  }, [groups, multiSelection, toast]);
+
+  const handleAnalyzeGroup = useCallback((groupId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      toast({
+        title: "Group Analysis",
+        description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
+      });
+    }
+  }, [groups, toast]);
+
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
     const nodes: Node[] = [];
@@ -85,7 +121,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           showAnnotations,
           currentTool,
           onViewChange,
-          onImageSelect
+          onImageSelect,
+          onToggleSelection: multiSelection.toggleSelection,
+          isSelected: multiSelection.isSelected(image.id)
         },
       };
       nodes.push(imageNode);
@@ -176,8 +214,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       yOffset += nextSpacing;
     });
 
+    // Add group nodes
+    groups.forEach((group, index) => {
+      const groupNode: Node = {
+        id: `group-${group.id}`,
+        type: 'group',
+        position: group.position,
+        data: {
+          group,
+          imageCount: group.imageIds.length,
+          onViewGroup: handleViewGroup,
+          onAnalyzeGroup: handleAnalyzeGroup,
+          onDeleteGroup: handleDeleteGroup,
+        },
+      };
+      nodes.push(groupNode);
+    });
+
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept]);
+  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, multiSelection]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
@@ -287,6 +342,40 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
   }, [toast]);
 
+  const handleCreateGroup = useCallback(() => {
+    if (multiSelection.state.selectedIds.length < 2) {
+      toast({
+        title: "Select Multiple Images",
+        description: "Please select at least 2 images to create a group",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsGroupDialogOpen(true);
+  }, [multiSelection.state.selectedIds.length, toast]);
+
+  const handleGroupCreation = useCallback((name: string, description: string, color: string) => {
+    const groupId = `group-${Date.now()}`;
+    const newGroup: ImageGroup = {
+      id: groupId,
+      name,
+      description,
+      imageIds: multiSelection.state.selectedIds,
+      position: { x: 50, y: 50 },
+      color,
+      createdAt: new Date(),
+    };
+
+    setGroups(prev => [...prev, newGroup]);
+    multiSelection.clearSelection();
+    
+    toast({
+      title: "Group Created",
+      description: `Successfully created group "${name}" with ${newGroup.imageIds.length} images`,
+    });
+  }, [multiSelection, toast]);
+
+
 
   return (
     <AnnotationOverlayProvider>
@@ -362,11 +451,21 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onToggleAnnotations={handleToggleAnnotations}
           onToggleAnalysis={handleToggleAnalysis}
           onAddComment={handleAddComment}
+          onCreateGroup={handleCreateGroup}
           showAnnotations={showAnnotations}
           showAnalysis={showAnalysis}
           currentTool={currentTool}
+          hasMultiSelection={multiSelection.state.isMultiSelectMode}
         />
       </ReactFlow>
+      
+      {/* Group Creation Dialog */}
+      <GroupCreationDialog
+        isOpen={isGroupDialogOpen}
+        onClose={() => setIsGroupDialogOpen(false)}
+        onCreateGroup={handleGroupCreation}
+        selectedImages={uploadedImages.filter(img => multiSelection.state.selectedIds.includes(img.id))}
+      />
       </div>
     </AnnotationOverlayProvider>
   );

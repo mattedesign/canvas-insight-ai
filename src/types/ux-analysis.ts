@@ -55,6 +55,16 @@ export interface GeneratedConcept {
   createdAt: Date;
 }
 
+export interface ImageGroup {
+  id: string;
+  name: string;
+  description: string;
+  imageIds: string[];
+  position: { x: number; y: number };
+  color: string;
+  createdAt: Date;
+}
+
 export interface UXAnalysis {
   id: string;
   imageId: string;

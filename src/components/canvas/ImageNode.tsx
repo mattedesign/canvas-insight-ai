@@ -16,6 +16,8 @@ interface ImageNodeData {
   currentTool?: 'cursor' | 'draw';
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
+  onToggleSelection?: (imageId: string, isCtrlOrCmd: boolean) => void;
+  isSelected?: boolean;
 }
 
 interface ImageNodeProps {
@@ -24,7 +26,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
@@ -127,10 +129,21 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     });
   }, [toast]);
 
-  
+  const handleNodeClick = useCallback((e: React.MouseEvent) => {
+    if (currentTool === 'cursor' && onToggleSelection) {
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      onToggleSelection(image.id, isCtrlOrCmd);
+    }
+  }, [currentTool, onToggleSelection, image.id]);
   
   return (
-    <Card className="max-w-2xl overflow-hidden bg-background border-border shadow-lg" onDoubleClick={handleDoubleClick}>
+    <Card 
+      className={`max-w-2xl overflow-hidden bg-background border-border shadow-lg transition-all cursor-pointer ${
+        isSelected ? 'ring-2 ring-primary ring-offset-2' : ''
+      }`} 
+      onDoubleClick={handleDoubleClick}
+      onClick={handleNodeClick}
+    >
       <div className="relative image-container" ref={imageContainerRef}>
         <img
           src={image.url}
