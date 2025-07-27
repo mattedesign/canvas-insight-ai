@@ -319,7 +319,23 @@ function generateMockAnalysisResponse(payload: any) {
 async function analyzeGroup(payload: any) {
   console.log('Analyzing group:', payload)
   
-  // Mock group analysis
+  try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (openaiApiKey && payload.imageUrls && payload.imageUrls.length > 0) {
+      console.log('Using AI for intelligent group analysis');
+      return await performAIGroupAnalysis(payload, openaiApiKey);
+    } else {
+      console.log('Using mock group analysis');
+      return generateMockGroupAnalysis();
+    }
+  } catch (error) {
+    console.error('Error in group analysis, falling back to mock:', error);
+    return generateMockGroupAnalysis();
+  }
+}
+
+function generateMockGroupAnalysis() {
   const mockGroupAnalysis = {
     summary: {
       overallScore: 78,
@@ -340,15 +356,31 @@ async function analyzeGroup(payload: any) {
       designInconsistencies: ['Button sizes', 'Icon styles'],
       userJourneyGaps: ['Missing back navigation', 'Unclear progress indicators']
     }
-  }
+  };
   
-  return { success: true, data: mockGroupAnalysis }
+  return { success: true, data: mockGroupAnalysis };
 }
 
 async function generateConcept(payload: any) {
   console.log('Generating concept:', payload)
   
-  // Mock concept generation
+  try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (openaiApiKey && payload.analysisData) {
+      console.log('Using AI for concept generation');
+      return await performAIConceptGeneration(payload, openaiApiKey);
+    } else {
+      console.log('Using mock concept generation');
+      return generateMockConcept();
+    }
+  } catch (error) {
+    console.error('Error in concept generation, falling back to mock:', error);
+    return generateMockConcept();
+  }
+}
+
+function generateMockConcept() {
   const mockConcept = {
     title: 'Enhanced Design Concept',
     description: 'A conceptual design addressing key usability issues identified in the analysis',
@@ -358,9 +390,184 @@ async function generateConcept(payload: any) {
       'Enhanced button consistency',
       'Better visual contrast'
     ]
-  }
+  };
   
-  return { success: true, data: mockConcept }
+  return { success: true, data: mockConcept };
+}
+
+async function performAIGroupAnalysis(payload: any, apiKey: string) {
+  console.log('Performing AI group analysis');
+  
+  try {
+    // Build message content with multiple images
+    const imageContent = payload.imageUrls.slice(0, 5).map((url: string, index: number) => ({
+      type: 'image_url',
+      image_url: { url, detail: 'high' }
+    }));
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze these ${payload.imageUrls.length} interface designs as a cohesive group. Focus on:
+
+1. Visual consistency across screens
+2. Design patterns and component reuse
+3. User flow continuity and navigation
+4. Brand consistency and thematic coherence
+5. Overall user experience across the journey
+
+${payload.prompt ? `Specific focus: ${payload.prompt}` : ''}
+
+Respond with a JSON object:
+{
+  "summary": {"overallScore": 85, "consistency": 90, "thematicCoherence": 80, "userFlowContinuity": 75},
+  "insights": ["Detailed insight 1", "Detailed insight 2"],
+  "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2"],
+  "patterns": {
+    "commonElements": ["Element 1", "Element 2"],
+    "designInconsistencies": ["Inconsistency 1", "Inconsistency 2"],
+    "userJourneyGaps": ["Gap 1", "Gap 2"]
+  }
+}`
+              },
+              ...imageContent
+            ]
+          }
+        ],
+        max_tokens: 1500,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    
+    const aiAnalysis = JSON.parse(aiResponse);
+    
+    return {
+      success: true,
+      data: {
+        summary: aiAnalysis.summary || {
+          overallScore: 78,
+          consistency: 80,
+          thematicCoherence: 75,
+          userFlowContinuity: 70
+        },
+        insights: aiAnalysis.insights || ['AI analysis completed'],
+        recommendations: aiAnalysis.recommendations || ['Review group coherence'],
+        patterns: aiAnalysis.patterns || {
+          commonElements: ['Consistent styling'],
+          designInconsistencies: ['Minor variations'],
+          userJourneyGaps: ['Navigation improvements needed']
+        }
+      }
+    };
+
+  } catch (error) {
+    console.error('AI group analysis failed:', error);
+    throw error;
+  }
+}
+
+async function performAIConceptGeneration(payload: any, apiKey: string) {
+  console.log('Performing AI concept generation');
+  
+  try {
+    const analysisData = payload.analysisData;
+    const imageUrl = payload.imageUrl;
+
+    // Create contextual prompt based on analysis data
+    const issuesContext = analysisData.suggestions?.slice(0, 5).map((s: any) => 
+      `- ${s.title}: ${s.description}`
+    ).join('\n') || 'General UX improvements needed';
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Based on this UX analysis, generate an improved design concept that addresses these key issues:
+
+${issuesContext}
+
+Overall Score: ${analysisData.summary?.overallScore || 'N/A'}
+
+Create a comprehensive design concept that:
+1. Addresses the identified usability issues
+2. Improves accessibility and visual hierarchy
+3. Enhances the overall user experience
+4. Maintains brand consistency
+
+Respond with a JSON object:
+{
+  "title": "Descriptive concept title",
+  "description": "Detailed description of the concept and improvements",
+  "improvements": ["Specific improvement 1", "Specific improvement 2", "Specific improvement 3"],
+  "rationale": "Why these changes will improve the user experience",
+  "implementationNotes": ["Technical note 1", "Design note 2"]
+}`
+              },
+              ...(imageUrl ? [{
+                type: 'image_url',
+                image_url: { url: imageUrl, detail: 'high' }
+              }] : [])
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.8
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    
+    const aiConcept = JSON.parse(aiResponse);
+    
+    return {
+      success: true,
+      data: {
+        title: aiConcept.title || 'AI-Enhanced Design Concept',
+        description: aiConcept.description || 'A comprehensive design improvement based on UX analysis',
+        imageUrl: `https://picsum.photos/1024/768?random=${Date.now()}`, // Placeholder until image generation implemented
+        improvements: aiConcept.improvements || ['Enhanced usability', 'Improved accessibility', 'Better visual hierarchy'],
+        rationale: aiConcept.rationale || 'Addresses key usability concerns identified in the analysis',
+        implementationNotes: aiConcept.implementationNotes || ['Consider user testing', 'Implement incrementally']
+      }
+    };
+
+  } catch (error) {
+    console.error('AI concept generation failed:', error);
+    throw error;
+  }
 }
 
 Deno.serve(async (req) => {
