@@ -11,6 +11,8 @@ This document outlines the complete transformation of our current frontend demo 
 - Establish comprehensive testing and monitoring systems
 - Deploy scalable, secure SaaS platform
 
+**AI Implementation Constraints:** This plan includes strict AI governance rules to prevent scope creep and ensure feature parity. See [AI Rules of Engagement](#ai-rules-of-engagement) for complete guidelines.
+
 ---
 
 ## Project Overview
@@ -201,6 +203,12 @@ export default async function handler(req: Request) {
 - [ ] Maintain exact TypeScript interfaces
 - [ ] Ensure zero UI/UX changes during migration
 
+**AI Compliance Checklist:**
+- [ ] No features added beyond defined scope ([AI Rules](#ai-rules-of-engagement))
+- [ ] Zero UI/UX deviations from current demo
+- [ ] All architectural decisions follow Supabase approach
+- [ ] User approval obtained for any unclear requirements
+
 **Testing Criteria:**
 - ✅ All current demo features work identically
 - ✅ Authentication flow completes successfully
@@ -227,6 +235,12 @@ export default async function handler(req: Request) {
 - [ ] Create real-time canvas state synchronization
 - [ ] Add undo/redo persistence across sessions
 - [ ] Maintain React Flow node structure exactly
+
+**AI Compliance Checklist:**
+- [ ] No features added beyond defined scope ([AI Rules](#ai-rules-of-engagement))
+- [ ] Zero UI/UX deviations from current demo
+- [ ] All architectural decisions follow Supabase approach
+- [ ] User approval obtained for any unclear requirements
 
 **Testing Criteria:**
 - ✅ Image upload/display matches current behavior
@@ -255,6 +269,12 @@ export default async function handler(req: Request) {
 - [ ] Create project sharing foundations
 - [ ] Maintain backward compatibility with current navigation
 
+**AI Compliance Checklist:**
+- [ ] No features added beyond defined scope ([AI Rules](#ai-rules-of-engagement))
+- [ ] Zero UI/UX deviations from current demo
+- [ ] All architectural decisions follow Supabase approach
+- [ ] User approval obtained for any unclear requirements
+
 **Testing Criteria:**
 - ✅ Group operations match current demo exactly
 - ✅ Dashboard calculations are identical
@@ -282,6 +302,12 @@ export default async function handler(req: Request) {
 - [ ] Optimize edge function performance
 - [ ] Maintain responsive UI during processing
 
+**AI Compliance Checklist:**
+- [ ] No features added beyond defined scope ([AI Rules](#ai-rules-of-engagement))
+- [ ] Zero UI/UX deviations from current demo
+- [ ] All architectural decisions follow Supabase approach
+- [ ] User approval obtained for any unclear requirements
+
 **Testing Criteria:**
 - ✅ AI results improve upon mock data quality
 - ✅ All existing UI interactions remain unchanged
@@ -308,6 +334,12 @@ export default async function handler(req: Request) {
 - [ ] Automated deployment pipelines
 - [ ] Load testing and performance validation
 - [ ] Go-live with feature flag system
+
+**AI Compliance Checklist:**
+- [ ] No features added beyond defined scope ([AI Rules](#ai-rules-of-engagement))
+- [ ] Zero UI/UX deviations from current demo
+- [ ] All architectural decisions follow Supabase approach
+- [ ] User approval obtained for any unclear requirements
 
 **Testing Criteria:**
 - ✅ Platform handles production load
