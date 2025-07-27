@@ -4,6 +4,7 @@ import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { useAppContext } from '@/context/AppContext';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate } from 'react-router-dom';
 
 const Canvas = () => {
@@ -84,6 +85,25 @@ const Canvas = () => {
     setGroupEditDialogOpen(false);
     setSelectedGroupId(null);
   };
+
+  // Set up keyboard shortcuts
+  useKeyboardShortcuts({
+    onGroup: () => {
+      if (uploadedImages.length > 0) {
+        // If on canvas, trigger group creation if multiple items selected
+        // You could add additional logic here to select multiple items first
+        console.log('Group shortcut triggered');
+      }
+    },
+    onUndo: () => {
+      console.log('Undo shortcut triggered');
+      // Wire this up to your undo functionality
+    },
+    onRedo: () => {
+      console.log('Redo shortcut triggered');
+      // Wire this up to your redo functionality
+    },
+  });
 
   // Redirect to upload if no images
   if (uploadedImages.length === 0) {
