@@ -237,6 +237,13 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         zoomLevel={getZoomLevel()}
         currentTool={currentTool}
       />
+      
+      {/* Visual feedback when panning is disabled */}
+      {activeCommentId && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-muted/90 backdrop-blur-sm text-muted-foreground text-xs px-3 py-1 rounded-md border">
+          Pan disabled - Close annotation to enable
+        </div>
+      )}
     </>
   ), [
     analysis,
@@ -275,7 +282,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         }}
         panning={{
           velocityDisabled: false,
-          disabled: false,
+          disabled: !!activeCommentId, // Disable panning when annotation dialog is open
         }}
         doubleClick={{
           disabled: false,
