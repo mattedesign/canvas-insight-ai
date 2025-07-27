@@ -134,8 +134,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   const handleNodeClick = useCallback((e: React.MouseEvent) => {
     if (currentTool === 'cursor' && onToggleSelection) {
-      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-      onToggleSelection(image.id, isCtrlOrCmd);
+      const isMultiSelectKey = e.ctrlKey || e.metaKey || e.shiftKey;
+      onToggleSelection(image.id, isMultiSelectKey);
     }
   }, [currentTool, onToggleSelection, image.id]);
   
