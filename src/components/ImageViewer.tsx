@@ -46,6 +46,7 @@ const AnnotationMarker: React.FC<{
         left: `${annotation.x}%`,
         top: `${annotation.y}%`,
       }}
+      data-annotation-id={annotation.id}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

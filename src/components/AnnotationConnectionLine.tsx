@@ -1,43 +1,79 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 interface AnnotationConnectionLineProps {
   markerPosition: { x: number; y: number };
   dialogPosition: { x: number; y: number };
   dialogSize: { width: number; height: number };
   isVisible: boolean;
+  annotationId: string; // Add ID to track the specific marker
 }
 
 export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> = ({
   markerPosition,
   dialogPosition,
   dialogSize,
-  isVisible
+  isVisible,
+  annotationId
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewportSize, setViewportSize] = useState({ 
     width: window.innerWidth, 
     height: window.innerHeight 
   });
+  const [actualMarkerPosition, setActualMarkerPosition] = useState(markerPosition);
 
-  // Update viewport size on resize
+  // Find the actual annotation marker element and track its position
+  const updateMarkerPosition = useCallback(() => {
+    const markerElements = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
+    if (markerElements.length > 0) {
+      const markerElement = markerElements[0] as HTMLElement;
+      const rect = markerElement.getBoundingClientRect();
+      const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+      const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      
+      setActualMarkerPosition({
+        x: rect.left + rect.width / 2 + scrollX,
+        y: rect.top + rect.height / 2 + scrollY
+      });
+    }
+  }, [annotationId]);
+
+  // Update viewport size and marker position on resize and scroll
   useEffect(() => {
     const handleResize = () => {
       setViewportSize({ 
         width: window.innerWidth, 
         height: window.innerHeight 
       });
+      updateMarkerPosition();
     };
 
+    const handleScroll = () => {
+      updateMarkerPosition();
+    };
+
+    // Initial position update
+    updateMarkerPosition();
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    window.addEventListener('scroll', handleScroll, true); // Use capture to catch all scroll events
+    
+    // Use animation frame for smooth updates
+    const animationId = requestAnimationFrame(updateMarkerPosition);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll, true);
+      cancelAnimationFrame(animationId);
+    };
+  }, [updateMarkerPosition]);
 
   if (!isVisible) return null;
 
-  // Calculate the optimal connection points
+  // Calculate the optimal connection points using actual marker position
   const calculateConnectionPoints = () => {
-    const markerX = markerPosition.x;
-    const markerY = markerPosition.y;
+    const markerX = actualMarkerPosition.x;
+    const markerY = actualMarkerPosition.y;
     
     // Dialog bounds
     const dialogLeft = dialogPosition.x;

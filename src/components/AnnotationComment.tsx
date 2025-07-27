@@ -155,6 +155,7 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
         dialogPosition={{ x: optimalPosition.dialogX, y: optimalPosition.dialogY }}
         dialogSize={dialogSize}
         isVisible={true}
+        annotationId={annotation.id}
       />
       
       <div 
