@@ -1,17 +1,12 @@
 import React from 'react';
 import { 
-  Grid3X3, 
+  BarChart3, 
+  Plus, 
+  Folder, 
   Bell, 
-  RotateCcw, 
-  Gem, 
-  User, 
-  Plus,
-  Eye,
-  BarChart3,
-  Trash2,
-  Network,
-  MapPin,
-  EyeOff
+  Crown, 
+  User,
+  Trash2
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 
@@ -26,6 +21,7 @@ interface SidebarProps {
   onImageSelect: (imageId: string) => void;
   showAnnotations: boolean;
   onToggleAnnotations: () => void;
+  onNavigateToPreviousAnalyses: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -39,13 +35,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onImageSelect,
   showAnnotations,
   onToggleAnnotations,
+  onNavigateToPreviousAnalyses,
 }) => {
   const sidebarIcons = [
+    { icon: BarChart3, label: 'Dashboard', active: selectedView === 'summary' },
     { icon: Plus, label: 'Add', active: false },
-    { icon: Grid3X3, label: 'Grid', active: selectedView === 'canvas' },
+    { icon: Folder, label: 'Previous', active: false },
     { icon: Bell, label: 'Notifications', active: false },
-    { icon: RotateCcw, label: 'History', active: false },
-    { icon: Gem, label: 'Assets', active: false },
+    { icon: Crown, label: 'Subscription', active: false },
     { icon: User, label: 'Profile', active: false },
   ];
 
@@ -62,8 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             key={index}
             onClick={
+              item.label === 'Dashboard' ? () => onViewChange('summary') :
               item.label === 'Add' ? onAddImages :
-              item.label === 'Grid' ? () => onViewChange('canvas') :
+              item.label === 'Previous' ? onNavigateToPreviousAnalyses :
               undefined
             }
             className={`
@@ -74,8 +72,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
             `}
             title={
+              item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Add' ? 'Add Images' :
-              item.label === 'Grid' ? 'Canvas View' :
+              item.label === 'Previous' ? 'Previous Analyses' :
+              item.label === 'Notifications' ? 'Notifications' :
+              item.label === 'Subscription' ? 'Subscription' :
+              item.label === 'Profile' ? 'Profile' :
               item.label
             }
           >
@@ -85,71 +87,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
 
-      {/* View Toggle */}
-      {analyses.length > 0 && (
-        <div className="flex flex-col space-y-2 mt-8">
-          <button
-            onClick={() => onViewChange('gallery')}
-            className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
-              ${selectedView === 'gallery'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              }
-            `}
-            title="Gallery View"
-          >
-            <Eye className="w-5 h-5" />
-          </button>
-          
-          <button
-            onClick={() => onViewChange('canvas')}
-            className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
-              ${selectedView === 'canvas'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              }
-            `}
-            title="Canvas View"
-          >
-            <Network className="w-5 h-5" />
-          </button>
-          
-          <button
-            onClick={() => onViewChange('summary')}
-            className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
-              ${selectedView === 'summary'
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              }
-            `}
-            title="Summary View"
-          >
-            <BarChart3 className="w-5 h-5" />
-          </button>
-        </div>
-      )}
-
-      {/* Annotation Toggle */}
-      {analyses.length > 0 && (
-        <div className="mt-4">
-          <button
-            onClick={onToggleAnnotations}
-            className={`
-              w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200
-              ${showAnnotations
-                ? 'bg-sidebar-accent text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-accent/20'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              }
-            `}
-            title={showAnnotations ? "Hide Annotations" : "Show Annotations"}
-          >
-            {showAnnotations ? <MapPin className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-          </button>
-        </div>
-      )}
 
       {/* Clear Canvas */}
       {uploadedImages.length > 0 && (

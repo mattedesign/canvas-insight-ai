@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
@@ -14,10 +15,11 @@ import { toast } from 'sonner';
 
 
 export const UXAnalysisTool: React.FC = () => {
+  const navigate = useNavigate();
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
-  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('canvas');
+  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('summary');
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
@@ -151,6 +153,10 @@ export const UXAnalysisTool: React.FC = () => {
     console.log('Add comment mode activated');
   }, []);
 
+  const handleNavigateToPreviousAnalyses = useCallback(() => {
+    navigate('/previous-analyses');
+  }, [navigate]);
+
 
   const showGalleryView = selectedView === 'gallery';
   const showCanvasView = selectedView === 'canvas';
@@ -180,6 +186,7 @@ export const UXAnalysisTool: React.FC = () => {
         onImageSelect={handleImageSelect}
         showAnnotations={showAnnotations}
         onToggleAnnotations={handleToggleAnnotations}
+        onNavigateToPreviousAnalyses={handleNavigateToPreviousAnalyses}
       />
       
       <div className="flex-1 relative">
