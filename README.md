@@ -324,13 +324,13 @@ export default async function handler(req: Request) {
 5. **Usage Limits** - Sustainable resource management
 6. **Model Selection UI** - User choice and flexibility
 
-### 🟢 MEDIUM (Next 8 weeks)  
+### 🟢 MEDIUM (Next 8 weeks)
 7. **Multi-Model Comparison** - Advanced analytics
 8. **Batch Processing** - Enterprise scalability
 9. **API Access** - Third-party integrations
 
-### Estimated Timeline: 8-12 weeks to full feature parity
-### Current Status: 60% complete (core platform operational)
+**Estimated Timeline:** 8-12 weeks to full feature parity  
+**Current Status:** 60% complete (core platform operational)
 
 ---
 
