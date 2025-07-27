@@ -42,6 +42,75 @@ export class ProjectService {
     return this.currentProjectId;
   }
 
+  static async getAllProjects() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get basic project info first
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+    if (!projects) return [];
+
+    // Get counts for each project
+    const projectsWithCounts = await Promise.all(
+      projects.map(async (project) => {
+        const [imageCount, analysisCount] = await Promise.all([
+          supabase.from('images').select('id', { count: 'exact' }).eq('project_id', project.id),
+          supabase.from('ux_analyses').select('ux_analyses.id', { count: 'exact' }).eq('images.project_id', project.id).eq('images.id', 'ux_analyses.image_id')
+        ]);
+
+        return {
+          ...project,
+          images: [{ count: imageCount.count || 0 }],
+          ux_analyses: [{ count: analysisCount.count || 0 }]
+        };
+      })
+    );
+
+    return projectsWithCounts;
+  }
+
+  static async createProject(name: string, description?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: newProject, error } = await supabase
+      .from('projects')
+      .insert({
+        user_id: user.id,
+        name,
+        description: description || ''
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return newProject;
+  }
+
+  static async switchToProject(projectId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Verify user owns this project
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !project) throw new Error('Project not found or access denied');
+    
+    this.currentProjectId = projectId;
+    return projectId;
+  }
+
   static resetProject() {
     this.currentProjectId = null;
   }
