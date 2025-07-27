@@ -14,6 +14,7 @@ interface AnnotationCommentProps {
   onRequestAnalysis: (prompt: string) => void;
   onGenerateVariation: (prompt: string) => void;
   relatedSuggestions?: Suggestion[];
+  imageContainerRef?: React.RefObject<HTMLElement>;
 }
 
 export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
@@ -23,6 +24,7 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   onRequestAnalysis,
   onGenerateVariation,
   relatedSuggestions = [],
+  imageContainerRef,
 }) => {
   const [userPrompt, setUserPrompt] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -30,37 +32,57 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const [dialogSize, setDialogSize] = useState({ width: 320, height: 400 });
 
-  // Smart positioning to keep dialog near annotation with viewport constraints
+  // Smart positioning to keep dialog within image container bounds (Figma-like behavior)
   const calculateOptimalPosition = () => {
     const dialogWidth = 320; // w-80 = 20rem = 320px
     const dialogHeight = 400; // Estimated height
     const offset = 20; // Distance from annotation marker
+    const margin = 16; // Minimum margin from container edges
     
-    const viewport = {
+    // Get image container bounds
+    const container = imageContainerRef?.current;
+    const containerBounds = container ? container.getBoundingClientRect() : {
       width: window.innerWidth,
       height: window.innerHeight,
+      left: 0,
+      top: 0
     };
 
     let dialogX = position.x + offset;
     let dialogY = position.y;
     let transformX = 'none';
 
-    // Check if dialog would overflow on the right
-    if (dialogX + dialogWidth > viewport.width - 20) {
+    // Check if dialog would overflow on the right of the container
+    if (dialogX + dialogWidth > containerBounds.width - margin) {
       // Position on the left side of the annotation
       dialogX = position.x - offset;
       transformX = 'translateX(-100%)';
     }
 
-    // Check if dialog would overflow at the bottom
-    if (dialogY + dialogHeight > viewport.height - 20) {
+    // If still overflowing on the left, center it within available space
+    if (dialogX < margin && transformX === 'translateX(-100%)') {
+      dialogX = margin;
+      transformX = 'none';
+    }
+
+    // Check if dialog would overflow at the bottom of the container
+    if (dialogY + dialogHeight > containerBounds.height - margin) {
       // Position above the annotation
       dialogY = position.y - dialogHeight - offset;
     }
 
-    // Check if dialog would overflow at the top
-    if (dialogY < 20) {
-      dialogY = 20;
+    // Check if dialog would overflow at the top of the container
+    if (dialogY < margin) {
+      dialogY = margin;
+    }
+
+    // Ensure dialog stays within horizontal bounds
+    if (dialogX < margin) {
+      dialogX = margin;
+      transformX = 'none';
+    } else if (dialogX + dialogWidth > containerBounds.width - margin) {
+      dialogX = containerBounds.width - dialogWidth - margin;
+      transformX = 'none';
     }
 
     return {

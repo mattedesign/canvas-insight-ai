@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback, useEffect } from 'react';
+import React, { memo, useState, useCallback, useEffect, useRef } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { AnnotationComment } from './AnnotationComment';
@@ -75,6 +75,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const {
     zoomIn,
@@ -86,13 +87,15 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   } = useImageTransform();
 
   const handleAnnotationClick = useCallback((annotation: AnnotationPoint, event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const imageRect = event.currentTarget.closest('.image-container')?.getBoundingClientRect();
+    const markerRect = event.currentTarget.getBoundingClientRect();
+    const imageContainer = imageContainerRef.current;
     
-    if (imageRect) {
+    if (imageContainer) {
+      const containerRect = imageContainer.getBoundingClientRect();
+      // Calculate position relative to the image container
       setCommentPosition({
-        x: rect.left - imageRect.left,
-        y: rect.top - imageRect.top
+        x: markerRect.left - containerRect.left + markerRect.width / 2,
+        y: markerRect.top - containerRect.top + markerRect.height / 2
       });
     }
     
@@ -171,6 +174,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   const ImageContent = useCallback(({ zoomIn, zoomOut, resetTransform }: any) => (
     <>
       <div 
+        ref={imageContainerRef}
         className="relative max-w-full max-h-full image-container w-full h-full flex items-center justify-center"
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -214,6 +218,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
               onRequestAnalysis={handleRequestAnalysis}
               onGenerateVariation={handleGenerateVariation}
               relatedSuggestions={relatedSuggestions}
+              imageContainerRef={imageContainerRef}
             />
           )}
         </div>
