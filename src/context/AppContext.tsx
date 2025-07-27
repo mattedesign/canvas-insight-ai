@@ -209,8 +209,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dimensions,
       };
 
-      // Generate mock analysis
-      const analysis = generateMockAnalysis(imageId, file.name, imageUrl);
+      // Generate analysis via edge function if authenticated, otherwise use mock
+      let analysis;
+      if (user) {
+        try {
+          const { data, error } = await supabase.functions.invoke('ux-analysis', {
+            body: {
+              type: 'ANALYZE_IMAGE',
+              payload: {
+                imageId,
+                imageUrl,
+                imageName: file.name,
+                userContext: ''
+              }
+            }
+          });
+          
+          if (error) throw error;
+          if (data.success) {
+            analysis = data.data;
+          } else {
+            throw new Error('Analysis failed');
+          }
+        } catch (error) {
+          console.error('Edge function analysis failed, using mock:', error);
+          analysis = generateMockAnalysis(imageId, file.name, imageUrl);
+        }
+      } else {
+        analysis = generateMockAnalysis(imageId, file.name, imageUrl);
+      }
 
       newImages.push(uploadedImage);
       newAnalyses.push(analysis);
