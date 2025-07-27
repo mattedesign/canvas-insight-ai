@@ -132,8 +132,14 @@ export const UXAnalysisTool: React.FC = () => {
   }, [toggleAnnotation]);
 
   const handleAddImages = useCallback(() => {
-    fileInputRef?.click();
-  }, [fileInputRef]);
+    // Navigate to upload screen by clearing images and switching to gallery view
+    setUploadedImages([]);
+    setAnalyses([]);
+    setGeneratedConcepts([]);
+    setSelectedImageId(null);
+    setSelectedView('gallery');
+    clearAnnotations();
+  }, [clearAnnotations]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
