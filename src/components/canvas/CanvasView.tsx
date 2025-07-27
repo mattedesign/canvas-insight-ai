@@ -64,6 +64,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
 
+  // Stable callback references
+  const stableCallbacks = useMemo(() => ({
+    onToggleSelection: multiSelection.toggleSelection,
+    isSelected: multiSelection.isSelected,
+    onViewChange,
+    onImageSelect,
+    onGenerateConcept
+  }), [multiSelection.toggleSelection, multiSelection.isSelected, onViewChange, onImageSelect, onGenerateConcept]);
+
   // Group management handlers
   const handleDeleteGroup = useCallback((groupId: string) => {
     setGroups(prev => prev.filter(g => g.id !== groupId));
@@ -80,7 +89,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         description: `Viewing group "${group.name}"`,
       });
     }
-  }, [groups, multiSelection, toast]);
+  }, [groups, multiSelection.selectMultiple, toast]);
 
   const handleAnalyzeGroup = useCallback((groupId: string) => {
     const group = groups.find(g => g.id === groupId);
@@ -120,10 +129,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           analysis,
           showAnnotations,
           currentTool,
-          onViewChange,
-          onImageSelect,
-          onToggleSelection: multiSelection.toggleSelection,
-          isSelected: multiSelection.isSelected(image.id)
+          onViewChange: stableCallbacks.onViewChange,
+          onImageSelect: stableCallbacks.onImageSelect,
+          onToggleSelection: stableCallbacks.onToggleSelection,
+          isSelected: stableCallbacks.isSelected(image.id)
         },
       };
       nodes.push(imageNode);
@@ -139,7 +148,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           position: { x: cardXPosition, y: yOffset },
           data: { 
             analysis,
-            onGenerateConcept,
+            onGenerateConcept: stableCallbacks.onGenerateConcept,
             isGeneratingConcept
           },
         };
@@ -232,12 +241,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, onGenerateConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, multiSelection.toggleSelection, multiSelection.isSelected]);
+  }, [uploadedImages, analyses, generatedConcepts, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialElements.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialElements.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
-
   const {
     saveState,
     undo,
@@ -245,37 +253,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     canUndo,
     canRedo,
     setIsUpdating,
-  } = useUndoRedo(initialElements.nodes, initialElements.edges);
+  } = useUndoRedo([], []);
 
-  // Save state when nodes or edges change
+  // Single consolidated effect to manage all node state updates
   useEffect(() => {
-    saveState(nodes, edges);
-  }, [nodes, edges, saveState]);
-
-  // Update nodes when initialElements change (including currentTool)
-  useEffect(() => {
+    setIsUpdating(true);
+    
+    // Update nodes and edges based on latest computed elements
     setNodes(initialElements.nodes);
     setEdges(initialElements.edges);
-  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges]);
-
-  // Update existing nodes with current tool when tool changes
-  useEffect(() => {
-    setNodes(currentNodes => 
-      currentNodes.map(node => {
-        if (node.type === 'image') {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              currentTool,
-              showAnnotations
-            }
-          };
-        }
-        return node;
-      })
-    );
-  }, [currentTool, showAnnotations, setNodes]);
+    
+    // Save to history
+    saveState(initialElements.nodes, initialElements.edges);
+    
+    // Clean up updating flag
+    const cleanup = () => setIsUpdating(false);
+    const timeoutId = setTimeout(cleanup, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, saveState, setIsUpdating]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
