@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           created_at: string | null
@@ -120,6 +171,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      error_logs: {
+        Row: {
+          created_at: string
+          error_message: string
+          error_type: string
+          id: string
+          metadata: Json
+          session_id: string
+          stack_trace: string | null
+          url: string
+          user_agent: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          error_type: string
+          id?: string
+          metadata?: Json
+          session_id: string
+          stack_trace?: string | null
+          url: string
+          user_agent: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          error_type?: string
+          id?: string
+          metadata?: Json
+          session_id?: string
+          stack_trace?: string | null
+          url?: string
+          user_agent?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       group_analyses: {
         Row: {
@@ -290,6 +380,39 @@ export type Database = {
           },
         ]
       }
+      performance_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          metric_name: string
+          metric_type: string
+          session_id: string
+          user_id: string | null
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          metric_name: string
+          metric_type: string
+          session_id: string
+          user_id?: string | null
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          metric_name?: string
+          metric_type?: string
+          session_id?: string
+          user_id?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string | null
@@ -377,6 +500,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          event_type: string
+          id: string
+          properties: Json
+          session_id: string
+          url: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          event_type: string
+          id?: string
+          properties?: Json
+          session_id: string
+          url: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          event_type?: string
+          id?: string
+          properties?: Json
+          session_id?: string
+          url?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ux_analyses: {
         Row: {
           created_at: string | null
@@ -430,6 +586,10 @@ export type Database = {
           window_minutes?: number
         }
         Returns: boolean
+      }
+      cleanup_monitoring_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_old_data: {
         Args: Record<PropertyKey, never>
