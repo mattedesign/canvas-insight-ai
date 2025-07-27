@@ -27,6 +27,7 @@ import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { GroupCreationDialog } from '../GroupCreationDialog';
+import { ForkCreationDialog } from '../ForkCreationDialog';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -93,6 +94,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(true);
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [selectedSessionData, setSelectedSessionData] = useState<{groupName?: string, originalPrompt?: string}>({});
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
@@ -133,6 +137,29 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       });
     }
   }, [groups, toast]);
+
+  // Fork creation handler
+  const handleCreateForkClick = useCallback((sessionId: string) => {
+    // Find the session data to get context
+    const sessionData = groupAnalysesWithPrompts.find(s => s.sessionId === sessionId);
+    const group = imageGroups.find(g => g.id === sessionData?.groupId);
+    setSelectedSessionId(sessionId);
+    setSelectedSessionData({
+      groupName: group?.name || '',
+      originalPrompt: sessionData?.prompt || ''
+    });
+    setIsForkDialogOpen(true);
+  }, [groupAnalysesWithPrompts, imageGroups]);
+
+  const handleForkCreation = useCallback(async (sessionId: string, forkName: string, forkDescription: string) => {
+    if (onCreateFork) {
+      await onCreateFork(sessionId);
+      toast({
+        title: "Fork Created",
+        description: `Created new analysis branch: "${forkName}"`,
+      });
+    }
+  }, [onCreateFork, toast]);
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
@@ -396,6 +423,60 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               style: { stroke: 'hsl(var(--primary))' },
             };
             edges.push(edge);
+            
+            // Add concept nodes for this analysis (same as ungrouped)
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            let currentConceptXPosition = padding + displayWidth + horizontalSpacing + 400 + 100; // After analysis card
+            
+            conceptsForAnalysis.forEach((concept, conceptIndex) => {
+              // Create concept image node (artboard)
+              const conceptImageNode: Node = {
+                id: `concept-image-${concept.id}`,
+                type: 'conceptImage',
+                position: { x: currentConceptXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptImageNode);
+
+              // Create concept details node (positioned to the right of concept image)
+              const conceptDetailsXPosition = currentConceptXPosition + 400 + 100;
+              const conceptDetailsNode: Node = {
+                id: `concept-details-${concept.id}`,
+                type: 'conceptDetails',
+                position: { x: conceptDetailsXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptDetailsNode);
+
+              // Create edge connecting analysis card to concept image
+              const conceptImageEdge: Edge = {
+                id: `edge-group-${analysis.id}-${concept.id}-image`,
+                source: `group-image-analysis-${image.id}`,
+                target: `concept-image-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptImageEdge);
+
+              // Create edge connecting concept image to concept details
+              const conceptDetailsEdge: Edge = {
+                id: `edge-group-${concept.id}-image-details`,
+                source: `concept-image-${concept.id}`,
+                target: `concept-details-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptDetailsEdge);
+
+              // Update position for next concept (if any)
+              currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
+            });
           }
           
           // Move to next vertical position using triple the image height to over-correct
@@ -459,6 +540,60 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               style: { stroke: 'hsl(var(--primary))' },
             };
             edges.push(edge);
+            
+            // Add concept nodes for this analysis (same as ungrouped)
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            let currentConceptXPosition = padding + displayWidth + horizontalSpacing + 400 + 100; // After analysis card
+            
+            conceptsForAnalysis.forEach((concept, conceptIndex) => {
+              // Create concept image node (artboard)
+              const conceptImageNode: Node = {
+                id: `concept-image-${concept.id}`,
+                type: 'conceptImage',
+                position: { x: currentConceptXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptImageNode);
+
+              // Create concept details node (positioned to the right of concept image)
+              const conceptDetailsXPosition = currentConceptXPosition + 400 + 100;
+              const conceptDetailsNode: Node = {
+                id: `concept-details-${concept.id}`,
+                type: 'conceptDetails',
+                position: { x: conceptDetailsXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptDetailsNode);
+
+              // Create edge connecting analysis card to concept image
+              const conceptImageEdge: Edge = {
+                id: `edge-group-${analysis.id}-${concept.id}-image`,
+                source: `group-image-analysis-${image.id}`,
+                target: `concept-image-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptImageEdge);
+
+              // Create edge connecting concept image to concept details
+              const conceptDetailsEdge: Edge = {
+                id: `edge-group-${concept.id}-image-details`,
+                source: `concept-image-${concept.id}`,
+                target: `concept-details-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptDetailsEdge);
+
+              // Update position for next concept (if any)
+              currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
+            });
           }
           
           // Move to next vertical position using triple the image height for stacked mode
@@ -518,8 +653,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             data: {
               analysis: latestAnalysis,
               groupName: group.name,
-              onEditPrompt: onEditGroupPrompt,
-              onCreateFork: onCreateFork,
+                onEditPrompt: onEditGroupPrompt,
+                onCreateFork: handleCreateForkClick,
               onViewDetails: (analysisId: string) => {
                 toast({
                   title: "Group Analysis Details",
@@ -555,7 +690,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 analysis,
                 groupName: group.name,
                 onEditPrompt: onEditGroupPrompt,
-                onCreateFork: onCreateFork,
+                onCreateFork: handleCreateForkClick,
                 onViewDetails: (analysisId: string) => {
                   toast({
                     title: "Group Analysis Details",
@@ -612,7 +747,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupPromptSessions, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, onSubmitGroupPrompt, onEditGroupPrompt, onCreateFork, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
+  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupPromptSessions, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, onSubmitGroupPrompt, onEditGroupPrompt, handleCreateForkClick, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -763,13 +898,52 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setIsGroupDialogOpen={setIsGroupDialogOpen}
         handleGroupCreation={handleGroupCreation}
         uploadedImages={uploadedImages}
+        isForkDialogOpen={isForkDialogOpen}
+        setIsForkDialogOpen={setIsForkDialogOpen}
+        handleForkCreation={handleForkCreation}
+        selectedSessionId={selectedSessionId}
+        selectedSessionData={selectedSessionData}
       />
     </AnnotationOverlayProvider>
   );
 };
 
 // Separate component to access useAnnotationOverlay hook
-const CanvasContent: React.FC<any> = ({
+interface CanvasContentProps {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: any;
+  onEdgesChange: any;
+  onConnect: any;
+  currentTool: ToolMode;
+  showAnnotations: boolean;
+  showAnalysis: boolean;
+  isMobile: boolean;
+  handleToolChange: (tool: ToolMode) => void;
+  handleToggleAnnotations: () => void;
+  handleToggleAnalysis: () => void;
+  handleAddComment: () => void;
+  handleCreateGroup: () => void;
+  multiSelection: any;
+  undo: () => any;
+  redo: () => any;
+  canUndo: boolean;
+  canRedo: boolean;
+  setNodes: any;
+  setEdges: any;
+  setIsUpdating: any;
+  isGroupDialogOpen: boolean;
+  setIsGroupDialogOpen: (open: boolean) => void;
+  handleGroupCreation: (name: string, description: string, color: string) => void;
+  uploadedImages: UploadedImage[];
+  isForkDialogOpen: boolean;
+  setIsForkDialogOpen: (open: boolean) => void;
+  handleForkCreation: (sessionId: string, forkName: string, forkDescription: string) => Promise<void>;
+  selectedSessionId: string;
+  selectedSessionData: {groupName?: string, originalPrompt?: string};
+}
+
+const CanvasContent: React.FC<CanvasContentProps> = ({
   nodes,
   edges,
   onNodesChange,
@@ -796,6 +970,11 @@ const CanvasContent: React.FC<any> = ({
   setIsGroupDialogOpen,
   handleGroupCreation,
   uploadedImages,
+  isForkDialogOpen,
+  setIsForkDialogOpen,
+  handleForkCreation,
+  selectedSessionId,
+  selectedSessionData,
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
@@ -897,6 +1076,16 @@ const CanvasContent: React.FC<any> = ({
         onClose={() => setIsGroupDialogOpen(false)}
         onCreateGroup={handleGroupCreation}
         selectedImages={uploadedImages.filter(img => multiSelection.state.selectedIds.includes(img.id))}
+      />
+      
+      {/* Fork Creation Dialog */}
+      <ForkCreationDialog
+        isOpen={isForkDialogOpen}
+        onClose={() => setIsForkDialogOpen(false)}
+        onCreateFork={handleForkCreation}
+        sessionId={selectedSessionId}
+        originalPrompt={selectedSessionData.originalPrompt}
+        groupName={selectedSessionData.groupName}
       />
     </div>
   );
