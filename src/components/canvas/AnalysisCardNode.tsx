@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   AlertCircle, 
   CheckCircle, 
@@ -15,7 +14,6 @@ import {
   Loader2, 
   FileText, 
   ChevronUp, 
-  ChevronDown,
   Eye, 
   Palette, 
   Type, 
@@ -88,24 +86,25 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   };
 
   return (
-    <Card className={`bg-background border-border shadow-lg transition-all duration-300 ${isExpanded ? 'w-[600px]' : 'w-96'}`}>
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="bg-primary border-2 border-background"
-        />
-        
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-foreground">
-              UX Analysis
-            </CardTitle>
-            <Badge variant={getScoreVariant(analysis.summary.overallScore)}>
-              {analysis.summary.overallScore}/100
-            </Badge>
-          </div>
-        </CardHeader>
-        
+    <Card className={`bg-background border-border shadow-lg transition-all duration-300 ${isExpanded ? 'w-[600px] max-h-[600px]' : 'w-96'}`}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="bg-primary border-2 border-background"
+      />
+      
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-foreground">
+            UX Analysis
+          </CardTitle>
+          <Badge variant={getScoreVariant(analysis.summary.overallScore)}>
+            {analysis.summary.overallScore}/100
+          </Badge>
+        </div>
+      </CardHeader>
+      
+      <div className={`${isExpanded ? 'max-h-[480px] overflow-y-auto' : ''}`}>
         <CardContent className="space-y-4">
           {/* Category Scores */}
           <div className="space-y-3">
@@ -168,7 +167,18 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
             </div>
           )}
 
-          {/* Expanded Details */}
+          {/* Suggestions Count - Always Show */}
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">Suggestions</span>
+            </div>
+            <Badge variant="outline">
+              {analysis.suggestions.length}
+            </Badge>
+          </div>
+
+          {/* Expanded Details - Only Show When Expanded */}
           {isExpanded && (
             <>
               <Separator />
@@ -183,49 +193,47 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
                   </Badge>
                 </div>
                 
-                <ScrollArea className="max-h-[300px] pr-4">
-                  <div className="space-y-3">
-                    {analysis.suggestions.map((suggestion, index) => (
-                      <Card key={suggestion.id} className="p-3 bg-muted/30">
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2">
-                              {getSuggestionIcon(suggestion.category)}
-                              <h5 className="font-medium text-sm">{suggestion.title}</h5>
-                            </div>
-                            <div className="flex gap-1">
-                              <Badge variant="outline" className="text-xs">
-                                {suggestion.category}
-                              </Badge>
-                              <Badge 
-                                variant={suggestion.impact === 'high' ? 'destructive' : suggestion.impact === 'medium' ? 'secondary' : 'outline'}
-                                className="text-xs"
-                              >
-                                {suggestion.impact} impact
-                              </Badge>
-                            </div>
+                <div className="max-h-[180px] overflow-y-auto space-y-3 pr-2">
+                  {analysis.suggestions.map((suggestion, index) => (
+                    <Card key={suggestion.id} className="p-3 bg-muted/30">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            {getSuggestionIcon(suggestion.category)}
+                            <h5 className="font-medium text-sm">{suggestion.title}</h5>
                           </div>
-                          
-                          <p className="text-sm text-muted-foreground">{suggestion.description}</p>
-                          
-                          {suggestion.actionItems.length > 0 && (
-                            <div className="space-y-1">
-                              <h6 className="text-xs font-medium text-foreground">Action Items:</h6>
-                              <ul className="space-y-1">
-                                {suggestion.actionItems.map((item, itemIndex) => (
-                                  <li key={itemIndex} className="text-xs text-muted-foreground flex items-start gap-2">
-                                    <span className="text-primary mt-1">•</span>
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
+                          <div className="flex gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {suggestion.category}
+                            </Badge>
+                            <Badge 
+                              variant={suggestion.impact === 'high' ? 'destructive' : suggestion.impact === 'medium' ? 'secondary' : 'outline'}
+                              className="text-xs"
+                            >
+                              {suggestion.impact} impact
+                            </Badge>
+                          </div>
                         </div>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
+                        
+                        <p className="text-sm text-muted-foreground">{suggestion.description}</p>
+                        
+                        {suggestion.actionItems.length > 0 && (
+                          <div className="space-y-1">
+                            <h6 className="text-xs font-medium text-foreground">Action Items:</h6>
+                            <ul className="space-y-1">
+                              {suggestion.actionItems.map((item, itemIndex) => (
+                                <li key={itemIndex} className="text-xs text-muted-foreground flex items-start gap-2">
+                                  <span className="text-primary mt-1">•</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               </div>
 
               <Separator />
@@ -256,19 +264,6 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
                 </div>
               </div>
             </>
-          )}
-          
-          {!isExpanded && (
-            /* Suggestions Count */
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">Suggestions</span>
-              </div>
-              <Badge variant="outline">
-                {analysis.suggestions.length}
-              </Badge>
-            </div>
           )}
           
           {/* Action Buttons */}
@@ -311,12 +306,13 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
             </Button>
           </div>
         </CardContent>
-        
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="bg-primary border-2 border-background"
-        />
-      </Card>
-    );
-  };
+      </div>
+      
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="bg-primary border-2 border-background"
+      />
+    </Card>
+  );
+};
