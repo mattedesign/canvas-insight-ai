@@ -11,12 +11,14 @@ import {
   Background,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { ConceptImageNode } from './ConceptImageNode';
 import { ConceptDetailsNode } from './ConceptDetailsNode';
 import { GroupNode } from './GroupNode';
+import { GroupContainerNode } from './GroupContainerNode';
+import { GroupAnalysisCardNode } from './GroupAnalysisCardNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
@@ -33,17 +35,24 @@ const nodeTypes = {
   conceptImage: ConceptImageNode,
   conceptDetails: ConceptDetailsNode,
   group: GroupNode,
+  groupContainer: GroupContainerNode,
+  groupAnalysisCard: GroupAnalysisCardNode,
 };
 
 interface CanvasViewProps {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
   generatedConcepts: GeneratedConcept[];
+  imageGroups?: ImageGroup[];
+  groupAnalyses?: GroupAnalysis[];
   showAnnotations: boolean;
   onToggleAnnotations?: () => void;
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
   onGenerateConcept?: (analysisId: string) => Promise<void>;
+  onCreateGroup?: (name: string, description: string, color: string, imageIds: string[]) => void;
+  onUngroup?: (groupId: string) => void;
+  onDeleteGroup?: (groupId: string) => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -51,11 +60,16 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   uploadedImages,
   analyses,
   generatedConcepts,
+  imageGroups = [],
+  groupAnalyses = [],
   showAnnotations,
   onToggleAnnotations,
   onViewChange,
   onImageSelect,
   onGenerateConcept,
+  onCreateGroup,
+  onUngroup,
+  onDeleteGroup,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -111,8 +125,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     let yOffset = 0;
     const horizontalSpacing = 100;
     const minVerticalSpacing = 150;
+    const groupedImageIds = new Set(imageGroups.flatMap(group => group.imageIds));
 
-    uploadedImages.forEach((image, index) => {
+    // Process ungrouped images first
+    const ungroupedImages = uploadedImages.filter(image => !groupedImageIds.has(image.id));
+    
+    ungroupedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);
       
       // Calculate image display dimensions (considering max-height: 80vh constraint)
@@ -225,21 +243,114 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       yOffset += nextSpacing;
     });
 
-    // Add group nodes
-    groups.forEach((group, index) => {
-      const groupNode: Node = {
-        id: `group-${group.id}`,
-        type: 'group',
-        position: group.position,
+    // Process image groups with containers and analysis cards
+    imageGroups.forEach((group, groupIndex) => {
+      const groupImages = uploadedImages.filter(img => group.imageIds.includes(img.id));
+      
+      // Calculate container dimensions based on contained images
+      let containerWidth = 0;
+      let containerHeight = 0;
+      const padding = 32;
+      const imageSpacing = 20;
+      
+      // Simple layout: arrange images in a row within the container
+      let currentX = padding;
+      let maxHeight = 0;
+      
+      groupImages.forEach((image, imageIndex) => {
+        const maxDisplayHeight = Math.min(image.dimensions.height, 300); // Smaller in groups
+        const scaleFactor = maxDisplayHeight / image.dimensions.height;
+        const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
+        const displayHeight = maxDisplayHeight;
+        
+        maxHeight = Math.max(maxHeight, displayHeight);
+        currentX += displayWidth + imageSpacing;
+      });
+      
+      containerWidth = Math.max(currentX + padding - imageSpacing, 200);
+      containerHeight = maxHeight + padding * 2 + 50; // Extra space for group title
+      
+      // Create group container node
+      const containerNode: Node = {
+        id: `group-container-${group.id}`,
+        type: 'groupContainer',
+        position: { x: 50, y: yOffset },
+        style: { 
+          width: containerWidth,
+          height: containerHeight,
+        },
         data: {
           group,
-          imageCount: group.imageIds.length,
-          onViewGroup: handleViewGroup,
-          onAnalyzeGroup: handleAnalyzeGroup,
-          onDeleteGroup: handleDeleteGroup,
+          onUngroup,
+          onDeleteGroup,
         },
       };
-      nodes.push(groupNode);
+      nodes.push(containerNode);
+      
+      // Position images inside the container
+      let imageX = padding;
+      groupImages.forEach((image, imageIndex) => {
+        const analysis = analyses.find(a => a.imageId === image.id);
+        const maxDisplayHeight = Math.min(image.dimensions.height, 300);
+        const scaleFactor = maxDisplayHeight / image.dimensions.height;
+        const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
+        
+        const imageNode: Node = {
+          id: `image-${image.id}`,
+          type: 'image',
+          position: { x: imageX, y: padding + 50 }, // Offset for group title
+          parentId: `group-container-${group.id}`,
+          extent: 'parent',
+          data: { 
+            image,
+            analysis,
+            showAnnotations,
+            currentTool,
+            onViewChange: stableCallbacks.onViewChange,
+            onImageSelect: stableCallbacks.onImageSelect,
+            onToggleSelection: stableCallbacks.onToggleSelection,
+            isSelected: stableCallbacks.isSelected(image.id)
+          },
+        };
+        nodes.push(imageNode);
+        
+        imageX += displayWidth + imageSpacing;
+      });
+      
+      // Create group analysis card
+      const groupAnalysis = groupAnalyses.find(ga => ga.groupId === group.id);
+      if (groupAnalysis) {
+        const analysisCardNode: Node = {
+          id: `group-analysis-${group.id}`,
+          type: 'groupAnalysisCard',
+          position: { x: 50 + containerWidth + 100, y: yOffset },
+          data: {
+            analysis: groupAnalysis,
+            groupName: group.name,
+            onViewDetails: (analysisId: string) => {
+              toast({
+                title: "Group Analysis Details",
+                description: `Viewing detailed analysis for group "${group.name}"`,
+              });
+            },
+          },
+        };
+        nodes.push(analysisCardNode);
+        
+        // Create edge connecting container to analysis card
+        const edge: Edge = {
+          id: `edge-group-${group.id}-analysis`,
+          source: `group-container-${group.id}`,
+          sourceHandle: 'analysis',
+          target: `group-analysis-${group.id}`,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+        };
+        edges.push(edge);
+      }
+      
+      yOffset += containerHeight + 100; // Space between groups
     });
 
     return { nodes, edges };
@@ -353,25 +464,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [multiSelection.state.selectedIds.length, toast]);
 
   const handleGroupCreation = useCallback((name: string, description: string, color: string) => {
-    const groupId = `group-${Date.now()}`;
-    const newGroup: ImageGroup = {
-      id: groupId,
-      name,
-      description,
-      imageIds: multiSelection.state.selectedIds,
-      position: { x: 50, y: 50 },
-      color,
-      createdAt: new Date(),
-    };
-
-    setGroups(prev => [...prev, newGroup]);
+    onCreateGroup?.(name, description, color, multiSelection.state.selectedIds);
     multiSelection.clearSelection();
+    setIsGroupDialogOpen(false);
     
     toast({
       title: "Group Created",
-      description: `Successfully created group "${name}" with ${newGroup.imageIds.length} images`,
+      description: `Successfully created group "${name}" with ${multiSelection.state.selectedIds.length} images`,
     });
-  }, [multiSelection, toast]);
+  }, [onCreateGroup, multiSelection, toast]);
 
 
 

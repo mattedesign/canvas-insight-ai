@@ -10,13 +10,18 @@ const Canvas = () => {
     uploadedImages, 
     analyses, 
     generatedConcepts,
+    imageGroups,
+    groupAnalyses,
     selectedImageId,
     showAnnotations,
     isGeneratingConcept,
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
-    handleGenerateConcept
+    handleGenerateConcept,
+    handleCreateGroup,
+    handleUngroup,
+    handleDeleteGroup
   } = useAppContext();
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
@@ -82,11 +87,16 @@ const Canvas = () => {
           uploadedImages={uploadedImages} 
           analyses={analyses}
           generatedConcepts={generatedConcepts}
+          imageGroups={imageGroups}
+          groupAnalyses={groupAnalyses}
           showAnnotations={showAnnotations}
           onToggleAnnotations={handleToggleAnnotations}
           onViewChange={handleViewChange}
           onImageSelect={handleImageSelect}
           onGenerateConcept={handleGenerateConcept}
+          onCreateGroup={handleCreateGroup}
+          onUngroup={handleUngroup}
+          onDeleteGroup={handleDeleteGroup}
           isGeneratingConcept={isGeneratingConcept}
         />
       </div>

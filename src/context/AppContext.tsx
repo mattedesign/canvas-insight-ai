@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { UXAnalysis, UploadedImage, GeneratedConcept } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
+import { generateMockGroupAnalysis } from '@/data/mockGroupAnalysis';
 import { useImageViewer } from '@/hooks/useImageViewer';
 
 interface AppContextType {
@@ -8,6 +9,8 @@ interface AppContextType {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
   generatedConcepts: GeneratedConcept[];
+  imageGroups: ImageGroup[];
+  groupAnalyses: GroupAnalysis[];
   selectedImageId: string | null;
   showAnnotations: boolean;
   galleryTool: 'cursor' | 'draw';
@@ -23,6 +26,9 @@ interface AppContextType {
   handleAnnotationClick: (annotationId: string) => void;
   handleGalleryToolChange: (tool: 'cursor' | 'draw') => void;
   handleAddComment: () => void;
+  handleCreateGroup: (name: string, description: string, color: string, imageIds: string[]) => void;
+  handleUngroup: (groupId: string) => void;
+  handleDeleteGroup: (groupId: string) => void;
   toggleAnnotation: (annotationId: string) => void;
   clearAnnotations: () => void;
 }
@@ -41,6 +47,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
+  const [imageGroups, setImageGroups] = useState<ImageGroup[]>([]);
+  const [groupAnalyses, setGroupAnalyses] = useState<GroupAnalysis[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
@@ -155,11 +163,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log('Add comment mode activated');
   }, []);
 
+  const handleCreateGroup = useCallback((name: string, description: string, color: string, imageIds: string[]) => {
+    const groupId = `group-${Date.now()}`;
+    const newGroup: ImageGroup = {
+      id: groupId,
+      name,
+      description,
+      imageIds,
+      position: { x: 100, y: 100 }, // Default position, will be calculated in canvas
+      color,
+      createdAt: new Date(),
+    };
+
+    // Generate group analysis
+    const groupAnalysis = generateMockGroupAnalysis(groupId, name);
+    
+    setImageGroups(prev => [...prev, newGroup]);
+    setGroupAnalyses(prev => [...prev, groupAnalysis]);
+  }, []);
+
+  const handleUngroup = useCallback((groupId: string) => {
+    setImageGroups(prev => prev.filter(group => group.id !== groupId));
+    setGroupAnalyses(prev => prev.filter(analysis => analysis.groupId !== groupId));
+  }, []);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    setImageGroups(prev => prev.filter(group => group.id !== groupId));
+    setGroupAnalyses(prev => prev.filter(analysis => analysis.groupId !== groupId));
+  }, []);
+
   const value: AppContextType = {
     // State
     uploadedImages,
     analyses,
     generatedConcepts,
+    imageGroups,
+    groupAnalyses,
     selectedImageId,
     showAnnotations,
     galleryTool,
@@ -175,6 +214,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleAnnotationClick,
     handleGalleryToolChange,
     handleAddComment,
+    handleCreateGroup,
+    handleUngroup,
+    handleDeleteGroup,
     toggleAnnotation,
     clearAnnotations,
   };
