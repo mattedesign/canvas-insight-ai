@@ -160,7 +160,7 @@ export const UXAnalysisTool: React.FC = () => {
   }, []);
 
   const handleNavigateToPreviousAnalyses = useCallback(() => {
-    navigate('/previous-analyses');
+    navigate('/projects');
   }, [navigate]);
 
 
