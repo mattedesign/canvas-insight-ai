@@ -306,14 +306,26 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         let totalHeight = headerHeight + padding; // Header space + top padding
         
         groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
-          // Width needed for this pair: image + generous spacing + analysis card
+          // Width needed for this pair: image + spacing + analysis card
           const horizontalSpacing = Math.max(displayWidth * 1.2, 300); // At least 300px or 120% image width
-          const pairWidth = displayWidth + horizontalSpacing + 400; // generous spacing + 400px analysis card
+          let pairWidth = displayWidth + horizontalSpacing + 400; // generous spacing + 400px analysis card
+          
+          // Add width for concept nodes if they exist for this analysis
+          if (analysis) {
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            if (conceptsForAnalysis.length > 0) {
+              // Each concept adds: concept image (400px) + spacing (100px) + concept details (400px) + spacing (100px)
+              const conceptWidth = conceptsForAnalysis.length * (400 + 100 + 400 + 100);
+              pairWidth += conceptWidth;
+            }
+          }
+          
           maxWidth = Math.max(maxWidth, pairWidth);
           
           // Use triple the scaled image height as the minimum vertical space to over-correct
@@ -329,12 +341,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         let totalHeight = headerHeight + padding; // Header space + top padding
         
         groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          maxWidth = Math.max(maxWidth, displayWidth + Math.max(displayWidth * 1.0, 250) + 400); // Include generous spacing
+          let pairWidth = displayWidth + Math.max(displayWidth * 1.0, 250) + 400; // Include generous spacing
+          
+          // Add width for concept nodes if they exist for this analysis
+          if (analysis) {
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            if (conceptsForAnalysis.length > 0) {
+              // Each concept adds: concept image (400px) + spacing (100px) + concept details (400px) + spacing (100px)
+              const conceptWidth = conceptsForAnalysis.length * (400 + 100 + 400 + 100);
+              pairWidth += conceptWidth;
+            }
+          }
+          
+          maxWidth = Math.max(maxWidth, pairWidth);
           
           // Use triple the scaled image height as the minimum vertical space for stacked mode
           const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
