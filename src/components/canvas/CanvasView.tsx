@@ -283,16 +283,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
-          // Analysis card approximate height (considering content)
-          const analysisCardHeight = 300; // Conservative estimate for analysis card height
-          
           // Width needed for this pair: image + spacing + analysis card
           const pairWidth = displayWidth + 100 + 400; // 100px spacing + 400px analysis card
           maxWidth = Math.max(maxWidth, pairWidth);
           
-          // Use the maximum height between image and analysis card, plus 50px spacing
-          const pairHeight = Math.max(displayHeight, analysisCardHeight);
-          totalHeight += pairHeight + 50; // 50px vertical spacing between pairs
+          // Use double the scaled image height as the minimum vertical space to over-correct
+          const minVerticalSpace = Math.max(displayHeight * 2, 400); // At least 400px or double image height
+          totalHeight += minVerticalSpace;
         });
         
         containerWidth = Math.max(maxWidth + padding * 2, 600);
@@ -308,14 +305,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          // Analysis card approximate height for stacked mode
-          const analysisCardHeight = 250; // Slightly smaller for stacked mode
-          
           maxWidth = Math.max(maxWidth, displayWidth + 100 + 400); // Include analysis card
           
-          // Use the maximum height between image and analysis card, plus 50px spacing
-          const pairHeight = Math.max(displayHeight, analysisCardHeight);
-          totalHeight += pairHeight + 50;
+          // Use double the scaled image height as the minimum vertical space for stacked mode
+          const minVerticalSpace = Math.max(displayHeight * 2, 300); // At least 300px or double image height
+          totalHeight += minVerticalSpace;
         });
         
         containerWidth = Math.max(maxWidth + padding * 2, 600);
@@ -401,10 +395,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          // Move to next vertical position with 50px spacing
-          const analysisCardHeight = 300; // Conservative estimate for analysis card height
-          const pairHeight = Math.max(displayHeight, analysisCardHeight);
-          currentY += pairHeight + 50; // 50px vertical spacing between pairs
+          // Move to next vertical position using double the image height to over-correct
+          const minVerticalSpace = Math.max(displayHeight * 2, 400); // At least 400px or double image height
+          currentY += minVerticalSpace;
         });
       } else {
         // Alternative stacked layout
@@ -464,10 +457,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          // Move to next vertical position with 50px spacing for stacked mode
-          const analysisCardHeight = 250; // Slightly smaller for stacked mode
-          const pairHeight = Math.max(displayHeight, analysisCardHeight);
-          currentY += pairHeight + 50; // 50px vertical spacing between pairs
+          // Move to next vertical position using double the image height for stacked mode
+          const minVerticalSpace = Math.max(displayHeight * 2, 300); // At least 300px or double image height
+          currentY += minVerticalSpace;
         });
       }
       
