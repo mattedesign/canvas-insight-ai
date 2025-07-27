@@ -37,9 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleAnnotations,
   onNavigateToPreviousAnalyses,
 }) => {
+  const isOnUploadScreen = uploadedImages.length === 0;
+  
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: selectedView === 'summary' },
-    { icon: Plus, label: 'Add', active: false },
+    { icon: Plus, label: 'Add', active: isOnUploadScreen },
     { icon: Folder, label: 'Previous', active: false },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: false },
