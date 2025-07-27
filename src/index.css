@@ -256,6 +256,49 @@ All colors MUST be HSL.
   animation: group-pulse 2s infinite;
 }
 
+/* Group Container Styles */
+.group-container {
+  @apply border-2 border-dashed bg-background/50 backdrop-blur-sm rounded-lg;
+  @apply hover:border-primary transition-colors duration-200;
+  border-color: var(--border);
+}
+
+.group-container.selected {
+  @apply border-primary bg-primary/5;
+}
+
+.group-header {
+  @apply flex items-center justify-between p-4 border-b border-dashed;
+  border-color: var(--border);
+}
+
+.group-title {
+  @apply text-sm font-medium text-foreground;
+}
+
+.group-actions {
+  @apply flex gap-1;
+}
+
+.group-action-btn {
+  @apply w-6 h-6 flex items-center justify-center text-xs rounded;
+  @apply hover:bg-muted text-muted-foreground hover:text-foreground;
+  @apply transition-colors duration-150;
+}
+
+.group-content {
+  @apply p-4;
+}
+
+.group-analysis-card {
+  @apply relative;
+}
+
+.group-analysis-handle {
+  background: hsl(var(--primary)) !important;
+  border-color: hsl(var(--primary)) !important;
+}
+
 /* Keyboard shortcut hints */
 .keyboard-hint {
   @apply text-xs text-muted-foreground;
