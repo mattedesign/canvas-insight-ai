@@ -447,7 +447,7 @@ Each phase must demonstrate:
 
 ## Project Information
 
-**Lovable Project URL**: https://lovable.dev/projects/0e16d29c-6c8d-45b0-a525-4eeef0432b5b
+**Lovable Project URL**: [https://lovable.dev/projects/0e16d29c-6c8d-45b0-a525-4eeef0432b5b](https://lovable.dev/projects/0e16d29c-6c8d-45b0-a525-4eeef0432b5b)
 
 **Technology Stack:**
 - Vite + TypeScript + React
