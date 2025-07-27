@@ -275,26 +275,26 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       if (displayMode === 'standard') {
         // Vertical stacking: each image+analysis pair stacked vertically
         let maxWidth = 0;
-        let totalHeight = padding + 60; // Header space
+        let totalHeight = 60 + padding; // Header space
         
         groupImages.forEach((image, imageIndex) => {
-          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
+          const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
-          // Width needed for this pair: image + analysis card + spacing
-          const pairWidth = displayWidth + 320 + 20; // analysis card width + spacing
+          // Width needed for this pair: image + spacing + analysis card
+          const pairWidth = displayWidth + 100 + 400; // 100px spacing + 400px analysis card
           maxWidth = Math.max(maxWidth, pairWidth);
-          totalHeight += displayHeight + 20; // vertical spacing between pairs
+          totalHeight += displayHeight + 40; // 40px vertical spacing between pairs
         });
         
-        containerWidth = Math.max(maxWidth + padding * 2, 400);
+        containerWidth = Math.max(maxWidth + padding * 2, 600);
         containerHeight = totalHeight + padding;
       } else {
-        // Stacked layout: images vertically with analysis cards to the right
+        // Alternative stacked layout
         let maxWidth = 0;
-        let totalHeight = padding + 60; // Header space
+        let totalHeight = 60 + padding; // Header space
         
         groupImages.forEach((image, imageIndex) => {
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
@@ -302,11 +302,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          maxWidth = Math.max(maxWidth, displayWidth + 320 + imageSpacing); // Include analysis card
-          totalHeight += displayHeight + imageSpacing;
+          maxWidth = Math.max(maxWidth, displayWidth + 100 + 400); // Include analysis card
+          totalHeight += displayHeight + 30;
         });
         
-        containerWidth = Math.max(maxWidth + padding * 2, 400);
+        containerWidth = Math.max(maxWidth + padding * 2, 600);
         containerHeight = totalHeight + padding;
       }
       
@@ -332,13 +332,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       
       // Position images and their individual analysis cards inside the container
       if (displayMode === 'standard') {
-        // Vertical stacking of horizontal pairs
+        // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
         let currentY = 60; // Start below header
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
+          const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
           const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
           // Image node - positioned relative to group container origin
@@ -361,12 +361,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
           nodes.push(imageNode);
           
-          // Individual analysis card for this image - to the right of the image
+          // Individual analysis card for this image - with proper spacing like ungrouped
           if (analysis && showAnalysis) {
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: padding + displayWidth + 20, y: currentY },
+              position: { x: padding + displayWidth + 100, y: currentY }, // 100px spacing like ungrouped
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
@@ -389,11 +389,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          // Move to next vertical position
-          currentY += displayHeight + 20;
+          // Move to next vertical position with breathing room
+          currentY += displayHeight + 40; // 40px vertical spacing for breathing room
         });
       } else {
-        // Stacked layout (alternative mode)
+        // Alternative stacked layout
         let currentY = 60;
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
@@ -427,7 +427,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
-              position: { x: padding + displayWidth + 20, y: currentY },
+              position: { x: padding + displayWidth + 100, y: currentY },
               parentId: `group-container-${group.id}`,
               extent: 'parent',
               data: { 
@@ -450,7 +450,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             edges.push(edge);
           }
           
-          currentY += displayHeight + 20;
+          currentY += displayHeight + 30;
         });
       }
       
