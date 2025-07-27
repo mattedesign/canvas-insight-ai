@@ -8,6 +8,7 @@ import { Eye } from 'lucide-react';
 import { DrawingOverlay } from '../DrawingOverlay';
 import { useToast } from '@/hooks/use-toast';
 import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -32,6 +33,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
   const { calculateGlobalPosition } = useGlobalCoordinates();
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const getMarkerColor = (type: string, isActive: boolean = false) => {
     const baseClasses = isActive ? 'ring-2 ring-primary ring-offset-1 scale-125' : '';
@@ -134,10 +136,12 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   const handleNodeClick = useCallback((e: React.MouseEvent) => {
     if (currentTool === 'cursor' && onToggleSelection) {
-      const isMultiSelectKey = e.ctrlKey || e.metaKey || e.shiftKey;
+      // For mobile devices (768px and under), treat all clicks as multi-select
+      // For desktop, use the traditional Ctrl/Cmd/Shift key detection
+      const isMultiSelectKey = isMobile || e.ctrlKey || e.metaKey || e.shiftKey;
       onToggleSelection(image.id, isMultiSelectKey);
     }
-  }, [currentTool, onToggleSelection, image.id]);
+  }, [currentTool, onToggleSelection, image.id, isMobile]);
   
   return (
     <Card 
