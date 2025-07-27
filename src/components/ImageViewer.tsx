@@ -99,6 +99,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
       });
     }
     
+    console.log('Setting activeCommentId:', annotation.id === activeCommentId ? null : annotation.id);
     setActiveCommentId(annotation.id === activeCommentId ? null : annotation.id);
     onAnnotationClick(annotation.id);
   }, [activeCommentId, onAnnotationClick]);
@@ -274,7 +275,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         minScale={0.1}
         maxScale={5}
         centerOnInit
-        onTransformed={handleTransformChange}
         limitToBounds={false}
         wheel={{
           step: 0.1,
@@ -283,6 +283,13 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         panning={{
           velocityDisabled: false,
           disabled: !!activeCommentId, // Disable panning when annotation dialog is open
+        }}
+        onInit={() => {
+          console.log('TransformWrapper initialized');
+        }}
+        onTransformed={(ref, state) => {
+          console.log('Transform changed:', { scale: state.scale, activeCommentId });
+          handleTransformChange(ref);
         }}
         doubleClick={{
           disabled: false,
