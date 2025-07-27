@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { UXAnalysis } from '@/types/ux-analysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { AlertCircle, CheckCircle, Lightbulb, Sparkles, Loader2 } from 'lucide-r
 interface AnalysisCardNodeData {
   analysis: UXAnalysis;
   onGenerateConcept?: (analysisId: string) => Promise<void>;
+  isGeneratingConcept?: boolean;
 }
 
 interface AnalysisCardNodeProps {
@@ -17,8 +18,7 @@ interface AnalysisCardNodeProps {
 }
 
 export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
-  const { analysis, onGenerateConcept } = data;
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { analysis, onGenerateConcept, isGeneratingConcept = false } = data;
   
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -33,15 +33,12 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   };
 
   const handleGenerateConcept = async () => {
-    if (!onGenerateConcept || isGenerating) return;
+    if (!onGenerateConcept || isGeneratingConcept) return;
     
-    setIsGenerating(true);
     try {
       await onGenerateConcept(analysis.id);
     } catch (error) {
       console.error('Failed to generate concept:', error);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -128,11 +125,11 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         <div className="pt-2">
           <Button 
             onClick={handleGenerateConcept} 
-            disabled={isGenerating}
+            disabled={isGeneratingConcept}
             className="w-full"
             variant="default"
           >
-            {isGenerating ? (
+            {isGeneratingConcept ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Generating...

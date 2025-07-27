@@ -8,7 +8,11 @@ import { SummaryDashboard } from './summary/SummaryDashboard';
 import { ImageViewer } from './ImageViewer';
 import { ContextualPanel } from './ContextualPanel';
 import { CanvasView } from './canvas/CanvasView';
+import { RunwareApiKeyInput } from './RunwareApiKeyInput';
 import { useImageViewer } from '@/hooks/useImageViewer';
+import { RunwareService } from '@/services/runware';
+import { generateConceptPrompt, generateTitleFromPrompt } from '@/utils/promptGenerator';
+import { toast } from 'sonner';
 
 
 export const UXAnalysisTool: React.FC = () => {
@@ -20,6 +24,8 @@ export const UXAnalysisTool: React.FC = () => {
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
+  const [runwareService, setRunwareService] = useState<RunwareService | null>(null);
+  const [isGeneratingConcept, setIsGeneratingConcept] = useState<boolean>(false);
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -63,29 +69,71 @@ export const UXAnalysisTool: React.FC = () => {
     }
   }, [selectedImageId]);
 
-  const handleGenerateConcept = useCallback(async (analysisId: string) => {
-    // Simulate concept generation with mock data
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate AI processing time
-    
-    const conceptId = `concept-${Date.now()}`;
-    const mockConcept: GeneratedConcept = {
-      id: conceptId,
-      analysisId,
-      imageUrl: `https://picsum.photos/400/300?random=${Date.now()}`, // Mock generated image
-      title: "Enhanced User Experience Design",
-      description: "An improved version of the interface with better accessibility, clearer visual hierarchy, and enhanced user flow based on the analysis suggestions.",
-      improvements: [
-        "Improved color contrast for better accessibility",
-        "Simplified navigation structure",
-        "Enhanced visual hierarchy with better typography",
-        "Optimized button placement and sizing",
-        "Added clear call-to-action elements"
-      ],
-      createdAt: new Date()
-    };
-    
-    setGeneratedConcepts(prev => [...prev, mockConcept]);
+  const handleApiKeySubmit = useCallback(async (apiKey: string) => {
+    try {
+      const service = new RunwareService(apiKey);
+      setRunwareService(service);
+      toast.success('Successfully connected to Runware AI');
+    } catch (error) {
+      console.error('Failed to connect to Runware:', error);
+      toast.error('Failed to connect to Runware AI. Please check your API key.');
+    }
   }, []);
+
+  const handleGenerateConcept = useCallback(async (analysisId: string) => {
+    if (!runwareService) {
+      toast.error('Please connect to Runware AI first');
+      return;
+    }
+
+    setIsGeneratingConcept(true);
+    
+    try {
+      const analysis = analyses.find(a => a.id === analysisId);
+      if (!analysis) {
+        throw new Error('Analysis not found');
+      }
+
+      // Generate detailed prompt based on analysis
+      const prompt = generateConceptPrompt(analysis);
+      
+      toast.info('Generating concept image... This may take a few moments.');
+      
+      // Generate image using Runware AI
+      const generatedImage = await runwareService.generateImage({
+        positivePrompt: prompt,
+        numberResults: 1,
+        outputFormat: "WEBP",
+        CFGScale: 1,
+        scheduler: "FlowMatchEulerDiscreteScheduler"
+      });
+
+      const conceptId = `concept-${Date.now()}`;
+      const title = generateTitleFromPrompt(prompt);
+      
+      const newConcept: GeneratedConcept = {
+        id: conceptId,
+        analysisId,
+        imageUrl: generatedImage.imageURL,
+        title,
+        description: `An AI-generated improved version based on UX analysis insights. This concept addresses key usability issues and implements best practices for enhanced user experience.`,
+        improvements: analysis.suggestions
+          .filter(s => s.impact === 'high')
+          .slice(0, 5)
+          .map(s => s.title),
+        createdAt: new Date()
+      };
+      
+      setGeneratedConcepts(prev => [...prev, newConcept]);
+      toast.success('Concept image generated successfully!');
+      
+    } catch (error) {
+      console.error('Failed to generate concept:', error);
+      toast.error('Failed to generate concept image. Please try again.');
+    } finally {
+      setIsGeneratingConcept(false);
+    }
+  }, [runwareService, analyses]);
 
   const handleClearCanvas = useCallback(() => {
     setUploadedImages([]);
@@ -168,6 +216,10 @@ export const UXAnalysisTool: React.FC = () => {
           <div className="h-full flex items-center justify-center">
             <ImageUploadZone onImageUpload={handleImageUpload} />
           </div>
+        ) : !runwareService ? (
+          <div className="h-full flex items-center justify-center p-8">
+            <RunwareApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
+          </div>
         ) : showCanvasView ? (
           <CanvasView 
             uploadedImages={uploadedImages} 
@@ -178,6 +230,7 @@ export const UXAnalysisTool: React.FC = () => {
             onViewChange={setSelectedView}
             onImageSelect={handleImageSelect}
             onGenerateConcept={handleGenerateConcept}
+            isGeneratingConcept={isGeneratingConcept}
           />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="w-full h-full">

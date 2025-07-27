@@ -39,6 +39,7 @@ interface CanvasViewProps {
   onViewChange?: (view: 'gallery' | 'canvas' | 'summary') => void;
   onImageSelect?: (imageId: string) => void;
   onGenerateConcept?: (analysisId: string) => Promise<void>;
+  isGeneratingConcept?: boolean;
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
@@ -49,7 +50,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onToggleAnnotations,
   onViewChange,
   onImageSelect,
-  onGenerateConcept
+  onGenerateConcept,
+  isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
@@ -99,7 +101,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           position: { x: cardXPosition, y: yOffset },
           data: { 
             analysis,
-            onGenerateConcept
+            onGenerateConcept,
+            isGeneratingConcept
           },
         };
         nodes.push(cardNode);
