@@ -25,16 +25,23 @@ export const AnnotationConnectionLine: React.FC<AnnotationConnectionLineProps> =
   // Find the actual annotation marker element and track its position
   const updateMarkerPosition = useCallback(() => {
     const markerElements = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
+    console.log(`Looking for marker with ID: ${annotationId}`, markerElements.length);
+    
     if (markerElements.length > 0) {
       const markerElement = markerElements[0] as HTMLElement;
       const rect = markerElement.getBoundingClientRect();
       const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
       const scrollY = window.pageYOffset || document.documentElement.scrollTop;
       
-      setActualMarkerPosition({
+      const newPosition = {
         x: rect.left + rect.width / 2 + scrollX,
         y: rect.top + rect.height / 2 + scrollY
-      });
+      };
+      
+      console.log('Updated marker position:', newPosition);
+      setActualMarkerPosition(newPosition);
+    } else {
+      console.warn(`No marker found with annotation ID: ${annotationId}`);
     }
   }, [annotationId]);
 

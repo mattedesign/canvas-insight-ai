@@ -174,6 +174,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
                 left: `${annotation.x}%`,
                 top: `${annotation.y}%`,
               }}
+              data-annotation-id={annotation.id}
               title={annotation.title}
               onClick={(e) => handleAnnotationClick(annotation, e)}
             />

@@ -54,6 +54,7 @@ const AnnotationMarker: React.FC<{
         top: `${annotation.y}%`,
         transform: 'translate(-50%, -50%)',
       }}
+      data-annotation-id={annotation.id}
       onClick={onClick}
       title={annotation.title}
     >
