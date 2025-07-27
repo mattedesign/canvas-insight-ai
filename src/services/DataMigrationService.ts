@@ -1,0 +1,408 @@
+import { supabase } from '@/integrations/supabase/client';
+import { UXAnalysis, UploadedImage, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
+
+// Project management for user data isolation
+export class ProjectService {
+  private static currentProjectId: string | null = null;
+
+  static async getCurrentProject() {
+    if (this.currentProjectId) return this.currentProjectId;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get or create default project for user
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1);
+
+    if (error) throw error;
+
+    if (projects && projects.length > 0) {
+      this.currentProjectId = projects[0].id;
+      return this.currentProjectId;
+    }
+
+    // Create default project
+    const { data: newProject, error: createError } = await supabase
+      .from('projects')
+      .insert({
+        user_id: user.id,
+        name: 'Default Project',
+        description: 'Your UX analysis workspace'
+      })
+      .select('id')
+      .single();
+
+    if (createError) throw createError;
+    
+    this.currentProjectId = newProject.id;
+    return this.currentProjectId;
+  }
+
+  static resetProject() {
+    this.currentProjectId = null;
+  }
+}
+
+// Image data migration service
+export class ImageMigrationService {
+  // Convert File to storage path and create database record
+  static async migrateImageToDatabase(uploadedImage: UploadedImage): Promise<string> {
+    const projectId = await ProjectService.getCurrentProject();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Upload file to storage
+    const fileName = `${user.id}/${uploadedImage.id}/${uploadedImage.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(fileName, uploadedImage.file);
+
+    if (uploadError) throw uploadError;
+
+    // Create database record
+    const { data, error } = await supabase
+      .from('images')
+      .insert({
+        id: uploadedImage.id,
+        project_id: projectId,
+        filename: uploadedImage.name,
+        original_name: uploadedImage.name,
+        storage_path: fileName,
+        dimensions: uploadedImage.dimensions
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  // Load images from database back to UploadedImage format
+  static async loadImagesFromDatabase(): Promise<UploadedImage[]> {
+    const projectId = await ProjectService.getCurrentProject();
+    
+    const { data: images, error } = await supabase
+      .from('images')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) throw error;
+    if (!images) return [];
+
+    const uploadedImages: UploadedImage[] = [];
+    
+    for (const img of images) {
+      // Get public URL for the image
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(img.storage_path);
+
+      // Create a synthetic File object for compatibility
+      const response = await fetch(urlData.publicUrl);
+      const blob = await response.blob();
+      const file = new File([blob], img.original_name, { type: blob.type });
+
+      uploadedImages.push({
+        id: img.id,
+        name: img.original_name,
+        url: urlData.publicUrl,
+        file,
+        dimensions: img.dimensions as { width: number; height: number }
+      });
+    }
+
+    return uploadedImages;
+  }
+}
+
+// Analysis data migration service  
+export class AnalysisMigrationService {
+  static async migrateAnalysisToDatabase(analysis: UXAnalysis): Promise<string> {
+    // Check if analysis already exists
+    const { data: existing } = await supabase
+      .from('ux_analyses')
+      .select('id')
+      .eq('image_id', analysis.imageId)
+      .single();
+
+    if (existing) {
+      // Update existing analysis
+      const { data, error } = await supabase
+        .from('ux_analyses')
+        .update({
+          user_context: analysis.userContext,
+          visual_annotations: analysis.visualAnnotations as any,
+          suggestions: analysis.suggestions as any,
+          summary: analysis.summary as any,
+          metadata: analysis.metadata as any
+        })
+        .eq('id', existing.id)
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } else {
+      // Create new analysis
+      const { data, error } = await supabase
+        .from('ux_analyses')
+        .insert({
+          image_id: analysis.imageId,
+          user_context: analysis.userContext,
+          visual_annotations: analysis.visualAnnotations as any,
+          suggestions: analysis.suggestions as any,
+          summary: analysis.summary as any,
+          metadata: analysis.metadata as any
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    }
+  }
+
+  static async loadAnalysesFromDatabase(): Promise<UXAnalysis[]> {
+    const projectId = await ProjectService.getCurrentProject();
+    
+    const { data: analyses, error } = await supabase
+      .from('ux_analyses')
+      .select(`
+        *,
+        images!inner(project_id, original_name, storage_path)
+      `)
+      .eq('images.project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!analyses) return [];
+
+    return analyses.map(analysis => {
+      // Get public URL for the image
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(analysis.images.storage_path);
+
+      return {
+        id: analysis.id,
+        imageId: analysis.image_id,
+        imageName: analysis.images.original_name,
+        imageUrl: urlData.publicUrl,
+        userContext: analysis.user_context || '',
+        visualAnnotations: (analysis.visual_annotations as any) || [],
+        suggestions: (analysis.suggestions as any) || [],
+        summary: (analysis.summary as any) || {},
+        metadata: (analysis.metadata as any) || {},
+        createdAt: new Date(analysis.created_at)
+      };
+    });
+  }
+}
+
+// Group data migration service
+export class GroupMigrationService {
+  static async migrateGroupToDatabase(group: ImageGroup): Promise<string> {
+    const projectId = await ProjectService.getCurrentProject();
+    
+    // Insert group
+    const { data: groupData, error: groupError } = await supabase
+      .from('image_groups')
+      .insert({
+        id: group.id,
+        project_id: projectId,
+        name: group.name,
+        description: group.description,
+        color: group.color,
+        position: group.position
+      })
+      .select('id')
+      .single();
+
+    if (groupError) throw groupError;
+
+    // Insert group-image associations
+    if (group.imageIds.length > 0) {
+      const associations = group.imageIds.map(imageId => ({
+        group_id: group.id,
+        image_id: imageId
+      }));
+
+      const { error: associationError } = await supabase
+        .from('group_images')
+        .insert(associations);
+
+      if (associationError) throw associationError;
+    }
+
+    return groupData.id;
+  }
+
+  static async loadGroupsFromDatabase(): Promise<ImageGroup[]> {
+    const projectId = await ProjectService.getCurrentProject();
+    
+    // Get groups with their image associations
+    const { data: groups, error } = await supabase
+      .from('image_groups')
+      .select(`
+        *,
+        group_images(image_id)
+      `)
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!groups) return [];
+
+    return groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      description: group.description || '',
+      imageIds: group.group_images?.map((gi: any) => gi.image_id) || [],
+      position: (group.position as any) || { x: 100, y: 100 },
+      color: group.color,
+      createdAt: new Date(group.created_at)
+    }));
+  }
+}
+
+// Group analysis migration service
+export class GroupAnalysisMigrationService {
+  static async migrateGroupAnalysisToDatabase(analysis: GroupAnalysisWithPrompt): Promise<string> {
+    const { data, error } = await supabase
+      .from('group_analyses')
+      .insert({
+        id: analysis.id,
+        group_id: analysis.groupId,
+        prompt: analysis.prompt,
+        is_custom: analysis.prompt !== 'default',
+        summary: analysis.summary as any,
+        insights: analysis.insights as any,
+        recommendations: analysis.recommendations as any,
+        patterns: analysis.patterns as any
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  static async loadGroupAnalysesFromDatabase(): Promise<GroupAnalysisWithPrompt[]> {
+    const projectId = await ProjectService.getCurrentProject();
+    
+    const { data: analyses, error } = await supabase
+      .from('group_analyses')
+      .select(`
+        *,
+        image_groups!inner(project_id)
+      `)
+      .eq('image_groups.project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!analyses) return [];
+
+    return analyses.map(analysis => ({
+      id: analysis.id,
+      sessionId: `session-${analysis.id}`, // Generate session ID for compatibility
+      groupId: analysis.group_id,
+      prompt: analysis.prompt,
+      summary: (analysis.summary as any) || {},
+      insights: (analysis.insights as any) || [],
+      recommendations: (analysis.recommendations as any) || [],
+      patterns: (analysis.patterns as any) || {},
+      createdAt: new Date(analysis.created_at)
+    }));
+  }
+}
+
+// Master migration service that coordinates all data migration
+export class DataMigrationService {
+  // Migrate current in-memory state to database
+  static async migrateAllToDatabase(state: {
+    uploadedImages: UploadedImage[];
+    analyses: UXAnalysis[];
+    imageGroups: ImageGroup[];
+    groupAnalysesWithPrompts: GroupAnalysisWithPrompt[];
+  }) {
+    try {
+      // Migrate images first (they're referenced by other entities)
+      for (const image of state.uploadedImages) {
+        await ImageMigrationService.migrateImageToDatabase(image);
+      }
+
+      // Migrate analyses (depend on images)
+      for (const analysis of state.analyses) {
+        await AnalysisMigrationService.migrateAnalysisToDatabase(analysis);
+      }
+
+      // Migrate groups (depend on images)
+      for (const group of state.imageGroups) {
+        await GroupMigrationService.migrateGroupToDatabase(group);
+      }
+
+      // Migrate group analyses (depend on groups)
+      for (const analysis of state.groupAnalysesWithPrompts) {
+        await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(analysis);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Migration failed:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Load all data from database back to in-memory format
+  static async loadAllFromDatabase() {
+    try {
+      const [images, analyses, groups, groupAnalyses] = await Promise.all([
+        ImageMigrationService.loadImagesFromDatabase(),
+        AnalysisMigrationService.loadAnalysesFromDatabase(),
+        GroupMigrationService.loadGroupsFromDatabase(),
+        GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase()
+      ]);
+
+      return {
+        success: true,
+        data: {
+          uploadedImages: images,
+          analyses,
+          imageGroups: groups,
+          groupAnalysesWithPrompts: groupAnalyses,
+          // Initialize empty arrays for other state
+          generatedConcepts: [],
+          groupAnalyses: [],
+          groupPromptSessions: []
+        }
+      };
+    } catch (error) {
+      console.error('Loading from database failed:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Check if user has existing data in database
+  static async hasExistingData(): Promise<boolean> {
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      
+      const { data: images, error } = await supabase
+        .from('images')
+        .select('id')
+        .eq('project_id', projectId)
+        .limit(1);
+
+      if (error) throw error;
+      return images ? images.length > 0 : false;
+    } catch (error) {
+      console.error('Error checking existing data:', error);
+      return false;
+    }
+  }
+}
