@@ -161,6 +161,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           imageDimensions={image.dimensions}
           isDrawMode={currentTool === 'draw'}
           onDrawingComplete={handleDrawingComplete}
+          isPanningDisabled={!!activeAnnotation}
         />
         
         {/* Annotation Markers */}

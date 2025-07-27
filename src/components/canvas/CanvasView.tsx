@@ -20,7 +20,7 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
-import { AnnotationOverlayProvider } from '../AnnotationOverlay';
+import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { GroupCreationDialog } from '../GroupCreationDialog';
 
 import { Button } from '@/components/ui/button';
@@ -375,7 +375,70 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   return (
     <AnnotationOverlayProvider>
-      <div className="h-full w-full bg-background relative">
+      <CanvasContent 
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        currentTool={currentTool}
+        showAnnotations={showAnnotations}
+        showAnalysis={showAnalysis}
+        handleToolChange={handleToolChange}
+        handleToggleAnnotations={handleToggleAnnotations}
+        handleToggleAnalysis={handleToggleAnalysis}
+        handleAddComment={handleAddComment}
+        handleCreateGroup={handleCreateGroup}
+        multiSelection={multiSelection}
+        undo={undo}
+        redo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        setNodes={setNodes}
+        setEdges={setEdges}
+        setIsUpdating={setIsUpdating}
+        isGroupDialogOpen={isGroupDialogOpen}
+        setIsGroupDialogOpen={setIsGroupDialogOpen}
+        handleGroupCreation={handleGroupCreation}
+        uploadedImages={uploadedImages}
+      />
+    </AnnotationOverlayProvider>
+  );
+};
+
+// Separate component to access useAnnotationOverlay hook
+const CanvasContent: React.FC<any> = ({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  currentTool,
+  showAnnotations,
+  showAnalysis,
+  handleToolChange,
+  handleToggleAnnotations,
+  handleToggleAnalysis,
+  handleAddComment,
+  handleCreateGroup,
+  multiSelection,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  setNodes,
+  setEdges,
+  setIsUpdating,
+  isGroupDialogOpen,
+  setIsGroupDialogOpen,
+  handleGroupCreation,
+  uploadedImages,
+}) => {
+  const { activeAnnotation } = useAnnotationOverlay();
+  const isPanningDisabled = !!activeAnnotation;
+
+  return (
+    <div className="h-full w-full bg-background relative">
       {/* Undo/Redo Controls */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <Button
@@ -416,6 +479,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         </Button>
       </div>
 
+      {/* Visual feedback when panning is disabled */}
+      {isPanningDisabled && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-muted/90 backdrop-blur-sm text-muted-foreground text-xs px-3 py-1 rounded-md border">
+          Pan disabled - Close annotation to enable
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -424,16 +494,16 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
-        panOnDrag={true}
-        panOnScroll={true}
+        panOnDrag={!isPanningDisabled} // Disable panning when annotation is active
+        panOnScroll={!isPanningDisabled} // Also disable pan on scroll
         zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick={currentTool !== 'draw'}
-        selectionOnDrag={currentTool === 'cursor'}
-        nodesDraggable={currentTool === 'cursor'}
+        selectionOnDrag={currentTool === 'cursor' && !isPanningDisabled}
+        nodesDraggable={currentTool === 'cursor' && !isPanningDisabled}
         nodesConnectable={currentTool === 'cursor'}
         elementsSelectable={currentTool === 'cursor'}
-        className={`bg-background tool-${currentTool}`}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''}`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
       >
@@ -462,7 +532,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onCreateGroup={handleGroupCreation}
         selectedImages={uploadedImages.filter(img => multiSelection.state.selectedIds.includes(img.id))}
       />
-      </div>
-    </AnnotationOverlayProvider>
+    </div>
   );
 };
