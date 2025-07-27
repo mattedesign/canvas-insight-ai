@@ -262,6 +262,7 @@ export const UXAnalysisTool: React.FC = () => {
                   onToolChange={handleGalleryToolChange}
                   onAddComment={handleAddComment}
                   currentTool={galleryTool}
+                  imageDimensions={uploadedImages.find(img => img.id === selectedImageId)?.dimensions}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">

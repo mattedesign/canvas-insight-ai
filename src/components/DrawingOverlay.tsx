@@ -29,17 +29,18 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match image
-    canvas.width = imageDimensions.width;
-    canvas.height = imageDimensions.height;
+    // Set canvas to match the container size
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     // Configure drawing context
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)'; // Semi-transparent red
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // Semi-transparent red
     ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; // Semi-transparent red fill
-    ctx.lineWidth = 10;
-  }, [imageDimensions]);
+    ctx.lineWidth = 3;
+  }, [isDrawMode]);
 
   const getMousePos = useCallback((e: MouseEvent | React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -159,11 +160,9 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       {/* Drawing Canvas */}
       <canvas
         ref={canvasRef}
-        className={`absolute inset-0 w-full h-full ${isDrawMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+        className={`absolute top-0 left-0 w-full h-full ${isDrawMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
         style={{ 
-          maxWidth: `${imageDimensions.width}px`, 
-          maxHeight: '80vh',
-          objectFit: 'contain'
+          zIndex: isDrawMode ? 10 : 1,
         }}
         onMouseDown={startDrawing}
         onMouseMove={draw}

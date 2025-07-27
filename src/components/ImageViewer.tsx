@@ -2,6 +2,7 @@ import React, { memo, useState, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { AnnotationComment } from './AnnotationComment';
+import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +17,7 @@ interface ImageViewerProps {
   onToolChange?: (tool: 'cursor' | 'draw') => void;
   onAddComment?: () => void;
   currentTool?: 'cursor' | 'draw';
+  imageDimensions?: { width: number; height: number };
 }
 
 const AnnotationMarker: React.FC<{
@@ -67,6 +69,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   onToolChange,
   onAddComment,
   currentTool = 'cursor',
+  imageDimensions = { width: 800, height: 600 },
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
@@ -108,6 +111,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
       description: "Creating a new design variation based on your request.",
     });
     // Here you would integrate with your design generation service
+  }, [toast]);
+
+  const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {
+    toast({
+      title: "Drawing Complete",
+      description: "Your drawing has been captured and is ready for analysis.",
+    });
+    console.log('Drawing completed with bounds:', bounds);
   }, [toast]);
 
   // Handle escape key to close active annotation comment
@@ -181,6 +192,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
             />
           ))}
 
+          {/* Drawing Overlay */}
+          <DrawingOverlay
+            imageUrl={analysis.imageUrl}
+            imageDimensions={imageDimensions}
+            isDrawMode={currentTool === 'draw'}
+            onDrawingComplete={handleDrawingComplete}
+          />
+
           {/* Active Comment */}
           {activeAnnotation && (
             <AnnotationComment
@@ -217,9 +236,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     commentPosition,
     handleAnnotationClick,
     handleCloseComment,
+    handleDrawingComplete,
     handleRequestAnalysis,
     handleGenerateVariation,
-    relatedSuggestions,
     handleDelete,
     handleToggleAnnotations,
     onToolChange,
