@@ -64,6 +64,7 @@ interface CanvasViewProps {
   onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   onEditGroupPrompt?: (sessionId: string) => void;
   onCreateFork?: (sessionId: string) => void;
+  onOpenAnalysisPanel?: (analysisId: string) => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -88,6 +89,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onSubmitGroupPrompt,
   onEditGroupPrompt,
   onCreateFork,
+  onOpenAnalysisPanel,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -97,7 +99,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [selectedSessionData, setSelectedSessionData] = useState<{groupName?: string, originalPrompt?: string}>({});
-  const [expandedAnalysisCards, setExpandedAnalysisCards] = useState<Set<string>>(new Set());
+  
   const { toast } = useToast();
   const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
@@ -162,18 +164,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, [onCreateFork, toast]);
 
-  // Handle analysis card expansion
-  const handleAnalysisExpansion = useCallback((analysisId: string, isExpanded: boolean) => {
-    setExpandedAnalysisCards(prev => {
-      const newSet = new Set(prev);
-      if (isExpanded) {
-        newSet.add(analysisId);
-      } else {
-        newSet.delete(analysisId);
-      }
-      return newSet;
-    });
-  }, []);
+  // Handle analysis panel opening
+  const handleAnalysisExpansion = useCallback((analysisId: string) => {
+    onOpenAnalysisPanel?.(analysisId);
+  }, [onOpenAnalysisPanel]);
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
@@ -220,7 +214,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         // Create analysis card node if analysis exists and showAnalysis is true
         if (analysis && showAnalysis) {
           const cardXPosition = rightmostXPosition;
-          const analysisCardWidth = expandedAnalysisCards.has(analysis.id) ? 600 : 400; // Expanded or normal width
+          const analysisCardWidth = 400; // Standard width
           const cardNode: Node = {
             id: `card-${analysis.id}`,
             type: 'analysisCard',
@@ -335,7 +329,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           
           // Width needed for this pair: image + spacing + analysis card (expanded or collapsed)
           const horizontalSpacing = Math.max(displayWidth * 1.2, 300); // At least 300px or 120% image width
-          const analysisCardWidth = analysis && expandedAnalysisCards.has(analysis.id) ? 600 : 400; // Expanded or normal width
+          const analysisCardWidth = 400; // Standard width
           let pairWidth = displayWidth + horizontalSpacing + analysisCardWidth; // generous spacing + analysis card
           
           // Add width for concept nodes if they exist for this analysis
@@ -369,7 +363,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          const analysisCardWidth = analysis && expandedAnalysisCards.has(analysis.id) ? 600 : 400; // Expanded or normal width
+          const analysisCardWidth = 400; // Standard width
           let pairWidth = displayWidth + Math.max(displayWidth * 1.0, 250) + analysisCardWidth; // Include generous spacing
           
           // Add width for concept nodes if they exist for this analysis
@@ -475,7 +469,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             
             // Add concept nodes for this analysis (same as ungrouped)
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-            const analysisCardWidth = expandedAnalysisCards.has(analysis.id) ? 600 : 400; // Expanded or normal width
+            const analysisCardWidth = 400; // Standard width
             let currentConceptXPosition = padding + displayWidth + horizontalSpacing + analysisCardWidth + 100; // After analysis card
             
             conceptsForAnalysis.forEach((concept, conceptIndex) => {
@@ -599,7 +593,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             
             // Add concept nodes for this analysis (same as ungrouped)
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-            const analysisCardWidth = expandedAnalysisCards.has(analysis.id) ? 600 : 400; // Expanded or normal width
+            const analysisCardWidth = 400; // Standard width
             let currentConceptXPosition = padding + displayWidth + horizontalSpacing + analysisCardWidth + 100; // After analysis card
             
             conceptsForAnalysis.forEach((concept, conceptIndex) => {
@@ -809,7 +803,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupPromptSessions, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, expandedAnalysisCards, onGroupDisplayModeChange, onSubmitGroupPrompt, onEditGroupPrompt, handleCreateForkClick, handleAnalysisExpansion, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
+  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalyses, groupPromptSessions, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept, onGroupDisplayModeChange, onSubmitGroupPrompt, onEditGroupPrompt, handleCreateForkClick, handleAnalysisExpansion, groups, handleViewGroup, handleAnalyzeGroup, handleDeleteGroup, stableCallbacks, toast]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { CanvasView } from '@/components/canvas/CanvasView';
+import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,6 +33,8 @@ const Canvas = () => {
   } = useAppContext();
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
@@ -56,6 +59,16 @@ const Canvas = () => {
     } else if (view === 'summary') {
       navigate('/dashboard');
     }
+  };
+
+  const handleOpenAnalysisPanel = (analysisId: string) => {
+    setSelectedAnalysisId(analysisId);
+    setAnalysisPanelOpen(true);
+  };
+
+  const handleCloseAnalysisPanel = () => {
+    setAnalysisPanelOpen(false);
+    setSelectedAnalysisId(null);
   };
 
   // Redirect to upload if no images
@@ -90,7 +103,12 @@ const Canvas = () => {
         onNavigateToPreviousAnalyses={handleNavigateToPreviousAnalyses}
       />
       
-      <div className="flex-1 relative">
+      <div 
+        className="flex-1 relative transition-all duration-300"
+        style={{ 
+          marginRight: analysisPanelOpen ? '480px' : '0px' 
+        }}
+      >
         <CanvasView 
           uploadedImages={uploadedImages} 
           analyses={analyses}
@@ -112,9 +130,20 @@ const Canvas = () => {
           onSubmitGroupPrompt={handleSubmitGroupPrompt}
           onEditGroupPrompt={handleEditGroupPrompt}
           onCreateFork={handleCreateFork}
+          onOpenAnalysisPanel={handleOpenAnalysisPanel}
           isGeneratingConcept={isGeneratingConcept}
         />
       </div>
+      
+      <AnalysisPanel
+        analysis={selectedAnalysisId ? analyses.find(a => a.id === selectedAnalysisId) || null : null}
+        image={selectedAnalysisId ? uploadedImages.find(img => {
+          const analysis = analyses.find(a => a.id === selectedAnalysisId);
+          return analysis && img.id === analysis.imageId;
+        }) || null : null}
+        isOpen={analysisPanelOpen}
+        onClose={handleCloseAnalysisPanel}
+      />
     </div>
   );
 };
