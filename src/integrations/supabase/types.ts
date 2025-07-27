@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      canvas_states: {
+        Row: {
+          canvas_settings: Json
+          created_at: string | null
+          id: string
+          node_positions: Json
+          project_id: string | null
+          selected_nodes: Json
+          updated_at: string | null
+          viewport: Json
+        }
+        Insert: {
+          canvas_settings?: Json
+          created_at?: string | null
+          id?: string
+          node_positions?: Json
+          project_id?: string | null
+          selected_nodes?: Json
+          updated_at?: string | null
+          viewport?: Json
+        }
+        Update: {
+          canvas_settings?: Json
+          created_at?: string | null
+          id?: string
+          node_positions?: Json
+          project_id?: string | null
+          selected_nodes?: Json
+          updated_at?: string | null
+          viewport?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_states_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_analyses: {
         Row: {
           created_at: string | null

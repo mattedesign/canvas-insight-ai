@@ -5,6 +5,7 @@ import { generateMockGroupAnalysis } from '@/data/mockGroupAnalysis';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAuth } from '@/context/AuthContext';
 import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
+import { CanvasStateService, CanvasState } from '@/services/CanvasStateService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 

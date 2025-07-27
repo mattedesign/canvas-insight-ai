@@ -24,13 +24,13 @@ export class CanvasStateService {
   static async saveCanvasState(projectId: string, state: Omit<CanvasState, 'id' | 'project_id' | 'updated_at'>) {
     try {
       const { data, error } = await supabase
-        .from('canvas_states')
+        .from('canvas_states' as any)
         .upsert({
           project_id: projectId,
-          viewport: state.viewport,
-          node_positions: state.node_positions,
-          selected_nodes: state.selected_nodes,
-          canvas_settings: state.canvas_settings
+          viewport: state.viewport as any,
+          node_positions: state.node_positions as any,
+          selected_nodes: state.selected_nodes as any,
+          canvas_settings: state.canvas_settings as any
         })
         .select()
         .single();
@@ -38,9 +38,9 @@ export class CanvasStateService {
       if (error) throw error;
       
       // Also cache locally for instant loading
-      this.cacheCanvasState(projectId, data);
+      this.cacheCanvasState(projectId, data as unknown as CanvasState);
       
-      return { success: true, data };
+      return { success: true, data: data as unknown as CanvasState };
     } catch (error) {
       console.error('Failed to save canvas state:', error);
       return { success: false, error };
@@ -55,7 +55,7 @@ export class CanvasStateService {
       
       // Load from database
       const { data, error } = await supabase
-        .from('canvas_states')
+        .from('canvas_states' as any)
         .select('*')
         .eq('project_id', projectId)
         .single();
@@ -69,9 +69,9 @@ export class CanvasStateService {
       }
 
       // Cache the latest data
-      this.cacheCanvasState(projectId, data);
+      this.cacheCanvasState(projectId, data as unknown as CanvasState);
       
-      return data;
+      return data as unknown as CanvasState;
     } catch (error) {
       console.error('Failed to load canvas state:', error);
       // Return cached data as fallback
