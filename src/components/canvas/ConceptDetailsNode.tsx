@@ -58,7 +58,7 @@ export const ConceptDetailsNode: React.FC<ConceptDetailsNodeProps> = ({ data }) 
           {/* Creation Date */}
           <div className="pt-2 border-t border-border">
             <p className="text-xs text-muted-foreground">
-              Generated: {concept.createdAt.toLocaleDateString()}
+              Generated: {new Date(concept.createdAt).toLocaleDateString()}
             </p>
           </div>
         </CardContent>

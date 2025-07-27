@@ -259,7 +259,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = ({
               </div>
               <Separator className="my-4" />
               <p className="text-sm text-muted-foreground">
-                Analyzed on {analysis.createdAt.toLocaleDateString()}
+                Analyzed on {new Date(analysis.createdAt).toLocaleDateString()}
               </p>
             </CardContent>
           </Card>
