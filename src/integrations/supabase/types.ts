@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          operation: string
+          record_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          operation: string
+          record_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          operation?: string
+          record_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_metadata: {
+        Row: {
+          backup_path: string
+          backup_type: string
+          checksum: string | null
+          created_at: string | null
+          file_size: number | null
+          id: string
+          restored_at: string | null
+          status: string | null
+        }
+        Insert: {
+          backup_path: string
+          backup_type: string
+          checksum?: string | null
+          created_at?: string | null
+          file_size?: number | null
+          id?: string
+          restored_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          backup_path?: string
+          backup_type?: string
+          checksum?: string | null
+          created_at?: string | null
+          file_size?: number | null
+          id?: string
+          restored_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       canvas_states: {
         Row: {
           canvas_settings: Json
@@ -180,28 +246,37 @@ export type Database = {
       images: {
         Row: {
           dimensions: Json
+          file_size: number | null
+          file_type: string | null
           filename: string
           id: string
           original_name: string
           project_id: string | null
+          security_scan_status: string | null
           storage_path: string
           uploaded_at: string | null
         }
         Insert: {
           dimensions: Json
+          file_size?: number | null
+          file_type?: string | null
           filename: string
           id?: string
           original_name: string
           project_id?: string | null
+          security_scan_status?: string | null
           storage_path: string
           uploaded_at?: string | null
         }
         Update: {
           dimensions?: Json
+          file_size?: number | null
+          file_type?: string | null
           filename?: string
           id?: string
           original_name?: string
           project_id?: string | null
+          security_scan_status?: string | null
           storage_path?: string
           uploaded_at?: string | null
         }
@@ -238,6 +313,66 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          request_count: number | null
+          user_id: string | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          request_count?: number | null
+          user_id?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          request_count?: number | null
+          user_id?: string | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
+      security_logs: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -288,7 +423,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_rate_limit: {
+        Args: {
+          endpoint_name: string
+          max_requests?: number
+          window_minutes?: number
+        }
+        Returns: boolean
+      }
+      cleanup_old_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      validate_user_permission: {
+        Args: { operation: string; resource_id?: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
