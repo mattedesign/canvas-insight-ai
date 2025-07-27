@@ -341,7 +341,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Position images and their individual analysis cards inside the container
       if (displayMode === 'standard') {
         // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
-        let currentY = headerHeight; // Start below header, padding will be added by image positioning
+        let currentY = headerHeight + padding; // Start below header with 32px top padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
@@ -404,7 +404,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         });
       } else {
         // Alternative stacked layout
-        let currentY = headerHeight; // Start below header, padding will be added by image positioning
+        let currentY = headerHeight + padding; // Start below header with 32px top padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const maxDisplayHeight = Math.min(image.dimensions.height, 200);
