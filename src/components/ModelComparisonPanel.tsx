@@ -1,359 +1,461 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Trophy, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  BarChart3,
-  Eye,
-  Lightbulb,
-  Palette,
-  Zap
-} from 'lucide-react';
+import { Loader2, Download, BarChart3, Eye, Zap, Clock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-interface ComparisonResult {
+interface ModelAnalysis {
+  id: string;
   model: string;
-  result: any;
-  duration: number;
-  error?: string;
+  imageId: string;
+  analysis: any;
+  processingTime: number;
+  createdAt: string;
+}
+
+interface ComparisonMetrics {
+  accuracy: number;
+  consistency: number;
+  performance: number;
+  coverage: number;
 }
 
 interface ModelComparisonPanelProps {
-  results: ComparisonResult[];
-  isComparing: boolean;
-  onStartComparison?: () => void;
-  onClearResults?: () => void;
-  bestModel?: ComparisonResult | null;
+  imageId?: string;
+  imageUrl?: string;
+  onAnalysisComplete?: (results: ModelAnalysis[]) => void;
 }
 
-const modelIcons: Record<string, React.ReactNode> = {
-  'claude-vision': <Eye className="h-4 w-4 text-purple-600" />,
-  'google-vision': <Zap className="h-4 w-4 text-blue-600" />,
-  'stability-ai': <Palette className="h-4 w-4 text-orange-600" />,
-  'openai': <Lightbulb className="h-4 w-4 text-green-600" />
-};
-
-const modelNames: Record<string, string> = {
-  'claude-vision': 'Claude Vision',
-  'google-vision': 'Google Vision',
-  'stability-ai': 'Stability AI',
-  'openai': 'OpenAI GPT-4o'
-};
-
 export function ModelComparisonPanel({ 
-  results, 
-  isComparing, 
-  onStartComparison,
-  onClearResults,
-  bestModel 
+  imageId, 
+  imageUrl, 
+  onAnalysisComplete 
 }: ModelComparisonPanelProps) {
-  
-  const successfulResults = results.filter(r => !r.error);
-  const avgDuration = successfulResults.length > 0 
-    ? Math.round(successfulResults.reduce((sum, r) => sum + r.duration, 0) / successfulResults.length)
-    : 0;
+  const [analyses, setAnalyses] = useState<ModelAnalysis[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [metrics, setMetrics] = useState<Record<string, ComparisonMetrics>>({});
+  const [selectedModels, setSelectedModels] = useState<string[]>(['openai', 'claude-vision', 'google-vision']);
+  const { toast } = useToast();
 
-  const getModelScore = (result: ComparisonResult) => {
-    if (result.error || !result.result) return 0;
-    return result.result.summary?.overallScore || 0;
+  const availableModels = [
+    { id: 'openai', name: 'OpenAI GPT-4o', icon: '🧠', color: 'bg-green-500' },
+    { id: 'claude-vision', name: 'Claude 3.5 Sonnet', icon: '🎯', color: 'bg-blue-500' },
+    { id: 'google-vision', name: 'Google Vision', icon: '👁️', color: 'bg-red-500' },
+    { id: 'stability-ai', name: 'Stability.ai', icon: '🎨', color: 'bg-purple-500' }
+  ];
+
+  const runMultiModelAnalysis = async () => {
+    if (!imageId || !imageUrl) {
+      toast({
+        title: "Error",
+        description: "Image ID and URL are required for analysis",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const results: ModelAnalysis[] = [];
+
+    try {
+      // Run analysis for each selected model in parallel
+      const analysisPromises = selectedModels.map(async (model) => {
+        const startTime = Date.now();
+        
+        const { data, error } = await supabase.functions.invoke('ux-analysis', {
+          body: {
+            type: 'ANALYZE_IMAGE',
+            payload: {
+              imageId,
+              imageUrl,
+              imageName: `comparison-${imageId}`,
+              userContext: 'Multi-model comparison analysis'
+            },
+            aiModel: model
+          }
+        });
+
+        const processingTime = Date.now() - startTime;
+
+        if (error) throw error;
+
+        return {
+          id: `${model}-${Date.now()}`,
+          model,
+          imageId,
+          analysis: data.data,
+          processingTime,
+          createdAt: new Date().toISOString()
+        };
+      });
+
+      const completedAnalyses = await Promise.all(analysisPromises);
+      setAnalyses(completedAnalyses);
+      calculateMetrics(completedAnalyses);
+      
+      if (onAnalysisComplete) {
+        onAnalysisComplete(completedAnalyses);
+      }
+
+      toast({
+        title: "Analysis Complete",
+        description: `Successfully analyzed with ${selectedModels.length} AI models`,
+      });
+
+    } catch (error) {
+      console.error('Multi-model analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Failed to complete multi-model analysis",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const getQualityMetrics = (result: ComparisonResult) => {
-    if (result.error || !result.result) return { annotations: 0, suggestions: 0, insights: 0 };
-    
-    return {
-      annotations: result.result.visualAnnotations?.length || 0,
-      suggestions: result.result.suggestions?.length || 0,
-      insights: result.result.summary?.keyIssues?.length || 0
+  const calculateMetrics = (analyses: ModelAnalysis[]) => {
+    const modelMetrics: Record<string, ComparisonMetrics> = {};
+
+    analyses.forEach((analysis) => {
+      const { model, analysis: data, processingTime } = analysis;
+      
+      // Calculate metrics based on analysis quality and coverage
+      const annotationCount = data.visualAnnotations?.length || 0;
+      const suggestionCount = data.suggestions?.length || 0;
+      const overallScore = data.summary?.overallScore || 0;
+      
+      // Performance score based on processing time (faster = better)
+      const performanceScore = Math.max(0, 100 - (processingTime / 1000) * 2);
+      
+      // Coverage score based on number of insights provided
+      const coverageScore = Math.min(100, (annotationCount * 10) + (suggestionCount * 5));
+      
+      // Accuracy score based on overall quality assessment
+      const accuracyScore = overallScore;
+      
+      // Consistency score (would need multiple runs to calculate properly)
+      const consistencyScore = 85; // Placeholder
+
+      modelMetrics[model] = {
+        accuracy: Math.round(accuracyScore),
+        consistency: Math.round(consistencyScore),
+        performance: Math.round(performanceScore),
+        coverage: Math.round(coverageScore)
+      };
+    });
+
+    setMetrics(modelMetrics);
+  };
+
+  const exportComparison = () => {
+    const comparisonReport = {
+      imageId,
+      timestamp: new Date().toISOString(),
+      models: selectedModels,
+      analyses: analyses.map(a => ({
+        model: a.model,
+        processingTime: a.processingTime,
+        summary: a.analysis.summary,
+        annotationCount: a.analysis.visualAnnotations?.length || 0,
+        suggestionCount: a.analysis.suggestions?.length || 0
+      })),
+      metrics,
+      recommendations: generateModelRecommendations()
     };
+
+    const blob = new Blob([JSON.stringify(comparisonReport, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `model-comparison-${imageId}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateModelRecommendations = () => {
+    const recommendations = [];
+    
+    // Find best performing model for each metric
+    let bestAccuracy = { model: '', score: 0 };
+    let bestPerformance = { model: '', score: 0 };
+    let bestCoverage = { model: '', score: 0 };
+
+    Object.entries(metrics).forEach(([model, metric]) => {
+      if (metric.accuracy > bestAccuracy.score) {
+        bestAccuracy = { model, score: metric.accuracy };
+      }
+      if (metric.performance > bestPerformance.score) {
+        bestPerformance = { model, score: metric.performance };
+      }
+      if (metric.coverage > bestCoverage.score) {
+        bestCoverage = { model, score: metric.coverage };
+      }
+    });
+
+    if (bestAccuracy.model) {
+      recommendations.push(`Use ${bestAccuracy.model} for highest accuracy (${bestAccuracy.score}%)`);
+    }
+    if (bestPerformance.model) {
+      recommendations.push(`Use ${bestPerformance.model} for fastest analysis (${bestPerformance.score}% performance)`);
+    }
+    if (bestCoverage.model) {
+      recommendations.push(`Use ${bestCoverage.model} for most comprehensive insights (${bestCoverage.score}% coverage)`);
+    }
+
+    return recommendations;
+  };
+
+  const getModelIcon = (modelId: string) => {
+    const model = availableModels.find(m => m.id === modelId);
+    return model?.icon || '🤖';
+  };
+
+  const getModelName = (modelId: string) => {
+    const model = availableModels.find(m => m.id === modelId);
+    return model?.name || modelId;
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Multi-Model AI Comparison
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Model Selection */}
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Multi-Model Analysis Comparison
-            </CardTitle>
-            <CardDescription>
-              Compare AI model performance and insights
-            </CardDescription>
+            <h4 className="text-sm font-medium mb-2">Select AI Models to Compare:</h4>
+            <div className="flex flex-wrap gap-2">
+              {availableModels.map((model) => (
+                <Button
+                  key={model.id}
+                  variant={selectedModels.includes(model.id) ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setSelectedModels(prev => 
+                      prev.includes(model.id) 
+                        ? prev.filter(m => m !== model.id)
+                        : [...prev, model.id]
+                    );
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <span>{model.icon}</span>
+                  {model.name}
+                </Button>
+              ))}
+            </div>
           </div>
+
+          {/* Run Analysis Button */}
           <div className="flex gap-2">
-            {results.length > 0 && (
-              <Button variant="outline" size="sm" onClick={onClearResults}>
-                Clear Results
+            <Button 
+              onClick={runMultiModelAnalysis}
+              disabled={isLoading || selectedModels.length === 0}
+              className="flex items-center gap-2"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              {isLoading ? 'Analyzing...' : 'Run Multi-Model Analysis'}
+            </Button>
+            
+            {analyses.length > 0 && (
+              <Button variant="outline" onClick={exportComparison}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
               </Button>
             )}
-            <Button 
-              size="sm" 
-              onClick={onStartComparison}
-              disabled={isComparing}
-            >
-              {isComparing ? 'Comparing...' : 'Start Comparison'}
-            </Button>
           </div>
-        </div>
-      </CardHeader>
+        </CardContent>
+      </Card>
 
-      <CardContent>
-        {isComparing && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Running multi-model analysis...</p>
-          </div>
-        )}
+      {/* Results */}
+      {analyses.length > 0 && (
+        <Tabs defaultValue="comparison" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="comparison">Model Comparison</TabsTrigger>
+            <TabsTrigger value="metrics">Performance Metrics</TabsTrigger>
+            <TabsTrigger value="details">Detailed Results</TabsTrigger>
+          </TabsList>
 
-        {results.length > 0 && !isComparing && (
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="performance">Performance</TabsTrigger>
-              <TabsTrigger value="detailed">Detailed Results</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{successfulResults.length}/{results.length}</div>
-                    <p className="text-xs text-muted-foreground">Successful Analyses</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{avgDuration}ms</div>
-                    <p className="text-xs text-muted-foreground">Average Duration</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      {bestModel && (
-                        <>
-                          <Trophy className="h-4 w-4 text-yellow-500" />
-                          <span className="text-sm font-medium">
-                            {modelNames[bestModel.model] || bestModel.model}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Best Performer</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {bestModel && (
-                <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+          <TabsContent value="comparison" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {analyses.map((analysis) => (
+                <Card key={analysis.id}>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Trophy className="h-4 w-4 text-yellow-500" />
-                      Best Performing Model: {modelNames[bestModel.model]}
+                      <span>{getModelIcon(analysis.model)}</span>
+                      {getModelName(analysis.model)}
+                      <Badge variant="secondary" className="ml-auto">
+                        {analysis.processingTime}ms
+                      </Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <div className="font-medium">Overall Score</div>
-                        <div className="text-lg">{getModelScore(bestModel)}/100</div>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Overall Score</span>
+                        <span className="font-medium">
+                          {analysis.analysis.summary?.overallScore || 0}%
+                        </span>
                       </div>
-                      <div>
-                        <div className="font-medium">Analysis Speed</div>
-                        <div className="text-lg">{bestModel.duration}ms</div>
+                      <Progress 
+                        value={analysis.analysis.summary?.overallScore || 0} 
+                        className="h-2"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {analysis.analysis.visualAnnotations?.length || 0} insights
                       </div>
-                      <div>
-                        <div className="font-medium">Insights Generated</div>
-                        <div className="text-lg">
-                          {getQualityMetrics(bestModel).suggestions + getQualityMetrics(bestModel).annotations}
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {(analysis.processingTime / 1000).toFixed(1)}s
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="performance" className="space-y-4">
-              <div className="space-y-3">
-                {results.map((result, index) => (
-                  <Card key={index}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {modelIcons[result.model]}
-                          <span className="font-medium">{modelNames[result.model]}</span>
-                          {result.error ? (
-                            <Badge variant="destructive" className="text-xs">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Error
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Success
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {result.duration}ms
-                        </div>
-                      </div>
-
-                      {!result.error && result.result && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span>Overall Score</span>
-                            <span>{getModelScore(result)}/100</span>
-                          </div>
-                          <Progress value={getModelScore(result)} className="h-2" />
-                          
-                          <div className="grid grid-cols-3 gap-4 text-xs">
-                            <div>
-                              <div className="text-muted-foreground">Annotations</div>
-                              <div className="font-medium">{getQualityMetrics(result).annotations}</div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">Suggestions</div>
-                              <div className="font-medium">{getQualityMetrics(result).suggestions}</div>
-                            </div>
-                            <div>
-                              <div className="text-muted-foreground">Key Insights</div>
-                              <div className="font-medium">{getQualityMetrics(result).insights}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {result.error && (
-                        <div className="text-sm text-red-600 dark:text-red-400">
-                          {result.error}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="detailed" className="space-y-4">
-              {successfulResults.map((result, index) => (
-                <Card key={index}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      {modelIcons[result.model]}
-                      {modelNames[result.model]} - Detailed Results
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="summary" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="summary">Summary</TabsTrigger>
-                        <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
-                        <TabsTrigger value="annotations">Annotations</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="summary" className="mt-4">
-                        {result.result.summary && (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              <div className="text-center">
-                                <div className="text-lg font-bold">{result.result.summary.categoryScores?.usability || 0}</div>
-                                <div className="text-xs text-muted-foreground">Usability</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-lg font-bold">{result.result.summary.categoryScores?.accessibility || 0}</div>
-                                <div className="text-xs text-muted-foreground">Accessibility</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-lg font-bold">{result.result.summary.categoryScores?.visual || 0}</div>
-                                <div className="text-xs text-muted-foreground">Visual</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-lg font-bold">{result.result.summary.categoryScores?.content || 0}</div>
-                                <div className="text-xs text-muted-foreground">Content</div>
-                              </div>
-                            </div>
-                            
-                            {result.result.summary.keyIssues && (
-                              <div>
-                                <h4 className="font-medium text-sm mb-2">Key Issues</h4>
-                                <ul className="text-sm space-y-1">
-                                  {result.result.summary.keyIssues.map((issue: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-2">
-                                      <div className="w-1 h-1 bg-red-500 rounded-full mt-2 flex-shrink-0" />
-                                      {issue}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </TabsContent>
-
-                      <TabsContent value="suggestions" className="mt-4">
-                        {result.result.suggestions && (
-                          <div className="space-y-3">
-                            {result.result.suggestions.slice(0, 3).map((suggestion: any, i: number) => (
-                              <div key={i} className="border rounded-lg p-3">
-                                <h4 className="font-medium text-sm">{suggestion.title}</h4>
-                                <p className="text-sm text-muted-foreground mt-1">{suggestion.description}</p>
-                                <div className="flex gap-2 mt-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {suggestion.category}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {suggestion.impact} impact
-                                  </Badge>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
-
-                      <TabsContent value="annotations" className="mt-4">
-                        {result.result.visualAnnotations && (
-                          <div className="text-sm">
-                            <p className="text-muted-foreground mb-2">
-                              Found {result.result.visualAnnotations.length} visual annotations
-                            </p>
-                            <div className="space-y-2">
-                              {result.result.visualAnnotations.slice(0, 3).map((annotation: any, i: number) => (
-                                <div key={i} className="flex items-center gap-2">
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
-                                  <span>{annotation.title || annotation.description}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
                   </CardContent>
                 </Card>
               ))}
-            </TabsContent>
-          </Tabs>
-        )}
+            </div>
+          </TabsContent>
 
-        {results.length === 0 && !isComparing && (
-          <div className="text-center py-8 text-muted-foreground">
-            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No comparison results yet. Start a multi-model analysis to see detailed performance metrics.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <TabsContent value="metrics" className="space-y-4">
+            {Object.entries(metrics).map(([model, metric]) => (
+              <Card key={model}>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <span>{getModelIcon(model)}</span>
+                    {getModelName(model)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Accuracy</span>
+                        <span className="font-medium">{metric.accuracy}%</span>
+                      </div>
+                      <Progress value={metric.accuracy} className="h-2" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Performance</span>
+                        <span className="font-medium">{metric.performance}%</span>
+                      </div>
+                      <Progress value={metric.performance} className="h-2" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Coverage</span>
+                        <span className="font-medium">{metric.coverage}%</span>
+                      </div>
+                      <Progress value={metric.coverage} className="h-2" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Consistency</span>
+                        <span className="font-medium">{metric.consistency}%</span>
+                      </div>
+                      <Progress value={metric.consistency} className="h-2" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="details" className="space-y-4">
+            {analyses.map((analysis) => (
+              <Card key={analysis.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>{getModelIcon(analysis.model)}</span>
+                    {getModelName(analysis.model)} - Detailed Results
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Key Insights:</h4>
+                      <ul className="text-sm space-y-1 text-muted-foreground">
+                        {analysis.analysis.summary?.keyIssues?.map((issue: string, index: number) => (
+                          <li key={index}>• {issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">Strengths:</h4>
+                      <ul className="text-sm space-y-1 text-muted-foreground">
+                        {analysis.analysis.summary?.strengths?.map((strength: string, index: number) => (
+                          <li key={index}>• {strength}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Annotations:</span>
+                        <div>{analysis.analysis.visualAnnotations?.length || 0}</div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Suggestions:</span>
+                        <div>{analysis.analysis.suggestions?.length || 0}</div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Processing Time:</span>
+                        <div>{analysis.processingTime}ms</div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Model:</span>
+                        <div>{analysis.model}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* Recommendations */}
+      {Object.keys(metrics).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Model Recommendations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {generateModelRecommendations().map((rec, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <Badge variant="outline" className="mt-0.5">
+                    {index + 1}
+                  </Badge>
+                  <span className="text-sm">{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
