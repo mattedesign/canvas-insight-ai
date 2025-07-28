@@ -33,8 +33,18 @@ interface AnalysisCardNodeProps {
 }
 
 export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
+  // Debug logging to understand the data structure
+  console.log('AnalysisCardNode received data:', {
+    hasData: !!data,
+    hasAnalysis: !!(data?.analysis),
+    hasSummary: !!(data?.analysis?.summary),
+    categoryScores: data?.analysis?.summary?.categoryScores,
+    categoryScoresType: typeof data?.analysis?.summary?.categoryScores
+  });
+
   // Add null/undefined checks to prevent React state errors
   if (!data || !data.analysis) {
+    console.warn('AnalysisCardNode: Missing data or analysis');
     return (
       <Card className="bg-background border-border shadow-lg w-96">
         <CardContent className="p-4 text-center">
@@ -48,17 +58,37 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Ensure analysis has all required properties with fallbacks
+  // First ensure we have the basic structure with proper typing
+  const baseSummary = analysis.summary || {} as any;
+  const baseCategoryScores = (baseSummary.categoryScores || {}) as Record<string, number>;
+  
+  // Create a safe categoryScores object with all required properties
+  const safeCategoryScores = {
+    usability: typeof baseCategoryScores.usability === 'number' ? baseCategoryScores.usability : 0,
+    accessibility: typeof baseCategoryScores.accessibility === 'number' ? baseCategoryScores.accessibility : 0,
+    visual: typeof baseCategoryScores.visual === 'number' ? baseCategoryScores.visual : 0,
+    content: typeof baseCategoryScores.content === 'number' ? baseCategoryScores.content : 0,
+    ...baseCategoryScores // Include any additional category scores
+  };
+
   const safeAnalysis = {
+    ...analysis, // Spread first to get all original properties
     id: analysis.id || '',
     summary: {
-      overallScore: analysis.summary?.overallScore || 0,
-      categoryScores: analysis.summary?.categoryScores || {},
-      keyIssues: analysis.summary?.keyIssues || [],
-      strengths: analysis.summary?.strengths || []
+      ...baseSummary, // Safely spread summary
+      overallScore: typeof baseSummary.overallScore === 'number' ? baseSummary.overallScore : 0,
+      categoryScores: safeCategoryScores,
+      keyIssues: Array.isArray(baseSummary.keyIssues) ? baseSummary.keyIssues : [],
+      strengths: Array.isArray(baseSummary.strengths) ? baseSummary.strengths : []
     },
-    suggestions: analysis.suggestions || [],
-    ...analysis
+    suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
   };
+
+  // Additional debug logging after safe construction
+  console.log('AnalysisCardNode safeAnalysis:', {
+    categoryScores: safeAnalysis.summary.categoryScores,
+    categoryScoresEntries: Object.entries(safeAnalysis.summary.categoryScores)
+  });
 
   const handleViewFullAnalysis = () => {
     onExpandedChange?.(safeAnalysis.id, true);
@@ -130,17 +160,20 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         {/* Category Scores */}
         <div className="space-y-3">
           <h4 className="font-medium text-foreground text-sm">Category Scores</h4>
-          {Object.entries(safeAnalysis.summary.categoryScores).map(([category, score]) => (
-            <div key={category} className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="capitalize text-muted-foreground">{category}</span>
+          {Object.entries(safeAnalysis.summary.categoryScores).map(([category, score]) => {
+            const numScore = typeof score === 'number' ? score : 0;
+            return (
+              <div key={category} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="capitalize text-muted-foreground">{category}</span>
+                  </div>
+                  <span className={getScoreColor(numScore)}>{numScore}%</span>
                 </div>
-                <span className={getScoreColor(score)}>{score}%</span>
+                <Progress value={numScore} className="h-2" />
               </div>
-              <Progress value={score} className="h-2" />
-            </div>
-          ))}
+            );
+          })}
         </div>
         
         {/* Key Issues */}
