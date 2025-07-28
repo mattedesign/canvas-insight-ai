@@ -9,6 +9,7 @@ import { NewSessionDialog } from '@/components/NewSessionDialog';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
+import { supabase } from '@/integrations/supabase/client';
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -65,39 +66,50 @@ const Upload = () => {
         stage.id === 'upload' ? { ...stage, status: 'active' } : stage
       ));
       
-      // Simulate upload progress
-      for (let i = 0; i <= 100; i += 10) {
-        setAnalysisStages(prev => prev.map(stage => 
-          stage.id === 'upload' ? { ...stage, progress: i } : stage
-        ));
-        setOverallProgress(i * 0.25);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Call the immediate upload function
+      await handleImageUploadImmediate(files);
       
       setAnalysisStages(prev => prev.map(stage => 
-        stage.id === 'upload' ? { ...stage, status: 'completed' } : stage
+        stage.id === 'upload' ? { ...stage, status: 'completed', progress: 100 } : stage
       ));
+      setOverallProgress(33);
       
-      // Stage 2: Processing
+      // Stage 2: Metadata Extraction (Google Vision - Background)
       setCurrentStage('processing');
       setAnalysisStages(prev => prev.map(stage => 
         stage.id === 'processing' ? { ...stage, status: 'active' } : stage
       ));
       
-      // Stage 3: Analysis
+      // Trigger metadata extraction for uploaded images in background
+      for (const image of uploadedImages) {
+        try {
+          // Trigger Google Vision metadata extraction in background
+          await supabase.functions.invoke('google-vision-metadata', {
+            body: {
+              imageId: image.id,
+              imageUrl: image.url, // Use the image URL directly
+              features: ['labels', 'text', 'faces', 'objects', 'colors']
+            }
+          });
+        } catch (error) {
+          console.warn('Metadata extraction failed for image:', image.id, error);
+          // Don't fail the upload process if metadata extraction fails
+        }
+      }
+      
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === 'processing' ? { ...stage, status: 'completed', progress: 100 } : stage
+      ));
+      setOverallProgress(66);
+      
+      // Stage 3: Complete
       setCurrentStage('analysis');
       setAnalysisStages(prev => prev.map(stage => 
-        stage.id === 'analysis' ? { ...stage, status: 'active' } : stage
+        stage.id === 'analysis' ? { ...stage, status: 'completed', progress: 100 } : stage
       ));
-      
-      // Call the immediate upload function and navigate to canvas immediately
-      await handleImageUploadImmediate(files);
-      
-      // Complete all stages and navigate immediately
-      setAnalysisStages(prev => prev.map(stage => ({ ...stage, status: 'completed', progress: 100 })));
       setOverallProgress(100);
       
-      // Navigate to canvas immediately
+      // Navigate to canvas
       navigate('/canvas');
     } catch (error) {
       console.error('Upload failed:', error);

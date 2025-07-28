@@ -3,10 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { AIModelSelector } from '@/components/AIModelSelector';
-import { useAI } from '@/context/AIContext';
-import { useAppContext } from '@/context/AppContext';
-import { Brain, Wand2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Brain, Wand2, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ImageAnalysisDialogProps {
   imageId: string;
@@ -24,15 +24,43 @@ export function ImageAnalysisDialog({
   onAnalysisComplete 
 }: ImageAnalysisDialogProps) {
   const [userContext, setUserContext] = useState('');
-  const { selectedAIModel, setSelectedAIModel, isAnalyzing, analyzeImageWithAI } = useAI();
+  const [selectedAIModel, setSelectedAIModel] = useState<'claude' | 'openai'>('claude');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleAnalyze = async () => {
+    if (isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    
     try {
-      const analysis = await analyzeImageWithAI(imageId, imageUrl, imageName, userContext);
-      onAnalysisComplete(analysis);
+      toast.info('Starting AI analysis...');
+
+      const { data, error } = await supabase.functions.invoke('ai-analysis', {
+        body: {
+          imageId,
+          imageUrl,
+          imageName,
+          userContext,
+          aiModel: selectedAIModel
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Analysis failed');
+      }
+
+      toast.success('AI analysis completed successfully!');
+      onAnalysisComplete(data.data);
       onClose();
     } catch (error) {
       console.error('Analysis failed:', error);
+      toast.error(error.message || 'Analysis failed. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -45,7 +73,7 @@ export function ImageAnalysisDialog({
             AI UX Analysis
           </CardTitle>
           <CardDescription>
-            Analyze "{imageName}" with advanced AI models
+            Analyze "{imageName}" with advanced AI models using pre-extracted metadata
           </CardDescription>
         </CardHeader>
         
@@ -57,6 +85,26 @@ export function ImageAnalysisDialog({
               alt={imageName}
               className="max-w-full max-h-48 object-contain rounded-lg border"
             />
+          </div>
+          
+          {/* AI Model Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="ai-model">
+              AI Model
+            </Label>
+            <Select value={selectedAIModel} onValueChange={(value: 'claude' | 'openai') => setSelectedAIModel(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select AI model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude">
+                  Claude Opus 4 - Most Advanced
+                </SelectItem>
+                <SelectItem value="openai">
+                  GPT-4.1 - Fast & Reliable
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           {/* User Context Input */}
@@ -72,14 +120,6 @@ export function ImageAnalysisDialog({
               rows={3}
             />
           </div>
-          
-          {/* AI Model Selector */}
-          <AIModelSelector
-            selectedModel={selectedAIModel}
-            onModelChange={setSelectedAIModel}
-            onAnalyze={handleAnalyze}
-            isAnalyzing={isAnalyzing}
-          />
           
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t">
@@ -97,7 +137,7 @@ export function ImageAnalysisDialog({
             >
               {isAnalyzing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Analyzing...
                 </>
               ) : (

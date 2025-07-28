@@ -4,6 +4,9 @@ import { UXAnalysis, AnnotationPoint } from '@/types/ux-analysis';
 import { AnnotationComment } from './AnnotationComment';
 import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
+import { ImageAnalysisDialog } from './ImageAnalysisDialog';
+import { Button } from './ui/button';
+import { Brain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -19,6 +22,7 @@ interface ImageViewerProps {
   onAddComment?: () => void;
   currentTool?: 'cursor' | 'draw';
   imageDimensions?: { width: number; height: number };
+  onAnalysisComplete?: (analysis: UXAnalysis) => void;
 }
 
 
@@ -34,9 +38,11 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   onAddComment,
   currentTool = 'cursor',
   imageDimensions = { width: 800, height: 600 },
+  onAnalysisComplete,
 }) => {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   // Remove useImageTransform hook that was interfering with TransformWrapper
@@ -229,6 +235,18 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         </div>
       </div>
 
+      {/* AI Analysis Button */}
+      <div className="absolute top-4 right-4 z-30">
+        <Button
+          onClick={() => setShowAnalysisDialog(true)}
+          className="bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg"
+          size="sm"
+        >
+          <Brain className="h-4 w-4 mr-2" />
+          Analyze with AI
+        </Button>
+      </div>
+
       {/* Gallery Floating Toolbar */}
       <GalleryFloatingToolbar
         onZoomIn={zoomIn}
@@ -249,6 +267,22 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           Pan disabled - Close annotation to enable
         </div>
       )}
+      
+      {/* AI Analysis Dialog */}
+      {showAnalysisDialog && (
+        <ImageAnalysisDialog
+          imageId={analysis.imageId}
+          imageName={analysis.imageName}
+          imageUrl={analysis.imageUrl}
+          onClose={() => setShowAnalysisDialog(false)}
+          onAnalysisComplete={(newAnalysis) => {
+            setShowAnalysisDialog(false);
+            if (onAnalysisComplete) {
+              onAnalysisComplete(newAnalysis);
+            }
+          }}
+        />
+      )}
     </>
   ), [
     analysis,
@@ -256,6 +290,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     selectedAnnotations,
     activeAnnotation,
     commentPosition,
+    showAnalysisDialog,
     handleAnnotationClick,
     handleCloseComment,
     handleDrawingComplete,
@@ -267,7 +302,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
     onAddComment,
     zoomLevel,
     currentTool,
-    handleImageDoubleClick
+    handleImageDoubleClick,
+    onAnalysisComplete
   ]);
 
   // Unified zoom/pan for both cursor and draw modes
