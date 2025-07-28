@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ImageUploadZone } from '@/components/ImageUploadZone';
 import { UploadErrorBoundary } from '@/components/UploadErrorBoundary';
+import { AnalysisStatusIndicator } from '@/components/AnalysisStatusIndicator';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -73,7 +74,8 @@ const Upload = () => {
       />
       
       <div className="flex-1">
-        <div className="h-full flex items-center justify-center">
+        <div className="h-full flex flex-col items-center justify-center p-8">
+          <AnalysisStatusIndicator />
           <UploadErrorBoundary>
             <ImageUploadZone onImageUpload={handleUploadComplete} isUploading={isUploading} />
           </UploadErrorBoundary>
