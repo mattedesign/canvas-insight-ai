@@ -20,7 +20,7 @@ import {
   Group,
   Upload
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { ChatPanel } from './ChatPanel';
 
 export type ToolMode = 'cursor' | 'draw';
@@ -51,7 +51,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   hasMultiSelection = false
 }) => {
   const { zoomIn, zoomOut, zoomTo, fitView, getZoom } = useReactFlow();
-  const { toast } = useToast();
+  const { toast } = useFilteredToast();
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -74,29 +74,29 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
 
   const handleZoomIn = useCallback(() => {
     zoomIn();
-    toast({ description: "Zoomed in" });
+    // Remove zoom toast - this is routine UI feedback
   }, [zoomIn, toast]);
 
   const handleZoomOut = useCallback(() => {
     zoomOut();
-    toast({ description: "Zoomed out" });
+    // Remove zoom toast - this is routine UI feedback
   }, [zoomOut, toast]);
 
   const handleZoomTo100 = useCallback(() => {
     zoomTo(1);
     setZoomLevel(100);
-    toast({ description: "Zoom set to 100%" });
+    // Remove zoom toast - this is routine UI feedback
   }, [zoomTo, toast]);
 
   const handleZoomTo200 = useCallback(() => {
     zoomTo(2);
     setZoomLevel(200);
-    toast({ description: "Zoom set to 200%" });
+    // Remove zoom toast - this is routine UI feedback
   }, [zoomTo, toast]);
 
   const handleFitView = useCallback(() => {
     fitView({ duration: 800, padding: 0.1 });
-    toast({ description: "Fit to view" });
+    // Remove zoom toast - this is routine UI feedback
   }, [fitView, toast]);
 
   const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
@@ -162,7 +162,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     const files = Array.from(event.target.files || []);
     if (files.length > 0 && onImageUpload) {
       onImageUpload(files);
-      toast({ description: `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...` });
+      // Remove upload progress toast - handled by main upload flow
     }
     // Reset the input value so the same file can be uploaded again
     event.target.value = '';

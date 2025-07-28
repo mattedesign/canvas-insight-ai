@@ -6,7 +6,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAuth } from '@/context/AuthContext';
 import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
 import { CanvasStateService, CanvasState } from '@/services/CanvasStateService';
-import { useToast } from '@/hooks/use-toast';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AppContextType {
@@ -71,7 +71,7 @@ export const useAppContext = () => {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { toast } = useFilteredToast();
   
   // Existing state
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
@@ -136,10 +136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setSelectedImageId(result.data.uploadedImages[0].id);
         }
         
-        toast({
-          title: "Data loaded",
-          description: `Loaded ${result.data.uploadedImages.length} images and ${result.data.analyses.length} analyses.`,
-        });
+        // Remove informational toast - this is routine data loading
       } else {
         console.log('No data found in database or loading failed');
       }
@@ -148,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Loading failed",
         description: "Could not load your data. You can continue working and sync later.",
+        category: "error",
         variant: "destructive",
       });
     } finally {
@@ -171,6 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast({
           title: "Synced successfully",
           description: "Your data has been saved to the cloud.",
+          category: "success",
         });
       } else {
         throw new Error('Sync failed');
@@ -180,7 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Sync failed",
         description: "Could not save your data. Please try again later.",
-        variant: "destructive",
+        category: "error",
       });
     } finally {
       setIsSyncing(false);
@@ -194,11 +193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsUploading(true);
     
     try {
-      // Show upload progress toast
-      toast({
-        title: "Uploading images",
-        description: `Processing ${files.length} image${files.length > 1 ? 's' : ''}...`,
-      });
+      // Remove informational upload progress toast
 
       console.log('Starting upload process for', files.length, 'files');
 
@@ -362,10 +357,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedImageId(newImages[0].id);
       }
 
-      // Show success feedback
+      // Show success feedback for upload completion
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
+        category: "success",
       });
 
       // Note: Removed auto-sync to prevent database conflicts
@@ -377,7 +373,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
-        variant: "destructive",
+        category: "error",
       });
     } finally {
       console.log('Upload process completed, setting isUploading to false');
@@ -390,11 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newAnalyses: UXAnalysis[] = [];
 
     try {
-      // Show immediate upload feedback
-      toast({
-        title: "Images added",
-        description: `${files.length} image${files.length > 1 ? 's' : ''} added to canvas. Analysis in progress...`,
-      });
+      // Remove informational upload feedback toast
 
       console.log('Starting immediate upload process for', files.length, 'files');
 
@@ -578,7 +570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
-        variant: "destructive",
+        category: "error",
       });
     }
   }, [selectedImageId, user, toast]);
@@ -640,13 +632,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Workspace cleared",
         description: "Canvas has been cleared. Ready for new analysis.",
+        category: "success",
       });
     } catch (error) {
       console.error('Failed to clear canvas:', error);
       toast({
         title: "Clear failed",
         description: "Could not clear workspace. Please try again.",
-        variant: "destructive",
+        category: "error",
       });
     }
   }, [clearAnnotations, toast]);
@@ -727,13 +720,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast({
           title: "Group created",
           description: `${newGroup.name} has been created with ${imageIds.length} images.`,
+          category: "success",
         });
       } catch (error) {
         console.error('Failed to persist group:', error);
         toast({
           title: "Group created locally",
           description: "Group was created but may not sync until you're online.",
-          variant: "destructive",
+          category: "action-required",
         });
       }
     }
@@ -916,6 +910,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Group analysis complete",
         description: `Analysis for "${prompt}" has been generated.`,
+        category: "success",
       });
       
     } catch (error) {
@@ -928,7 +923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Analysis failed",
         description: "Could not complete the group analysis. Please try again.",
-        variant: "destructive",
+        category: "error",
       });
     }
   }, [user, imageGroups, toast]);
@@ -989,6 +984,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast({
       title: "Analysis Complete",
       description: "New AI analysis has been generated for your image.",
+      category: "success",
     });
   }, [toast]);
 

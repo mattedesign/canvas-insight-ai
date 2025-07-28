@@ -26,7 +26,7 @@ import { AnalysisLoadingNode } from './AnalysisLoadingNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
-import { useToast } from '@/hooks/use-toast';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 
 
@@ -109,7 +109,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   
   
-  const { toast } = useToast();
+  const { toast } = useFilteredToast();
   const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
 
@@ -127,6 +127,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     setGroups(prev => prev.filter(g => g.id !== groupId));
     toast({
       description: "Group deleted successfully",
+      category: "success",
     });
   }, [toast]);
 
@@ -134,9 +135,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const group = groups.find(g => g.id === groupId);
     if (group) {
       multiSelection.selectMultiple(group.imageIds);
-      toast({
-        description: `Viewing group "${group.name}"`,
-      });
+      // Remove informational group view toast
     }
   }, [groups, multiSelection.selectMultiple, toast]);
 
@@ -146,6 +145,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       toast({
         title: "Group Analysis",
         description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
+        category: "success",
       });
     }
   }, [groups, toast]);
@@ -157,6 +157,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       toast({
         title: "Fork Created",
         description: "Created new analysis branch - add your prompt to continue",
+        category: "action-required",
       });
     }
   }, [onCreateFork, toast]);
@@ -805,10 +806,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 onEditPrompt: onEditGroupPrompt,
                 onCreateFork: handleCreateForkClick,
               onViewDetails: (analysisId: string) => {
-                toast({
-                  title: "Group Analysis Details",
-                  description: `Viewing detailed analysis for group "${group.name}"`,
-                });
+                // Remove informational group analysis view toast
               },
             },
           };
@@ -839,10 +837,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 onEditPrompt: onEditGroupPrompt,
                 onCreateFork: handleCreateForkClick,
                 onViewDetails: (analysisId: string) => {
-                  toast({
-                    title: "Group Analysis Details",
-                    description: `Viewing detailed analysis for group "${group.name}"`,
-                  });
+                  // Remove informational group analysis view toast
                 },
               },
             };
@@ -937,29 +932,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       cursor: isMobile ? 'Cursor tool - Select artboards (dragging disabled on mobile)' : 'Cursor tool - Select and move artboards',
       draw: 'Draw tool - Paint regions for inpainting feedback'
     };
-    toast({
-      description: toolMessages[tool],
-    });
+    // Remove tool change toast - this is routine UI feedback
   }, [toast, isMobile]);
 
   const handleToggleAnnotations = useCallback(() => {
     onToggleAnnotations?.();
-    toast({
-      description: `Annotations ${showAnnotations ? 'hidden' : 'shown'}`,
-    });
+    // Remove annotation toggle toast - this is routine UI feedback
   }, [onToggleAnnotations, showAnnotations, toast]);
 
   const handleToggleAnalysis = useCallback(() => {
     setShowAnalysis(prev => !prev);
-    toast({
-      description: `Analysis ${showAnalysis ? 'hidden' : 'shown'}`,
-    });
+    // Remove analysis toggle toast - this is routine UI feedback
   }, [showAnalysis, toast]);
 
   const handleAddComment = useCallback(() => {
     toast({
       title: "Add Comment Mode",
       description: "Click on an artboard to add a new annotation",
+      category: "action-required",
     });
   }, [toast]);
 
@@ -968,7 +958,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       toast({
         title: "Select Multiple Images",
         description: "Please select at least 2 images to create a group.",
-        variant: "destructive",
+        category: "error",
       });
       return;
     }
@@ -980,6 +970,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     toast({
       title: "Group Created",
       description: `Successfully created group with ${multiSelection.state.selectedIds.length} images`,
+      category: "success",
     });
   }, [onCreateGroup, multiSelection, toast]);
 

@@ -18,7 +18,7 @@ import {
   MessageCircle,
   Target
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { ChatPanel } from './ChatPanel';
 
 export type GalleryToolMode = 'cursor' | 'draw';
@@ -48,33 +48,33 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
   zoomLevel,
   currentTool = 'cursor'
 }) => {
-  const { toast } = useToast();
+  const { toast } = useFilteredToast();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handleZoomIn = () => {
     onZoomIn();
-    toast({ description: "Zoomed in" });
+    // Remove zoom toast - this is routine UI feedback
   };
 
   const handleZoomOut = () => {
     onZoomOut();
-    toast({ description: "Zoomed out" });
+    // Remove zoom toast - this is routine UI feedback
   };
 
   const handleReset = () => {
     onReset();
-    toast({ description: "Reset to fit view" });
+    // Remove zoom toast - this is routine UI feedback
   };
 
   const handleDelete = () => {
     onDelete();
-    toast({ description: "Image deleted" });
+    toast({ description: "Image deleted", category: "success" });
   };
 
   const handleAddComment = () => {
     if (onAddComment) {
       onAddComment();
-      toast({ description: "Comment mode activated. Click anywhere to add a comment." });
+      toast({ description: "Comment mode activated. Click anywhere to add a comment.", category: "action-required" });
     }
   };
 
@@ -164,7 +164,7 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
               <DropdownMenuItem onClick={() => {
                 onZoomIn();
                 onZoomIn();
-                toast({ description: "Zoom set to 200%" });
+                // Remove zoom toast - this is routine UI feedback
               }} className="gap-2">
                 <Target className="h-4 w-4" />
                 <span>Zoom to 200%</span>
