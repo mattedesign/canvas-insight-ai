@@ -4,7 +4,7 @@ import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { CanvasUploadZone } from '@/components/CanvasUploadZone';
-import { CanvasUploadProgress } from '@/components/CanvasUploadProgress';
+
 import { useAppContext } from '@/context/AppContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -44,23 +44,12 @@ const Canvas = () => {
     handleEditGroupPrompt,
     handleCreateFork,
     handleAnalysisComplete,
-    handleImageUpload
+    handleImageUpload,
+    updateAppStateFromDatabase
   } = useAppContext();
 
   // Track if user has existing data in the database
   const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
-  
-  // Upload state
-  const [uploadStages, setUploadStages] = useState<Array<{
-    id: string;
-    name: string;
-    status: 'pending' | 'processing' | 'completed' | 'error';
-    progress: number;
-    error?: string;
-  }>>([]);
-  const [overallProgress, setOverallProgress] = useState(0);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -102,121 +91,20 @@ const Canvas = () => {
   const { debounce } = useDebounce();
   const debouncedMetadataExtraction = debounce(extractMetadataForImage, 300);
 
-  // Canvas upload implementation
+  // Simplified canvas upload - load images immediately, upload in background
   const handleCanvasUpload = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
 
-    setIsUploadingFiles(true);
-    setPendingFiles(files);
+    // Process images immediately for display
+    await handleImageUpload(files);
     
-    const stages = files.map(file => ({
-      id: `${file.name}-${Date.now()}`,
-      name: file.name,
-      status: 'pending' as const,
-      progress: 0
-    }));
-    
-    setUploadStages(stages);
-    setOverallProgress(0);
-
-    try {
-      // Stage 1: Upload files to Supabase
-      const uploadedImages = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const stageId = stages[i].id;
-        
-        // Update stage to processing
-        setUploadStages(prev => prev.map(stage => 
-          stage.id === stageId 
-            ? { ...stage, status: 'processing', progress: 10 }
-            : stage
-        ));
-
-        try {
-          // Upload to Supabase
-          const result = await handleImageUpload([file]);
-          uploadedImages.push(result);
-          
-          // Update stage progress
-          setUploadStages(prev => prev.map(stage => 
-            stage.id === stageId 
-              ? { ...stage, progress: 50 }
-              : stage
-          ));
-          
-        } catch (error) {
-          console.error('Upload failed for:', file.name, error);
-          setUploadStages(prev => prev.map(stage => 
-            stage.id === stageId 
-              ? { ...stage, status: 'error', error: 'Upload failed' }
-              : stage
-          ));
-        }
-      }
-
-      // Stage 2: Extract metadata for uploaded images
-      for (let i = 0; i < uploadedImages.length; i++) {
-        const uploadResult = uploadedImages[i];
-        const stageId = stages[i].id;
-        
-        try {
-          setUploadStages(prev => prev.map(stage => 
-            stage.id === stageId 
-              ? { ...stage, progress: 75 }
-              : stage
-          ));
-
-          // Extract metadata with retry
-          if (uploadResult?.id) {
-            debouncedMetadataExtraction(uploadResult.id);
-          }
-          
-          setUploadStages(prev => prev.map(stage => 
-            stage.id === stageId 
-              ? { ...stage, status: 'completed', progress: 100 }
-              : stage
-          ));
-        } catch (error) {
-          console.error('Metadata extraction failed:', error);
-          // Don't fail the whole process for metadata extraction
-          setUploadStages(prev => prev.map(stage => 
-            stage.id === stageId 
-              ? { ...stage, status: 'completed', progress: 100 }
-              : stage
-          ));
-        }
-      }
-
-      // Update overall progress
-      setOverallProgress(100);
-      
-      toast.toast({
-        category: 'success',
-        title: "Upload Complete",
-        description: `Successfully uploaded ${files.length} image${files.length > 1 ? 's' : ''}`,
-        variant: "default"
-      });
-      
-      // Clear upload state after delay
-      setTimeout(() => {
-        setUploadStages([]);
-        setPendingFiles([]);
-        setIsUploadingFiles(false);
-        setOverallProgress(0);
-      }, 3000);
-
-    } catch (error) {
-      console.error('Upload process failed:', error);
-      toast.toast({
-        category: 'error',
-        title: "Upload Failed",
-        description: "Upload failed. Please try again.",
-        variant: "destructive"
-      });
-      setIsUploadingFiles(false);
-    }
-  }, [handleImageUpload, extractMetadataForImage, toast]);
+    toast.toast({
+      category: 'success',
+      title: "Images Added",
+      description: `Successfully added ${files.length} image${files.length > 1 ? 's' : ''} to canvas`,
+      variant: "default"
+    });
+  }, [handleImageUpload, toast]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -226,18 +114,6 @@ const Canvas = () => {
     event.target.value = '';
   }, [handleCanvasUpload]);
 
-  const handleCancelUpload = useCallback(() => {
-    setUploadStages([]);
-    setPendingFiles([]);
-    setIsUploadingFiles(false);
-    setOverallProgress(0);
-  }, []);
-
-  const handleRetryUpload = useCallback(() => {
-    if (pendingFiles.length > 0) {
-      handleCanvasUpload(pendingFiles);
-    }
-  }, [pendingFiles, handleCanvasUpload]);
 
   const handleNavigateToPreviousAnalyses = () => {
     navigate('/projects');
@@ -296,10 +172,12 @@ const Canvas = () => {
           // Switch to the project
           await ProjectService.switchToProject(project.id);
           
-          // Load project data
+          // Load project data and update AppContext state
           const result = await DataMigrationService.loadAllFromDatabase();
           if (result.success && result.data) {
-            console.log('Project data loaded successfully');
+            console.log('Project data loaded successfully, updating context state...');
+            // Update AppContext with loaded data
+            updateAppStateFromDatabase(result.data);
           }
         } catch (error) {
           console.error('Error loading project by slug:', error);
@@ -322,8 +200,9 @@ const Canvas = () => {
                 console.log('Loading existing project data...');
                 const result = await DataMigrationService.loadAllFromDatabase();
                 if (result.success && result.data) {
+                  console.log('Existing data loaded, updating context state...');
                   // Update context with loaded data
-                  // This ensures continuity when user has existing data
+                  updateAppStateFromDatabase(result.data);
                 }
               }
             } catch (error) {
@@ -438,17 +317,8 @@ const Canvas = () => {
         {/* Upload Zone - shows full overlay when no images, floating button when images exist */}
         <CanvasUploadZone
           onImageUpload={handleCanvasUpload}
-          isUploading={isUploadingFiles}
+          isUploading={false}
           hasImages={uploadedImages.length > 0}
-        />
-        
-        {/* Upload Progress */}
-        <CanvasUploadProgress
-          stages={uploadStages}
-          overallProgress={overallProgress}
-          isVisible={uploadStages.length > 0}
-          onCancel={handleCancelUpload}
-          onRetry={handleRetryUpload}
         />
       </div>
       

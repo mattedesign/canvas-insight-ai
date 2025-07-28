@@ -59,6 +59,7 @@ interface AppContextType {
   // Migration actions
   syncToDatabase: () => Promise<void>;
   loadDataFromDatabase: () => Promise<void>;
+  updateAppStateFromDatabase: (data: any) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1081,6 +1082,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [toast]);
 
+  // Update app state with data loaded from database
+  const updateAppStateFromDatabase = useCallback((data: {
+    uploadedImages: UploadedImage[];
+    analyses: UXAnalysis[];
+    imageGroups: ImageGroup[];
+    groupAnalysesWithPrompts: GroupAnalysisWithPrompt[];
+    generatedConcepts?: GeneratedConcept[];
+    groupAnalyses?: GroupAnalysis[];
+    groupPromptSessions?: GroupPromptSession[];
+  }) => {
+    console.log('Updating app state from database:', data);
+    setUploadedImages(data.uploadedImages || []);
+    setAnalyses(data.analyses || []);
+    setImageGroups(data.imageGroups || []);
+    setGroupAnalysesWithPrompts(data.groupAnalysesWithPrompts || []);
+    setGeneratedConcepts(data.generatedConcepts || []);
+    setGroupAnalyses(data.groupAnalyses || []);
+    setGroupPromptSessions(data.groupPromptSessions || []);
+  }, []);
+
   const value: AppContextType = {
     // State
     uploadedImages,
@@ -1127,6 +1148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Migration actions
     syncToDatabase,
     loadDataFromDatabase,
+    updateAppStateFromDatabase,
   };
 
   return (
