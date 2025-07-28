@@ -9,6 +9,7 @@ import { DrawingOverlay } from '../DrawingOverlay';
 import { useToast } from '@/hooks/use-toast';
 import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { ImageAnalysisDialog } from '../ImageAnalysisDialog';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -34,6 +35,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const { calculateGlobalPosition } = useGlobalCoordinates();
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
   const getMarkerColor = (type: string, isActive: boolean = false) => {
     const baseClasses = isActive ? 'ring-2 ring-primary ring-offset-1 scale-125' : '';
@@ -211,16 +213,28 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
             </div>
           </div>
           
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleViewSingle}
-            className="ml-3 flex-shrink-0"
-            title="View in single image mode"
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
+          <div className="flex gap-2 ml-3 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAnalysisDialog(true);
+              }}
+              title="Analyze with AI"
+            >
+              AI Analysis
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleViewSingle}
+              title="View in single image mode"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View
+            </Button>
+          </div>
         </div>
       </div>
       
@@ -229,6 +243,22 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           type="source"
           position={Position.Right}
           className="bg-primary border-2 border-background"
+        />
+      )}
+      
+      {showAnalysisDialog && (
+        <ImageAnalysisDialog
+          imageId={image.id}
+          imageName={image.name}
+          imageUrl={image.url}
+          onClose={() => setShowAnalysisDialog(false)}
+          onAnalysisComplete={() => {
+            setShowAnalysisDialog(false);
+            toast({
+              title: "Analysis Complete",
+              description: "AI analysis has been generated for this image"
+            });
+          }}
         />
       )}
     </Card>

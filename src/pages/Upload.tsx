@@ -80,20 +80,25 @@ const Upload = () => {
         stage.id === 'processing' ? { ...stage, status: 'active' } : stage
       ));
       
-      // Trigger metadata extraction for uploaded images in background
-      for (const image of uploadedImages) {
+      // Wait for images to be available in context and trigger metadata extraction
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await loadDataFromDatabase();
+      
+      // Trigger metadata extraction for recently uploaded images in background
+      for (const image of uploadedImages.slice(-files.length)) {
         try {
           // Trigger Google Vision metadata extraction in background
-          await supabase.functions.invoke('google-vision-metadata', {
+          supabase.functions.invoke('google-vision-metadata', {
             body: {
               imageId: image.id,
-              imageUrl: image.url, // Use the image URL directly
+              imageUrl: image.url,
               features: ['labels', 'text', 'faces', 'objects', 'colors']
             }
+          }).catch(error => {
+            console.warn('Metadata extraction failed for image:', image.id, error);
           });
         } catch (error) {
           console.warn('Metadata extraction failed for image:', image.id, error);
-          // Don't fail the upload process if metadata extraction fails
         }
       }
       
@@ -118,7 +123,7 @@ const Upload = () => {
         stage.id === currentStage ? { ...stage, status: 'error', error: 'Failed' } : stage
       ));
     }
-  }, [handleImageUploadImmediate, navigate, currentStage]);
+  }, [handleImageUploadImmediate, navigate, currentStage, loadDataFromDatabase, uploadedImages]);
 
   const handleUploadComplete = useCallback(async (files: File[]) => {
     // Check if we need to show session dialog

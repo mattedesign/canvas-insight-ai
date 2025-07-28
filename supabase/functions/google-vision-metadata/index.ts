@@ -38,7 +38,18 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
     const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    
+    // Convert ArrayBuffer to base64 safely without stack overflow
+    const uint8Array = new Uint8Array(imageBuffer);
+    let binaryString = '';
+    const chunkSize = 8192; // Process in chunks to avoid stack overflow
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    const base64Image = btoa(binaryString);
     imageData = base64Image;
   } catch (error) {
     console.error('Error converting image to base64:', error);
