@@ -116,12 +116,16 @@ const Projects = () => {
     try {
       const project = await ProjectService.createNewProject();
       
+      // Create a default blank canvas state for the new project
+      const defaultState = CanvasStateService.createDefaultState(project.id, 'Quick Start Session');
+      await CanvasStateService.saveCanvasState(project.id, defaultState);
+      
       toast({
         title: "New project created",
         description: `${project.name} is ready for analysis.`,
       });
       
-      navigate('/upload');
+      navigate('/canvas');
     } catch (error) {
       console.error('Failed to create project:', error);
       toast({
@@ -141,7 +145,7 @@ const Projects = () => {
   };
 
   const handleAddImages = () => {
-    navigate('/upload');
+    navigate('/canvas');
   };
 
   const handleNavigateToPreviousAnalyses = () => {

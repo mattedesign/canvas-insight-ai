@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   BarChart3, 
-  Plus, 
   Folder, 
   Bell, 
   Crown, 
@@ -46,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
   const { signOut, user } = useAuth();
   
-  const isOnUploadScreen = location.pathname === '/upload';
+  
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   const isOnProjects = location.pathname === '/projects';
   const isOnAnalytics = location.pathname === '/analytics';
@@ -55,7 +54,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
-    { icon: Plus, label: 'Add', active: isOnUploadScreen },
     { icon: Folder, label: 'Previous', active: isOnProjects },
     { icon: Activity, label: 'Analytics', active: isOnAnalytics },
     { icon: Brain, label: 'Test OpenAI', active: isOnTestOpenAI },
@@ -78,7 +76,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             key={index}
             onClick={
               item.label === 'Dashboard' ? () => navigate('/dashboard') :
-              item.label === 'Add' ? () => navigate('/upload') :
               item.label === 'Previous' ? () => navigate('/projects') :
               item.label === 'Analytics' ? () => navigate('/analytics') :
               item.label === 'Test OpenAI' ? () => navigate('/test-openai') :
@@ -93,7 +90,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             `}
             title={
               item.label === 'Dashboard' ? 'Dashboard' :
-              item.label === 'Add' ? 'Add Images' :
               item.label === 'Previous' ? 'Previous Analyses' :
               item.label === 'Analytics' ? 'System Analytics' :
               item.label === 'Test OpenAI' ? 'Test OpenAI Analysis' :

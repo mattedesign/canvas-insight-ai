@@ -26,7 +26,7 @@ const Dashboard = () => {
   const { metrics, loading, error, refreshMetrics } = useDashboardMetrics();
 
   const handleAddImages = () => {
-    navigate('/upload');
+    navigate('/canvas');
   };
 
   const handleNavigateToPreviousAnalyses = () => {
