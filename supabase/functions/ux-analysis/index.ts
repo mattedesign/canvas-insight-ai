@@ -49,17 +49,16 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
     const { data: imageRecord, error: imageError } = await supabase
       .from('images')
       .select('id')
-      .eq('filename', payload.imageId)
+      .eq('id', payload.imageId) // Search by ID directly since we now store it correctly
       .single();
 
-    let dbImageId;
+    let dbImageId = payload.imageId; // Use the provided imageId directly
     if (imageError || !imageRecord) {
-      console.log('Image record not found, using imageId as-is');
-      // If it's already a UUID, use it; otherwise generate one
-      dbImageId = payload.imageId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) 
-        ? payload.imageId 
-        : crypto.randomUUID();
+      console.log('Image record not found in database, imageId:', payload.imageId);
+      console.log('Database error:', imageError);
+      // Image should exist if uploaded properly, but continue with analysis anyway
     } else {
+      console.log('Found image record:', imageRecord.id);
       dbImageId = imageRecord.id;
     }
 
@@ -105,7 +104,34 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
     };
 
   } catch (error) {
-    console.error('Error in analysis, falling back to mock:', error);
+    console.error('CRITICAL ERROR in analysis pipeline:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      payload: payload
+    });
+    
+    // Still store the error analysis in database for debugging
+    try {
+      await supabase
+        .from('ux_analyses')
+        .insert({
+          image_id: payload.imageId,
+          user_context: payload.userContext || '',
+          visual_annotations: [],
+          suggestions: [],
+          summary: { error: true, message: error.message },
+          metadata: { 
+            error: true, 
+            fallbackToMock: true, 
+            timestamp: new Date().toISOString(),
+            originalError: error.message
+          }
+        });
+    } catch (dbError) {
+      console.error('Failed to store error analysis:', dbError);
+    }
+    
     return generateMockAnalysisResponse(payload);
   }
 }
@@ -117,19 +143,28 @@ async function selectBestModel(): Promise<string> {
   const hasStabilityAI = !!Deno.env.get('STABILITY_API_KEY');
   const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
   
-  console.log('Available AI models:', { hasGoogleVision, hasClaudeVision, hasStabilityAI, hasOpenAI });
+  console.log('API key availability check:');
+  console.log('- Google Vision API Key:', hasGoogleVision ? 'Available' : 'Missing');
+  console.log('- Claude/Anthropic API Key:', hasClaudeVision ? 'Available' : 'Missing');
+  console.log('- Stability AI API Key:', hasStabilityAI ? 'Available' : 'Missing');
+  console.log('- OpenAI API Key:', hasOpenAI ? 'Available' : 'Missing');
   
-  // Priority order: Claude (best for UX analysis) > Stability AI (concept generation) > Google Vision (object detection) > OpenAI (text-based)
-  if (hasClaudeVision) {
-    return 'claude-vision';
-  } else if (hasStabilityAI) {
-    return 'stability-ai';
-  } else if (hasGoogleVision) {
-    return 'google-vision';
-  } else if (hasOpenAI) {
+  // Priority order: OpenAI (most reliable) > Claude > Google Vision > Stability AI
+  if (hasOpenAI) {
+    console.log('Selected AI model: OpenAI');
     return 'openai';
+  } else if (hasClaudeVision) {
+    console.log('Selected AI model: Claude Vision');
+    return 'claude-vision';
+  } else if (hasGoogleVision) {
+    console.log('Selected AI model: Google Vision');
+    return 'google-vision';
+  } else if (hasStabilityAI) {
+    console.log('Selected AI model: Stability AI');
+    return 'stability-ai';
   }
   
+  console.log('No AI models available, falling back to mock data');
   return 'mock';
 }
 

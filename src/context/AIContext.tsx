@@ -57,6 +57,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     try {
       console.log('Starting AI analysis with model:', selectedAIModel);
+      console.log('Analysis payload:', { imageId, imageUrl, imageName, userContext });
       
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
@@ -70,6 +71,8 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           aiModel: selectedAIModel
         }
       });
+      
+      console.log('Edge function response:', { data, error });
 
       if (error) {
         console.error('AI analysis error:', error);
@@ -81,10 +84,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
 
       console.log('AI analysis completed successfully');
+      console.log('Analysis result metadata:', data.data?.metadata);
+      
+      const isRealAI = data.data?.metadata?.aiGenerated === true;
+      const analysisType = isRealAI ? 'Real AI Analysis' : 'Mock Analysis';
       
       toast({
         title: "Analysis Complete",
-        description: `${modelName} has finished analyzing your image.`,
+        description: `${modelName} analysis complete (${analysisType})`,
       });
 
       return data.data;

@@ -179,12 +179,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let imageUrl = URL.createObjectURL(file);
       
-      // If user is authenticated, upload to Supabase Storage
+      // If user is authenticated, upload to Supabase Storage AND create DB record
       if (user) {
         try {
           const { data: { user: authUser } } = await supabase.auth.getUser();
           if (authUser) {
+            const projectId = await ProjectService.getCurrentProject();
             const fileName = `${authUser.id}/${imageId}/${file.name}`;
+            
+            // Upload to storage
             const { error: uploadError } = await supabase.storage
               .from('images')
               .upload(fileName, file);
@@ -194,6 +197,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 .from('images')
                 .getPublicUrl(fileName);
               imageUrl = urlData.publicUrl;
+              
+              // Create image record in database immediately 
+              const { error: dbError } = await supabase
+                .from('images')
+                .insert({
+                  id: imageId,
+                  project_id: projectId,
+                  filename: imageId, // Use imageId as filename for edge function compatibility
+                  original_name: file.name,
+                  storage_path: fileName,
+                  dimensions: dimensions,
+                  file_size: file.size,
+                  file_type: file.type
+                });
+                
+              if (dbError) {
+                console.error('Failed to create image record:', dbError);
+              } else {
+                console.log('Image record created successfully:', imageId);
+              }
             }
           }
         } catch (error) {
