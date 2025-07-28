@@ -100,8 +100,8 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
     }
 
-    // STAGE 3: Comprehensive UX Analysis (Claude Opus 4)
-    console.log('Stage 3: Comprehensive UX analysis with Claude Opus 4');
+    // STAGE 3: Comprehensive UX Analysis (Claude Sonnet)
+    console.log('Stage 3: Comprehensive UX analysis with Claude Sonnet');
     let finalAnalysisResult;
     try {
       finalAnalysisResult = await performClaudeOpus4ComprehensiveAnalysis(payload, metadataResult, visionAnalysisResult);
@@ -345,7 +345,13 @@ async function performClaudeVisionAnalysisWithMetadata(payload: any, metadata: V
   
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!anthropicApiKey) {
-    throw new Error('Anthropic API key not available');
+    console.error('ANTHROPIC_API_KEY is not configured in Supabase secrets');
+    throw new Error('Anthropic API key not available - please configure ANTHROPIC_API_KEY in Supabase Edge Function secrets');
+  }
+  
+  if (!anthropicApiKey.startsWith('sk-ant-')) {
+    console.error('Invalid ANTHROPIC_API_KEY format');
+    throw new Error('Invalid Anthropic API key format - should start with sk-ant-');
   }
 
   const metadataContext = `
@@ -364,7 +370,7 @@ Labels: ${metadata.labels?.map(l => l.name).join(', ') || 'None'}
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-sonnet-20241022', // Using stable model version
         max_tokens: 2000,
         messages: [
           {
@@ -401,7 +407,12 @@ Return JSON with:
     });
 
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Claude API error: ${response.status} - ${errorText}`);
+      if (response.status === 401) {
+        throw new Error('Claude API authentication failed - please check your ANTHROPIC_API_KEY in Supabase secrets');
+      }
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -532,7 +543,13 @@ async function performClaudeOpus4ComprehensiveAnalysis(payload: any, metadata: V
   
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!anthropicApiKey) {
-    throw new Error('Anthropic API key not available');
+    console.error('ANTHROPIC_API_KEY is not configured in Supabase secrets');
+    throw new Error('Anthropic API key not available - please configure ANTHROPIC_API_KEY in Supabase Edge Function secrets');
+  }
+  
+  if (!anthropicApiKey.startsWith('sk-ant-')) {
+    console.error('Invalid ANTHROPIC_API_KEY format');
+    throw new Error('Invalid Anthropic API key format - should start with sk-ant-');
   }
 
   const domainContext = detectDomainFromContext(payload.userContext, payload.imageName);
@@ -552,7 +569,7 @@ Initial Concerns: ${Array.isArray(visionAnalysis.initialConcerns) ? visionAnalys
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-20250514',
+        model: 'claude-3-5-sonnet-20241022', // Using proven stable model
         max_tokens: 3000,
         messages: [
           {
@@ -627,7 +644,12 @@ Focus on actionable, specific improvements for ${domainContext.domain} contexts.
     });
 
     if (!response.ok) {
-      throw new Error(`Claude Opus 4 API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Claude Opus 4 API error: ${response.status} - ${errorText}`);
+      if (response.status === 401) {
+        throw new Error('Claude Opus 4 API authentication failed - please check your ANTHROPIC_API_KEY in Supabase secrets');
+      }
+      throw new Error(`Claude Opus 4 API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
