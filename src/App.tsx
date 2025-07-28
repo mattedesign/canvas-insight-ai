@@ -14,6 +14,7 @@ import Canvas from "./pages/Canvas";
 import Projects from "./pages/Projects";
 import Analytics from "./pages/Analytics";
 import Auth from "./pages/Auth";
+import TestOpenAI from "./pages/TestOpenAI";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,11 @@ const App = () => (
               <Route path="/analytics" element={
                 <ProtectedRoute>
                   <Analytics />
+                </ProtectedRoute>
+              } />
+              <Route path="/test-openai" element={
+                <ProtectedRoute>
+                  <TestOpenAI />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

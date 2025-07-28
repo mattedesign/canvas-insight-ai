@@ -9,7 +9,8 @@ import {
   User,
   Activity,
   Trash2,
-  LogOut
+  LogOut,
+  Brain
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { useAuth } from '@/context/AuthContext';
@@ -49,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   const isOnProjects = location.pathname === '/projects';
   const isOnAnalytics = location.pathname === '/analytics';
+  const isOnTestOpenAI = location.pathname === '/test-openai';
   
   
   const sidebarIcons = [
@@ -56,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { icon: Plus, label: 'Add', active: isOnUploadScreen },
     { icon: Folder, label: 'Previous', active: isOnProjects },
     { icon: Activity, label: 'Analytics', active: isOnAnalytics },
+    { icon: Brain, label: 'Test OpenAI', active: isOnTestOpenAI },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: false },
     { icon: User, label: 'Profile', active: false },
@@ -78,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Add' ? () => navigate('/upload') :
               item.label === 'Previous' ? () => navigate('/projects') :
               item.label === 'Analytics' ? () => navigate('/analytics') :
+              item.label === 'Test OpenAI' ? () => navigate('/test-openai') :
               undefined
             }
             className={`
@@ -92,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Add' ? 'Add Images' :
               item.label === 'Previous' ? 'Previous Analyses' :
               item.label === 'Analytics' ? 'System Analytics' :
+              item.label === 'Test OpenAI' ? 'Test OpenAI Analysis' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :
               item.label === 'Profile' ? 'Profile' :
