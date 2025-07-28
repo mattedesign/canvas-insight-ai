@@ -55,20 +55,83 @@ const Upload = () => {
     checkExistingData();
   }, []);
 
-  // Debounced metadata extraction to prevent API overload
-  const debounceMetadataExtraction = useCallback(() => {
-    return debounce((imageId: string, imageUrl: string) => {
-      supabase.functions.invoke('google-vision-metadata', {
+  // Enhanced metadata extraction with proper URL handling and retry mechanism
+  const extractMetadataForImage = useCallback(async (imageId: string, retryCount = 0): Promise<boolean> => {
+    const maxRetries = 3;
+    
+    try {
+      // First, get the latest image data from database to ensure we have the correct storage URL
+      const { data: imageData, error: imageError } = await supabase
+        .from('images')
+        .select('id, storage_path, metadata')
+        .eq('id', imageId)
+        .single();
+
+      if (imageError) {
+        console.error('Failed to fetch image data for metadata extraction:', imageError);
+        return false;
+      }
+
+      // Skip if metadata already exists
+      if (imageData?.metadata && typeof imageData.metadata === 'object' && 
+          (imageData.metadata as any)?.provider === 'google-vision') {
+        console.log('Metadata already exists for image:', imageId);
+        return true;
+      }
+
+      // Construct proper Supabase storage URL
+      if (!imageData?.storage_path) {
+        console.warn('No storage path found for image:', imageId);
+        return false;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(imageData.storage_path);
+
+      const imageUrl = urlData.publicUrl;
+      
+      console.log('Extracting metadata for image:', imageId, 'with URL:', imageUrl);
+
+      const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
         body: {
           imageId,
           imageUrl,
           features: ['labels', 'text', 'faces', 'objects', 'colors']
         }
-      }).catch(error => {
-        console.warn('Metadata extraction failed for image:', imageId, error);
       });
-    }, 1000); // 1 second debounce to prevent spam
-  }, [debounce]);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success) {
+        console.log('Metadata extraction successful for image:', imageId);
+        return true;
+      } else {
+        throw new Error(data?.error || 'Metadata extraction failed');
+      }
+    } catch (error) {
+      console.error(`Metadata extraction failed for image ${imageId} (attempt ${retryCount + 1}):`, error);
+      
+      // Retry mechanism with exponential backoff
+      if (retryCount < maxRetries) {
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+        console.log(`Retrying metadata extraction for image ${imageId} in ${delay}ms`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return extractMetadataForImage(imageId, retryCount + 1);
+      }
+      
+      console.warn(`Failed to extract metadata for image ${imageId} after ${maxRetries + 1} attempts`);
+      return false;
+    }
+  }, []);
+
+  // Debounced metadata extraction to prevent API overload
+  const debounceMetadataExtraction = useCallback(() => {
+    return debounce(extractMetadataForImage, 1000); // 1 second debounce to prevent spam
+  }, [debounce, extractMetadataForImage]);
 
   const processUploadWithProgress = useCallback(async (files: File[]) => {
     setUploadError('');
@@ -98,17 +161,41 @@ const Upload = () => {
         stage.id === 'processing' ? { ...stage, status: 'active' } : stage
       ));
       
-      // Wait for images to be available in context and trigger metadata extraction
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for upload to complete and images to be saved to database
+      await new Promise(resolve => setTimeout(resolve, 2000));
       await loadDataFromDatabase();
       
-      // Debounced metadata extraction to prevent API spam
-      const debouncedMetadataExtraction = debounceMetadataExtraction();
+      // Get uploaded image IDs to extract metadata for
+      const fileNames = files.map(f => f.name);
       
-      // Trigger metadata extraction for recently uploaded images in background
-      for (const image of uploadedImages.slice(-files.length)) {
-        debouncedMetadataExtraction(image.id, image.url);
-      }
+      // Trigger metadata extraction with proper database lookup
+      const metadataPromises = files.map(async (file, index) => {
+        // Wait a bit longer for each subsequent image to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, index * 500));
+        
+        // Find the corresponding uploaded image by name
+        const { data: imageData } = await supabase
+          .from('images')
+          .select('id, storage_path')
+          .eq('original_name', file.name)
+          .order('uploaded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (imageData?.id && imageData?.storage_path) {
+          return extractMetadataForImage(imageData.id);
+        } else {
+          console.warn('Could not find database record for uploaded file:', file.name);
+          return false;
+        }
+      });
+      
+      // Execute all metadata extractions (they'll be properly debounced internally)
+      Promise.allSettled(metadataPromises).then(results => {
+        const successful = results.filter(r => r.status === 'fulfilled' && r.value).length;
+        const failed = results.length - successful;
+        console.log(`Metadata extraction results: ${successful} successful, ${failed} failed`);
+      });
       
       setAnalysisStages(prev => prev.map(stage => 
         stage.id === 'processing' ? { ...stage, status: 'completed', progress: 100 } : stage
@@ -131,7 +218,7 @@ const Upload = () => {
         stage.id === currentStage ? { ...stage, status: 'error', error: 'Failed' } : stage
       ));
     }
-  }, [handleImageUploadImmediate, navigate, currentStage, loadDataFromDatabase, uploadedImages]);
+  }, [handleImageUploadImmediate, navigate, currentStage, loadDataFromDatabase, extractMetadataForImage]);
 
   const handleUploadComplete = useCallback(async (files: File[]) => {
     // Check if we need to show session dialog

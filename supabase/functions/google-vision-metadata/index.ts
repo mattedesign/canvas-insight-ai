@@ -27,8 +27,11 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
   const GOOGLE_VISION_API_KEY = Deno.env.get('GOOGLE_VISION_API_KEY');
   
   if (!GOOGLE_VISION_API_KEY) {
+    console.error('Google Vision API key not configured in environment variables');
     throw new Error('Google Vision API key not configured');
   }
+
+  console.log('Starting Google Vision API call for URL:', imageUrl.substring(0, 100) + '...');
 
   // Convert image URL to base64 if needed
   let imageData: string;
@@ -110,12 +113,24 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Google Vision API error:', errorText);
-    throw new Error(`Google Vision API error: ${response.status}`);
+    console.error('Google Vision API error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText,
+      imageUrl: imageUrl.substring(0, 100) + '...'
+    });
+    throw new Error(`Google Vision API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   const annotations = data.responses[0];
+
+  if (annotations.error) {
+    console.error('Google Vision API returned error:', annotations.error);
+    throw new Error(`Google Vision API error: ${annotations.error.message || 'Unknown error'}`);
+  }
+
+  console.log('Google Vision API response received successfully');
 
   // Extract metadata in standardized format
   const metadata: VisionMetadata = {
@@ -175,7 +190,8 @@ serve(async (req) => {
       .eq('id', imageId)
       .single();
 
-    if (existingImage?.metadata?.provider === 'google-vision') {
+    if (existingImage?.metadata && typeof existingImage.metadata === 'object' && 
+        (existingImage.metadata as any)?.provider === 'google-vision') {
       console.log('Metadata already exists for image:', imageId);
       return new Response(
         JSON.stringify({
