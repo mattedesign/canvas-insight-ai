@@ -9,18 +9,98 @@ interface MetricsOverviewProps {
 }
 
 export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metrics: dashboardMetrics }) => {
-  // Use database metrics if available, otherwise calculate from analyses
-  const totalSuggestions = dashboardMetrics?.totalSuggestions || analyses.reduce((sum, analysis) => sum + analysis.suggestions.length, 0);
-  const avgScore = dashboardMetrics?.averageScore || Math.round(
-    analyses.reduce((sum, analysis) => sum + analysis.summary.overallScore, 0) / analyses.length
+  // Early return with safe defaults if no analyses
+  if (!analyses || analyses.length === 0) {
+    const metricsData = [
+      {
+        title: 'Overall UX Score',
+        value: 0,
+        suffix: '/100',
+        icon: Target,
+        trend: 'down' as const,
+        trendValue: '0%',
+        description: 'No designs analyzed yet'
+      },
+      {
+        title: 'Total Issues Found',
+        value: 0,
+        icon: AlertTriangle,
+        trend: 'down' as const,
+        trendValue: '0%',
+        description: 'No issues found yet'
+      },
+      {
+        title: 'High Impact Items',
+        value: 0,
+        icon: Zap,
+        trend: 'up' as const,
+        trendValue: '0',
+        description: 'No suggestions yet'
+      },
+      {
+        title: 'Accessibility Score',
+        value: 0,
+        suffix: '/100',
+        icon: CheckCircle,
+        trend: 'down' as const,
+        trendValue: '0%',
+        description: 'No accessibility data yet'
+      }
+    ];
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricsData.map((metric, index) => (
+          <div key={index} className="bg-card border border-border rounded-lg p-6 shadow-card">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">{metric.title}</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold">
+                    {metric.value}
+                  </span>
+                  {metric.suffix && (
+                    <span className="text-lg text-muted-foreground">{metric.suffix}</span>
+                  )}
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+                <metric.icon className="w-4 h-4" />
+              </div>
+            </div>
+            
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{metric.description}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Use database metrics if available, otherwise calculate from analyses with safe access
+  const totalSuggestions = dashboardMetrics?.totalSuggestions || 
+    analyses.reduce((sum, analysis) => sum + (analysis.suggestions?.length || 0), 0);
+  
+  const avgScore = dashboardMetrics?.averageScore || (
+    analyses.length > 0 ? Math.round(
+      analyses.reduce((sum, analysis) => sum + (analysis.summary?.overallScore || 0), 0) / analyses.length
+    ) : 0
   );
-  const totalIssues = dashboardMetrics?.totalIssues || analyses.reduce((sum, analysis) => sum + analysis.summary.keyIssues.length, 0);
-  const accessibilityScore = dashboardMetrics?.categoryScores.accessibility || Math.round(
-    analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.accessibility, 0) / analyses.length
+  
+  const totalIssues = dashboardMetrics?.totalIssues || 
+    analyses.reduce((sum, analysis) => sum + (analysis.summary?.keyIssues?.length || 0), 0);
+  
+  const accessibilityScore = dashboardMetrics?.categoryScores?.accessibility || (
+    analyses.length > 0 ? Math.round(
+      analyses.reduce((sum, analysis) => sum + (analysis.summary?.categoryScores?.accessibility || 0), 0) / analyses.length
+    ) : 0
   );
-  const highImpactSuggestions = dashboardMetrics?.issueDistribution.high || analyses.reduce((sum, analysis) => 
-    sum + analysis.suggestions.filter(s => s.impact === 'high').length, 0
-  );
+  
+  const highImpactSuggestions = dashboardMetrics?.issueDistribution?.high || 
+    analyses.reduce((sum, analysis) => 
+      sum + (analysis.suggestions?.filter(s => s.impact === 'high').length || 0), 0
+    );
 
   const metricsData = [
     {
