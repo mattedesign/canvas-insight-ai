@@ -30,6 +30,14 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
 
+  // Handle auto-creation for new users (hooks must be called unconditionally)
+  React.useEffect(() => {
+    if (!hasPreviousData && open) {
+      onCreateNew();
+      onOpenChange(false);
+    }
+  }, [open, onCreateNew, onOpenChange, hasPreviousData]);
+
   const handleCreateNew = () => {
     onCreateNew(
       projectName.trim() || undefined,
@@ -45,14 +53,8 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({
     onOpenChange(false);
   };
 
+  // Don't render dialog for new users
   if (!hasPreviousData) {
-    // If no previous data, just create new without dialog
-    React.useEffect(() => {
-      if (open) {
-        onCreateNew();
-        onOpenChange(false);
-      }
-    }, [open, onCreateNew, onOpenChange]);
     return null;
   }
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle, AlertCircle, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, CheckCircle, AlertCircle, Upload, RefreshCw } from 'lucide-react';
 
 interface UploadStatusIndicatorProps {
   isUploading: boolean;
@@ -9,6 +10,9 @@ interface UploadStatusIndicatorProps {
   currentFile?: string;
   error?: string;
   success?: boolean;
+  stage?: string;
+  onRetry?: () => void;
+  onCancel?: () => void;
 }
 
 export const UploadStatusIndicator: React.FC<UploadStatusIndicatorProps> = ({
@@ -16,7 +20,10 @@ export const UploadStatusIndicator: React.FC<UploadStatusIndicatorProps> = ({
   progress = 0,
   currentFile,
   error,
-  success
+  success,
+  stage,
+  onRetry,
+  onCancel
 }) => {
   if (!isUploading && !error && !success) {
     return null;
@@ -31,10 +38,18 @@ export const UploadStatusIndicator: React.FC<UploadStatusIndicatorProps> = ({
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               <div className="flex-1">
                 <div className="text-sm font-medium">
-                  {currentFile ? `Processing ${currentFile}...` : 'Uploading files...'}
+                  {stage || (currentFile ? `Processing ${currentFile}...` : 'Uploading files...')}
                 </div>
                 <Progress value={progress} className="mt-2 h-2" />
+                <div className="text-xs text-muted-foreground mt-1">
+                  {Math.round(progress)}% complete
+                </div>
               </div>
+              {onCancel && (
+                <Button variant="outline" size="sm" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
             </>
           )}
           
@@ -58,6 +73,12 @@ export const UploadStatusIndicator: React.FC<UploadStatusIndicatorProps> = ({
                   {error}
                 </div>
               </div>
+              {onRetry && (
+                <Button variant="outline" size="sm" onClick={onRetry} className="ml-2">
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Retry
+                </Button>
+              )}
             </>
           )}
         </div>

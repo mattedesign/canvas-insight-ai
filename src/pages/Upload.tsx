@@ -4,6 +4,7 @@ import { ImageUploadZone } from '@/components/ImageUploadZone';
 import { UploadErrorBoundary } from '@/components/UploadErrorBoundary';
 import { AnalysisStatusIndicator } from '@/components/AnalysisStatusIndicator';
 import { UploadStatusIndicator } from '@/components/UploadStatusIndicator';
+import { EnhancedUploadProgress, createAnalysisStages } from '@/components/EnhancedUploadProgress';
 import { NewSessionDialog } from '@/components/NewSessionDialog';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,10 @@ const Upload = () => {
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [hasPreviousData, setHasPreviousData] = useState(false);
+  const [analysisStages, setAnalysisStages] = useState(createAnalysisStages());
+  const [currentStage, setCurrentStage] = useState<string>('');
+  const [overallProgress, setOverallProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string>('');
 
   // Check for existing data on mount
   useEffect(() => {
@@ -45,6 +50,64 @@ const Upload = () => {
     checkExistingData();
   }, []);
 
+  const processUploadWithProgress = useCallback(async (files: File[]) => {
+    setUploadError('');
+    setOverallProgress(0);
+    
+    const stages = createAnalysisStages();
+    setAnalysisStages(stages);
+    
+    try {
+      // Stage 1: Upload
+      setCurrentStage('upload');
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === 'upload' ? { ...stage, status: 'active' } : stage
+      ));
+      
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 10) {
+        setAnalysisStages(prev => prev.map(stage => 
+          stage.id === 'upload' ? { ...stage, progress: i } : stage
+        ));
+        setOverallProgress(i * 0.25);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === 'upload' ? { ...stage, status: 'completed' } : stage
+      ));
+      
+      // Stage 2: Processing
+      setCurrentStage('processing');
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === 'processing' ? { ...stage, status: 'active' } : stage
+      ));
+      
+      // Stage 3: Analysis
+      setCurrentStage('analysis');
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === 'analysis' ? { ...stage, status: 'active' } : stage
+      ));
+      
+      // Call the actual upload function
+      await handleImageUpload(files);
+      
+      // Complete all stages
+      setAnalysisStages(prev => prev.map(stage => ({ ...stage, status: 'completed', progress: 100 })));
+      setOverallProgress(100);
+      
+      setTimeout(() => {
+        navigate('/canvas');
+      }, 1000);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      setAnalysisStages(prev => prev.map(stage => 
+        stage.id === currentStage ? { ...stage, status: 'error', error: 'Failed' } : stage
+      ));
+    }
+  }, [handleImageUpload, navigate, currentStage]);
+
   const handleUploadComplete = useCallback(async (files: File[]) => {
     // Check if we need to show session dialog
     if (hasPreviousData) {
@@ -54,15 +117,8 @@ const Upload = () => {
     }
 
     // No previous data, proceed directly
-    try {
-      await handleImageUpload(files);
-      setTimeout(() => {
-        navigate('/canvas');
-      }, 100);
-    } catch (error) {
-      console.error('Upload failed:', error);
-    }
-  }, [handleImageUpload, navigate, hasPreviousData]);
+    await processUploadWithProgress(files);
+  }, [processUploadWithProgress, hasPreviousData]);
 
   const handleCreateNewProject = useCallback(async (name?: string, description?: string) => {
     try {
@@ -72,33 +128,43 @@ const Upload = () => {
       // Clear current state
       handleClearCanvas();
       
-      // Process the upload
+      // Process the upload with progress tracking
       if (pendingFiles.length > 0) {
-        await handleImageUpload(pendingFiles);
+        await processUploadWithProgress(pendingFiles);
         setPendingFiles([]);
-        setTimeout(() => {
-          navigate('/canvas');
-        }, 100);
       }
     } catch (error) {
       console.error('Failed to create new project:', error);
+      setUploadError('Failed to create new project');
     }
-  }, [pendingFiles, handleImageUpload, handleClearCanvas, navigate]);
+  }, [pendingFiles, processUploadWithProgress, handleClearCanvas]);
 
   const handleAddToCurrent = useCallback(async () => {
     try {
-      // Process the upload in current project
+      // Process the upload in current project with progress tracking
       if (pendingFiles.length > 0) {
-        await handleImageUpload(pendingFiles);
+        await processUploadWithProgress(pendingFiles);
         setPendingFiles([]);
-        setTimeout(() => {
-          navigate('/canvas');
-        }, 100);
       }
     } catch (error) {
       console.error('Failed to add to current project:', error);
+      setUploadError('Failed to add to current project');
     }
-  }, [pendingFiles, handleImageUpload, navigate]);
+  }, [pendingFiles, processUploadWithProgress]);
+
+  const handleRetryUpload = useCallback(() => {
+    if (pendingFiles.length > 0) {
+      processUploadWithProgress(pendingFiles);
+    }
+  }, [pendingFiles, processUploadWithProgress]);
+
+  const handleCancelUpload = useCallback(() => {
+    setOverallProgress(0);
+    setCurrentStage('');
+    setAnalysisStages(createAnalysisStages());
+    setUploadError('');
+    setPendingFiles([]);
+  }, []);
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
@@ -146,12 +212,20 @@ const Upload = () => {
       <div className="flex-1">
         <div className="h-full flex flex-col items-center justify-center p-8 gap-6">
           <AnalysisStatusIndicator />
-          <UploadStatusIndicator 
-            isUploading={isUploading}
-            progress={0} // TODO: Add upload progress tracking
+          <EnhancedUploadProgress
+            stages={analysisStages}
+            currentStage={currentStage}
+            overallProgress={overallProgress}
+            isActive={overallProgress > 0 && overallProgress < 100}
+            onCancel={handleCancelUpload}
+            onRetry={handleRetryUpload}
+            error={uploadError}
           />
           <UploadErrorBoundary>
-            <ImageUploadZone onImageUpload={handleUploadComplete} isUploading={isUploading} />
+            <ImageUploadZone 
+              onImageUpload={handleUploadComplete} 
+              isUploading={overallProgress > 0 && overallProgress < 100}
+            />
           </UploadErrorBoundary>
         </div>
       </div>
