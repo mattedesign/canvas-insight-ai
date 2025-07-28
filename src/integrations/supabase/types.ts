@@ -462,6 +462,7 @@ export type Database = {
           file_type: string | null
           filename: string
           id: string
+          metadata: Json | null
           original_name: string
           project_id: string | null
           security_scan_status: string | null
@@ -474,6 +475,7 @@ export type Database = {
           file_type?: string | null
           filename: string
           id?: string
+          metadata?: Json | null
           original_name: string
           project_id?: string | null
           security_scan_status?: string | null
@@ -486,6 +488,7 @@ export type Database = {
           file_type?: string | null
           filename?: string
           id?: string
+          metadata?: Json | null
           original_name?: string
           project_id?: string | null
           security_scan_status?: string | null
@@ -699,6 +702,7 @@ export type Database = {
       }
       ux_analyses: {
         Row: {
+          analysis_type: string | null
           counted_towards_limit: boolean | null
           created_at: string | null
           id: string
@@ -710,6 +714,7 @@ export type Database = {
           visual_annotations: Json
         }
         Insert: {
+          analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
           id?: string
@@ -721,6 +726,7 @@ export type Database = {
           visual_annotations?: Json
         }
         Update: {
+          analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
           id?: string
