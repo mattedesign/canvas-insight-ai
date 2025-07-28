@@ -3,11 +3,16 @@ import { Sidebar } from '@/components/Sidebar';
 import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { GroupEditDialog } from '@/components/GroupEditDialog';
+import { CanvasUploadZone } from '@/components/CanvasUploadZone';
+import { CanvasUploadProgress } from '@/components/CanvasUploadProgress';
 import { useAppContext } from '@/context/AppContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { DataMigrationService } from '@/services/DataMigrationService';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const Canvas = () => {
   const navigate = useNavigate();
@@ -42,24 +47,195 @@ const Canvas = () => {
 
   // Track if user has existing data in the database
   const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
+  
+  // Upload state
+  const [uploadStages, setUploadStages] = useState<Array<{
+    id: string;
+    name: string;
+    status: 'pending' | 'processing' | 'completed' | 'error';
+    progress: number;
+    error?: string;
+  }>>([]);
+  const [overallProgress, setOverallProgress] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [groupEditDialogOpen, setGroupEditDialogOpen] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  
+  const toast = useFilteredToast();
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
   }, [fileInputRef]);
 
+  // Debounced metadata extraction
+  const extractMetadataForImage = useCallback(async (imageId: string) => {
+    try {
+      const { data: imageData, error: imageError } = await supabase
+        .from('images')
+        .select('storage_path')
+        .eq('id', imageId)
+        .single();
+
+      if (imageError) throw imageError;
+
+      const publicUrl = `https://sdcmbfdtafkzpimwjpij.supabase.co/storage/v1/object/public/images/${imageData.storage_path}`;
+      
+      const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
+        body: { imageId, imageUrl: publicUrl }
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Metadata extraction failed:', error);
+      throw error;
+    }
+  }, []);
+
+  const { debounce } = useDebounce();
+  const debouncedMetadataExtraction = debounce(extractMetadataForImage, 300);
+
+  // Canvas upload implementation
+  const handleCanvasUpload = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsUploadingFiles(true);
+    setPendingFiles(files);
+    
+    const stages = files.map(file => ({
+      id: `${file.name}-${Date.now()}`,
+      name: file.name,
+      status: 'pending' as const,
+      progress: 0
+    }));
+    
+    setUploadStages(stages);
+    setOverallProgress(0);
+
+    try {
+      // Stage 1: Upload files to Supabase
+      const uploadedImages = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const stageId = stages[i].id;
+        
+        // Update stage to processing
+        setUploadStages(prev => prev.map(stage => 
+          stage.id === stageId 
+            ? { ...stage, status: 'processing', progress: 10 }
+            : stage
+        ));
+
+        try {
+          // Upload to Supabase
+          const result = await handleImageUpload([file]);
+          uploadedImages.push(result);
+          
+          // Update stage progress
+          setUploadStages(prev => prev.map(stage => 
+            stage.id === stageId 
+              ? { ...stage, progress: 50 }
+              : stage
+          ));
+          
+        } catch (error) {
+          console.error('Upload failed for:', file.name, error);
+          setUploadStages(prev => prev.map(stage => 
+            stage.id === stageId 
+              ? { ...stage, status: 'error', error: 'Upload failed' }
+              : stage
+          ));
+        }
+      }
+
+      // Stage 2: Extract metadata for uploaded images
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const uploadResult = uploadedImages[i];
+        const stageId = stages[i].id;
+        
+        try {
+          setUploadStages(prev => prev.map(stage => 
+            stage.id === stageId 
+              ? { ...stage, progress: 75 }
+              : stage
+          ));
+
+          // Extract metadata with retry
+          if (uploadResult?.id) {
+            debouncedMetadataExtraction(uploadResult.id);
+          }
+          
+          setUploadStages(prev => prev.map(stage => 
+            stage.id === stageId 
+              ? { ...stage, status: 'completed', progress: 100 }
+              : stage
+          ));
+        } catch (error) {
+          console.error('Metadata extraction failed:', error);
+          // Don't fail the whole process for metadata extraction
+          setUploadStages(prev => prev.map(stage => 
+            stage.id === stageId 
+              ? { ...stage, status: 'completed', progress: 100 }
+              : stage
+          ));
+        }
+      }
+
+      // Update overall progress
+      setOverallProgress(100);
+      
+      toast.toast({
+        category: 'success',
+        title: "Upload Complete",
+        description: `Successfully uploaded ${files.length} image${files.length > 1 ? 's' : ''}`,
+        variant: "default"
+      });
+      
+      // Clear upload state after delay
+      setTimeout(() => {
+        setUploadStages([]);
+        setPendingFiles([]);
+        setIsUploadingFiles(false);
+        setOverallProgress(0);
+      }, 3000);
+
+    } catch (error) {
+      console.error('Upload process failed:', error);
+      toast.toast({
+        category: 'error',
+        title: "Upload Failed",
+        description: "Upload failed. Please try again.",
+        variant: "destructive"
+      });
+      setIsUploadingFiles(false);
+    }
+  }, [handleImageUpload, extractMetadataForImage, toast]);
+
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
-      // Handle additional image uploads
+      handleCanvasUpload(files);
     }
     event.target.value = '';
+  }, [handleCanvasUpload]);
+
+  const handleCancelUpload = useCallback(() => {
+    setUploadStages([]);
+    setPendingFiles([]);
+    setIsUploadingFiles(false);
+    setOverallProgress(0);
   }, []);
+
+  const handleRetryUpload = useCallback(() => {
+    if (pendingFiles.length > 0) {
+      handleCanvasUpload(pendingFiles);
+    }
+  }, [pendingFiles, handleCanvasUpload]);
 
   const handleNavigateToPreviousAnalyses = () => {
     navigate('/projects');
@@ -133,11 +309,7 @@ const Canvas = () => {
     },
   });
 
-  // Only redirect if not loading and truly no data
-  if (uploadedImages.length === 0 && !isLoading && !hasExistingData) {
-    navigate('/upload');
-    return null;
-  }
+  // Don't redirect to upload anymore - show upload zone in canvas instead
 
   // Show loading state while data is being loaded
   if (isLoading) {
@@ -207,8 +379,24 @@ const Canvas = () => {
           onCreateFork={handleCreateFork}
           onOpenAnalysisPanel={handleOpenAnalysisPanel}
           onAnalysisComplete={handleAnalysisComplete}
-          onImageUpload={handleImageUpload}
+          onImageUpload={handleCanvasUpload}
           isGeneratingConcept={isGeneratingConcept}
+        />
+        
+        {/* Upload Zone - shows full overlay when no images, floating button when images exist */}
+        <CanvasUploadZone
+          onImageUpload={handleCanvasUpload}
+          isUploading={isUploadingFiles}
+          hasImages={uploadedImages.length > 0}
+        />
+        
+        {/* Upload Progress */}
+        <CanvasUploadProgress
+          stages={uploadStages}
+          overallProgress={overallProgress}
+          isVisible={uploadStages.length > 0}
+          onCancel={handleCancelUpload}
+          onRetry={handleRetryUpload}
         />
       </div>
       

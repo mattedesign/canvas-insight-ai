@@ -9,7 +9,6 @@ import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
-import Upload from "./pages/Upload";
 import Canvas from "./pages/Canvas";
 import Projects from "./pages/Projects";
 import Analytics from "./pages/Analytics";
@@ -38,11 +37,6 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/upload" element={
-                <ProtectedRoute>
-                  <Upload />
                 </ProtectedRoute>
               } />
               <Route path="/canvas" element={
