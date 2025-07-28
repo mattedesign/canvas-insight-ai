@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Canvas from "./pages/Canvas";
 import Projects from "./pages/Projects";
 import Analytics from "./pages/Analytics";
+import Subscription from "./pages/Subscription";
 import Auth from "./pages/Auth";
 import TestOpenAI from "./pages/TestOpenAI";
 import NotFound from "./pages/NotFound";
@@ -57,6 +58,11 @@ const App = () => (
               <Route path="/analytics" element={
                 <ProtectedRoute>
                   <Analytics />
+                </ProtectedRoute>
+              } />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <Subscription />
                 </ProtectedRoute>
               } />
               <Route path="/test-openai" element={

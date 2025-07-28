@@ -1,12 +1,12 @@
 import React from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { SummaryDashboard } from '@/components/summary/SummaryDashboard';
+import { SubscriptionManagement } from '@/components/SubscriptionManagement';
 import { useAppContext } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
-const Dashboard = () => {
+const Subscription = () => {
   const navigate = useNavigate();
   const { 
     uploadedImages, 
@@ -19,7 +19,7 @@ const Dashboard = () => {
   } = useAppContext();
   const { subscription } = useAuth();
 
-  const { metrics, loading, error, refreshMetrics } = useDashboardMetrics();
+  const { refreshMetrics } = useDashboardMetrics();
 
   const handleAddImages = () => {
     navigate('/canvas');
@@ -36,7 +36,7 @@ const Dashboard = () => {
         onAddImages={handleAddImages}
         uploadedImages={uploadedImages}
         analyses={analyses}
-        selectedView="summary"
+        selectedView="subscription"
         onViewChange={() => {}}
         selectedImageId={selectedImageId}
         onImageSelect={handleImageSelect}
@@ -49,7 +49,7 @@ const Dashboard = () => {
         {/* Page Header */}
         <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-14 items-center px-6 gap-4">
-            <h1 className="text-lg font-semibold">Analytics Dashboard</h1>
+            <h1 className="text-lg font-semibold">Subscription Management</h1>
             
             {/* Subscription Status Badge */}
             {subscription && (
@@ -67,17 +67,17 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          <SummaryDashboard 
-            analyses={analyses}
-            metrics={metrics}
-            loading={loading}
-            error={error}
-            onRefresh={refreshMetrics}
-          />
+          <div className="p-6">
+            <SubscriptionManagement 
+              onSubscriptionChange={() => {
+                refreshMetrics();
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default Dashboard;
+export default Subscription;

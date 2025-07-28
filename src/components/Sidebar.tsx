@@ -50,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isOnProjects = location.pathname === '/projects';
   const isOnAnalytics = location.pathname === '/analytics';
   const isOnTestOpenAI = location.pathname === '/test-openai';
+  const isOnSubscription = location.pathname === '/subscription';
   
   
   const sidebarIcons = [
@@ -58,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { icon: Activity, label: 'Analytics', active: isOnAnalytics },
     { icon: Brain, label: 'Test OpenAI', active: isOnTestOpenAI },
     { icon: Bell, label: 'Notifications', active: false },
-    { icon: Crown, label: 'Subscription', active: false },
+    { icon: Crown, label: 'Subscription', active: isOnSubscription },
     { icon: User, label: 'Profile', active: false },
   ];
 
@@ -79,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Previous' ? () => navigate('/projects') :
               item.label === 'Analytics' ? () => navigate('/analytics') :
               item.label === 'Test OpenAI' ? () => navigate('/test-openai') :
+              item.label === 'Subscription' ? () => navigate('/subscription') :
               undefined
             }
             className={`
