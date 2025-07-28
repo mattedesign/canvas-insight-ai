@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ImageUploadZone } from '@/components/ImageUploadZone';
 import { UploadErrorBoundary } from '@/components/UploadErrorBoundary';
 import { AnalysisStatusIndicator } from '@/components/AnalysisStatusIndicator';
 import { UploadStatusIndicator } from '@/components/UploadStatusIndicator';
+import { NewSessionDialog } from '@/components/NewSessionDialog';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -19,23 +21,84 @@ const Upload = () => {
     handleImageUpload,
     handleClearCanvas,
     handleImageSelect,
-    handleToggleAnnotations
+    handleToggleAnnotations,
+    loadDataFromDatabase
   } = useAppContext();
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [hasPreviousData, setHasPreviousData] = useState(false);
+
+  // Check for existing data on mount
+  useEffect(() => {
+    const checkExistingData = async () => {
+      try {
+        const hasData = await DataMigrationService.hasExistingData();
+        setHasPreviousData(hasData);
+      } catch (error) {
+        console.error('Error checking existing data:', error);
+        setHasPreviousData(false);
+      }
+    };
+    
+    checkExistingData();
+  }, []);
 
   const handleUploadComplete = useCallback(async (files: File[]) => {
+    // Check if we need to show session dialog
+    if (hasPreviousData) {
+      setPendingFiles(files);
+      setSessionDialogOpen(true);
+      return;
+    }
+
+    // No previous data, proceed directly
     try {
       await handleImageUpload(files);
-      // Add a small delay to ensure state updates are processed
       setTimeout(() => {
         navigate('/canvas');
       }, 100);
     } catch (error) {
       console.error('Upload failed:', error);
-      // Error handling is already done in AppContext
     }
-  }, [handleImageUpload, navigate]);
+  }, [handleImageUpload, navigate, hasPreviousData]);
+
+  const handleCreateNewProject = useCallback(async (name?: string, description?: string) => {
+    try {
+      // Create new project and switch to it
+      await ProjectService.createNewProject(name, description);
+      
+      // Clear current state
+      handleClearCanvas();
+      
+      // Process the upload
+      if (pendingFiles.length > 0) {
+        await handleImageUpload(pendingFiles);
+        setPendingFiles([]);
+        setTimeout(() => {
+          navigate('/canvas');
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Failed to create new project:', error);
+    }
+  }, [pendingFiles, handleImageUpload, handleClearCanvas, navigate]);
+
+  const handleAddToCurrent = useCallback(async () => {
+    try {
+      // Process the upload in current project
+      if (pendingFiles.length > 0) {
+        await handleImageUpload(pendingFiles);
+        setPendingFiles([]);
+        setTimeout(() => {
+          navigate('/canvas');
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Failed to add to current project:', error);
+    }
+  }, [pendingFiles, handleImageUpload, navigate]);
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
@@ -92,6 +155,14 @@ const Upload = () => {
           </UploadErrorBoundary>
         </div>
       </div>
+
+      <NewSessionDialog
+        open={sessionDialogOpen}
+        onOpenChange={setSessionDialogOpen}
+        onCreateNew={handleCreateNewProject}
+        onAddToCurrent={handleAddToCurrent}
+        hasPreviousData={hasPreviousData}
+      />
     </div>
   );
 };

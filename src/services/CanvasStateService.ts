@@ -14,6 +14,11 @@ export interface CanvasState {
     showAnnotations: boolean;
     tool: 'cursor' | 'draw';
   };
+  session_metadata?: {
+    created_at: string;
+    last_upload: string;
+    session_name?: string;
+  };
   updated_at?: string;
 }
 
@@ -128,7 +133,8 @@ export class CanvasStateService {
   }
 
   // Create default canvas state
-  static createDefaultState(projectId: string): CanvasState {
+  static createDefaultState(projectId: string, sessionName?: string): CanvasState {
+    const now = new Date().toISOString();
     return {
       project_id: projectId,
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -137,7 +143,27 @@ export class CanvasStateService {
       canvas_settings: {
         showAnnotations: true,
         tool: 'cursor'
+      },
+      session_metadata: {
+        created_at: now,
+        last_upload: now,
+        session_name: sessionName
       }
     };
+  }
+
+  // Clear canvas state for new session
+  static async clearCanvasState(projectId: string): Promise<void> {
+    try {
+      await supabase
+        .from('canvas_states' as any)
+        .delete()
+        .eq('project_id', projectId);
+
+      // Clear local cache for this project
+      this.clearCache(projectId);
+    } catch (error) {
+      console.error('Failed to clear canvas state:', error);
+    }
   }
 }

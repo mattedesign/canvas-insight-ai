@@ -111,6 +111,32 @@ export class ProjectService {
     return projectId;
   }
 
+  static async createNewProject(name?: string, description?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const projectName = name || `New Analysis ${new Date().toLocaleDateString()}`;
+    const project = await this.createProject(projectName, description);
+    
+    // Switch to the new project
+    this.currentProjectId = project.id;
+    return project;
+  }
+
+  static async clearCurrentProject() {
+    const projectId = await this.getCurrentProject();
+    
+    // Clear canvas state
+    const { error: canvasError } = await supabase
+      .from('canvas_states')
+      .delete()
+      .eq('project_id', projectId);
+    
+    if (canvasError) console.error('Failed to clear canvas state:', canvasError);
+    
+    return projectId;
+  }
+
   static resetProject() {
     this.currentProjectId = null;
   }
@@ -481,6 +507,51 @@ export class DataMigrationService {
       };
     } catch (error) {
       console.error('Loading from database failed:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Load data for a specific project
+  static async loadProjectData(projectId: string) {
+    try {
+      // Temporarily switch to the specified project
+      const currentProject = await ProjectService.getCurrentProject();
+      await ProjectService.switchToProject(projectId);
+      
+      const result = await this.loadAllFromDatabase();
+      
+      // Restore previous project
+      if (currentProject) {
+        await ProjectService.switchToProject(currentProject);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Loading project data failed:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Clear all data for current project
+  static async clearCurrentProjectData() {
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      
+      // Delete all data in reverse dependency order
+      await Promise.all([
+        supabase.from('group_analyses').delete().eq('image_groups.project_id', projectId),
+        supabase.from('group_images').delete().eq('image_groups.project_id', projectId),
+        supabase.from('ux_analyses').delete().eq('images.project_id', projectId),
+      ]);
+      
+      await Promise.all([
+        supabase.from('image_groups').delete().eq('project_id', projectId),
+        supabase.from('images').delete().eq('project_id', projectId),
+      ]);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Clearing project data failed:', error);
       return { success: false, error };
     }
   }

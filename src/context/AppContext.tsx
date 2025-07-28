@@ -33,7 +33,7 @@ interface AppContextType {
   // Actions
   handleImageUpload: (files: File[]) => Promise<void>;
   handleGenerateConcept: (analysisId: string) => Promise<void>;
-  handleClearCanvas: () => void;
+  handleClearCanvas: () => Promise<void>;
   handleImageSelect: (imageId: string) => void;
   handleToggleAnnotations: () => void;
   handleAnnotationClick: (annotationId: string) => void;
@@ -52,6 +52,7 @@ interface AppContextType {
   
   // Migration actions
   syncToDatabase: () => Promise<void>;
+  loadDataFromDatabase: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -416,13 +417,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [analyses]);
 
-  const handleClearCanvas = useCallback(() => {
-    setUploadedImages([]);
-    setAnalyses([]);
-    setGeneratedConcepts([]);
-    setSelectedImageId(null);
-    clearAnnotations();
-  }, [clearAnnotations]);
+  const handleClearCanvas = useCallback(async () => {
+    try {
+      // Clear canvas state in database
+      const projectId = await ProjectService.getCurrentProject();
+      await CanvasStateService.clearCanvasState(projectId);
+      
+      // Clear local state
+      setUploadedImages([]);
+      setAnalyses([]);
+      setGeneratedConcepts([]);
+      setImageGroups([]);
+      setGroupAnalysesWithPrompts([]);
+      setGroupAnalyses([]);
+      setGroupPromptSessions([]);
+      setSelectedImageId(null);
+      clearAnnotations();
+      
+      toast({
+        title: "Workspace cleared",
+        description: "Canvas has been cleared. Ready for new analysis.",
+      });
+    } catch (error) {
+      console.error('Failed to clear canvas:', error);
+      toast({
+        title: "Clear failed",
+        description: "Could not clear workspace. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [clearAnnotations, toast]);
 
   const handleImageSelect = useCallback((imageId: string) => {
     setSelectedImageId(imageId);
@@ -783,6 +807,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toggleAnnotation,
     clearAnnotations,
     syncToDatabase,
+    loadDataFromDatabase,
   };
 
   return (

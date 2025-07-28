@@ -5,6 +5,7 @@ import { FileImage, Clock, Users, Plus, Settings, MoreVertical } from 'lucide-re
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { ProjectService } from '@/services/DataMigrationService';
+import { CanvasStateService } from '@/services/CanvasStateService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -91,16 +92,41 @@ const Projects = () => {
   const handleSwitchProject = async (projectId: string) => {
     try {
       await ProjectService.switchToProject(projectId);
+      
+      // Clear canvas state for the new project
+      await CanvasStateService.clearCanvasState(projectId);
+      
       toast({
-        title: "Success",
-        description: "Switched to project successfully",
+        title: "Project switched",
+        description: "Switched to selected project. Canvas has been cleared.",
       });
+      
       navigate('/dashboard');
     } catch (error) {
-      console.error('Error switching project:', error);
+      console.error('Failed to switch project:', error);
       toast({
-        title: "Error",
-        description: "Failed to switch project",
+        title: "Switch failed",
+        description: "Could not switch to the selected project.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateQuickProject = async () => {
+    try {
+      const project = await ProjectService.createNewProject();
+      
+      toast({
+        title: "New project created",
+        description: `${project.name} is ready for analysis.`,
+      });
+      
+      navigate('/upload');
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      toast({
+        title: "Creation failed",
+        description: "Could not create new project.",
         variant: "destructive",
       });
     }
@@ -172,10 +198,16 @@ const Projects = () => {
               <h1 className="text-3xl font-bold text-foreground">Projects</h1>
               <p className="text-muted-foreground">View and manage your UX analysis projects</p>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCreateQuickProject}>
+                <Plus className="w-4 h-4 mr-2" />
+                Quick Start
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+            </div>
           </div>
 
           {/* Projects Grid */}
