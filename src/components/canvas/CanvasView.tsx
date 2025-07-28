@@ -103,6 +103,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
+  
+  // Debug log to check onImageUpload
+  console.log('CanvasView onImageUpload:', onImageUpload);
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   
   
@@ -1009,6 +1012,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setEdges={setEdges}
         setIsUpdating={setIsUpdating}
         uploadedImages={uploadedImages}
+        onImageUpload={onImageUpload}
       />
     </AnnotationOverlayProvider>
   );
@@ -1039,6 +1043,7 @@ interface CanvasContentProps {
   setEdges: any;
   setIsUpdating: any;
   uploadedImages: UploadedImage[];
+  onImageUpload?: (files: File[]) => void;
 }
 
 const CanvasContent: React.FC<CanvasContentProps> = ({
@@ -1065,6 +1070,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   setEdges,
   setIsUpdating,
   uploadedImages,
+  onImageUpload,
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
