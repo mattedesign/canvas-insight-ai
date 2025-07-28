@@ -96,14 +96,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (!user) {
       // Reset project ID when user logs out
       ProjectService.resetProject();
+      // Clear state when user logs out
+      setUploadedImages([]);
+      setAnalyses([]);
+      setImageGroups([]);
+      setGroupAnalysesWithPrompts([]);
+      setGeneratedConcepts([]);
+      setGroupAnalyses([]);
+      setGroupPromptSessions([]);
     }
   }, [user]);
 
   const loadDataFromDatabase = async () => {
     setIsLoading(true);
     try {
+      console.log('Loading data from database...');
       const result = await DataMigrationService.loadAllFromDatabase();
       if (result.success && result.data) {
+        console.log('Data loaded successfully:', {
+          images: result.data.uploadedImages.length,
+          analyses: result.data.analyses.length,
+          groups: result.data.imageGroups.length
+        });
         setUploadedImages(result.data.uploadedImages);
         setAnalyses(result.data.analyses);
         setImageGroups(result.data.imageGroups);
@@ -111,6 +125,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setGeneratedConcepts(result.data.generatedConcepts);
         setGroupAnalyses(result.data.groupAnalyses);
         setGroupPromptSessions(result.data.groupPromptSessions);
+        
+        // Auto-select first image if none selected and we have images
+        if (!selectedImageId && result.data.uploadedImages.length > 0) {
+          setSelectedImageId(result.data.uploadedImages[0].id);
+        }
+        
+        toast({
+          title: "Data loaded",
+          description: `Loaded ${result.data.uploadedImages.length} images and ${result.data.analyses.length} analyses.`,
+        });
+      } else {
+        console.log('No data found in database or loading failed');
       }
     } catch (error) {
       console.error('Failed to load data from database:', error);

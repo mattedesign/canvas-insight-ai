@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { ImageUploadZone } from '@/components/ImageUploadZone';
 import { UploadErrorBoundary } from '@/components/UploadErrorBoundary';
 import { AnalysisStatusIndicator } from '@/components/AnalysisStatusIndicator';
+import { UploadStatusIndicator } from '@/components/UploadStatusIndicator';
 import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,6 +15,7 @@ const Upload = () => {
     selectedImageId,
     showAnnotations,
     isUploading,
+    isLoading,
     handleImageUpload,
     handleClearCanvas,
     handleImageSelect,
@@ -22,6 +24,19 @@ const Upload = () => {
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
 
+  const handleUploadComplete = useCallback(async (files: File[]) => {
+    try {
+      await handleImageUpload(files);
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        navigate('/canvas');
+      }, 100);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      // Error handling is already done in AppContext
+    }
+  }, [handleImageUpload, navigate]);
+
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
   }, [fileInputRef]);
@@ -29,23 +44,15 @@ const Upload = () => {
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) {
-      handleImageUpload(files).then(() => {
-        // Navigate to canvas after upload
-        navigate('/canvas');
-      });
+      handleUploadComplete(files);
     }
     // Reset input value to allow selecting the same file again
     event.target.value = '';
-  }, [handleImageUpload, navigate]);
+  }, [handleUploadComplete]);
 
   const handleNavigateToPreviousAnalyses = () => {
     navigate('/projects');
   };
-
-  const handleUploadComplete = useCallback(async (files: File[]) => {
-    await handleImageUpload(files);
-    navigate('/canvas');
-  }, [handleImageUpload, navigate]);
 
   return (
     <div className="flex h-screen bg-background">
@@ -74,8 +81,12 @@ const Upload = () => {
       />
       
       <div className="flex-1">
-        <div className="h-full flex flex-col items-center justify-center p-8">
+        <div className="h-full flex flex-col items-center justify-center p-8 gap-6">
           <AnalysisStatusIndicator />
+          <UploadStatusIndicator 
+            isUploading={isUploading}
+            progress={0} // TODO: Add upload progress tracking
+          />
           <UploadErrorBoundary>
             <ImageUploadZone onImageUpload={handleUploadComplete} isUploading={isUploading} />
           </UploadErrorBoundary>

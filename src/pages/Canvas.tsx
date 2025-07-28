@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
@@ -6,6 +6,8 @@ import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { useAppContext } from '@/context/AppContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { DataMigrationService } from '@/services/DataMigrationService';
 
 const Canvas = () => {
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ const Canvas = () => {
     selectedImageId,
     showAnnotations,
     isGeneratingConcept,
+    isLoading,
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
@@ -34,6 +37,9 @@ const Canvas = () => {
     handleEditGroupPrompt,
     handleCreateFork
   } = useAppContext();
+
+  // Track if user has existing data in the database
+  const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -86,6 +92,26 @@ const Canvas = () => {
     setSelectedGroupId(null);
   };
 
+  // Check for existing data on mount if authenticated
+  const { user } = useAuth();
+  useEffect(() => {
+    const checkExistingData = async () => {
+      if (user && hasExistingData === null) {
+        try {
+          const hasData = await DataMigrationService.hasExistingData();
+          setHasExistingData(hasData);
+        } catch (error) {
+          console.error('Failed to check existing data:', error);
+          setHasExistingData(false);
+        }
+      } else if (!user) {
+        setHasExistingData(false);
+      }
+    };
+
+    checkExistingData();
+  }, [user, hasExistingData]);
+
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
     onGroup: () => {
@@ -105,10 +131,22 @@ const Canvas = () => {
     },
   });
 
-  // Redirect to upload if no images
-  if (uploadedImages.length === 0) {
+  // Only redirect if not loading and truly no data
+  if (uploadedImages.length === 0 && !isLoading && !hasExistingData) {
     navigate('/upload');
     return null;
+  }
+
+  // Show loading state while data is being loaded
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading your project...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

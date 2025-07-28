@@ -1121,11 +1121,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type, payload, aiModel }: AnalysisRequest = await req.json()
+    const requestData = await req.json()
+    const { type, payload, aiModel }: AnalysisRequest = requestData
     
     console.log(`Processing ${type} request with AI model: ${aiModel || 'auto'}`)
+    console.log('Request payload:', JSON.stringify(payload, null, 2))
     
     let result
+    const startTime = Date.now()
+    
     switch (type) {
       case 'ANALYZE_IMAGE':
         result = await analyzeImage(payload, aiModel)
@@ -1140,6 +1144,9 @@ Deno.serve(async (req) => {
         throw new Error(`Unknown analysis type: ${type}`)
     }
 
+    const duration = Date.now() - startTime
+    console.log(`${type} completed successfully in ${duration}ms`)
+    
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

@@ -9,42 +9,69 @@ interface CategoryBreakdownProps {
 }
 
 export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, metrics }) => {
-  // Calculate average scores by category
+  // Early return if no analyses
+  if (!analyses || analyses.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-6 shadow-card">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold">Category Breakdown</h3>
+            <p className="text-sm text-muted-foreground">
+              No analyses available yet
+            </p>
+          </div>
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            Upload and analyze images to see category breakdown
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate average scores by category with safe access
   const categoryData = [
     {
       name: 'Usability',
       score: Math.round(
-        analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.usability, 0) / analyses.length
+        analyses.reduce((sum, analysis) => 
+          sum + (analysis.summary?.categoryScores?.usability || 0), 0
+        ) / analyses.length
       ),
       issues: analyses.reduce((sum, analysis) => 
-        sum + analysis.suggestions.filter(s => s.category === 'usability').length, 0
+        sum + (analysis.suggestions?.filter(s => s.category === 'usability').length || 0), 0
       )
     },
     {
       name: 'Accessibility',
       score: Math.round(
-        analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.accessibility, 0) / analyses.length
+        analyses.reduce((sum, analysis) => 
+          sum + (analysis.summary?.categoryScores?.accessibility || 0), 0
+        ) / analyses.length
       ),
       issues: analyses.reduce((sum, analysis) => 
-        sum + analysis.suggestions.filter(s => s.category === 'accessibility').length, 0
+        sum + (analysis.suggestions?.filter(s => s.category === 'accessibility').length || 0), 0
       )
     },
     {
       name: 'Visual',
       score: Math.round(
-        analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.visual, 0) / analyses.length
+        analyses.reduce((sum, analysis) => 
+          sum + (analysis.summary?.categoryScores?.visual || 0), 0
+        ) / analyses.length
       ),
       issues: analyses.reduce((sum, analysis) => 
-        sum + analysis.suggestions.filter(s => s.category === 'visual').length, 0
+        sum + (analysis.suggestions?.filter(s => s.category === 'visual').length || 0), 0
       )
     },
     {
       name: 'Content',
       score: Math.round(
-        analyses.reduce((sum, analysis) => sum + analysis.summary.categoryScores.content, 0) / analyses.length
+        analyses.reduce((sum, analysis) => 
+          sum + (analysis.summary?.categoryScores?.content || 0), 0
+        ) / analyses.length
       ),
       issues: analyses.reduce((sum, analysis) => 
-        sum + analysis.suggestions.filter(s => s.category === 'content').length, 0
+        sum + (analysis.suggestions?.filter(s => s.category === 'content').length || 0), 0
       )
     }
   ];

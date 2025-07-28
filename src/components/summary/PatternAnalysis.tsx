@@ -10,11 +10,31 @@ interface PatternAnalysisProps {
 }
 
 export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({ analyses, metrics }) => {
-  // Analyze common issues across designs
+  // Early return if no analyses
+  if (!analyses || analyses.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-6 shadow-card">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold">Pattern Analysis</h3>
+            <p className="text-sm text-muted-foreground">
+              No analyses available yet
+            </p>
+          </div>
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            Upload and analyze images to see pattern insights
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Analyze common issues across designs with safe access
   const issueFrequency: Record<string, number> = {};
   
   analyses.forEach(analysis => {
-    analysis.summary.keyIssues.forEach(issue => {
+    const keyIssues = analysis.summary?.keyIssues || [];
+    keyIssues.forEach(issue => {
       issueFrequency[issue] = (issueFrequency[issue] || 0) + 1;
     });
   });
@@ -28,9 +48,10 @@ export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({ analyses, metr
       percentage: Math.round((count / analyses.length) * 100)
     }));
 
-  // Category distribution
+  // Category distribution with safe access
   const categoryDistribution = analyses.reduce((acc, analysis) => {
-    analysis.suggestions.forEach(suggestion => {
+    const suggestions = analysis.suggestions || [];
+    suggestions.forEach(suggestion => {
       acc[suggestion.category] = (acc[suggestion.category] || 0) + 1;
     });
     return acc;
@@ -66,7 +87,7 @@ export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({ analyses, metr
     {
       icon: Users,
       title: 'Accessibility Focus',
-      description: `${analyses.filter(a => a.summary.categoryScores.accessibility < 70).length} designs need accessibility improvements`,
+      description: `${analyses.filter(a => a.summary?.categoryScores?.accessibility && a.summary.categoryScores.accessibility < 70).length} designs need accessibility improvements`,
       status: 'critical'
     }
   ];
