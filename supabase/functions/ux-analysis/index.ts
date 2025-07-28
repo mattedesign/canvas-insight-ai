@@ -344,12 +344,21 @@ Format exactly as: {
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
     
-    // Parse JSON response
+    // Parse JSON response - handle markdown code blocks
     let aiAnalysis;
     try {
-      aiAnalysis = JSON.parse(aiResponse);
+      // Remove markdown code block wrapping if present
+      let cleanResponse = aiResponse.trim();
+      if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+      } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
+      }
+      
+      aiAnalysis = JSON.parse(cleanResponse);
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
+      console.error('Raw AI response:', aiResponse);
       throw new Error('Invalid AI response format');
     }
 
