@@ -65,6 +65,83 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          api_key: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_name: string
+          last_used_at: string | null
+          rate_limit: number
+          requests_made: number
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_name: string
+          last_used_at?: string | null
+          rate_limit?: number
+          requests_made?: number
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_name?: string
+          last_used_at?: string | null
+          rate_limit?: number
+          requests_made?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      api_logs: {
+        Row: {
+          api_key_id: string
+          endpoint: string
+          id: string
+          response_time_ms: number
+          success: boolean
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          api_key_id: string
+          endpoint: string
+          id?: string
+          response_time_ms: number
+          success: boolean
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          api_key_id?: string
+          endpoint?: string
+          id?: string
+          response_time_ms?: number
+          success?: boolean
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           created_at: string | null
@@ -128,6 +205,51 @@ export type Database = {
           id?: string
           restored_at?: string | null
           status?: string | null
+        }
+        Relationships: []
+      }
+      batch_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          failed_images: number
+          id: string
+          name: string
+          processed_images: number
+          progress: number
+          results: Json | null
+          settings: Json
+          status: string
+          total_images: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          failed_images?: number
+          id?: string
+          name: string
+          processed_images?: number
+          progress?: number
+          results?: Json | null
+          settings?: Json
+          status?: string
+          total_images: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          failed_images?: number
+          id?: string
+          name?: string
+          processed_images?: number
+          progress?: number
+          results?: Json | null
+          settings?: Json
+          status?: string
+          total_images?: number
+          user_id?: string
         }
         Relationships: []
       }
@@ -639,6 +761,10 @@ export type Database = {
       cleanup_old_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      generate_api_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       validate_user_permission: {
         Args: { operation: string; resource_id?: string }
