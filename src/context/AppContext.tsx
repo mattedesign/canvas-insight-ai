@@ -32,6 +32,7 @@ interface AppContextType {
   
   // Actions
   handleImageUpload: (files: File[]) => Promise<void>;
+  handleImageUploadImmediate: (files: File[]) => Promise<void>;
   handleGenerateConcept: (analysisId: string) => Promise<void>;
   handleClearCanvas: () => Promise<void>;
   handleImageSelect: (imageId: string) => void;
@@ -308,6 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           url: imageUrl,
           file,
           dimensions,
+          status: 'completed',
         };
 
         // Generate analysis via edge function if authenticated, otherwise use mock
@@ -377,6 +379,204 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       console.log('Upload process completed, setting isUploading to false');
       setIsUploading(false);
+    }
+  }, [selectedImageId, user, toast]);
+
+  const handleImageUploadImmediate = useCallback(async (files: File[]) => {
+    const newImages: UploadedImage[] = [];
+    const newAnalyses: UXAnalysis[] = [];
+
+    try {
+      // Show immediate upload feedback
+      toast({
+        title: "Images added",
+        description: `${files.length} image${files.length > 1 ? 's' : ''} added to canvas. Analysis in progress...`,
+      });
+
+      console.log('Starting immediate upload process for', files.length, 'files');
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const imageId = crypto.randomUUID();
+
+        // Get dimensions immediately
+        const img = new Image();
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+          const imageUrl = URL.createObjectURL(file);
+          img.onload = () => {
+            URL.revokeObjectURL(imageUrl);
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(imageUrl);
+            reject(new Error('Failed to load image'));
+          };
+          img.src = imageUrl;
+        });
+
+        // Create image with processing status
+        const uploadedImage: UploadedImage = {
+          id: imageId,
+          name: file.name,
+          url: URL.createObjectURL(file),
+          file,
+          dimensions,
+          status: 'processing',
+        };
+
+        // Create placeholder analysis with processing status
+        const placeholderAnalysis: UXAnalysis = {
+          id: `analysis-${imageId}`,
+          imageId,
+          imageName: file.name,
+          imageUrl: uploadedImage.url,
+          userContext: '',
+          visualAnnotations: [],
+          suggestions: [],
+          summary: {
+            overallScore: 0,
+            categoryScores: {
+              usability: 0,
+              accessibility: 0,
+              visual: 0,
+              content: 0,
+            },
+            keyIssues: [],
+            strengths: [],
+          },
+          metadata: {
+            objects: [],
+            text: [],
+            colors: [],
+            faces: 0,
+          },
+          createdAt: new Date(),
+          status: 'processing',
+        };
+
+        newImages.push(uploadedImage);
+        newAnalyses.push(placeholderAnalysis);
+      }
+
+      // Update state immediately
+      setUploadedImages(prev => [...prev, ...newImages]);
+      setAnalyses(prev => [...prev, ...newAnalyses]);
+      
+      // Auto-select first image if none selected
+      if (!selectedImageId && newImages.length > 0) {
+        setSelectedImageId(newImages[0].id);
+      }
+
+      // Process each image in background
+      newImages.forEach(async (uploadedImage, index) => {
+        try {
+          // Update status to analyzing
+          setUploadedImages(prev => prev.map(img => 
+            img.id === uploadedImage.id ? { ...img, status: 'analyzing' } : img
+          ));
+          setAnalyses(prev => prev.map(analysis => 
+            analysis.imageId === uploadedImage.id ? { ...analysis, status: 'analyzing' } : analysis
+          ));
+
+          let imageUrl = uploadedImage.url;
+          
+          // Upload to storage if authenticated
+          if (user) {
+            try {
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              if (authUser) {
+                const projectId = await ProjectService.getCurrentProject();
+                const fileName = `${authUser.id}/${uploadedImage.id}/${uploadedImage.file.name}`;
+                
+                const { error: uploadError } = await supabase.storage
+                  .from('images')
+                  .upload(fileName, uploadedImage.file);
+
+                if (!uploadError || uploadError.message?.includes('already exists')) {
+                  const { data: urlData } = supabase.storage
+                    .from('images')
+                    .getPublicUrl(fileName);
+                  imageUrl = urlData.publicUrl;
+                  
+                  // Update image record
+                  await supabase
+                    .from('images')
+                    .upsert({
+                      id: uploadedImage.id,
+                      project_id: projectId,
+                      filename: uploadedImage.id,
+                      original_name: uploadedImage.file.name,
+                      storage_path: fileName,
+                      dimensions: uploadedImage.dimensions,
+                      file_size: uploadedImage.file.size,
+                      file_type: uploadedImage.file.type
+                    }, {
+                      onConflict: 'id'
+                    });
+                }
+              }
+            } catch (error) {
+              console.error('Storage upload failed, using local URL:', error);
+            }
+          }
+
+          // Generate analysis
+          let finalAnalysis;
+          if (user) {
+            try {
+              const { data, error } = await supabase.functions.invoke('ux-analysis', {
+                body: {
+                  type: 'ANALYZE_IMAGE',
+                  payload: {
+                    imageId: uploadedImage.id,
+                    imageUrl,
+                    imageName: uploadedImage.file.name,
+                    userContext: ''
+                  }
+                }
+              });
+              
+              if (error) throw error;
+              if (data.success) {
+                finalAnalysis = { ...data.data, status: 'completed' };
+              } else {
+                throw new Error('Analysis failed');
+              }
+            } catch (error) {
+              console.error('Edge function analysis failed, using mock:', error);
+              finalAnalysis = { ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, imageUrl), status: 'completed' };
+            }
+          } else {
+            finalAnalysis = { ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, imageUrl), status: 'completed' };
+          }
+
+          // Update final states
+          setUploadedImages(prev => prev.map(img => 
+            img.id === uploadedImage.id ? { ...img, url: imageUrl, status: 'completed' } : img
+          ));
+          setAnalyses(prev => prev.map(analysis => 
+            analysis.imageId === uploadedImage.id ? finalAnalysis : analysis
+          ));
+
+        } catch (error) {
+          console.error(`Failed to process image ${uploadedImage.name}:`, error);
+          // Update to error state
+          setUploadedImages(prev => prev.map(img => 
+            img.id === uploadedImage.id ? { ...img, status: 'error' } : img
+          ));
+          setAnalyses(prev => prev.map(analysis => 
+            analysis.imageId === uploadedImage.id ? { ...analysis, status: 'error' } : analysis
+          ));
+        }
+      });
+
+    } catch (error) {
+      console.error('Immediate upload process failed:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
+        variant: "destructive",
+      });
     }
   }, [selectedImageId, user, toast]);
 
@@ -789,6 +989,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     // Actions
     handleImageUpload,
+    handleImageUploadImmediate,
     handleGenerateConcept,
     handleClearCanvas,
     handleImageSelect,

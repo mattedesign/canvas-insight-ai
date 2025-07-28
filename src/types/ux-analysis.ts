@@ -126,6 +126,7 @@ export interface UXAnalysis {
   summary: AnalysisSummary;
   metadata: VisionMetadata;
   createdAt: Date;
+  status?: 'processing' | 'analyzing' | 'completed' | 'error';
 }
 
 export interface UploadedImage {
@@ -137,4 +138,5 @@ export interface UploadedImage {
     width: number;
     height: number;
   };
+  status?: 'uploading' | 'processing' | 'analyzing' | 'completed' | 'error';
 }

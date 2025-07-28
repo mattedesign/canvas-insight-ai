@@ -21,6 +21,8 @@ import { GroupContainerNode } from './GroupContainerNode';
 import { GroupAnalysisCardNode } from './GroupAnalysisCardNode';
 import { GroupPromptCollectionNode } from './GroupPromptCollectionNode';
 import { GroupAnalysisResultsNode } from './GroupAnalysisResultsNode';
+import { ImageLoadingNode } from './ImageLoadingNode';
+import { AnalysisLoadingNode } from './AnalysisLoadingNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
@@ -40,6 +42,8 @@ const nodeTypes = {
   groupAnalysisCard: GroupAnalysisCardNode,
   groupPromptCollection: GroupPromptCollectionNode,
   groupAnalysisResults: GroupAnalysisResultsNode,
+  imageLoading: ImageLoadingNode,
+  analysisLoading: AnalysisLoadingNode,
 };
 
 interface CanvasViewProps {
@@ -177,12 +181,20 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       const displayWidth = Math.min(image.dimensions.width * scaleFactor, 800); // max-width constraint
       const displayHeight = maxDisplayHeight;
       
-      // Create image node
+      // Check if image is still loading or processing
+      const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
+      
+      // Create image node or loading node based on status
       const imageNode: Node = {
         id: `image-${image.id}`,
-        type: 'image',
+        type: isImageLoading ? 'imageLoading' : 'image',
         position: { x: 50, y: yOffset },
-        data: { 
+        data: isImageLoading ? {
+          id: image.id,
+          name: image.name,
+          status: image.status!,
+          error: image.status === 'error' ? 'Upload failed' : undefined
+        } : { 
           image,
           analysis,
           showAnnotations,
@@ -198,14 +210,23 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
 
         // Create analysis card node if analysis exists and showAnalysis is true
-        if (analysis && showAnalysis) {
+        if (analysis && showAnalysis && !isImageLoading) {
           const cardXPosition = rightmostXPosition;
           const analysisCardWidth = 400; // Standard width
+          
+          // Check if analysis is still loading
+          const isAnalysisLoading = analysis.status && ['processing', 'analyzing'].includes(analysis.status);
+          
           const cardNode: Node = {
             id: `card-${analysis.id}`,
-            type: 'analysisCard',
+            type: isAnalysisLoading ? 'analysisLoading' : 'analysisCard',
             position: { x: cardXPosition, y: yOffset },
-            data: { 
+            data: isAnalysisLoading ? {
+              imageId: analysis.imageId,
+              imageName: analysis.imageName,
+              status: analysis.status!,
+              error: analysis.status === 'error' ? 'Analysis failed' : undefined
+            } : { 
               analysis,
               onGenerateConcept: stableCallbacks.onGenerateConcept,
               isGeneratingConcept,
@@ -214,16 +235,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           };
         nodes.push(cardNode);
 
-        // Create edge connecting image to analysis card
-        const edge: Edge = {
-          id: `edge-${image.id}-${analysis.id}`,
-          source: `image-${image.id}`,
-          target: `card-${analysis.id}`,
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: 'hsl(var(--primary))' },
-        };
-        edges.push(edge);
+        // Create edge connecting image to analysis card (only if both exist and not loading)
+        if (!isImageLoading) {
+          const edge: Edge = {
+            id: `edge-${image.id}-${analysis.id}`,
+            source: `image-${image.id}`,
+            target: `card-${analysis.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))' },
+          };
+          edges.push(edge);
+        }
 
         rightmostXPosition += analysisCardWidth + horizontalSpacing; // Card width + spacing
 
@@ -405,14 +428,22 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
+          // Check if image is still loading or processing
+          const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
+          
           // Image node - positioned relative to group container origin
           const imageNode: Node = {
             id: `image-${image.id}`,
-            type: 'image',
+            type: isImageLoading ? 'imageLoading' : 'image',
             position: { x: padding, y: currentY },
             parentId: `group-container-${group.id}`,
             extent: 'parent',
-            data: { 
+            data: isImageLoading ? {
+              id: image.id,
+              name: image.name,
+              status: image.status!,
+              error: image.status === 'error' ? 'Upload failed' : undefined
+            } : { 
               image,
               analysis,
               showAnnotations,
@@ -426,15 +457,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           nodes.push(imageNode);
           
           // Individual analysis card for this image - with generous spacing
-          if (analysis && showAnalysis) {
+          if (analysis && showAnalysis && !isImageLoading) {
             const horizontalSpacing = Math.max(displayWidth * 1.2, 300); // At least 300px or 120% image width
+            
+            // Check if analysis is still loading
+            const isAnalysisLoading = analysis.status && ['processing', 'analyzing'].includes(analysis.status);
+            
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
-              type: 'analysisCard',
+              type: isAnalysisLoading ? 'analysisLoading' : 'analysisCard',
               position: { x: padding + displayWidth + horizontalSpacing, y: currentY }, // generous spacing
               parentId: `group-container-${group.id}`,
               extent: 'parent',
-              data: { 
+              data: isAnalysisLoading ? {
+                imageId: analysis.imageId,
+                imageName: analysis.imageName,
+                status: analysis.status!,
+                error: analysis.status === 'error' ? 'Analysis failed' : undefined
+              } : { 
                 analysis,
                 onGenerateConcept: stableCallbacks.onGenerateConcept,
                 isGeneratingConcept,
@@ -443,16 +483,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             };
             nodes.push(analysisNode);
             
-            // Create edge connecting image to its analysis
-            const edge: Edge = {
-              id: `edge-group-image-${image.id}-analysis`,
-              source: `image-${image.id}`,
-              target: `group-image-analysis-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))' },
-            };
-            edges.push(edge);
+            // Create edge connecting image to its analysis (only if image not loading)
+            if (!isImageLoading) {
+              const edge: Edge = {
+                id: `edge-group-image-${image.id}-analysis`,
+                source: `image-${image.id}`,
+                target: `group-image-analysis-${image.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(edge);
+            }
             
             // Add concept nodes for this analysis (same as ungrouped)
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);

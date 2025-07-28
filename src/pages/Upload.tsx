@@ -20,6 +20,7 @@ const Upload = () => {
     isUploading,
     isLoading,
     handleImageUpload,
+    handleImageUploadImmediate,
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
@@ -89,16 +90,15 @@ const Upload = () => {
         stage.id === 'analysis' ? { ...stage, status: 'active' } : stage
       ));
       
-      // Call the actual upload function
-      await handleImageUpload(files);
+      // Call the immediate upload function and navigate to canvas immediately
+      await handleImageUploadImmediate(files);
       
-      // Complete all stages
+      // Complete all stages and navigate immediately
       setAnalysisStages(prev => prev.map(stage => ({ ...stage, status: 'completed', progress: 100 })));
       setOverallProgress(100);
       
-      setTimeout(() => {
-        navigate('/canvas');
-      }, 1000);
+      // Navigate to canvas immediately
+      navigate('/canvas');
     } catch (error) {
       console.error('Upload failed:', error);
       setUploadError(error instanceof Error ? error.message : 'Upload failed');
@@ -106,7 +106,7 @@ const Upload = () => {
         stage.id === currentStage ? { ...stage, status: 'error', error: 'Failed' } : stage
       ));
     }
-  }, [handleImageUpload, navigate, currentStage]);
+  }, [handleImageUploadImmediate, navigate, currentStage]);
 
   const handleUploadComplete = useCallback(async (files: File[]) => {
     // Check if we need to show session dialog
