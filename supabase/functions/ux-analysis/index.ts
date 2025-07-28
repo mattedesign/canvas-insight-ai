@@ -916,8 +916,6 @@ Provide comprehensive UX analysis in strict JSON format:
         }
       };
     }
-      throw new Error('Invalid comprehensive analysis response');
-    }
   } catch (error) {
     console.error('Claude Opus 4 comprehensive analysis failed:', error);
     throw error;
