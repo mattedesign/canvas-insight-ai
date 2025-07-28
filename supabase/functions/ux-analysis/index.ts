@@ -109,7 +109,7 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         stage: 'comprehensive_analysis',
         data: finalAnalysisResult,
         timestamp: new Date().toISOString(),
-        model: 'claude-opus-4',
+        model: 'claude-sonnet-4',
         success: true
       });
       console.log('Stage 3 completed: Comprehensive analysis done');
@@ -370,7 +370,7 @@ Labels: ${metadata.labels?.map(l => l.name).join(', ') || 'None'}
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022', // Using stable model version
+        model: 'claude-sonnet-4-20250514', // Using Claude Sonnet 4
         max_tokens: 2000,
         messages: [
           {
@@ -569,7 +569,7 @@ Initial Concerns: ${Array.isArray(visionAnalysis.initialConcerns) ? visionAnalys
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022', // Using proven stable model
+        model: 'claude-sonnet-4-20250514', // Using Claude Sonnet 4
         max_tokens: 3000,
         messages: [
           {
