@@ -71,15 +71,24 @@ const Projects = () => {
     }
 
     try {
-      await ProjectService.createProject(newProjectName, newProjectDescription);
+      // Create project with custom name and description
+      const project = await ProjectService.createNewProject(newProjectName, newProjectDescription);
+      
+      // Create a default blank canvas state for the new project
+      const defaultState = CanvasStateService.createDefaultState(project.id, newProjectName);
+      await CanvasStateService.saveCanvasState(project.id, defaultState);
+      
       setNewProjectName('');
       setNewProjectDescription('');
       setShowCreateDialog(false);
-      loadProjects();
+      
       toast({
         title: "Success",
-        description: "Project created successfully",
+        description: `${project.name} created successfully`,
       });
+      
+      // Navigate directly to canvas with the project slug
+      navigate(`/canvas/${project.slug}`);
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
