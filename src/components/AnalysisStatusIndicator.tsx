@@ -1,74 +1,112 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Bot, Zap, Key } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { UXAnalysis } from '@/types/ux-analysis';
 
-export const AnalysisStatusIndicator = () => {
-  const { user } = useAuth();
+interface AnalysisStatusIndicatorProps {
+  status?: UXAnalysis['status'];
+  isProcessing?: boolean;
+  onRetry?: () => void;
+  compact?: boolean;
+}
 
-  return (
-    <Card className="w-full max-w-md mx-auto mb-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Bot className="h-4 w-4" />
-          Analysis Status
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Authentication Status */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Authentication</span>
-          <Badge variant={user ? "default" : "destructive"}>
-            {user ? "Logged In" : "Not Logged In"}
-          </Badge>
-        </div>
+export const AnalysisStatusIndicator: React.FC<AnalysisStatusIndicatorProps> = ({
+  status = 'completed',
+  isProcessing = false,
+  onRetry,
+  compact = false
+}) => {
+  const getStatusConfig = () => {
+    if (isProcessing || status === 'processing') {
+      return {
+        icon: Loader2,
+        label: 'Processing',
+        variant: 'secondary' as const,
+        className: 'text-blue-600 bg-blue-50 border-blue-200',
+        animate: true
+      };
+    }
 
-        {/* Analysis Type */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Analysis Type</span>
-          <Badge variant={user ? "default" : "secondary"}>
-            {user ? "AI-Powered" : "Mock Data"}
-          </Badge>
-        </div>
+    switch (status) {
+      case 'analyzing':
+        return {
+          icon: Loader2,
+          label: 'Analyzing',
+          variant: 'secondary' as const,
+          className: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+          animate: true
+        };
+      case 'completed':
+        return {
+          icon: CheckCircle,
+          label: 'Complete',
+          variant: 'default' as const,
+          className: 'text-green-600 bg-green-50 border-green-200',
+          animate: false
+        };
+      case 'error':
+        return {
+          icon: AlertCircle,
+          label: 'Failed',
+          variant: 'destructive' as const,
+          className: 'text-red-600 bg-red-50 border-red-200',
+          animate: false
+        };
+      default:
+        return {
+          icon: CheckCircle,
+          label: 'Ready',
+          variant: 'outline' as const,
+          className: 'text-muted-foreground',
+          animate: false
+        };
+    }
+  };
 
-        {/* Status Message */}
-        <div className="p-3 rounded-lg bg-muted">
-          {user ? (
-            <div className="flex items-start gap-2">
-              <Zap className="h-4 w-4 text-primary mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium">Real AI Analysis Active</p>
-                <p className="text-muted-foreground text-xs mt-1">
-                  Using OpenAI GPT-4 Vision for comprehensive UX analysis
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium">Mock Analysis Mode</p>
-                <p className="text-muted-foreground text-xs mt-1">
-                  Log in to get real AI-powered analysis
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+  const config = getStatusConfig();
+  const Icon = config.icon;
 
-        {!user && (
-          <Button 
-            onClick={() => window.location.href = '/auth'} 
-            size="sm" 
-            className="w-full"
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1">
+        <Icon 
+          className={`w-3 h-3 ${config.className} ${config.animate ? 'animate-spin' : ''}`} 
+        />
+        {status === 'error' && onRetry && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onRetry}
+            className="h-4 w-4 p-0 hover:bg-red-100"
           >
-            <Key className="mr-2 h-4 w-4" />
-            Log In for AI Analysis
+            <RefreshCw className="w-3 h-3" />
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Badge variant={config.variant} className={`${config.className} gap-1`}>
+        <Icon 
+          className={`w-3 h-3 ${config.animate ? 'animate-spin' : ''}`} 
+        />
+        {config.label}
+      </Badge>
+      
+      {status === 'error' && onRetry && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRetry}
+          className="h-6 px-2 gap-1"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Retry
+        </Button>
+      )}
+    </div>
   );
 };

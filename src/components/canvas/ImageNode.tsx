@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ImageAnalysisDialog } from '../ImageAnalysisDialog';
+import { AnalysisStatusIndicator } from '../AnalysisStatusIndicator';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -208,8 +209,14 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
             <h3 className="font-semibold text-foreground mb-2 truncate">
               {image.name}
             </h3>
-            <div className="text-sm text-muted-foreground mb-3">
+            <div className="text-sm text-muted-foreground mb-2">
               {image.dimensions.width} × {image.dimensions.height}px
+            </div>
+            <div className="mb-2">
+              <AnalysisStatusIndicator 
+                status={analysis?.status || (image.status === 'uploading' ? 'processing' : image.status as UXAnalysis['status'])} 
+                compact 
+              />
             </div>
           </div>
           

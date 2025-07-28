@@ -708,6 +708,7 @@ export type Database = {
           id: string
           image_id: string | null
           metadata: Json
+          status: string | null
           suggestions: Json
           summary: Json
           user_context: string | null
@@ -720,6 +721,7 @@ export type Database = {
           id?: string
           image_id?: string | null
           metadata?: Json
+          status?: string | null
           suggestions?: Json
           summary?: Json
           user_context?: string | null
@@ -732,6 +734,7 @@ export type Database = {
           id?: string
           image_id?: string | null
           metadata?: Json
+          status?: string | null
           suggestions?: Json
           summary?: Json
           user_context?: string | null

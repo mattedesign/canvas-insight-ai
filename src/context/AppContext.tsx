@@ -8,6 +8,8 @@ import { DataMigrationService, ProjectService } from '@/services/DataMigrationSe
 import { CanvasStateService, CanvasState } from '@/services/CanvasStateService';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
+import { AnalysisPerformanceService } from '@/services/AnalysisPerformanceService';
 
 interface AppContextType {
   // State
@@ -93,6 +95,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isUploading, setIsUploading] = useState<boolean>(false);
   
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
+
+  // Real-time analysis handling
+  const handleAnalysisUpdate = useCallback((analysis: UXAnalysis) => {
+    console.log('Real-time analysis update received:', analysis);
+    
+    // Update local state
+    setAnalyses(prev => {
+      const existingIndex = prev.findIndex(a => a.imageId === analysis.imageId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = analysis;
+        return updated;
+      } else {
+        return [...prev, analysis];
+      }
+    });
+
+    // Update image status
+    setUploadedImages(prev => prev.map(img => 
+      img.id === analysis.imageId 
+        ? { ...img, status: analysis.status === 'completed' ? 'completed' : img.status }
+        : img
+    ));
+
+    // Cache the analysis for performance
+    AnalysisPerformanceService.setCachedAnalysis(analysis.imageId, analysis);
+  }, []);
+
+  const handleAnalysisError = useCallback((imageId: string, error: string) => {
+    console.error('Analysis error for image:', imageId, error);
+    
+    // Update image and analysis status to error
+    setUploadedImages(prev => prev.map(img => 
+      img.id === imageId ? { ...img, status: 'error' } : img
+    ));
+    
+    setAnalyses(prev => prev.map(analysis => 
+      analysis.imageId === imageId ? { ...analysis, status: 'error' } : analysis
+    ));
+
+    toast({
+      title: "Analysis failed",
+      description: `Analysis failed for image: ${error}`,
+      category: "error",
+      variant: "destructive"
+    });
+  }, [toast]);
+
+  const handleAnalysisStatusChange = useCallback((imageId: string, status: UXAnalysis['status']) => {
+    console.log('Analysis status change:', imageId, status);
+    
+    // Update analysis status
+    setAnalyses(prev => prev.map(analysis => 
+      analysis.imageId === imageId ? { ...analysis, status } : analysis
+    ));
+
+    // Update image status accordingly
+    setUploadedImages(prev => prev.map(img => 
+      img.id === imageId 
+        ? { ...img, status: status === 'processing' ? 'analyzing' : img.status }
+        : img
+    ));
+  }, []);
+
+  // Set up real-time analysis system
+  const {
+    isConnected: realtimeConnected,
+    pendingAnalyses,
+    failedAnalyses,
+    trackAnalysis,
+    completeAnalysis,
+    retryAnalysis
+  } = useAnalysisRealtime({
+    onAnalysisUpdate: handleAnalysisUpdate,
+    onAnalysisError: handleAnalysisError,
+    onAnalysisStatusChange: handleAnalysisStatusChange
+  });
 
   // Load data from database when user authenticates
   useEffect(() => {
@@ -310,32 +389,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: 'completed',
         };
 
-        // Generate analysis via edge function if authenticated, otherwise use mock
+        // Generate analysis with enhanced performance service
         let analysis;
         if (user) {
           try {
-            console.log('Calling edge function for analysis...');
-            const { data, error } = await supabase.functions.invoke('ux-analysis', {
-              body: {
-                type: 'ANALYZE_IMAGE',
-                payload: {
-                  imageId,
-                  imageUrl,
-                  imageName: file.name,
-                  userContext: ''
-                }
-              }
-            });
+            console.log('Performing analysis with retry and caching...');
+            trackAnalysis(imageId); // Track for real-time updates
             
-            if (error) throw error;
-            if (data.success) {
-              analysis = data.data;
-              console.log('Analysis completed successfully');
+            const result = await AnalysisPerformanceService.performAnalysisWithRetry(
+              imageId,
+              imageUrl,
+              file.name,
+              ''
+            );
+            
+            if (result.success && result.analysis) {
+              analysis = result.analysis;
+              console.log('Analysis completed successfully with performance service');
             } else {
-              throw new Error('Analysis failed');
+              throw new Error(result.error || 'Analysis failed');
             }
           } catch (error) {
-            console.error('Edge function analysis failed, using mock:', error);
+            console.error('Performance service analysis failed, using mock:', error);
             analysis = generateMockAnalysis(imageId, file.name, imageUrl);
           }
         } else {
