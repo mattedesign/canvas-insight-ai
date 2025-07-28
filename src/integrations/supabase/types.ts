@@ -544,6 +544,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          slug: string
           updated_at: string | null
           user_id: string | null
         }
@@ -552,6 +553,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          slug: string
           updated_at?: string | null
           user_id?: string | null
         }
@@ -560,6 +562,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          slug?: string
           updated_at?: string | null
           user_id?: string | null
         }
@@ -774,6 +777,17 @@ export type Database = {
       generate_api_key: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      generate_project_slug: {
+        Args: { project_name: string }
+        Returns: string
+      }
+      generate_random_project_name: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          name: string
+          slug: string
+        }[]
       }
       validate_user_permission: {
         Args: { operation: string; resource_id?: string }
