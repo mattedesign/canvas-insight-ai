@@ -37,6 +37,16 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
+    
+    // Check image size before processing
+    const contentLength = imageResponse.headers.get('content-length');
+    if (contentLength) {
+      const sizeInMB = parseInt(contentLength) / (1024 * 1024);
+      if (sizeInMB > 20) { // Google Vision has 20MB limit
+        throw new Error(`Image too large: ${sizeInMB.toFixed(1)}MB (max 20MB)`);
+      }
+    }
+    
     const imageBuffer = await imageResponse.arrayBuffer();
     
     // Convert ArrayBuffer to base64 safely without stack overflow
@@ -94,6 +104,7 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000), // 30 second timeout
     }
   );
 
@@ -156,6 +167,29 @@ serve(async (req) => {
     }
 
     console.log('Starting Google Vision metadata extraction for image:', imageId);
+
+    // Check if metadata already exists to avoid redundant API calls
+    const { data: existingImage } = await supabaseClient
+      .from('images')
+      .select('metadata')
+      .eq('id', imageId)
+      .single();
+
+    if (existingImage?.metadata?.provider === 'google-vision') {
+      console.log('Metadata already exists for image:', imageId);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          metadata: existingImage.metadata,
+          imageId,
+          fromCache: true
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
 
     // Extract metadata with Google Vision
     const metadata = await extractGoogleVisionMetadata(imageUrl, features);

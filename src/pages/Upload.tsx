@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ImageUploadZone } from '@/components/ImageUploadZone';
 import { UploadErrorBoundary } from '@/components/UploadErrorBoundary';
+import { AnalysisErrorBoundary } from '@/components/AnalysisErrorBoundary';
 import { AnalysisStatusIndicator } from '@/components/AnalysisStatusIndicator';
 import { UploadStatusIndicator } from '@/components/UploadStatusIndicator';
 import { EnhancedUploadProgress, createAnalysisStages } from '@/components/EnhancedUploadProgress';
@@ -10,9 +11,11 @@ import { useAppContext } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
 import { supabase } from '@/integrations/supabase/client';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const Upload = () => {
   const navigate = useNavigate();
+  const { debounce } = useDebounce();
   const { 
     uploadedImages, 
     analyses, 
@@ -52,6 +55,21 @@ const Upload = () => {
     checkExistingData();
   }, []);
 
+  // Debounced metadata extraction to prevent API overload
+  const debounceMetadataExtraction = useCallback(() => {
+    return debounce((imageId: string, imageUrl: string) => {
+      supabase.functions.invoke('google-vision-metadata', {
+        body: {
+          imageId,
+          imageUrl,
+          features: ['labels', 'text', 'faces', 'objects', 'colors']
+        }
+      }).catch(error => {
+        console.warn('Metadata extraction failed for image:', imageId, error);
+      });
+    }, 1000); // 1 second debounce to prevent spam
+  }, [debounce]);
+
   const processUploadWithProgress = useCallback(async (files: File[]) => {
     setUploadError('');
     setOverallProgress(0);
@@ -84,22 +102,12 @@ const Upload = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       await loadDataFromDatabase();
       
+      // Debounced metadata extraction to prevent API spam
+      const debouncedMetadataExtraction = debounceMetadataExtraction();
+      
       // Trigger metadata extraction for recently uploaded images in background
       for (const image of uploadedImages.slice(-files.length)) {
-        try {
-          // Trigger Google Vision metadata extraction in background
-          supabase.functions.invoke('google-vision-metadata', {
-            body: {
-              imageId: image.id,
-              imageUrl: image.url,
-              features: ['labels', 'text', 'faces', 'objects', 'colors']
-            }
-          }).catch(error => {
-            console.warn('Metadata extraction failed for image:', image.id, error);
-          });
-        } catch (error) {
-          console.warn('Metadata extraction failed for image:', image.id, error);
-        }
+        debouncedMetadataExtraction(image.id, image.url);
       }
       
       setAnalysisStages(prev => prev.map(stage => 
@@ -142,8 +150,8 @@ const Upload = () => {
       // Create new project and switch to it
       await ProjectService.createNewProject(name, description);
       
-      // Clear current state
-      handleClearCanvas();
+      // Clear current state silently for new project
+      handleClearCanvas({ silent: true, forNewProject: true });
       
       // Process the upload with progress tracking
       if (pendingFiles.length > 0) {
@@ -238,12 +246,14 @@ const Upload = () => {
             onRetry={handleRetryUpload}
             error={uploadError}
           />
-          <UploadErrorBoundary>
-            <ImageUploadZone 
-              onImageUpload={handleUploadComplete} 
-              isUploading={overallProgress > 0 && overallProgress < 100}
-            />
-          </UploadErrorBoundary>
+          <AnalysisErrorBoundary>
+            <UploadErrorBoundary>
+              <ImageUploadZone 
+                onImageUpload={handleUploadComplete} 
+                isUploading={overallProgress > 0 && overallProgress < 100}
+              />
+            </UploadErrorBoundary>
+          </AnalysisErrorBoundary>
         </div>
       </div>
 

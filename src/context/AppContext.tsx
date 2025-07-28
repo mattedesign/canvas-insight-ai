@@ -34,7 +34,7 @@ interface AppContextType {
   handleImageUpload: (files: File[]) => Promise<void>;
   handleImageUploadImmediate: (files: File[]) => Promise<void>;
   handleGenerateConcept: (analysisId: string) => Promise<void>;
-  handleClearCanvas: () => Promise<void>;
+  handleClearCanvas: (options?: { silent?: boolean; forNewProject?: boolean }) => Promise<void>;
   handleImageSelect: (imageId: string) => void;
   handleToggleAnnotations: () => void;
   handleAnnotationClick: (annotationId: string) => void;
@@ -612,11 +612,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [analyses]);
 
-  const handleClearCanvas = useCallback(async () => {
+  const handleClearCanvas = useCallback(async (options?: { silent?: boolean; forNewProject?: boolean }) => {
     try {
-      // Clear canvas state in database
-      const projectId = await ProjectService.getCurrentProject();
-      await CanvasStateService.clearCanvasState(projectId);
+      // Only show clear action for existing data
+      const hasExistingData = uploadedImages.length > 0 || analyses.length > 0 || imageGroups.length > 0;
+      
+      // Clear canvas state in database if there's a current project
+      try {
+        const projectId = await ProjectService.getCurrentProject();
+        if (projectId) {
+          await CanvasStateService.clearCanvasState(projectId);
+        }
+      } catch (error) {
+        console.warn('Could not clear canvas state, continuing anyway:', error);
+      }
       
       // Clear local state
       setUploadedImages([]);
@@ -629,20 +638,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedImageId(null);
       clearAnnotations();
       
-      toast({
-        title: "Workspace cleared",
-        description: "Canvas has been cleared. Ready for new analysis.",
-        category: "success",
-      });
+      // Only show feedback toast if:
+      // 1. Not silent mode
+      // 2. Had existing data to clear 
+      // 3. Not clearing for a new project (which should be silent)
+      if (!options?.silent && hasExistingData && !options?.forNewProject) {
+        toast({
+          title: "Workspace cleared",
+          description: "Canvas has been cleared. Ready for new analysis.",
+          category: "success",
+        });
+      }
     } catch (error) {
       console.error('Failed to clear canvas:', error);
-      toast({
-        title: "Clear failed",
-        description: "Could not clear workspace. Please try again.",
-        category: "error",
-      });
+      // Only show error toast if not in silent mode
+      if (!options?.silent) {
+        toast({
+          title: "Clear failed",
+          description: "Could not clear workspace. Please try again.",
+          category: "error",
+        });
+      }
     }
-  }, [clearAnnotations, toast]);
+  }, [clearAnnotations, toast, uploadedImages.length, analyses.length, imageGroups.length]);
 
   const handleImageSelect = useCallback((imageId: string) => {
     setSelectedImageId(imageId);
