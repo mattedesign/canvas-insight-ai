@@ -70,6 +70,7 @@ interface CanvasViewProps {
   onCreateFork?: (sessionId: string) => void;
   onOpenAnalysisPanel?: (analysisId: string) => void;
   onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
+  onImageUpload?: (files: File[]) => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -97,6 +98,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onCreateFork,
   onOpenAnalysisPanel,
   onAnalysisComplete,
+  onImageUpload,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -1151,6 +1153,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           onToggleAnalysis={handleToggleAnalysis}
           onAddComment={handleAddComment}
           onCreateGroup={handleCreateGroup}
+          onImageUpload={onImageUpload}
           showAnnotations={showAnnotations}
           showAnalysis={showAnalysis}
           currentTool={currentTool}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -17,7 +17,8 @@ import {
   Eye,
   EyeOff,
   Target,
-  Group
+  Group,
+  Upload
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ChatPanel } from './ChatPanel';
@@ -30,6 +31,7 @@ interface FloatingToolbarProps {
   onToggleAnalysis: () => void;
   onAddComment: () => void;
   onCreateGroup?: () => void;
+  onImageUpload?: (files: File[]) => void;
   showAnnotations: boolean;
   showAnalysis: boolean;
   currentTool: ToolMode;
@@ -42,6 +44,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   onToggleAnalysis,
   onAddComment,
   onCreateGroup,
+  onImageUpload,
   showAnnotations,
   showAnalysis,
   currentTool,
@@ -52,6 +55,7 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update zoom level when zoom changes
   React.useEffect(() => {
@@ -148,6 +152,20 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       default:
         return 'Cursor';
     }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0 && onImageUpload) {
+      onImageUpload(files);
+      toast({ description: `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...` });
+    }
+    // Reset the input value so the same file can be uploaded again
+    event.target.value = '';
   };
 
   return (
@@ -251,6 +269,31 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
                 <Group className="h-4 w-4" />
               </Button>
               
+              <Separator orientation="vertical" className="h-6" />
+            </>
+          )}
+
+          {/* Upload Button */}
+          {onImageUpload && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.html"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                onClick={handleUploadClick}
+                title="Upload images"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+
               <Separator orientation="vertical" className="h-6" />
             </>
           )}
