@@ -7,15 +7,17 @@ import { CanvasUploadZone } from '@/components/CanvasUploadZone';
 import { CanvasUploadProgress } from '@/components/CanvasUploadProgress';
 import { useAppContext } from '@/context/AppContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { DataMigrationService } from '@/services/DataMigrationService';
+import { DataMigrationService, ProjectService } from '@/services/DataMigrationService';
+import { SlugService } from '@/services/SlugService';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const Canvas = () => {
   const navigate = useNavigate();
+  const { projectSlug } = useParams<{ projectSlug: string }>();
   const { 
     uploadedImages, 
     analyses, 
@@ -270,25 +272,75 @@ const Canvas = () => {
     setSelectedGroupId(null);
   };
 
-  // Check for existing data on mount if authenticated
+  // Load project by slug if provided, otherwise check for existing data
   const { user } = useAuth();
   useEffect(() => {
-    const checkExistingData = async () => {
-      if (user && hasExistingData === null) {
+    const loadProjectBySlug = async () => {
+      if (projectSlug) {
         try {
-          const hasData = await DataMigrationService.hasExistingData();
-          setHasExistingData(hasData);
+          console.log('Loading project by slug:', projectSlug);
+          const project = await SlugService.getProjectBySlug(projectSlug);
+          
+          if (!project) {
+            console.error('Project not found for slug:', projectSlug);
+            toast.toast({
+              category: 'error',
+              title: "Project not found",
+              description: "The project you're looking for doesn't exist or you don't have access to it.",
+              variant: "destructive",
+            });
+            navigate('/projects');
+            return;
+          }
+
+          // Switch to the project
+          await ProjectService.switchToProject(project.id);
+          
+          // Load project data
+          const result = await DataMigrationService.loadAllFromDatabase();
+          if (result.success && result.data) {
+            console.log('Project data loaded successfully');
+          }
         } catch (error) {
-          console.error('Failed to check existing data:', error);
-          setHasExistingData(false);
+          console.error('Error loading project by slug:', error);
+          toast.toast({
+            category: 'error',
+            title: "Error loading project",
+            description: "Failed to load the project. Please try again.",
+            variant: "destructive",
+          });
+          navigate('/projects');
         }
-      } else if (!user) {
-        setHasExistingData(false);
+      } else {
+        // Check for existing data in current project
+        const checkExistingData = async () => {
+          if (user && hasExistingData === null) {
+            try {
+              const hasData = await DataMigrationService.hasExistingData();
+              setHasExistingData(hasData);
+              if (hasData) {
+                console.log('Loading existing project data...');
+                const result = await DataMigrationService.loadAllFromDatabase();
+                if (result.success && result.data) {
+                  // Update context with loaded data
+                  // This ensures continuity when user has existing data
+                }
+              }
+            } catch (error) {
+              console.error('Failed to check existing data:', error);
+              setHasExistingData(false);
+            }
+          } else if (!user) {
+            setHasExistingData(false);
+          }
+        };
+
+        checkExistingData();
       }
     };
 
-    checkExistingData();
-  }, [user, hasExistingData]);
+    loadProjectBySlug();
+  }, [projectSlug, navigate, toast, user, hasExistingData]);
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({

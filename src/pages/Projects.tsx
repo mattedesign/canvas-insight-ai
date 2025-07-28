@@ -24,6 +24,7 @@ interface Project {
   id: string;
   name: string;
   description: string;
+  slug: string;
   created_at: string;
   updated_at: string;
   images: { count: number }[];
@@ -89,24 +90,28 @@ const Projects = () => {
     }
   };
 
-  const handleSwitchProject = async (projectId: string) => {
+  const handleSwitchProject = async (project: Project) => {
     try {
-      await ProjectService.switchToProject(projectId);
+      console.log('Switching to project:', project.name);
       
-      // Clear canvas state for the new project
-      await CanvasStateService.clearCanvasState(projectId);
+      // Switch to the project using the service
+      await ProjectService.switchToProject(project.id);
+      
+      // Clear any existing canvas state for clean start
+      await CanvasStateService.clearCanvasState(project.id);
       
       toast({
         title: "Project switched",
-        description: "Switched to selected project. Canvas has been cleared.",
+        description: `Now working on "${project.name}"`,
       });
       
-      navigate('/dashboard');
+      // Navigate to canvas using project slug
+      navigate(`/canvas/${project.slug}`);
     } catch (error) {
       console.error('Failed to switch project:', error);
       toast({
-        title: "Switch failed",
-        description: "Could not switch to the selected project.",
+        title: "Error switching project",
+        description: "Failed to switch to the selected project. Please try again.",
         variant: "destructive",
       });
     }
@@ -125,12 +130,12 @@ const Projects = () => {
         description: `${project.name} is ready for analysis.`,
       });
       
-      navigate('/canvas');
+      navigate(`/canvas/${project.slug}`);
     } catch (error) {
       console.error('Failed to create project:', error);
       toast({
-        title: "Creation failed",
-        description: "Could not create new project.",
+        title: "Error creating project",
+        description: "Failed to create a new project. Please try again.",
         variant: "destructive",
       });
     }
@@ -224,7 +229,7 @@ const Projects = () => {
                 <Card 
                   key={project.id} 
                   className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => handleSwitchProject(project.id)}
+                  onClick={() => handleSwitchProject(project)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">

@@ -44,6 +44,11 @@ const App = () => (
                   <Canvas />
                 </ProtectedRoute>
               } />
+              <Route path="/canvas/:projectSlug" element={
+                <ProtectedRoute>
+                  <Canvas />
+                </ProtectedRoute>
+              } />
               <Route path="/projects" element={
                 <ProtectedRoute>
                   <Projects />

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { UXAnalysis, UploadedImage, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
+import { SlugService } from './SlugService';
 
 // Project management for user data isolation
 export class ProjectService {
@@ -25,13 +26,15 @@ export class ProjectService {
       return this.currentProjectId;
     }
 
-    // Create default project
+    // Create default project with slug
+    const slug = await SlugService.generateUniqueSlug('Default Project');
     const { data: newProject, error: createError } = await supabase
       .from('projects')
       .insert({
         user_id: user.id,
         name: 'Default Project',
-        description: 'Your UX analysis workspace'
+        description: 'Your UX analysis workspace',
+        slug
       })
       .select('id')
       .single();
@@ -79,12 +82,16 @@ export class ProjectService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Generate unique slug
+    const slug = await SlugService.generateUniqueSlug(name);
+
     const { data: newProject, error } = await supabase
       .from('projects')
       .insert({
         user_id: user.id,
         name,
-        description: description || ''
+        description: description || '',
+        slug
       })
       .select('*')
       .single();
@@ -115,12 +122,36 @@ export class ProjectService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const projectName = name || `New Analysis ${new Date().toLocaleDateString()}`;
-    const project = await this.createProject(projectName, description);
+    let projectName: string;
+    let slug: string;
+
+    if (name) {
+      // Use provided name and generate slug
+      projectName = name;
+      slug = await SlugService.generateUniqueSlug(name);
+    } else {
+      // Generate random name and slug
+      const randomProject = await SlugService.generateRandomProject();
+      projectName = randomProject.name;
+      slug = randomProject.slug;
+    }
+
+    const { data: newProject, error } = await supabase
+      .from('projects')
+      .insert({
+        user_id: user.id,
+        name: projectName,
+        description: description || `Created on ${new Date().toLocaleDateString()}`,
+        slug
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
     
     // Switch to the new project
-    this.currentProjectId = project.id;
-    return project;
+    this.currentProjectId = newProject.id;
+    return newProject;
   }
 
   static async clearCurrentProject() {
