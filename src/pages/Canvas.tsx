@@ -35,7 +35,8 @@ const Canvas = () => {
     handleGroupDisplayModeChange,
     handleSubmitGroupPrompt,
     handleEditGroupPrompt,
-    handleCreateFork
+    handleCreateFork,
+    handleAnalysisComplete
   } = useAppContext();
 
   // Track if user has existing data in the database
@@ -204,6 +205,7 @@ const Canvas = () => {
           onEditGroupPrompt={handleEditGroupPrompt}
           onCreateFork={handleCreateFork}
           onOpenAnalysisPanel={handleOpenAnalysisPanel}
+          onAnalysisComplete={handleAnalysisComplete}
           isGeneratingConcept={isGeneratingConcept}
         />
       </div>

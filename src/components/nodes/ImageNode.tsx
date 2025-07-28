@@ -1,13 +1,15 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { ZoomIn, Info, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
+import { ZoomIn, Info, AlertTriangle, CheckCircle, AlertCircle, Brain } from 'lucide-react';
 import { UXAnalysis, UploadedImage, AnnotationPoint } from '@/types/ux-analysis';
+import { ImageAnalysisDialog } from '@/components/ImageAnalysisDialog';
 
 interface ImageNodeProps {
   data: {
     image: UploadedImage;
     analysis: UXAnalysis;
     onAnnotationClick: (annotationId: string) => void;
+    onAnalysisComplete?: (analysis: UXAnalysis) => void;
   };
 }
 
@@ -64,9 +66,10 @@ const AnnotationMarker: React.FC<{
 };
 
 export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
-  const { image, analysis, onAnnotationClick } = data;
+  const { image, analysis, onAnnotationClick, onAnalysisComplete } = data;
   const [isHovered, setIsHovered] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
   return (
     <div 
@@ -81,6 +84,13 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
             {image.name}
           </h3>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAnalysisDialog(true)}
+              className="p-1 rounded transition-colors hover:bg-accent"
+              title="Analyze with AI"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
             <button
               onClick={() => setShowAnnotations(!showAnnotations)}
               className={`p-1 rounded transition-colors ${
@@ -152,6 +162,20 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
 
       {/* React Flow Handles */}
       <Handle type="source" position={Position.Right} className="opacity-0" />
+      
+      {/* AI Analysis Dialog */}
+      {showAnalysisDialog && (
+        <ImageAnalysisDialog
+          imageId={image.id}
+          imageName={image.name}
+          imageUrl={image.url}
+          onClose={() => setShowAnalysisDialog(false)}
+          onAnalysisComplete={(newAnalysis) => {
+            onAnalysisComplete?.(newAnalysis);
+            setShowAnalysisDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 });

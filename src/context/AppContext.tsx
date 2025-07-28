@@ -51,6 +51,9 @@ interface AppContextType {
   toggleAnnotation: (annotationId: string) => void;
   clearAnnotations: () => void;
   
+  // AI Analysis actions
+  handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
+  
   // Migration actions
   syncToDatabase: () => Promise<void>;
   loadDataFromDatabase: () => Promise<void>;
@@ -968,6 +971,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [groupPromptSessions]);
 
+  const handleAnalysisComplete = useCallback((imageId: string, newAnalysis: UXAnalysis) => {
+    console.log('Handling analysis completion for image:', imageId);
+    setAnalyses(prev => {
+      const existingIndex = prev.findIndex(a => a.imageId === imageId);
+      if (existingIndex >= 0) {
+        // Update existing analysis
+        const updated = [...prev];
+        updated[existingIndex] = newAnalysis;
+        return updated;
+      } else {
+        // Add new analysis
+        return [...prev, newAnalysis];
+      }
+    });
+    
+    toast({
+      title: "Analysis Complete",
+      description: "New AI analysis has been generated for your image.",
+    });
+  }, [toast]);
+
   const value: AppContextType = {
     // State
     uploadedImages,
@@ -1007,6 +1031,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleCreateFork,
     toggleAnnotation,
     clearAnnotations,
+    
+    // AI Analysis actions
+    handleAnalysisComplete,
+    
+    // Migration actions
     syncToDatabase,
     loadDataFromDatabase,
   };

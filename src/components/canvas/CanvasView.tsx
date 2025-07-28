@@ -69,6 +69,7 @@ interface CanvasViewProps {
   onEditGroupPrompt?: (sessionId: string) => void;
   onCreateFork?: (sessionId: string) => void;
   onOpenAnalysisPanel?: (analysisId: string) => void;
+  onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
   isGeneratingConcept?: boolean;
 }
 
@@ -95,6 +96,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onEditGroupPrompt,
   onCreateFork,
   onOpenAnalysisPanel,
+  onAnalysisComplete,
   isGeneratingConcept
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
@@ -202,7 +204,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onViewChange: stableCallbacks.onViewChange,
           onImageSelect: stableCallbacks.onImageSelect,
           onToggleSelection: stableCallbacks.onToggleSelection,
-          isSelected: stableCallbacks.isSelected(image.id)
+          isSelected: stableCallbacks.isSelected(image.id),
+          onAnnotationClick: () => {},
+          onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+            onAnalysisComplete?.(image.id, newAnalysis);
+          }
         },
       };
       nodes.push(imageNode);
@@ -451,7 +457,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               onViewChange: stableCallbacks.onViewChange,
               onImageSelect: stableCallbacks.onImageSelect,
               onToggleSelection: stableCallbacks.onToggleSelection,
-              isSelected: stableCallbacks.isSelected(image.id)
+              isSelected: stableCallbacks.isSelected(image.id),
+              onAnnotationClick: () => {},
+              onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+                onAnalysisComplete?.(image.id, newAnalysis);
+              }
             },
           };
           nodes.push(imageNode);
@@ -586,7 +596,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               onViewChange: stableCallbacks.onViewChange,
               onImageSelect: stableCallbacks.onImageSelect,
               onToggleSelection: stableCallbacks.onToggleSelection,
-              isSelected: stableCallbacks.isSelected(image.id)
+              isSelected: stableCallbacks.isSelected(image.id),
+              onAnnotationClick: () => {},
+              onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+                onAnalysisComplete?.(image.id, newAnalysis);
+              }
             },
           };
           nodes.push(imageNode);
