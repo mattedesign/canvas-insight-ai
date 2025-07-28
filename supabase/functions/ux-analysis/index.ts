@@ -706,12 +706,39 @@ Respond with a JSON object:
     
     const aiConcept = JSON.parse(aiResponse);
     
+    // Generate the actual concept image using OpenAI's image generation
+    const imagePrompt = `Create a modern UI/UX design concept based on: ${aiConcept.title}. ${aiConcept.description}. Focus on: ${aiConcept.improvements?.slice(0, 3).join(', ')}. Style: clean, modern, professional interface design with good visual hierarchy and accessibility.`;
+    
+    const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: imagePrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high',
+        output_format: 'png'
+      })
+    });
+
+    if (!imageResponse.ok) {
+      console.error('Image generation failed, using placeholder');
+      var generatedImageUrl = `https://picsum.photos/1024/768?random=${Date.now()}`;
+    } else {
+      const imageData = await imageResponse.json();
+      var generatedImageUrl = imageData.data[0].url || `https://picsum.photos/1024/768?random=${Date.now()}`;
+    }
+    
     return {
       success: true,
       data: {
         title: aiConcept.title || 'AI-Enhanced Design Concept',
         description: aiConcept.description || 'A comprehensive design improvement based on UX analysis',
-        imageUrl: `https://picsum.photos/1024/768?random=${Date.now()}`, // Placeholder until image generation implemented
+        imageUrl: generatedImageUrl,
         improvements: aiConcept.improvements || ['Enhanced usability', 'Improved accessibility', 'Better visual hierarchy'],
         rationale: aiConcept.rationale || 'Addresses key usability concerns identified in the analysis',
         implementationNotes: aiConcept.implementationNotes || ['Consider user testing', 'Implement incrementally']
