@@ -520,15 +520,53 @@ async function analyzeGroup(payload: any) {
   try {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     
-    if (openaiApiKey && payload.imageUrls && payload.imageUrls.length > 0) {
+    if (!openaiApiKey) {
+      console.log('No OpenAI API key found, using mock group analysis');
+      return generateMockGroupAnalysis();
+    }
+
+    // If we have imageIds, fetch the image URLs from the database
+    let imageUrls = payload.imageUrls || [];
+    
+    if (payload.imageIds && payload.imageIds.length > 0) {
+      console.log('Fetching image URLs for imageIds:', payload.imageIds);
+      
+      const { data: images, error } = await supabase
+        .from('images')
+        .select('storage_path, filename')
+        .in('id', payload.imageIds);
+      
+      if (error) {
+        console.error('Error fetching images from database:', error);
+        throw new Error(`Database query failed: ${error.message}`);
+      }
+      
+      if (!images || images.length === 0) {
+        console.error('No images found for the provided imageIds');
+        throw new Error('No images found for analysis');
+      }
+      
+      // Convert storage paths to public URLs
+      imageUrls = images.map(image => {
+        const publicUrl = `${supabase.supabaseUrl}/storage/v1/object/public/images/${image.storage_path}`;
+        console.log(`Generated URL for ${image.filename}: ${publicUrl}`);
+        return publicUrl;
+      });
+      
+      console.log(`Successfully fetched ${imageUrls.length} image URLs for group analysis`);
+    }
+    
+    if (imageUrls.length > 0) {
       console.log('Using AI for intelligent group analysis');
-      return await performAIGroupAnalysis(payload, openaiApiKey);
+      const updatedPayload = { ...payload, imageUrls };
+      return await performAIGroupAnalysis(updatedPayload, openaiApiKey);
     } else {
-      console.log('Using mock group analysis');
+      console.log('No image URLs available, using mock group analysis');
       return generateMockGroupAnalysis();
     }
   } catch (error) {
     console.error('Error in group analysis, falling back to mock:', error);
+    console.error('Error details:', error.message, error.stack);
     return generateMockGroupAnalysis();
   }
 }
@@ -655,7 +693,24 @@ Respond with a JSON object:
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
     
-    const aiAnalysis = JSON.parse(aiResponse);
+    // Parse JSON response - handle markdown code blocks
+    let aiAnalysis;
+    try {
+      // Remove markdown code block wrapping if present
+      let cleanResponse = aiResponse.trim();
+      if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+      } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
+      }
+      
+      aiAnalysis = JSON.parse(cleanResponse);
+      console.log('Successfully parsed AI group analysis response');
+    } catch (parseError) {
+      console.error('Failed to parse AI group analysis response as JSON:', parseError);
+      console.error('Raw AI response:', aiResponse);
+      throw new Error('Invalid AI response format for group analysis');
+    }
     
     return {
       success: true,
