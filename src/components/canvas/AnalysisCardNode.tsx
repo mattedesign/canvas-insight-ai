@@ -33,11 +33,35 @@ interface AnalysisCardNodeProps {
 }
 
 export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
+  // Add null/undefined checks to prevent React state errors
+  if (!data || !data.analysis) {
+    return (
+      <Card className="bg-background border-border shadow-lg w-96">
+        <CardContent className="p-4 text-center">
+          <div className="text-muted-foreground">Analysis data not available</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const { analysis, onGenerateConcept, isGeneratingConcept = false, onExpandedChange } = data;
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Ensure analysis has all required properties with fallbacks
+  const safeAnalysis = {
+    id: analysis.id || '',
+    summary: {
+      overallScore: analysis.summary?.overallScore || 0,
+      categoryScores: analysis.summary?.categoryScores || {},
+      keyIssues: analysis.summary?.keyIssues || [],
+      strengths: analysis.summary?.strengths || []
+    },
+    suggestions: analysis.suggestions || [],
+    ...analysis
+  };
+
   const handleViewFullAnalysis = () => {
-    onExpandedChange?.(analysis.id, true);
+    onExpandedChange?.(safeAnalysis.id, true);
   };
   
   const getScoreColor = (score: number) => {
@@ -56,7 +80,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     if (!onGenerateConcept || isGeneratingConcept) return;
     
     try {
-      await onGenerateConcept(analysis.id);
+      await onGenerateConcept(safeAnalysis.id);
     } catch (error) {
       console.error('Failed to generate concept:', error);
     }
@@ -96,8 +120,8 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
           <CardTitle className="text-lg font-semibold text-foreground">
             UX Analysis
           </CardTitle>
-          <Badge variant={getScoreVariant(analysis.summary.overallScore)}>
-            {analysis.summary.overallScore}/100
+          <Badge variant={getScoreVariant(safeAnalysis.summary.overallScore)}>
+            {safeAnalysis.summary.overallScore}/100
           </Badge>
         </div>
       </CardHeader>
@@ -106,7 +130,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         {/* Category Scores */}
         <div className="space-y-3">
           <h4 className="font-medium text-foreground text-sm">Category Scores</h4>
-          {Object.entries(analysis.summary.categoryScores).map(([category, score]) => (
+          {Object.entries(safeAnalysis.summary.categoryScores).map(([category, score]) => (
             <div key={category} className="space-y-1">
               <div className="flex justify-between text-sm">
                 <div className="flex items-center gap-2">
@@ -120,14 +144,14 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         </div>
         
         {/* Key Issues */}
-        {analysis.summary.keyIssues.length > 0 && (
+        {safeAnalysis.summary.keyIssues.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-destructive" />
               <h4 className="font-medium text-foreground text-sm">Key Issues</h4>
             </div>
             <div className="space-y-1">
-              {analysis.summary.keyIssues.slice(0, 3).map((issue, index) => (
+              {safeAnalysis.summary.keyIssues.slice(0, 3).map((issue, index) => (
                 <div key={index} className="text-sm text-muted-foreground pl-2 border-l-2 border-destructive/30">
                   {issue}
                 </div>
@@ -137,14 +161,14 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         )}
         
         {/* Strengths */}
-        {analysis.summary.strengths.length > 0 && (
+        {safeAnalysis.summary.strengths.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <h4 className="font-medium text-foreground text-sm">Strengths</h4>
             </div>
             <div className="space-y-1">
-              {analysis.summary.strengths.slice(0, 2).map((strength, index) => (
+              {safeAnalysis.summary.strengths.slice(0, 2).map((strength, index) => (
                 <div key={index} className="text-sm text-muted-foreground pl-2 border-l-2 border-green-600/30">
                   {strength}
                 </div>
@@ -160,7 +184,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
             <span className="text-sm font-medium text-foreground">Suggestions</span>
           </div>
           <Badge variant="outline">
-            {analysis.suggestions.length}
+            {safeAnalysis.suggestions.length}
           </Badge>
         </div>
         

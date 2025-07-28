@@ -197,7 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         let imageUrl = URL.createObjectURL(file);
         
-        // If user is authenticated, upload to Supabase Storage AND create DB record
+        // If user is authenticated, upload to Supabase Storage AND create DB record with better error handling
         if (user) {
           try {
             console.log('User authenticated, uploading to Supabase...');
@@ -209,25 +209,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               
               const fileName = `${authUser.id}/${imageId}/${file.name}`;
               
-              // Upload to storage
-              console.log('Uploading to storage with filename:', fileName);
-              const { error: uploadError } = await supabase.storage
+              // Check if file already exists to handle duplicates gracefully
+              const { data: existingFiles } = await supabase.storage
                 .from('images')
-                .upload(fileName, file);
+                .list(`${authUser.id}/${imageId}`);
 
-              if (!uploadError) {
-                console.log('Storage upload successful');
+              let uploadSuccessful = false;
+              if (!existingFiles || existingFiles.length === 0) {
+                // Upload to storage
+                console.log('Uploading to storage with filename:', fileName);
+                const { error: uploadError } = await supabase.storage
+                  .from('images')
+                  .upload(fileName, file);
+
+                if (!uploadError) {
+                  uploadSuccessful = true;
+                  console.log('Storage upload successful');
+                } else if (uploadError.message?.includes('already exists')) {
+                  uploadSuccessful = true; // File already exists, that's okay
+                  console.log('File already exists in storage, continuing...');
+                } else {
+                  console.error('Storage upload failed:', uploadError);
+                  throw uploadError;
+                }
+              } else {
+                uploadSuccessful = true; // File already exists
+                console.log('File already exists in storage, continuing...');
+              }
+
+              if (uploadSuccessful) {
                 const { data: urlData } = supabase.storage
                   .from('images')
                   .getPublicUrl(fileName);
                 imageUrl = urlData.publicUrl;
                 console.log('Public URL obtained:', imageUrl);
                 
-                // Create image record in database immediately 
-                console.log('Creating image record in database...');
+                // Create image record in database with upsert to handle conflicts
+                console.log('Creating/updating image record in database...');
                 const { error: dbError } = await supabase
                   .from('images')
-                  .insert({
+                  .upsert({
                     id: imageId,
                     project_id: projectId,
                     filename: imageId, // Use imageId as filename for edge function compatibility
@@ -236,15 +257,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     dimensions: dimensions,
                     file_size: file.size,
                     file_type: file.type
+                  }, {
+                    onConflict: 'id'
                   });
                   
                 if (dbError) {
-                  console.error('Failed to create image record:', dbError);
+                  console.error('Failed to create/update image record:', dbError);
+                  // Continue anyway - we can still analyze with the image URL
                 } else {
-                  console.log('Image record created successfully:', imageId);
+                  console.log('Image record created/updated successfully:', imageId);
                 }
-              } else {
-                console.error('Storage upload failed:', uploadError);
               }
             }
           } catch (error) {
@@ -314,10 +336,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
       });
 
-      // Auto-sync to database if user is authenticated
-      if (user) {
-        setTimeout(() => syncToDatabase(), 1000);
-      }
+      // Note: Removed auto-sync to prevent database conflicts
+      // Users can manually sync via the interface when ready
+      console.log('Upload complete. Manual sync available via interface.');
       
     } catch (error) {
       console.error('Upload process failed:', error);

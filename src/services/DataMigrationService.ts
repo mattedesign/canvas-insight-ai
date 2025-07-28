@@ -118,36 +118,65 @@ export class ProjectService {
 
 // Image data migration service
 export class ImageMigrationService {
-  // Convert File to storage path and create database record
+  // Convert File to storage path and create database record with duplicate handling
   static async migrateImageToDatabase(uploadedImage: UploadedImage): Promise<string> {
-    const projectId = await ProjectService.getCurrentProject();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-    // Upload file to storage
-    const fileName = `${user.id}/${uploadedImage.id}/${uploadedImage.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from('images')
-      .upload(fileName, uploadedImage.file);
+      // Check if image already exists in database
+      const { data: existingImage } = await supabase
+        .from('images')
+        .select('id')
+        .eq('id', uploadedImage.id)
+        .single();
 
-    if (uploadError) throw uploadError;
+      if (existingImage) {
+        console.log('Image already exists in database:', uploadedImage.id);
+        return existingImage.id;
+      }
 
-    // Create database record
-    const { data, error } = await supabase
-      .from('images')
-      .insert({
-        id: uploadedImage.id,
-        project_id: projectId,
-        filename: uploadedImage.name,
-        original_name: uploadedImage.name,
-        storage_path: fileName,
-        dimensions: uploadedImage.dimensions
-      })
-      .select('id')
-      .single();
+      // Upload file to storage with conflict handling
+      const fileName = `${user.id}/${uploadedImage.id}/${uploadedImage.name}`;
+      
+      // Check if file already exists in storage
+      const { data: existingFile } = await supabase.storage
+        .from('images')
+        .list(`${user.id}/${uploadedImage.id}`);
 
-    if (error) throw error;
-    return data.id;
+      if (!existingFile || existingFile.length === 0) {
+        const { error: uploadError } = await supabase.storage
+          .from('images')
+          .upload(fileName, uploadedImage.file);
+
+        if (uploadError && !uploadError.message?.includes('already exists')) {
+          throw uploadError;
+        }
+      }
+
+      // Create database record using upsert
+      const { data, error } = await supabase
+        .from('images')
+        .upsert({
+          id: uploadedImage.id,
+          project_id: projectId,
+          filename: uploadedImage.name,
+          original_name: uploadedImage.name,
+          storage_path: fileName,
+          dimensions: uploadedImage.dimensions
+        }, {
+          onConflict: 'id'
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error migrating image to database:', error);
+      throw error;
+    }
   }
 
   // Load images from database back to UploadedImage format
