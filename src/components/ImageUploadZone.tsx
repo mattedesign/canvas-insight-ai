@@ -1,12 +1,13 @@
 import React, { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Image, FileText } from 'lucide-react';
+import { Upload, Image, FileText, Loader2 } from 'lucide-react';
 
 interface ImageUploadZoneProps {
   onImageUpload: (files: File[]) => void;
+  isUploading?: boolean;
 }
 
-export const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({ onImageUpload }) => {
+export const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({ onImageUpload, isUploading = false }) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     onImageUpload(acceptedFiles);
   }, [onImageUpload]);
@@ -18,6 +19,7 @@ export const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({ onImageUpload 
       'text/html': ['.html'],
     },
     multiple: true,
+    disabled: isUploading,
   });
 
   return (
@@ -38,16 +40,23 @@ export const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({ onImageUpload 
         <div className={`
           mx-auto w-16 h-16 rounded-full flex items-center justify-center transition-all
           ${isDragActive ? 'bg-primary text-primary-foreground' : 'bg-muted'}
+          ${isUploading ? 'bg-primary text-primary-foreground' : ''}
         `}>
-          <Upload className="w-8 h-8" />
+          {isUploading ? (
+            <Loader2 className="w-8 h-8 animate-spin" />
+          ) : (
+            <Upload className="w-8 h-8" />
+          )}
         </div>
         
         <div className="space-y-3">
           <h3 className="text-xl font-semibold">
-            {isDragActive ? 'Drop your files here' : 'Upload Design Files'}
+            {isUploading ? 'Processing files...' : 
+             isDragActive ? 'Drop your files here' : 'Upload Design Files'}
           </h3>
           <p className="text-muted-foreground">
-            Drag and drop your design files or click to browse
+            {isUploading ? 'Uploading and analyzing your images' :
+             'Drag and drop your design files or click to browse'}
           </p>
         </div>
 

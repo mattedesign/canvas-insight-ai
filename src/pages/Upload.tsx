@@ -11,6 +11,7 @@ const Upload = () => {
     analyses, 
     selectedImageId,
     showAnnotations,
+    isUploading,
     handleImageUpload,
     handleClearCanvas,
     handleImageSelect,
@@ -72,7 +73,7 @@ const Upload = () => {
       
       <div className="flex-1">
         <div className="h-full flex items-center justify-center">
-          <ImageUploadZone onImageUpload={handleUploadComplete} />
+          <ImageUploadZone onImageUpload={handleUploadComplete} isUploading={isUploading} />
         </div>
       </div>
     </div>

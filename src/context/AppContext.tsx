@@ -28,6 +28,7 @@ interface AppContextType {
   // Migration state
   isLoading: boolean;
   isSyncing: boolean;
+  isUploading: boolean;
   
   // Actions
   handleImageUpload: (files: File[]) => Promise<void>;
@@ -84,6 +85,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Migration state
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
@@ -158,9 +160,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newImages: UploadedImage[] = [];
     const newAnalyses: UXAnalysis[] = [];
 
+    setIsUploading(true);
+    
+    // Show upload progress toast
+    toast({
+      title: "Uploading images",
+      description: `Processing ${files.length} image${files.length > 1 ? 's' : ''}...`,
+    });
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const imageId = `img-${Date.now()}-${i}`;
+      // Generate proper UUID for database compatibility
+      const imageId = crypto.randomUUID();
 
       // Get actual image dimensions first
       const img = new Image();
@@ -275,11 +286,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedImageId(newImages[0].id);
     }
 
+    // Show success feedback
+    toast({
+      title: "Upload complete",
+      description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
+    });
+
     // Auto-sync to database if user is authenticated
     if (user) {
       setTimeout(() => syncToDatabase(), 1000);
     }
-  }, [selectedImageId, user]);
+    
+    setIsUploading(false);
+  }, [selectedImageId, user, toast]);
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
     setIsGeneratingConcept(true);
@@ -348,7 +367,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const handleCreateGroup = useCallback(async (imageIds: string[]) => {
-    const groupId = `group-${Date.now()}`;
+    const groupId = crypto.randomUUID();
     const groupNumber = imageGroups.length + 1;
     const defaultColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
     const color = defaultColors[(groupNumber - 1) % defaultColors.length];
@@ -663,6 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     viewerState,
     isLoading,
     isSyncing,
+    isUploading,
     
     // Actions
     handleImageUpload,
