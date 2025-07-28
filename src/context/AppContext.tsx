@@ -162,142 +162,174 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setIsUploading(true);
     
-    // Show upload progress toast
-    toast({
-      title: "Uploading images",
-      description: `Processing ${files.length} image${files.length > 1 ? 's' : ''}...`,
-    });
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      // Generate proper UUID for database compatibility
-      const imageId = crypto.randomUUID();
-
-      // Get actual image dimensions first
-      const img = new Image();
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        const imageUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(imageUrl); // Clean up
-          resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(imageUrl);
-          reject(new Error('Failed to load image'));
-        };
-        img.src = imageUrl;
+    try {
+      // Show upload progress toast
+      toast({
+        title: "Uploading images",
+        description: `Processing ${files.length} image${files.length > 1 ? 's' : ''}...`,
       });
 
-      let imageUrl = URL.createObjectURL(file);
-      
-      // If user is authenticated, upload to Supabase Storage AND create DB record
-      if (user) {
-        try {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          if (authUser) {
-            const projectId = await ProjectService.getCurrentProject();
-            const fileName = `${authUser.id}/${imageId}/${file.name}`;
-            
-            // Upload to storage
-            const { error: uploadError } = await supabase.storage
-              .from('images')
-              .upload(fileName, file);
+      console.log('Starting upload process for', files.length, 'files');
 
-            if (!uploadError) {
-              const { data: urlData } = supabase.storage
-                .from('images')
-                .getPublicUrl(fileName);
-              imageUrl = urlData.publicUrl;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`Processing file ${i + 1}/${files.length}:`, file.name);
+        
+        // Generate proper UUID for database compatibility
+        const imageId = crypto.randomUUID();
+
+        // Get actual image dimensions first
+        const img = new Image();
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+          const imageUrl = URL.createObjectURL(file);
+          img.onload = () => {
+            URL.revokeObjectURL(imageUrl); // Clean up
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(imageUrl);
+            reject(new Error('Failed to load image'));
+          };
+          img.src = imageUrl;
+        });
+
+        console.log('Image dimensions obtained:', dimensions);
+
+        let imageUrl = URL.createObjectURL(file);
+        
+        // If user is authenticated, upload to Supabase Storage AND create DB record
+        if (user) {
+          try {
+            console.log('User authenticated, uploading to Supabase...');
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+              console.log('Getting current project...');
+              const projectId = await ProjectService.getCurrentProject();
+              console.log('Project ID obtained:', projectId);
               
-              // Create image record in database immediately 
-              const { error: dbError } = await supabase
+              const fileName = `${authUser.id}/${imageId}/${file.name}`;
+              
+              // Upload to storage
+              console.log('Uploading to storage with filename:', fileName);
+              const { error: uploadError } = await supabase.storage
                 .from('images')
-                .insert({
-                  id: imageId,
-                  project_id: projectId,
-                  filename: imageId, // Use imageId as filename for edge function compatibility
-                  original_name: file.name,
-                  storage_path: fileName,
-                  dimensions: dimensions,
-                  file_size: file.size,
-                  file_type: file.type
-                });
+                .upload(fileName, file);
+
+              if (!uploadError) {
+                console.log('Storage upload successful');
+                const { data: urlData } = supabase.storage
+                  .from('images')
+                  .getPublicUrl(fileName);
+                imageUrl = urlData.publicUrl;
+                console.log('Public URL obtained:', imageUrl);
                 
-              if (dbError) {
-                console.error('Failed to create image record:', dbError);
+                // Create image record in database immediately 
+                console.log('Creating image record in database...');
+                const { error: dbError } = await supabase
+                  .from('images')
+                  .insert({
+                    id: imageId,
+                    project_id: projectId,
+                    filename: imageId, // Use imageId as filename for edge function compatibility
+                    original_name: file.name,
+                    storage_path: fileName,
+                    dimensions: dimensions,
+                    file_size: file.size,
+                    file_type: file.type
+                  });
+                  
+                if (dbError) {
+                  console.error('Failed to create image record:', dbError);
+                } else {
+                  console.log('Image record created successfully:', imageId);
+                }
               } else {
-                console.log('Image record created successfully:', imageId);
+                console.error('Storage upload failed:', uploadError);
               }
             }
+          } catch (error) {
+            console.error('Failed to upload to storage, using local URL:', error);
           }
-        } catch (error) {
-          console.error('Failed to upload to storage, using local URL:', error);
         }
-      }
 
-      // Create uploaded image record with actual storage URL or local fallback
-      const uploadedImage: UploadedImage = {
-        id: imageId,
-        name: file.name,
-        url: imageUrl,
-        file,
-        dimensions,
-      };
+        // Create uploaded image record with actual storage URL or local fallback
+        const uploadedImage: UploadedImage = {
+          id: imageId,
+          name: file.name,
+          url: imageUrl,
+          file,
+          dimensions,
+        };
 
-      // Generate analysis via edge function if authenticated, otherwise use mock
-      let analysis;
-      if (user) {
-        try {
-          const { data, error } = await supabase.functions.invoke('ux-analysis', {
-            body: {
-              type: 'ANALYZE_IMAGE',
-              payload: {
-                imageId,
-                imageUrl,
-                imageName: file.name,
-                userContext: ''
+        // Generate analysis via edge function if authenticated, otherwise use mock
+        let analysis;
+        if (user) {
+          try {
+            console.log('Calling edge function for analysis...');
+            const { data, error } = await supabase.functions.invoke('ux-analysis', {
+              body: {
+                type: 'ANALYZE_IMAGE',
+                payload: {
+                  imageId,
+                  imageUrl,
+                  imageName: file.name,
+                  userContext: ''
+                }
               }
+            });
+            
+            if (error) throw error;
+            if (data.success) {
+              analysis = data.data;
+              console.log('Analysis completed successfully');
+            } else {
+              throw new Error('Analysis failed');
             }
-          });
-          
-          if (error) throw error;
-          if (data.success) {
-            analysis = data.data;
-          } else {
-            throw new Error('Analysis failed');
+          } catch (error) {
+            console.error('Edge function analysis failed, using mock:', error);
+            analysis = generateMockAnalysis(imageId, file.name, imageUrl);
           }
-        } catch (error) {
-          console.error('Edge function analysis failed, using mock:', error);
+        } else {
+          console.log('User not authenticated, using mock analysis');
           analysis = generateMockAnalysis(imageId, file.name, imageUrl);
         }
-      } else {
-        analysis = generateMockAnalysis(imageId, file.name, imageUrl);
+
+        newImages.push(uploadedImage);
+        newAnalyses.push(analysis);
+        console.log(`Completed processing file ${i + 1}/${files.length}`);
       }
 
-      newImages.push(uploadedImage);
-      newAnalyses.push(analysis);
-    }
+      console.log('All files processed, updating state...');
+      setUploadedImages(prev => [...prev, ...newImages]);
+      setAnalyses(prev => [...prev, ...newAnalyses]);
+      
+      // Auto-select first image if none selected
+      if (!selectedImageId && newImages.length > 0) {
+        setSelectedImageId(newImages[0].id);
+      }
 
-    setUploadedImages(prev => [...prev, ...newImages]);
-    setAnalyses(prev => [...prev, ...newAnalyses]);
-    
-    // Auto-select first image if none selected
-    if (!selectedImageId && newImages.length > 0) {
-      setSelectedImageId(newImages[0].id);
-    }
+      // Show success feedback
+      toast({
+        title: "Upload complete",
+        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
+      });
 
-    // Show success feedback
-    toast({
-      title: "Upload complete",
-      description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
-    });
-
-    // Auto-sync to database if user is authenticated
-    if (user) {
-      setTimeout(() => syncToDatabase(), 1000);
+      // Auto-sync to database if user is authenticated
+      if (user) {
+        setTimeout(() => syncToDatabase(), 1000);
+      }
+      
+    } catch (error) {
+      console.error('Upload process failed:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      console.log('Upload process completed, setting isUploading to false');
+      setIsUploading(false);
     }
-    
-    setIsUploading(false);
   }, [selectedImageId, user, toast]);
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
