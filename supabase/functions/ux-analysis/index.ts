@@ -408,7 +408,7 @@ Focus on initial visual assessment and return structured JSON:
 }`;
 
   const requestPayload = {
-    model: 'claude-3-5-sonnet-20241022', // Using stable proven model
+    model: 'claude-sonnet-4-20250514', // Using latest Claude Sonnet 4
     max_tokens: 1500,
     messages: [{
       role: 'user',
@@ -436,8 +436,7 @@ Focus on initial visual assessment and return structured JSON:
         headers: {
           'Authorization': `Bearer ${anthropicApiKey}`,
           'Content-Type': 'application/json',
-          'anthropic-version': '2024-06-01', // Updated API version
-          'anthropic-dangerous-direct-browser-access': 'true'
+          'anthropic-version': '2024-06-01'
         },
         body: JSON.stringify(requestPayload)
       });
@@ -717,7 +716,7 @@ Provide comprehensive UX analysis in strict JSON format:
 }`;
 
     const requestPayload = {
-      model: 'claude-3-5-sonnet-20241022', // Using stable proven model
+      model: 'claude-sonnet-4-20250514', // Using latest Claude Sonnet 4
       max_tokens: 2500,
       messages: [{
         role: 'user',
@@ -751,8 +750,7 @@ Provide comprehensive UX analysis in strict JSON format:
           headers: {
             'Authorization': `Bearer ${anthropicApiKey}`,
             'Content-Type': 'application/json',
-            'anthropic-version': '2024-06-01', // Updated API version
-            'anthropic-dangerous-direct-browser-access': 'true'
+            'anthropic-version': '2024-06-01'
           },
           body: JSON.stringify(requestPayload)
         });
@@ -2110,7 +2108,7 @@ async function analyzeMarkedRegion(imageUrl: string, prompt: string, bounds?: { 
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         messages: [
           {
