@@ -112,21 +112,21 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   }, []);
 
   const handleRequestAnalysis = useCallback(async (prompt: string) => {
-    // Simulate AI analysis request
+    // This would be handled by the DrawingOverlay component
+    // when the user draws on the image and requests analysis
     toast({
       title: "Analysis Requested",
-      description: "AI is analyzing your request and will provide insights shortly.",
+      description: `Use drawing mode to mark regions for analysis`,
     });
-    // Here you would integrate with your AI analysis service
   }, [toast]);
 
   const handleGenerateVariation = useCallback(async (prompt: string) => {
-    // Simulate variation generation
+    // This would be handled by the DrawingOverlay component
+    // when the user draws on the image and requests generation
     toast({
-      title: "Generating Variation",
-      description: "Creating a new design variation based on your request.",
+      title: "Generation Requested", 
+      description: `Use drawing mode to mark regions for inpainting`,
     });
-    // Here you would integrate with your design generation service
   }, [toast]);
 
   const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {

@@ -11,7 +11,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 interface AnalysisRequest {
-  type: 'ANALYZE_IMAGE' | 'ANALYZE_GROUP' | 'GENERATE_CONCEPT'
+  type: 'ANALYZE_IMAGE' | 'ANALYZE_GROUP' | 'GENERATE_CONCEPT' | 'INPAINT_REGION'
   payload: any
   aiModel?: 'openai' | 'google-vision' | 'claude-vision' | 'stability-ai' | 'auto'
 }
@@ -1791,6 +1791,318 @@ Technical specs: clean interface design, high contrast, modern typography, profe
   }
 }
 
+// Inpainting functionality
+async function inpaintRegion(payload: { 
+  imageUrl: string; 
+  imageName: string; 
+  maskData?: string; 
+  prompt: string; 
+  action: 'analyze' | 'generate'; 
+  bounds?: { x: number; y: number; width: number; height: number } 
+}, aiModel = 'auto') {
+  console.log('Starting inpainting operation');
+  console.log('Payload:', JSON.stringify(payload, null, 2));
+  console.log('AI model preference:', aiModel);
+
+  try {
+    const { imageUrl, imageName, maskData, prompt, action, bounds } = payload;
+
+    if (action === 'analyze') {
+      // Analyze the marked region with Claude or OpenAI
+      return await analyzeMarkedRegion(imageUrl, prompt, bounds);
+    } else if (action === 'generate') {
+      // Generate variation using Stability AI or OpenAI DALL-E 2
+      const preferredModel = aiModel === 'stability-ai' ? 'stability-ai' : 'openai';
+      
+      if (preferredModel === 'stability-ai') {
+        return await generateWithStabilityAI(imageUrl, maskData, prompt);
+      } else {
+        return await generateWithOpenAI(imageUrl, maskData, prompt);
+      }
+    }
+
+    throw new Error(`Unknown inpainting action: ${action}`);
+  } catch (error) {
+    console.error('Inpainting operation failed:', error);
+    throw error;
+  }
+}
+
+async function analyzeMarkedRegion(imageUrl: string, prompt: string, bounds?: { x: number; y: number; width: number; height: number }) {
+  console.log('Analyzing marked region with AI');
+  
+  try {
+    // Use Claude for analysis
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!anthropicApiKey) {
+      throw new Error('Anthropic API key not found');
+    }
+
+    const analysisPrompt = `Please analyze the marked region in this image. User's specific request: "${prompt}"
+
+    ${bounds ? `The marked region is at coordinates: x:${bounds.x}, y:${bounds.y}, width:${bounds.width}, height:${bounds.height}` : 'Focus on any highlighted or marked areas.'}
+
+    Provide:
+    1. What you observe in the marked region
+    2. Potential UX/UI issues or improvements
+    3. Specific recommendations
+    4. How this relates to the overall design
+
+    Respond in JSON format with: { "observation": "", "issues": [], "recommendations": [], "context": "" }`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: analysisPrompt
+              },
+              {
+                type: 'image',
+                source: {
+                  type: 'url',
+                  url: imageUrl
+                }
+              }
+            ]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Claude API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    let analysisResult;
+    
+    try {
+      analysisResult = JSON.parse(data.content[0].text);
+    } catch {
+      // If JSON parsing fails, structure the response
+      analysisResult = {
+        observation: data.content[0].text,
+        issues: ['Manual review recommended'],
+        recommendations: ['Further analysis needed'],
+        context: 'Analysis completed'
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        type: 'region_analysis',
+        analysis: analysisResult,
+        prompt: prompt,
+        bounds: bounds,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Region analysis failed:', error);
+    
+    // Fallback response
+    return {
+      success: false,
+      data: {
+        type: 'region_analysis',
+        analysis: {
+          observation: 'Unable to analyze region at this time',
+          issues: ['Analysis service temporarily unavailable'],
+          recommendations: ['Please try again later'],
+          context: 'Fallback response'
+        },
+        prompt: prompt,
+        bounds: bounds,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+}
+
+async function generateWithStabilityAI(imageUrl: string, maskData: string | undefined, prompt: string) {
+  console.log('Generating variation with Stability AI');
+  
+  try {
+    const stabilityApiKey = Deno.env.get('STABILITY_API_KEY');
+    if (!stabilityApiKey) {
+      throw new Error('Stability AI API key not found');
+    }
+
+    // Fetch the original image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+
+    // Create form data for Stability AI inpainting API
+    const formData = new FormData();
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    
+    if (maskData) {
+      // Convert mask data to blob if provided
+      const maskBuffer = Uint8Array.from(atob(maskData), c => c.charCodeAt(0));
+      formData.append('mask', new Blob([maskBuffer]), 'mask.png');
+    }
+    
+    formData.append('prompt', prompt);
+    formData.append('output_format', 'png');
+    formData.append('strength', '0.8');
+    formData.append('cfg_scale', '7');
+    formData.append('samples', '1');
+
+    const response = await fetch('https://api.stability.ai/v2beta/stable-image/edit/inpaint', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stabilityApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Stability AI API error:', response.status, errorText);
+      throw new Error(`Stability AI API error: ${response.status} - ${errorText}`);
+    }
+
+    const imageBuffer2 = await response.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer2)));
+    const dataUrl = `data:image/png;base64,${base64Image}`;
+
+    return {
+      success: true,
+      data: {
+        type: 'inpainted_image',
+        imageUrl: dataUrl,
+        prompt: prompt,
+        model: 'stability-ai',
+        timestamp: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('Stability AI generation failed:', error);
+    return generateFallbackInpaintedImage(prompt, 'stability-ai', error.message);
+  }
+}
+
+async function generateWithOpenAI(imageUrl: string, maskData: string | undefined, prompt: string) {
+  console.log('Generating variation with OpenAI DALL-E 2');
+  
+  try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+
+    // Fetch the original image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+
+    // Create form data for OpenAI inpainting API
+    const formData = new FormData();
+    formData.append('image', new Blob([imageBuffer]), 'image.png');
+    
+    if (maskData) {
+      const maskBuffer = Uint8Array.from(atob(maskData), c => c.charCodeAt(0));
+      formData.append('mask', new Blob([maskBuffer]), 'mask.png');
+    }
+    
+    formData.append('prompt', prompt);
+    formData.append('n', '1');
+    formData.append('size', '1024x1024');
+    formData.append('response_format', 'b64_json');
+
+    const response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const base64Image = data.data[0].b64_json;
+    const dataUrl = `data:image/png;base64,${base64Image}`;
+
+    return {
+      success: true,
+      data: {
+        type: 'inpainted_image',
+        imageUrl: dataUrl,
+        prompt: prompt,
+        model: 'openai-dalle2',
+        timestamp: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    console.error('OpenAI generation failed:', error);
+    return generateFallbackInpaintedImage(prompt, 'openai-dalle2', error.message);
+  }
+}
+
+function generateFallbackInpaintedImage(prompt: string, model: string, error: string) {
+  console.log('Generating fallback inpainted image');
+  
+  // Create a simple colored rectangle as fallback
+  const canvas = new OffscreenCanvas(1024, 1024);
+  const ctx = canvas.getContext('2d');
+  
+  if (ctx) {
+    // Create a gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 1024, 1024);
+    gradient.addColorStop(0, '#f0f0f0');
+    gradient.addColorStop(1, '#e0e0e0');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    // Add some text
+    ctx.fillStyle = '#666';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Inpainting service temporarily unavailable', 512, 480);
+    ctx.fillText(`Prompt: ${prompt.substring(0, 50)}...`, 512, 520);
+    ctx.fillText('Please try again later', 512, 560);
+  }
+
+  return {
+    success: false,
+    data: {
+      type: 'inpainted_image',
+      imageUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 transparent pixel
+      prompt: prompt,
+      model: model,
+      error: error,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -1816,6 +2128,9 @@ Deno.serve(async (req) => {
         break
       case 'GENERATE_CONCEPT':
         result = await generateConcept(payload)
+        break
+      case 'INPAINT_REGION':
+        result = await inpaintRegion(payload, aiModel)
         break
       default:
         throw new Error(`Unknown analysis type: ${type}`)

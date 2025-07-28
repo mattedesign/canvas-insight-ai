@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { AnnotationComment } from './AnnotationComment';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface DrawingOverlayProps {
   imageUrl: string;
@@ -134,24 +136,122 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   }, []);
 
   const handleRequestAnalysis = useCallback(async (prompt: string) => {
-    // Mock AI analysis for drawing region
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.log('AI Analysis requested for drawing region:', prompt);
-        resolve();
-      }, 1000);
-    });
-  }, []);
+    try {
+      toast({
+        title: "Analyzing region...",
+        description: "AI is analyzing the marked region",
+      });
+
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        body: {
+          type: 'INPAINT_REGION',
+          payload: {
+            imageUrl: imageUrl,
+            imageName: 'drawing-region',
+            prompt: prompt,
+            action: 'analyze',
+            bounds: drawingBounds
+          },
+          aiModel: 'claude-vision'
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success) {
+        toast({
+          title: "Analysis complete",
+          description: data.data.analysis.observation || "Region analysis completed",
+        });
+        console.log('Analysis result:', data.data);
+      } else {
+        throw new Error(data?.data?.error || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      toast({
+        title: "Analysis failed",
+        description: error.message || "Failed to analyze region",
+        variant: "destructive",
+      });
+    }
+  }, [imageUrl, drawingBounds, toast]);
 
   const handleGenerateVariation = useCallback(async (prompt: string) => {
-    // Mock AI generation for drawing region
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.log('AI Generation requested for drawing region:', prompt);
-        resolve();
-      }, 1000);
-    });
-  }, []);
+    try {
+      toast({
+        title: "Generating variation...",
+        description: "AI is creating a new design based on your prompt",
+      });
+
+      // Convert canvas drawing to mask data
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error('Canvas not available');
+      }
+
+      // Create mask from canvas
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (tempCtx) {
+        // Fill background with black (masked area)
+        tempCtx.fillStyle = 'black';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Draw white where user drew (unmasked area)
+        tempCtx.globalCompositeOperation = 'source-over';
+        tempCtx.drawImage(canvas, 0, 0);
+        
+        // Convert to base64
+        const maskDataUrl = tempCanvas.toDataURL('image/png');
+        const maskData = maskDataUrl.split(',')[1]; // Remove data:image/png;base64, prefix
+        
+        const { data, error } = await supabase.functions.invoke('ux-analysis', {
+          body: {
+            type: 'INPAINT_REGION',
+            payload: {
+              imageUrl: imageUrl,
+              imageName: 'drawing-region',
+              prompt: prompt,
+              action: 'generate',
+              maskData: maskData,
+              bounds: drawingBounds
+            },
+            aiModel: 'stability-ai' // Prefer Stability AI for generation
+          }
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data?.success) {
+          toast({
+            title: "Variation generated",
+            description: "New design variation created successfully",
+          });
+          console.log('Generated variation:', data.data);
+          
+          // You could emit an event here to show the generated image
+          // or update the parent component with the new image
+        } else {
+          throw new Error(data?.data?.error || 'Generation failed');
+        }
+      }
+    } catch (error) {
+      console.error('Generation failed:', error);
+      toast({
+        title: "Generation failed",
+        description: error.message || "Failed to generate variation",
+        variant: "destructive",
+      });
+    }
+  }, [imageUrl, drawingBounds, toast]);
 
   if (!isDrawMode && !hasDrawn) {
     return null;

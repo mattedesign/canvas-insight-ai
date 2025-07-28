@@ -53,15 +53,15 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   const handleRequestAnalysis = useCallback(async (prompt: string) => {
     toast({
-      title: "Analysis Requested",
-      description: "AI is analyzing your request and will provide insights shortly.",
+      title: "Analysis Available in Drawing Mode",
+      description: `Switch to drawing mode to analyze specific regions`,
     });
   }, [toast]);
 
   const handleGenerateVariation = useCallback(async (prompt: string) => {
     toast({
-      title: "Generating Variation", 
-      description: "Creating a new design variation based on your request.",
+      title: "Generation Available in Drawing Mode", 
+      description: `Switch to drawing mode to create inpainted variations`,
     });
   }, [toast]);
 
