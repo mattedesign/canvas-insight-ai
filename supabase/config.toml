@@ -1,7 +1,10 @@
 project_id = "sdcmbfdtafkzpimwjpij"
 
-[functions.ux-analysis]
+[functions.openai-test]
 verify_jwt = false
+
+[functions.ux-analysis]
+verify_jwt = true
 
 [functions.google-vision-analysis]
 verify_jwt = false
@@ -19,4 +22,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.customer-portal]
+verify_jwt = false
+
+[functions.api-access]
 verify_jwt = false
