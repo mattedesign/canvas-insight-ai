@@ -15,6 +15,7 @@ export const CanvasUploadZone: React.FC<CanvasUploadZoneProps> = ({
   isUploading = false,
   hasImages = false
 }) => {
+  console.log('CanvasUploadZone render:', { isUploading, hasImages });
   const onDrop = useCallback((acceptedFiles: File[]) => {
     onImageUpload(acceptedFiles);
   }, [onImageUpload]);

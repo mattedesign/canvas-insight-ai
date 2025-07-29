@@ -203,8 +203,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           analyses: result.data.analyses.length,
           groups: result.data.imageGroups.length
         });
-        setUploadedImages(result.data.uploadedImages);
-        setAnalyses(result.data.analyses);
+        
+        // Only update state if there's actual data to prevent clearing current uploads
+        if (result.data.uploadedImages.length > 0 || uploadedImages.length === 0) {
+          setUploadedImages(result.data.uploadedImages);
+        }
+        if (result.data.analyses.length > 0 || analyses.length === 0) {
+          setAnalyses(result.data.analyses);
+        }
+        
         setImageGroups(result.data.imageGroups);
         setGroupAnalysesWithPrompts(result.data.groupAnalysesWithPrompts);
         setGeneratedConcepts(result.data.generatedConcepts);
@@ -530,7 +537,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Update state immediately
-      setUploadedImages(prev => [...prev, ...newImages]);
+      console.log('handleImageUploadImmediate: Adding images to state:', newImages.length);
+      setUploadedImages(prev => {
+        console.log('Previous images:', prev.length, 'Adding:', newImages.length);
+        return [...prev, ...newImages];
+      });
       setAnalyses(prev => [...prev, ...newAnalyses]);
       
       // Auto-select first image if none selected
@@ -1092,9 +1103,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     groupAnalyses?: GroupAnalysis[];
     groupPromptSessions?: GroupPromptSession[];
   }) => {
-    console.log('Updating app state from database:', data);
-    setUploadedImages(data.uploadedImages || []);
-    setAnalyses(data.analyses || []);
+    console.log('Updating app state from database:', {
+      images: data.uploadedImages?.length || 0,
+      analyses: data.analyses?.length || 0,
+      groups: data.imageGroups?.length || 0
+    });
+    
+    // Merge with existing state instead of replacing to prevent clearing uploaded images
+    setUploadedImages(prev => {
+      const existing = data.uploadedImages || [];
+      if (existing.length === 0) return prev; // Don't clear existing images
+      console.log('Setting uploaded images:', existing.length);
+      return existing;
+    });
+    
+    setAnalyses(prev => {
+      const existing = data.analyses || [];
+      if (existing.length === 0) return prev; // Don't clear existing analyses
+      return existing;
+    });
+    
     setImageGroups(data.imageGroups || []);
     setGroupAnalysesWithPrompts(data.groupAnalysesWithPrompts || []);
     setGeneratedConcepts(data.generatedConcepts || []);

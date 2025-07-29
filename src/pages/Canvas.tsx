@@ -31,6 +31,7 @@ const Canvas = () => {
     showAnnotations,
     isGeneratingConcept,
     isLoading,
+    isUploading,
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
@@ -45,6 +46,7 @@ const Canvas = () => {
     handleCreateFork,
     handleAnalysisComplete,
     handleImageUpload,
+    handleImageUploadImmediate,
     updateAppStateFromDatabase
   } = useAppContext();
 
@@ -95,8 +97,10 @@ const Canvas = () => {
   const handleCanvasUpload = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
 
-    // Process images immediately for display
-    await handleImageUpload(files);
+    console.log('Canvas upload started for', files.length, 'files');
+    
+    // Use immediate upload for fast canvas loading
+    await handleImageUploadImmediate(files);
     
     toast.toast({
       category: 'success',
@@ -104,7 +108,7 @@ const Canvas = () => {
       description: `Successfully added ${files.length} image${files.length > 1 ? 's' : ''} to canvas`,
       variant: "default"
     });
-  }, [handleImageUpload, toast]);
+  }, [handleImageUploadImmediate, toast]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -172,12 +176,14 @@ const Canvas = () => {
           // Switch to the project
           await ProjectService.switchToProject(project.id);
           
-          // Load project data and update AppContext state
+          // Load project data and merge with AppContext state
           const result = await DataMigrationService.loadAllFromDatabase();
           if (result.success && result.data) {
-            console.log('Project data loaded successfully, updating context state...');
-            // Update AppContext with loaded data
-            updateAppStateFromDatabase(result.data);
+            console.log('Project data loaded successfully, merging with context state...');
+            // Only update if we have actual data to prevent clearing current state
+            if (result.data.uploadedImages.length > 0 || result.data.analyses.length > 0) {
+              updateAppStateFromDatabase(result.data);
+            }
           }
         } catch (error) {
           console.error('Error loading project by slug:', error);
@@ -196,15 +202,17 @@ const Canvas = () => {
             try {
               const hasData = await DataMigrationService.hasExistingData();
               setHasExistingData(hasData);
-              if (hasData) {
-                console.log('Loading existing project data...');
-                const result = await DataMigrationService.loadAllFromDatabase();
-                if (result.success && result.data) {
-                  console.log('Existing data loaded, updating context state...');
-                  // Update context with loaded data
-                  updateAppStateFromDatabase(result.data);
+                if (hasData) {
+                  console.log('Loading existing project data...');
+                  const result = await DataMigrationService.loadAllFromDatabase();
+                  if (result.success && result.data) {
+                    console.log('Existing data loaded, merging with context state...');
+                    // Only update if we have data to prevent clearing current uploads
+                    if (result.data.uploadedImages.length > 0 || result.data.analyses.length > 0) {
+                      updateAppStateFromDatabase(result.data);
+                    }
+                  }
                 }
-              }
             } catch (error) {
               console.error('Failed to check existing data:', error);
               setHasExistingData(false);
@@ -317,7 +325,7 @@ const Canvas = () => {
         {/* Upload Zone - shows full overlay when no images, floating button when images exist */}
         <CanvasUploadZone
           onImageUpload={handleCanvasUpload}
-          isUploading={false}
+          isUploading={isUploading}
           hasImages={uploadedImages.length > 0}
         />
       </div>
