@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { ErrorRecoveryBoundary } from './ErrorRecoveryBoundary';
-import { useAppContext } from '@/context/AppContext';
+import { useAppState } from '@/hooks/useAppState';
 import { atomicStateManager } from '@/services/AtomicStateManager';
 
 interface StateRecoveryProviderProps {
@@ -12,7 +12,7 @@ interface StateRecoveryProviderProps {
 }
 
 export const StateRecoveryProvider: React.FC<StateRecoveryProviderProps> = ({ children }) => {
-  const { updateAppStateFromDatabase } = useAppContext();
+  const state = useAppState();
 
   const handleRecovery = async () => {
     console.log('[StateRecovery] Attempting state recovery...');
@@ -22,7 +22,8 @@ export const StateRecoveryProvider: React.FC<StateRecoveryProviderProps> = ({ ch
       const lastSnapshot = atomicStateManager.getLastSnapshot();
       if (lastSnapshot) {
         console.log('[StateRecovery] Rolling back to snapshot:', lastSnapshot.operationId);
-        updateAppStateFromDatabase(lastSnapshot);
+        // The atomic state manager handles the actual rollback
+        atomicStateManager.rollbackToSnapshot(lastSnapshot.operationId);
       } else {
         // If no snapshot, trigger a fresh data load
         console.log('[StateRecovery] No snapshot available, triggering fresh load');
