@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { ImageMigrationService, AnalysisMigrationService, GroupMigrationService, GroupAnalysisMigrationService } from './DataMigrationService';
+import { SmartCacheService } from './SmartCacheService';
 
 export class OptimizedImageMigrationService extends ImageMigrationService {
   static async loadImagesFromDatabaseOptimized(
@@ -14,71 +15,88 @@ export class OptimizedImageMigrationService extends ImageMigrationService {
   ): Promise<UploadedImage[]> {
     const { limit = 50, offset = 0, includeProcessing = true, status } = options;
     
-    // Use existing indexes for performance
-    let query = supabase
-      .from('images')
-      .select(`
-        id,
-        original_name,
-        storage_path,
-        dimensions,
-        file_size,
-        file_type,
-        uploaded_at,
-        project_id,
-        metadata
-      `)
-      .eq('project_id', projectId)
-      .order('uploaded_at', { ascending: false });
+    // Generate cache key
+    const cacheKey = SmartCacheService.generateImageKey(projectId, limit, offset);
     
-    // Filter by status if specified
-    if (status) {
-      query = query.eq('security_scan_status', status);
-    } else if (!includeProcessing) {
-      query = query.neq('security_scan_status', 'processing');
-    }
-    
-    // Apply pagination
-    if (limit > 0) {
-      query = query.range(offset, offset + limit - 1);
-    }
-    
-    const { data: images, error } = await query;
-    
-    if (error) throw error;
-    if (!images) return [];
-    
-    // Process images with optimized URL generation
-    return images.map(img => {
-      const { data: urlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(img.storage_path);
+    return SmartCacheService.getOrLoad(
+      cacheKey,
+      async () => {
+        // Use existing indexes for performance
+        let query = supabase
+          .from('images')
+          .select(`
+            id,
+            original_name,
+            storage_path,
+            dimensions,
+            file_size,
+            file_type,
+            uploaded_at,
+            project_id,
+            metadata
+          `)
+          .eq('project_id', projectId)
+          .order('uploaded_at', { ascending: false });
         
-      return {
-        id: img.id,
-        name: img.original_name,
-        url: urlData.publicUrl,
-        file: null, // Not needed for loaded images
-        size: img.file_size || 0,
-        type: img.file_type || 'image/jpeg',
-        dimensions: img.dimensions as { width: number; height: number } || { width: 0, height: 0 },
-        status: 'completed' as const, // Map from security_scan_status
-        createdAt: new Date(img.uploaded_at),
-        userId: '', // Will be populated by context
-        projectId: img.project_id,
-        analysis: null // Will be populated separately
-      };
-    });
+        // Filter by status if specified
+        if (status) {
+          query = query.eq('security_scan_status', status);
+        } else if (!includeProcessing) {
+          query = query.neq('security_scan_status', 'processing');
+        }
+        
+        // Apply pagination
+        if (limit > 0) {
+          query = query.range(offset, offset + limit - 1);
+        }
+        
+        const { data: images, error } = await query;
+        
+        if (error) throw error;
+        if (!images) return [];
+        
+        // Process images with optimized URL generation
+        return images.map(img => {
+          const { data: urlData } = supabase.storage
+            .from('images')
+            .getPublicUrl(img.storage_path);
+            
+          return {
+            id: img.id,
+            name: img.original_name,
+            url: urlData.publicUrl,
+            file: null, // Not needed for loaded images
+            size: img.file_size || 0,
+            type: img.file_type || 'image/jpeg',
+            dimensions: img.dimensions as { width: number; height: number } || { width: 0, height: 0 },
+            status: 'completed' as const, // Map from security_scan_status
+            createdAt: new Date(img.uploaded_at),
+            userId: '', // Will be populated by context
+            projectId: img.project_id,
+            analysis: null // Will be populated separately
+          };
+        });
+      },
+      3 * 60 * 1000 // 3 minutes cache for images
+    );
   }
   
   static async getImageCount(projectId: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('images')
-      .select('id', { count: 'exact' })
-      .eq('project_id', projectId);
-      
-    if (error) throw error;
-    return count || 0;
+    const cacheKey = `image-count:${projectId}`;
+    
+    return SmartCacheService.getOrLoad(
+      cacheKey,
+      async () => {
+        const { count, error } = await supabase
+          .from('images')
+          .select('id', { count: 'exact' })
+          .eq('project_id', projectId);
+          
+        if (error) throw error;
+        return count || 0;
+      },
+      10 * 60 * 1000 // 10 minutes cache for counts
+    );
   }
 
   static async getImagesByIds(imageIds: string[]): Promise<UploadedImage[]> {
@@ -351,19 +369,27 @@ export class OptimizedDataService {
     groupCount: number;
     groupAnalysisCount: number;
   }> {
-    const [imageCount, analysisCount, groupCount, groupAnalysisCount] = await Promise.all([
-      OptimizedImageMigrationService.getImageCount(projectId),
-      OptimizedAnalysisMigrationService.getAnalysisCount(projectId),
-      OptimizedGroupMigrationService.getGroupCount(projectId),
-      OptimizedGroupAnalysisMigrationService.getGroupAnalysisCount(projectId)
-    ]);
+    const cacheKey = SmartCacheService.generateProjectKey(projectId);
+    
+    return SmartCacheService.getOrLoad(
+      cacheKey,
+      async () => {
+        const [imageCount, analysisCount, groupCount, groupAnalysisCount] = await Promise.all([
+          OptimizedImageMigrationService.getImageCount(projectId),
+          OptimizedAnalysisMigrationService.getAnalysisCount(projectId),
+          OptimizedGroupMigrationService.getGroupCount(projectId),
+          OptimizedGroupAnalysisMigrationService.getGroupAnalysisCount(projectId)
+        ]);
 
-    return {
-      imageCount,
-      analysisCount,
-      groupCount,
-      groupAnalysisCount
-    };
+        return {
+          imageCount,
+          analysisCount,
+          groupCount,
+          groupAnalysisCount
+        };
+      },
+      10 * 60 * 1000 // 10 minutes cache for stats
+    );
   }
 
   static async loadProjectDataBatch(
@@ -381,29 +407,42 @@ export class OptimizedDataService {
   }> {
     const { imageLimit = 20, groupLimit = 10, analysisLimit = 50 } = options;
 
-    // Load images first
+    // Load images first (cached)
     const images = await OptimizedImageMigrationService.loadImagesFromDatabaseOptimized(
       projectId,
       { limit: imageLimit }
     );
 
-    // Load groups
-    const groups = await OptimizedGroupMigrationService.loadGroupsFromDatabaseOptimized(
-      projectId,
-      { limit: groupLimit }
+    // Load groups (with caching)
+    const groupCacheKey = SmartCacheService.generateGroupKey(projectId);
+    const groups = await SmartCacheService.getOrLoad(
+      groupCacheKey,
+      () => OptimizedGroupMigrationService.loadGroupsFromDatabaseOptimized(
+        projectId,
+        { limit: groupLimit }
+      ),
+      5 * 60 * 1000 // 5 minutes cache for groups
     );
 
-    // Load analyses for the loaded images
+    // Load analyses for the loaded images (with caching)
     const imageIds = images.map(img => img.id);
-    const analyses = await OptimizedAnalysisMigrationService.loadAnalysesForImagesOptimized(
-      imageIds,
-      { limit: analysisLimit }
+    const analysisCacheKey = SmartCacheService.generateAnalysisKey(imageIds);
+    const analyses = await SmartCacheService.getOrLoad(
+      analysisCacheKey,
+      () => OptimizedAnalysisMigrationService.loadAnalysesForImagesOptimized(
+        imageIds,
+        { limit: analysisLimit }
+      ),
+      3 * 60 * 1000 // 3 minutes cache for analyses
     );
 
-    // Load group analyses for the loaded groups
+    // Load group analyses for the loaded groups (with caching)
     const groupIds = groups.map(group => group.id);
-    const groupAnalyses = await OptimizedGroupAnalysisMigrationService.loadGroupAnalysesOptimized(
-      groupIds
+    const groupAnalysisCacheKey = SmartCacheService.generateGroupAnalysisKey(groupIds);
+    const groupAnalyses = await SmartCacheService.getOrLoad(
+      groupAnalysisCacheKey,
+      () => OptimizedGroupAnalysisMigrationService.loadGroupAnalysesOptimized(groupIds),
+      5 * 60 * 1000 // 5 minutes cache for group analyses
     );
 
     return {
@@ -412,5 +451,50 @@ export class OptimizedDataService {
       groups,
       groupAnalyses
     };
+  }
+
+  // Cache invalidation methods for data updates
+  static invalidateProjectCache(projectId: string): void {
+    console.log(`[Cache] Invalidating all cache for project: ${projectId}`);
+    SmartCacheService.clear(projectId);
+  }
+
+  static invalidateImageCache(projectId: string): void {
+    console.log(`[Cache] Invalidating image cache for project: ${projectId}`);
+    SmartCacheService.clear(`images:${projectId}`);
+    SmartCacheService.invalidate(`image-count:${projectId}`);
+  }
+
+  static invalidateGroupCache(projectId: string): void {
+    console.log(`[Cache] Invalidating group cache for project: ${projectId}`);
+    SmartCacheService.clear(`groups:${projectId}`);
+    SmartCacheService.clear(`group-analyses:`);
+  }
+
+  static invalidateAnalysisCache(imageIds: string[]): void {
+    console.log(`[Cache] Invalidating analysis cache for images: ${imageIds.length}`);
+    const cacheKey = SmartCacheService.generateAnalysisKey(imageIds);
+    SmartCacheService.invalidate(cacheKey);
+  }
+
+  // Warm cache for better initial performance
+  static async warmProjectCache(projectId: string): Promise<void> {
+    try {
+      console.log(`[Cache] Warming project cache: ${projectId}`);
+      
+      // Pre-load project stats
+      await this.getProjectStats(projectId);
+      
+      // Pre-load initial batch of data
+      await this.loadProjectDataBatch(projectId, {
+        imageLimit: 10,
+        groupLimit: 5,
+        analysisLimit: 20
+      });
+      
+      console.log(`[Cache] Project cache warmed: ${projectId}`);
+    } catch (error) {
+      console.error(`[Cache] Failed to warm project cache: ${projectId}`, error);
+    }
   }
 }
