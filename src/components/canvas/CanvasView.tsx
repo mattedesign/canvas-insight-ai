@@ -14,6 +14,7 @@ import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
+import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
 import { ConceptImageNode } from './ConceptImageNode';
 import { ConceptDetailsNode } from './ConceptDetailsNode';
 import { GroupNode } from './GroupNode';
@@ -46,7 +47,7 @@ const nodeTypes = {
   analysisLoading: AnalysisLoadingNode,
 };
 
-interface CanvasViewProps {
+export interface CanvasViewProps {
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
   generatedConcepts: GeneratedConcept[];
