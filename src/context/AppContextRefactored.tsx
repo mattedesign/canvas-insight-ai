@@ -8,6 +8,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { useClientStateManager } from '@/hooks/useClientStateManager';
+import { useOfflineCache } from '@/hooks/useOfflineCache';
+import { useOptimisticUpdates } from '@/hooks/useOptimisticUpdates';
 import { appStateReducer } from './AppStateReducer';
 import { initialAppState, type AppState, type AppAction } from './AppStateTypes';
 import { atomicStateManager } from '@/services/AtomicStateManager';
@@ -96,6 +99,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useFilteredToast();
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
+  
+  // Initialize client-side management hooks
+  const clientStateManager = useClientStateManager(state, async (stateToSync) => {
+    const result = await DataMigrationService.migrateAllToDatabase(stateToSync);
+    return result.success;
+  });
+  const offlineCache = useOfflineCache();
+  const optimisticUpdates = useOptimisticUpdates();
 
   // Real-time analysis handling with optimized updates
   const handleAnalysisUpdate = useCallback((analysis: UXAnalysis) => {
