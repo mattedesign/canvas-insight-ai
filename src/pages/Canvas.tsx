@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
+import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 
 interface ErrorDisplayProps {
   error: string;
@@ -110,89 +111,61 @@ const Canvas = () => {
     );
   }
 
-  // Add this TEMPORARY debug code to your Canvas.tsx file
-  // Replace your current CanvasView rendering with this:
-  try {
-    console.log('Canvas Debug - About to render CanvasView with:', {
-      images: uploadedImages?.length || 0,
-      analyses: analyses?.length || 0,
-      groups: imageGroups?.length || 0,
-      showAnnotations,
-      canvasError
-    });
-
-    if (canvasError) {
-      return (
-        <div className="canvas-error-display p-8">
-          <h2 className="text-xl font-bold text-red-600 mb-4">Canvas Rendering Error</h2>
-          <p className="text-gray-700 mb-4">{canvasError}</p>
-          <button 
-            onClick={() => setCanvasError(null)}
-            className="px-4 py-2 bg-blue-500 text-white rounded"
-          >
-            Try Again
-          </button>
-          
-          {/* Show raw data as fallback */}
-          <div className="mt-8 p-4 bg-gray-100 rounded">
-            <h3 className="font-semibold mb-2">Raw Data (for debugging):</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <h4 className="font-medium">Images ({uploadedImages?.length || 0})</h4>
-                {uploadedImages?.slice(0, 3).map(img => (
-                  <div key={img.id}>{img.name}</div>
-                ))}
-              </div>
-              <div>
-                <h4 className="font-medium">Analyses ({analyses?.length || 0})</h4>
-                {analyses?.slice(0, 3).map(analysis => (
-                  <div key={analysis.id}>{analysis.id.substring(0, 8)}...</div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // For now, return simple debug view instead of CanvasView
-    return (
-      <div className="canvas-container p-8">
-        <h1 className="text-2xl font-bold mb-4">Canvas - Debug Mode</h1>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="border p-4 rounded">
-            <h2 className="text-lg font-semibold mb-2">Images ({uploadedImages?.length || 0})</h2>
-            {uploadedImages?.map(img => (
-              <div key={img.id} className="text-sm">{img.name}</div>
-            ))}
-          </div>
-          <div className="border p-4 rounded">
-            <h2 className="text-lg font-semibold mb-2">Analyses ({analyses?.length || 0})</h2>
-            {analyses?.map(analysis => (
-              <div key={analysis.id} className="text-sm">{analysis.id}</div>
-            ))}
-          </div>
-          <div className="border p-4 rounded">
-            <h2 className="text-lg font-semibold mb-2">Groups ({imageGroups?.length || 0})</h2>
-            {imageGroups?.map(group => (
-              <div key={group.id} className="text-sm">{group.name}</div>
-            ))}
-          </div>
-          <div className="border p-4 rounded">
-            <h2 className="text-lg font-semibold mb-2">Group Analyses ({groupAnalysesWithPrompts?.length || 0})</h2>
-            {groupAnalysesWithPrompts?.map(ga => (
-              <div key={ga.id} className="text-sm">{ga.prompt}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-
-  } catch (error: any) {
-    console.error('Canvas rendering error:', error);
-    setCanvasError(`Canvas failed to render: ${error.message}`);
-    return null;
-  }
+  return (
+    <ErrorBoundary
+      fallback={
+        <ErrorDisplay 
+          error="Canvas component failed to render" 
+          onRetry={() => window.location.reload()} 
+        />
+      }
+      onError={(error, errorInfo) => {
+        console.error('Canvas ErrorBoundary:', error, errorInfo);
+        setCanvasError(error.message);
+      }}
+    >
+      <PerformantCanvasView
+        uploadedImages={uploadedImages || []}
+        analyses={analyses || []}
+        generatedConcepts={generatedConcepts || []}
+        imageGroups={imageGroups || []}
+        groupAnalysesWithPrompts={groupAnalysesWithPrompts || []}
+        groupDisplayModes={groupDisplayModes || {}}
+        showAnnotations={showAnnotations}
+        onToggleAnnotations={() => console.log('Toggle annotations - TODO: implement')}
+        onImageSelect={(imageId: string) => console.log('Image selected:', imageId)}
+        onGenerateConcept={async (analysisId: string) => {
+          console.log('Generate concept for analysis:', analysisId);
+          // TODO: Implement concept generation with analysisId
+        }}
+        onCreateGroup={(imageIds: string[]) => {
+          // Use default values for missing required parameters
+          stableHelpers.createGroup(
+            'New Group',
+            'Group created from canvas',
+            '#3b82f6',
+            imageIds,
+            { x: 100, y: 100 }
+          );
+        }}
+        onUngroup={(groupId: string) => console.log('Ungroup:', groupId)}
+        onDeleteGroup={(groupId: string) => console.log('Delete group:', groupId)}
+        onEditGroup={(groupId: string) => console.log('Edit group:', groupId)}
+        onGroupDisplayModeChange={(groupId: string, mode: 'standard' | 'stacked') => 
+          console.log('Change group display mode:', groupId, mode)
+        }
+        onSubmitGroupPrompt={async (groupId: string, prompt: string, isCustom: boolean) => 
+          console.log('Submit group prompt:', groupId, prompt, isCustom)
+        }
+        onOpenAnalysisPanel={(analysisId: string) => console.log('Open analysis panel:', analysisId)}
+        onAnalysisComplete={(imageId: string, analysis: any) => 
+          console.log('Analysis complete:', imageId, analysis)
+        }
+        onImageUpload={stableHelpers.uploadImages}
+        isGeneratingConcept={state.isGeneratingConcept}
+      />
+    </ErrorBoundary>
+  );
 };
 
 export default Canvas;
