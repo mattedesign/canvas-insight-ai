@@ -126,29 +126,6 @@ const Projects = () => {
     }
   };
 
-  const handleCreateQuickProject = async () => {
-    try {
-      const project = await ProjectService.createNewProject();
-      
-      // Create a default blank canvas state for the new project
-      const defaultState = CanvasStateService.createDefaultState(project.id, 'Quick Start Session');
-      await CanvasStateService.saveCanvasState(project.id, defaultState);
-      
-      toast({
-        title: "New project created",
-        description: `${project.name} is ready for analysis.`,
-      });
-      
-      navigate(`/canvas/${project.slug}`);
-    } catch (error) {
-      console.error('Failed to create project:', error);
-      toast({
-        title: "Error creating project",
-        description: "Failed to create a new project. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   useEffect(() => {
     loadProjects();
@@ -216,16 +193,10 @@ const Projects = () => {
               <h1 className="text-3xl font-bold text-foreground">Projects</h1>
               <p className="text-muted-foreground">View and manage your UX analysis projects</p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCreateQuickProject}>
-                <Plus className="w-4 h-4 mr-2" />
-                Quick Start
-              </Button>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                New Project
-              </Button>
-            </div>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
           </div>
 
           {/* Projects Grid */}
