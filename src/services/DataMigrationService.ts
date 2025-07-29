@@ -273,29 +273,23 @@ export class ImageMigrationService {
     if (error) throw error;
     if (!images) return [];
 
-    const uploadedImages: UploadedImage[] = [];
-    
-    for (const img of images) {
+    return images.map(img => {
       // Get public URL for the image
       const { data: urlData } = supabase.storage
         .from('images')
         .getPublicUrl(img.storage_path);
 
-      // Create a synthetic File object for compatibility
-      const response = await fetch(urlData.publicUrl);
-      const blob = await response.blob();
-      const file = new File([blob], img.original_name, { type: blob.type });
+      // Create a minimal File object for backward compatibility
+      const emptyFile = new File([], img.original_name, { type: 'image/*' });
 
-      uploadedImages.push({
+      return {
         id: img.id,
         name: img.original_name,
         url: urlData.publicUrl,
-        file,
+        file: emptyFile, // Canvas components use URL, not File content
         dimensions: img.dimensions as { width: number; height: number }
-      });
-    }
-
-    return uploadedImages;
+      };
+    });
   }
 }
 
