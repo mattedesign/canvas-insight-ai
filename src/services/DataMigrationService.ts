@@ -5,6 +5,7 @@ import { SlugService } from './SlugService';
 // Project management for user data isolation
 export class ProjectService {
   private static currentProjectId: string | null = null;
+  private static isSwitching = false; // Flag to prevent duplicate switches
 
   static async getCurrentProject() {
     try {
@@ -148,21 +149,46 @@ export class ProjectService {
   }
 
   static async switchToProject(projectId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    // Verify user owns this project
-    const { data: project, error } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !project) throw new Error('Project not found or access denied');
+    // Prevent duplicate switches
+    if (this.currentProjectId === projectId || this.isSwitching) {
+      console.log('[ProjectService] Already on project or switching:', projectId);
+      return projectId;
+    }
     
-    this.currentProjectId = projectId;
-    return projectId;
+    try {
+      this.isSwitching = true;
+      console.log('[ProjectService] Switching to project:', projectId);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Verify user owns this project
+      const { data: project, error } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !project) throw new Error('Project not found or access denied');
+      
+      this.currentProjectId = projectId;
+      
+      // Store in localStorage
+      localStorage.setItem('currentProjectId', projectId);
+      
+      // Emit event for other components to listen
+      window.dispatchEvent(new CustomEvent('projectChanged', { 
+        detail: { projectId } 
+      }));
+      
+      return projectId;
+    } finally {
+      // Reset flag after a delay to prevent rapid switches
+      setTimeout(() => {
+        this.isSwitching = false;
+      }, 500);
+    }
   }
 
   static async createNewProject(name?: string, description?: string) {
