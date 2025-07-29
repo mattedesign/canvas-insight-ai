@@ -88,10 +88,13 @@ const Dashboard = () => {
 
   const handleCreateProject = async () => {
     try {
-      // Create project with auto-generated name and slug
+      // Create project
       const project = await ProjectService.createNewProject();
       
-      // Create a default blank canvas state for the new project
+      // Switch to it first
+      await ProjectService.switchToProject(project.id);
+      
+      // Create default canvas state
       const defaultState = await CanvasStateService.createDefaultState('New Analysis Session');
       await CanvasStateService.saveCanvasState(defaultState);
       
@@ -101,8 +104,10 @@ const Dashboard = () => {
         description: `${project.name} is ready for analysis.`,
       });
       
-      // Navigate directly to canvas with the project slug
-      navigate(`/canvas/${project.slug}`);
+      // Small delay to ensure project switch completes
+      setTimeout(() => {
+        navigate(`/canvas/${project.slug}`);
+      }, 100);
     } catch (error) {
       console.error('Error creating project:', error);
       toast.toast({
