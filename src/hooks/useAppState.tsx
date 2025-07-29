@@ -1,14 +1,13 @@
 /**
- * Optimized App State Hook
- * Provides selector-based access to prevent unnecessary re-renders
+ * Optimized App State Hook - Selector-based access
+ * Prevents unnecessary re-renders and circular dependencies
  */
 
 import { useContext, useMemo } from 'react';
 import type { AppState, StateSelector } from '@/context/AppStateTypes';
-
-// Import the actual context
 import { AppContext } from '@/context/AppContext';
 
+// Main hook with overloads for typed access
 export function useAppState(): AppState;
 export function useAppState<T>(selector: StateSelector<T>): T;
 export function useAppState<T>(selector?: StateSelector<T>) {
@@ -29,7 +28,7 @@ export function useAppState<T>(selector?: StateSelector<T>) {
   return useMemo(() => selector(state), [selector, state]);
 }
 
-// Convenience hooks for common state access patterns
+// Convenience hooks for common access patterns
 export function useImages() {
   return useAppState(state => state.uploadedImages);
 }
@@ -64,7 +63,8 @@ export function useOperationState() {
     isSyncing: state.isSyncing,
     isUploading: state.isUploading,
     isGeneratingConcept: state.isGeneratingConcept,
-    hasPendingSync: state.pendingBackgroundSync.size > 0
+    hasPendingSync: state.pendingBackgroundSync.size > 0,
+    error: state.error,
   }));
 }
 
@@ -72,7 +72,7 @@ export function useUIState() {
   return useAppState(state => ({
     showAnnotations: state.showAnnotations,
     galleryTool: state.galleryTool,
-    groupDisplayModes: state.groupDisplayModes
+    groupDisplayModes: state.groupDisplayModes,
   }));
 }
 
@@ -101,4 +101,16 @@ export function useGroupData(groupId: string | null) {
     
     return { group, images, analyses: groupAnalyses };
   });
+}
+
+// Performance monitoring hook
+export function useStatePerformance() {
+  return useAppState(state => ({
+    totalImages: state.uploadedImages.length,
+    totalAnalyses: state.analyses.length,
+    totalGroups: state.imageGroups.length,
+    pendingSyncCount: state.pendingBackgroundSync.size,
+    version: state.version,
+    lastSync: state.lastSyncTimestamp,
+  }));
 }
