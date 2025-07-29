@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useRef } from 'react';
 import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
-import { ImageMigrationService, AnalysisMigrationService, GroupMigrationService, GroupAnalysisMigrationService } from '@/services/DataMigrationService';
+import { ProgressiveDataLoader } from '@/services/ProgressiveDataLoader';
 
 interface AppState {
   uploadedImages: UploadedImage[];
@@ -78,18 +78,19 @@ export const StableAppProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       dispatch({ type: 'SET_ERROR', payload: null });
       
       try {
-        // Load data sequentially to avoid overwhelming database
-        const images = await ImageMigrationService.loadImagesFromDatabase();
-        dispatch({ type: 'SET_IMAGES', payload: images });
+        // Use progressive loader for better performance
+        const data = await ProgressiveDataLoader.loadCanvasDataProgressively(
+          projectId,
+          (stage, progress) => {
+            console.log(`Loading: ${stage} (${progress}%)`);
+          }
+        );
         
-        const analyses = await AnalysisMigrationService.loadAnalysesFromDatabase();
-        dispatch({ type: 'SET_ANALYSES', payload: analyses });
-        
-        const groups = await GroupMigrationService.loadGroupsFromDatabase();
-        dispatch({ type: 'SET_GROUPS', payload: groups });
-        
-        const groupAnalyses = await GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase();
-        dispatch({ type: 'SET_GROUP_ANALYSES', payload: groupAnalyses });
+        // Update state with loaded data
+        dispatch({ type: 'SET_IMAGES', payload: data.images });
+        dispatch({ type: 'SET_ANALYSES', payload: data.analyses });
+        dispatch({ type: 'SET_GROUPS', payload: data.groups });
+        dispatch({ type: 'SET_GROUP_ANALYSES', payload: data.groupAnalyses });
         
       } catch (error) {
         dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
