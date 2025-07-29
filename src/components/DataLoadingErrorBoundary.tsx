@@ -1,10 +1,9 @@
 /**
- * Data Loading Error Boundary - Phase 3.2: Proper error boundaries for failed data loads
+ * Data Loading Error Boundary - Fixed version without hooks in fallback
  */
 
 import React from 'react';
 import { ErrorRecoveryBoundary } from './ErrorRecoveryBoundary';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -13,23 +12,12 @@ interface DataLoadingErrorBoundaryProps {
   children: React.ReactNode;
 }
 
-const DataLoadingErrorFallback: React.FC<{ error: Error; reset: () => void }> = ({ error, reset }) => {
-  const { stableHelpers } = useSimplifiedAppContext();
-
-  const handleRetryLoad = async () => {
-    try {
-      await stableHelpers.loadData();
-      reset();
-    } catch (err) {
-      console.error('Retry failed:', err);
-    }
-  };
-
-  const handleClearAndReload = () => {
-    stableHelpers.clearCanvas();
-    reset();
-  };
-
+// Standalone error UI component - NO HOOKS
+const DataLoadingErrorUI: React.FC<{ 
+  error: Error; 
+  onRetry: () => void;
+  onClear: () => void;
+}> = ({ error, onRetry, onClear }) => {
   return (
     <div className="flex items-center justify-center min-h-[400px] p-8">
       <Card className="w-full max-w-lg">
@@ -48,14 +36,14 @@ const DataLoadingErrorFallback: React.FC<{ error: Error; reset: () => void }> = 
           </div>
           
           <div className="flex flex-col gap-2">
-            <Button onClick={handleRetryLoad} className="w-full gap-2">
+            <Button onClick={onRetry} className="w-full gap-2">
               <RefreshCw className="h-4 w-4" />
               Retry Loading Data
             </Button>
             
             <Button 
               variant="outline" 
-              onClick={handleClearAndReload}
+              onClick={onClear}
               className="w-full"
             >
               Start Fresh
@@ -72,11 +60,33 @@ const DataLoadingErrorFallback: React.FC<{ error: Error; reset: () => void }> = 
 };
 
 export const DataLoadingErrorBoundary: React.FC<DataLoadingErrorBoundaryProps> = ({ children }) => {
+  const handleRetry = () => {
+    // Reload the page to retry data loading
+    window.location.reload();
+  };
+
+  const handleClear = () => {
+    // Clear local storage and reload
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  };
+
+  // Create the error UI as a component instance, not a function
+  const errorFallback = (
+    <DataLoadingErrorUI 
+      error={new Error('Data loading failed')} 
+      onRetry={handleRetry}
+      onClear={handleClear}
+    />
+  );
+
   return (
     <ErrorRecoveryBoundary
       name="DataLoading"
       enableRecovery={true}
       enableStateRollback={false}
+      fallback={errorFallback}
     >
       {children}
     </ErrorRecoveryBoundary>
