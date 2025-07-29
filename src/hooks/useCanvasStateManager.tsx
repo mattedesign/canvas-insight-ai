@@ -56,6 +56,10 @@ export function useCanvasStateManager({
   const isInitialized = useRef(false);
   const lastSaveTime = useRef<number>(0);
   const pendingChanges = useRef<boolean>(false);
+  
+  // Add these refs for version tracking
+  const lastSyncedVersion = useRef<string>('');
+  const syncInProgress = useRef(false);
 
   // Offline cache for canvas operations
   const offlineCache = useOfflineCache();
@@ -125,6 +129,11 @@ export function useCanvasStateManager({
     undoRedoManager.saveState(initialState.nodes, initialState.edges);
     isInitialized.current = true; // Mark as initialized here too
   }, [appState, undoRedoManager]);
+
+  // Create version string from app state
+  const getStateVersion = useCallback((state: AppState): string => {
+    return `${state.uploadedImages.length}-${state.analyses.length}-${state.imageGroups.length}-${state.version}`;
+  }, []);
 
   // Auto-save mechanism
   useEffect(() => {
@@ -367,9 +376,15 @@ export function useCanvasStateManager({
     );
   }, [undoRedoManager, updateCanvasState, toast]);
 
-  // Sync canvas state when app state changes
+  // Update the sync effect
   useEffect(() => {
-    if (!isInitialized.current) return;
+    if (!isInitialized.current || syncInProgress.current) return;
+    
+    const currentVersion = getStateVersion(appState);
+    if (currentVersion === lastSyncedVersion.current) return;
+    
+    syncInProgress.current = true;
+    console.log('Canvas state sync: version changed', currentVersion);
     
     // Preserve existing node positions
     const existingPositions = canvasState.nodes.reduce((acc, node) => {
@@ -381,7 +396,6 @@ export function useCanvasStateManager({
     const newEdges = generateEdgesFromAppState(appState);
     
     // Only update if there are actual changes to prevent infinite loops
-    // Use shallow comparison instead of deep JSON.stringify to avoid recursion issues
     const hasNodeChanges = newNodes.length !== canvasState.nodes.length || 
       newNodes.some(newNode => {
         const existingNode = canvasState.nodes.find(n => n.id === newNode.id);
@@ -389,7 +403,6 @@ export function useCanvasStateManager({
                existingNode.type !== newNode.type ||
                existingNode.position.x !== newNode.position.x ||
                existingNode.position.y !== newNode.position.y ||
-               // Compare specific data fields instead of deep stringify
                (existingNode.data?.id !== newNode.data?.id);
       });
     
@@ -400,13 +413,17 @@ export function useCanvasStateManager({
       });
     
     if (hasNodeChanges || hasEdgeChanges) {
-      console.log('Canvas state sync: updating nodes/edges due to app state changes');
       updateCanvasState({
         nodes: newNodes,
         edges: newEdges
       });
     }
-  }, [appState.uploadedImages, appState.analyses, appState.imageGroups]); // Only watch specific dependencies
+    
+    lastSyncedVersion.current = currentVersion;
+    setTimeout(() => {
+      syncInProgress.current = false;
+    }, 100);
+  }, [appState.uploadedImages.length, appState.analyses.length, appState.imageGroups.length, appState.version]);
 
   return {
     // State
