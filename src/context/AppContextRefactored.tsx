@@ -130,7 +130,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     },
   });
 
-  // Data loading function
+  // Data loading function - removed from dependency array to prevent infinite loops
   const loadDataFromDatabase = useCallback(async () => {
     if (!user) return;
 
@@ -181,7 +181,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [user, toast]);
 
-  // Load initial data when user logs in
+  // Load initial data when user logs in - REMOVED loadDataFromDatabase from dependencies to prevent infinite loop
   useEffect(() => {
     if (user) {
       console.log('[AppContext] User authenticated, loading data...');
@@ -190,7 +190,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.log('[AppContext] User logged out, clearing state...');
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user, loadDataFromDatabase]);
+  }, [user]); // Only depend on user, not the function
 
   // Database sync function - pass state as parameter to avoid dependency issues
   const syncToDatabase = useCallback(async (stateToSync = state) => {

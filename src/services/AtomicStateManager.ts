@@ -182,12 +182,12 @@ class AtomicStateManager {
     }
   }
 
-  // Conflict detection
+  // Conflict detection - improved to avoid same-type operation conflicts
   private hasConflictingOperation(operation: AtomicOperation): boolean {
     return this.operationQueue.some(op => {
-      // Same type operations on same resources conflict
-      if (op.type === operation.type && op.id !== operation.id) {
-        return true;
+      // Only same exact operation ID conflicts with itself
+      if (op.id === operation.id) {
+        return false; // Same operation, not a conflict
       }
       
       // CLEAR operations conflict with everything
@@ -195,12 +195,13 @@ class AtomicStateManager {
         return true;
       }
       
-      // LOAD and SYNC operations conflict
+      // LOAD and SYNC operations on same resources can conflict, but allow multiple LOAD operations
       if ((op.type === 'LOAD' && operation.type === 'SYNC') ||
           (op.type === 'SYNC' && operation.type === 'LOAD')) {
         return true;
       }
       
+      // Allow multiple operations of the same type, they will be processed in order
       return false;
     });
   }
