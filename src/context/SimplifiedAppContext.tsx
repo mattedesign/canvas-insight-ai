@@ -344,6 +344,18 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [user]); // Only user dependency - loadData is stable
 
+  // Phase 5.2: Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      console.log('[SimplifiedAppContext] Cleaning up context...');
+      // Stop any ongoing operations
+      if (isLoadingRef.current || isSyncingRef.current) {
+        isLoadingRef.current = false;
+        isSyncingRef.current = false;
+      }
+    };
+  }, []);
+
   // Create context value with stable references
   const contextValue = useMemo(() => ({
     state,

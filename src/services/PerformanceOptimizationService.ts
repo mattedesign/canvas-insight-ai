@@ -220,7 +220,14 @@ export class PerformanceOptimizationService {
   /**
    * Monitor and optimize memory usage
    */
+  private static memoryMonitorInterval: number | null = null;
+
   static monitorMemoryUsage(): void {
+    // Clear existing interval to prevent duplicates
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval);
+    }
+
     if ('memory' in performance) {
       const memoryInfo = (performance as any).memory;
       const usagePercent = (memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100;
@@ -230,10 +237,20 @@ export class PerformanceOptimizationService {
       }
     }
 
-    // Monitor for memory leaks
-    setInterval(() => {
+    // Monitor for memory leaks with proper cleanup
+    this.memoryMonitorInterval = window.setInterval(() => {
       this.detectMemoryLeaks();
     }, 60000); // Check every minute
+  }
+
+  /**
+   * Stop memory monitoring
+   */
+  static stopMemoryMonitoring(): void {
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval);
+      this.memoryMonitorInterval = null;
+    }
   }
 
   /**
