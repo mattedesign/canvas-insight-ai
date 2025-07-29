@@ -53,6 +53,11 @@ interface AppContextType {
   // AI Analysis actions
   handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
   
+  // Client-side management features
+  clientStateManager?: any;
+  offlineCache?: any;
+  optimisticUpdates?: any;
+  
   // Backward compatibility - direct state access
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
@@ -252,7 +257,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [user, toast]);
 
-  // Image upload with atomic operation
+  // Enhanced image upload with optimistic updates and client-side management
   const handleImageUpload = useCallback(async (files: File[]) => {
     const operationId = `upload-${Date.now()}`;
     
@@ -268,30 +273,41 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const imageId = `temp-${Date.now()}-${i}`;
-            const imageUrl = URL.createObjectURL(file);
-            
-            const uploadedImage: UploadedImage = {
-              id: imageId,
-              name: file.name,
-              url: imageUrl,
-              file,
-              dimensions: { width: 0, height: 0 },
-              status: 'processing'
-            };
-            
-            newImages.push(uploadedImage);
             
             if (user) {
+              // Use optimistic updates for authenticated users
+              const { tempImage, operationId: optimisticId, confirm } = optimisticUpdates.optimisticImageUpload(
+                file,
+                async (uploadFile) => {
+                  // Actual upload logic would go here
+                  const imageId = `img-${Date.now()}-${i}`;
+                  const imageUrl = URL.createObjectURL(uploadFile);
+                  
+                  return {
+                    id: imageId,
+                    name: uploadFile.name,
+                    url: imageUrl,
+                    file: uploadFile,
+                    dimensions: { width: 0, height: 0 },
+                    status: 'completed' as const
+                  };
+                }
+              );
+              
+              newImages.push(tempImage);
+              
+              // Cache the image immediately
+              offlineCache.cacheImage(tempImage, 'high');
+              
               // Queue background processing
-              backgroundSyncService.queueImageProcessing(imageId, imageUrl, file.name);
+              backgroundSyncService.queueImageProcessing(tempImage.id, tempImage.url, tempImage.name);
               
               // Create placeholder analysis
               const placeholderAnalysis: UXAnalysis = {
-                id: `analysis-${imageId}`,
-                imageId,
-                imageName: file.name,
-                imageUrl,
+                id: `analysis-${tempImage.id}`,
+                imageId: tempImage.id,
+                imageName: tempImage.name,
+                imageUrl: tempImage.url,
                 userContext: '',
                 status: 'processing',
                 visualAnnotations: [],
@@ -312,9 +328,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
               };
               
               newAnalyses.push(placeholderAnalysis);
-              dispatch({ type: 'ADD_PENDING_SYNC', payload: imageId });
+              offlineCache.cacheAnalysis(placeholderAnalysis, 'high');
+              
+              // Confirm the optimistic operation
+              setTimeout(() => confirm(), 100);
+              
             } else {
-              // Use mock analysis for non-authenticated users
+              // Use immediate mock for non-authenticated users
+              const imageId = `temp-${Date.now()}-${i}`;
+              const imageUrl = URL.createObjectURL(file);
+              
+              const uploadedImage: UploadedImage = {
+                id: imageId,
+                name: file.name,
+                url: imageUrl,
+                file,
+                dimensions: { width: 0, height: 0 },
+                status: 'completed'
+              };
+              
+              newImages.push(uploadedImage);
               newAnalyses.push(generateMockAnalysis(imageId, file.name, imageUrl));
             }
           }
@@ -368,7 +401,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         variant: "destructive"
       });
     }
-  }, [user, toast]);
+  }, [user, toast, optimisticUpdates, offlineCache, backgroundSyncService]);
 
   // Immediate upload for demo purposes
   const handleImageUploadImmediate = useCallback(async (files: File[]) => {
@@ -598,7 +631,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Original functionality would create a fork session
   }, []);
 
-  // Context value with backward compatibility
+  // Context value with backward compatibility and enhanced client-side features
   const value = useMemo(() => ({
     // New interface
     state,
@@ -617,6 +650,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toggleAnnotation,
     clearAnnotations,
     handleAnalysisComplete,
+    
+    // Client-side management features
+    clientStateManager,
+    offlineCache,
+    optimisticUpdates,
     
     // Backward compatibility - direct state access
     uploadedImages: state.uploadedImages,
@@ -668,6 +706,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toggleAnnotation,
     clearAnnotations,
     handleAnalysisComplete,
+    clientStateManager,
+    offlineCache,
+    optimisticUpdates,
     handleAnnotationClick,
     handleGalleryToolChange,
     handleAddComment,

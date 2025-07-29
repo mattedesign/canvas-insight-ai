@@ -57,9 +57,7 @@ export const useClientStateManager = (
   const lastStateRef = useRef<AppState>(state);
   const autoSaveTimerRef = useRef<NodeJS.Timeout>();
   const isOnlineRef = useRef(navigator.onLine);
-
-  // Debounced state changes for auto-save
-  const debouncedState = useDebounce(state, finalConfig.debounceDelay).debounce;
+  const { debounce } = useDebounce();
 
   // Save state to localStorage for offline persistence
   const saveToLocalStorage = useCallback((stateToSave: AppState, operations: PendingOperation[] = []) => {
@@ -248,6 +246,16 @@ export const useClientStateManager = (
     };
   }, [processPendingOperations, toast]);
 
+  // Create debounced auto-save function
+  const debouncedAutoSave = useCallback(() => {
+    debounce(() => {
+      if (JSON.stringify(lastStateRef.current) !== JSON.stringify(state)) {
+        performAutoSave();
+        lastStateRef.current = state;
+      }
+    }, finalConfig.debounceDelay)();
+  }, [state, performAutoSave, finalConfig.debounceDelay, debounce]);
+
   // Auto-save timer
   useEffect(() => {
     if (autoSaveTimerRef.current) {
@@ -268,13 +276,10 @@ export const useClientStateManager = (
     };
   }, [state, performAutoSave, finalConfig.autoSaveInterval]);
 
-  // Debounced auto-save on state changes
+  // Trigger debounced save on state changes
   useEffect(() => {
-    if (JSON.stringify(lastStateRef.current) !== JSON.stringify(debouncedState)) {
-      performAutoSave();
-      lastStateRef.current = debouncedState;
-    }
-  }, [debouncedState, performAutoSave]);
+    debouncedAutoSave();
+  }, [state, debouncedAutoSave]);
 
   // Initialize from localStorage on mount
   useEffect(() => {
