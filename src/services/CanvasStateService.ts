@@ -49,12 +49,12 @@ export class CanvasStateService {
   // Save canvas state immediately
   static async saveCanvasStateImmediate(state: Omit<CanvasState, 'id' | 'project_id' | 'user_id' | 'updated_at'>) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await (supabase as any).auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       const projectId = await ProjectService.getCurrentProject();
 
-      const { data, error } = await supabase
+      const result = await (supabase as any)
         .from('canvas_states')
         .upsert({
           project_id: projectId,
@@ -68,6 +68,9 @@ export class CanvasStateService {
         })
         .select()
         .single();
+
+      const data = result.data;
+      const error = result.error;
 
       if (error) throw error;
       
@@ -84,7 +87,7 @@ export class CanvasStateService {
   // Load canvas state from database
   static async loadCanvasState(): Promise<CanvasState | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await (supabase as any).auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       const projectId = await ProjectService.getCurrentProject();
@@ -92,14 +95,14 @@ export class CanvasStateService {
       // Try cache first for instant loading
       const cached = this.getCachedCanvasState(projectId);
       
-      // Load from database
-      const result: any = await supabase
+      // Load from database with explicit typing to avoid infinite type recursion
+      const supabaseQuery = (supabase as any)
         .from('canvas_states')
         .select('*')
         .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .eq('user_id', user.id);
         
+      const result = await supabaseQuery.maybeSingle();
       const data = result.data;
       const error = result.error;
 
@@ -114,16 +117,20 @@ export class CanvasStateService {
       }
 
       // Cache the latest data
-      this.cacheCanvasState(projectId, data as unknown as CanvasState);
+      this.cacheCanvasState(projectId, data);
       
-      return data as unknown as CanvasState;
+      return data as CanvasState;
     } catch (error) {
       console.error('Failed to load canvas state:', error);
       // Return cached data as fallback
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const projectId = await ProjectService.getCurrentProject();
-        return this.getCachedCanvasState(projectId);
+      try {
+        const { data: { user } } = await (supabase as any).auth.getUser();
+        if (user) {
+          const projectId = await ProjectService.getCurrentProject();
+          return this.getCachedCanvasState(projectId);
+        }
+      } catch {
+        // Ignore nested errors
       }
       return null;
     }
@@ -179,7 +186,7 @@ export class CanvasStateService {
 
   // Create default canvas state
   static async createDefaultState(sessionName?: string): Promise<CanvasState> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await (supabase as any).auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
     const projectId = await ProjectService.getCurrentProject();
@@ -202,12 +209,12 @@ export class CanvasStateService {
   // Clear canvas state for new session
   static async clearCanvasState(): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await (supabase as any).auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       const projectId = await ProjectService.getCurrentProject();
 
-      await supabase
+      await (supabase as any)
         .from('canvas_states')
         .delete()
         .eq('project_id', projectId)
