@@ -8,13 +8,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
-import { useClientStateManager } from '@/hooks/useClientStateManager';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
-import { useOptimisticUpdates } from '@/hooks/useOptimisticUpdates';
 import { appStateReducer } from './AppStateReducer';
 import { initialAppState, type AppState, type AppAction } from './AppStateTypes';
-import { atomicStateManager } from '@/services/AtomicStateManager';
-import { backgroundSyncService } from '@/services/BackgroundSyncService';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { AnalysisPerformanceService } from '@/services/AnalysisPerformanceService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
@@ -53,10 +49,8 @@ interface AppContextType {
   // AI Analysis actions
   handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
   
-  // Client-side management features
-  clientStateManager?: any;
+  // Cache features
   offlineCache?: any;
-  optimisticUpdates?: any;
   
   // Backward compatibility - direct state access
   uploadedImages: UploadedImage[];
@@ -105,13 +99,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const { toast } = useFilteredToast();
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
   
-  // Initialize client-side management hooks
-  const clientStateManager = useClientStateManager(state, async (stateToSync) => {
-    const result = await DataMigrationService.migrateAllToDatabase(stateToSync);
-    return result.success;
-  });
+  // Simplified hooks for basic functionality
   const offlineCache = useOfflineCache();
-  const optimisticUpdates = useOptimisticUpdates();
 
   // Real-time analysis handling with optimized updates
   const handleAnalysisUpdate = useCallback((analysis: UXAnalysis) => {
@@ -146,54 +135,40 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     },
   });
 
-  // Data loading function - removed from dependency array to prevent infinite loops
+  // Simplified data loading function
   const loadDataFromDatabase = useCallback(async () => {
     if (!user) return;
 
-    const operationId = `load-data-${Date.now()}`;
+    dispatch({ type: 'SET_LOADING', payload: true });
     
-    const result = await atomicStateManager.executeOperation(
-      operationId,
-      'LOAD',
-      async () => {
-        dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const migrationResult = await DataMigrationService.loadAllFromDatabase();
+      
+      if (migrationResult.success && migrationResult.data) {
+        console.log('[AppContext] Data loaded successfully:', {
+          images: migrationResult.data.uploadedImages.length,
+          analyses: migrationResult.data.analyses.length,
+          groups: migrationResult.data.imageGroups.length
+        });
         
-        try {
-          const migrationResult = await DataMigrationService.loadAllFromDatabase();
-          
-          if (migrationResult.success && migrationResult.data) {
-            console.log('[AppContext] Data loaded successfully:', {
-              images: migrationResult.data.uploadedImages.length,
-              analyses: migrationResult.data.analyses.length,
-              groups: migrationResult.data.imageGroups.length
-            });
-            
-            dispatch({ 
-              type: 'MERGE_FROM_DATABASE', 
-              payload: migrationResult.data,
-              meta: { forceReplace: false }
-            });
-            
-            return migrationResult.data;
-          } else {
-            console.log('[AppContext] No data loaded or load failed');
-            return null;
-          }
-        } finally {
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      },
-      5 // High priority for initial load
-    );
-
-    if (!result.success) {
-      console.error('[AppContext] Failed to load data:', result.error);
+        dispatch({ 
+          type: 'MERGE_FROM_DATABASE', 
+          payload: migrationResult.data,
+          meta: { forceReplace: false }
+        });
+      } else {
+        console.log('[AppContext] No data loaded or load failed');
+      }
+    } catch (error) {
+      console.error('[AppContext] Failed to load data:', error);
       toast({
         title: "Failed to load data",
-        description: result.error || "Unknown error occurred",
+        description: "Error loading your data. Please try refreshing.",
         category: "error",
         variant: "destructive"
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [user, toast]);
 
@@ -208,200 +183,98 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [user]); // Only depend on user, not the function
 
-  // Database sync function - pass state as parameter to avoid dependency issues
-  const syncToDatabase = useCallback(async (stateToSync = state) => {
+  // Simplified database sync function
+  const syncToDatabase = useCallback(async () => {
     if (!user) return;
 
-    const operationId = `sync-${Date.now()}`;
+    dispatch({ type: 'SET_SYNCING', payload: true });
     
-    const result = await atomicStateManager.executeOperation(
-      operationId,
-      'SYNC',
-      async () => {
-        dispatch({ type: 'SET_SYNCING', payload: true });
-        
-        try {
-          const migrationResult = await DataMigrationService.migrateAllToDatabase({
-            uploadedImages: stateToSync.uploadedImages,
-            analyses: stateToSync.analyses,
-            imageGroups: stateToSync.imageGroups,
-            groupAnalysesWithPrompts: stateToSync.groupAnalysesWithPrompts,
-          });
-          
-          if (migrationResult.success) {
-            console.log('[AppContext] Data synced successfully');
-            toast({
-              title: "Sync complete",
-              description: "Your data has been saved to the cloud.",
-              category: "success",
-            });
-            return true;
-          } else {
-            throw new Error(migrationResult.error || 'Sync failed');
-          }
-        } finally {
-          dispatch({ type: 'SET_SYNCING', payload: false });
-        }
-      },
-      7 // High priority for sync
-    );
-
-    if (!result.success) {
-      console.error('[AppContext] Sync failed:', result.error);
+    try {
+      const migrationResult = await DataMigrationService.migrateAllToDatabase({
+        uploadedImages: state.uploadedImages,
+        analyses: state.analyses,
+        imageGroups: state.imageGroups,
+        groupAnalysesWithPrompts: state.groupAnalysesWithPrompts,
+      });
+      
+      if (migrationResult.success) {
+        console.log('[AppContext] Data synced successfully');
+        toast({
+          title: "Sync complete",
+          description: "Your data has been saved to the cloud.",
+          category: "success",
+        });
+      } else {
+        throw new Error(migrationResult.error || 'Sync failed');
+      }
+    } catch (error) {
+      console.error('[AppContext] Sync failed:', error);
       toast({
         title: "Sync failed",
-        description: result.error || "Failed to save data",
+        description: "Failed to save data. Please try again.",
         category: "error",
         variant: "destructive"
       });
+    } finally {
+      dispatch({ type: 'SET_SYNCING', payload: false });
     }
-  }, [user, toast]);
+  }, [user, state, toast]);
 
-  // Enhanced image upload with optimistic updates and client-side management
+  // Simplified image upload - direct state update
   const handleImageUpload = useCallback(async (files: File[]) => {
-    const operationId = `upload-${Date.now()}`;
+    dispatch({ type: 'SET_UPLOADING', payload: true });
     
-    const result = await atomicStateManager.executeOperation(
-      operationId,
-      'UPLOAD',
-      async () => {
-        dispatch({ type: 'SET_UPLOADING', payload: true });
-        
-        try {
-          const newImages: UploadedImage[] = [];
-          const newAnalyses: UXAnalysis[] = [];
-          
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            
-            if (user) {
-              // Use optimistic updates for authenticated users
-              const { tempImage, operationId: optimisticId, confirm } = optimisticUpdates.optimisticImageUpload(
-                file,
-                async (uploadFile) => {
-                  // Actual upload logic would go here
-                  const imageId = `img-${Date.now()}-${i}`;
-                  const imageUrl = URL.createObjectURL(uploadFile);
-                  
-                  return {
-                    id: imageId,
-                    name: uploadFile.name,
-                    url: imageUrl,
-                    file: uploadFile,
-                    dimensions: { width: 0, height: 0 },
-                    status: 'completed' as const
-                  };
-                }
-              );
-              
-              newImages.push(tempImage);
-              
-              // Cache the image immediately
-              offlineCache.cacheImage(tempImage, 'high');
-              
-              // Queue background processing
-              backgroundSyncService.queueImageProcessing(tempImage.id, tempImage.url, tempImage.name);
-              
-              // Create placeholder analysis
-              const placeholderAnalysis: UXAnalysis = {
-                id: `analysis-${tempImage.id}`,
-                imageId: tempImage.id,
-                imageName: tempImage.name,
-                imageUrl: tempImage.url,
-                userContext: '',
-                status: 'processing',
-                visualAnnotations: [],
-                suggestions: [],
-                summary: {
-                  overallScore: 0,
-                  categoryScores: {
-                    usability: 0,
-                    accessibility: 0,
-                    visual: 0,
-                    content: 0
-                  },
-                  keyIssues: [],
-                  strengths: []
-                },
-                metadata: { objects: [], text: [], colors: [], faces: 0 },
-                createdAt: new Date()
-              };
-              
-              newAnalyses.push(placeholderAnalysis);
-              offlineCache.cacheAnalysis(placeholderAnalysis, 'high');
-              
-              // Confirm the optimistic operation
-              setTimeout(() => confirm(), 100);
-              
-            } else {
-              // Use immediate mock for non-authenticated users
-              const imageId = `temp-${Date.now()}-${i}`;
-              const imageUrl = URL.createObjectURL(file);
-              
-              const uploadedImage: UploadedImage = {
-                id: imageId,
-                name: file.name,
-                url: imageUrl,
-                file,
-                dimensions: { width: 0, height: 0 },
-                status: 'completed'
-              };
-              
-              newImages.push(uploadedImage);
-              newAnalyses.push(generateMockAnalysis(imageId, file.name, imageUrl));
-            }
-          }
-          
-          console.log('[AppContext] Batch uploading images and analyses...');
-          
-          // Single atomic update
-          dispatch({ 
-            type: 'BATCH_UPLOAD', 
-            payload: { images: newImages, analyses: newAnalyses } 
-          });
-          
-          return { newImages, newAnalyses };
-          
-        } finally {
-          dispatch({ type: 'SET_UPLOADING', payload: false });
-        }
-      },
-      9 // Very high priority for uploads
-    );
-
-    if (result.success && result.data) {
-      console.log('[AppContext] Upload completed successfully');
+    try {
+      const newImages: UploadedImage[] = [];
+      const newAnalyses: UXAnalysis[] = [];
       
-      // Set up background sync event handlers
-      backgroundSyncService.setEventHandlers({
-        onSyncComplete: (syncResult) => {
-          if (syncResult.success && syncResult.data) {
-            console.log('[AppContext] Background analysis completed:', syncResult.operationId);
-            handleAnalysisComplete(syncResult.data.imageId, syncResult.data);
-          }
-        },
-        onSyncError: (operationId, error) => {
-          console.error('[AppContext] Background sync failed:', operationId, error);
-        }
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const imageId = `img-${Date.now()}-${i}`;
+        const imageUrl = URL.createObjectURL(file);
+        
+        const uploadedImage: UploadedImage = {
+          id: imageId,
+          name: file.name,
+          url: imageUrl,
+          file,
+          dimensions: { width: 0, height: 0 },
+          status: 'completed'
+        };
+        
+        newImages.push(uploadedImage);
+        
+        // Generate immediate mock analysis
+        const mockAnalysis = generateMockAnalysis(imageId, file.name, imageUrl);
+        newAnalyses.push(mockAnalysis);
+      }
+      
+      console.log('[AppContext] Uploading', newImages.length, 'images');
+      
+      // Single atomic update
+      dispatch({ 
+        type: 'BATCH_UPLOAD', 
+        payload: { images: newImages, analyses: newAnalyses } 
       });
 
-      // Show success feedback
-      const uploadedImages = result.data.newImages || [];
       toast({
         title: "Upload complete",
-        description: `Successfully uploaded ${uploadedImages.length} image${uploadedImages.length > 1 ? 's' : ''} and generated analyses.`,
+        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
         category: "success",
       });
-    } else {
-      console.error('[AppContext] Upload failed:', result.error);
+      
+    } catch (error) {
+      console.error('[AppContext] Upload failed:', error);
       toast({
         title: "Upload failed", 
-        description: result.error || "Unknown error occurred",
+        description: "Failed to upload images. Please try again.",
         category: "error",
         variant: "destructive"
       });
+    } finally {
+      dispatch({ type: 'SET_UPLOADING', payload: false });
     }
-  }, [user, toast, optimisticUpdates, offlineCache, backgroundSyncService]);
+  }, [toast]);
 
   // Immediate upload for demo purposes
   const handleImageUploadImmediate = useCallback(async (files: File[]) => {
@@ -651,10 +524,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     clearAnnotations,
     handleAnalysisComplete,
     
-    // Client-side management features
-    clientStateManager,
+    // Cache features
     offlineCache,
-    optimisticUpdates,
     
     // Backward compatibility - direct state access
     uploadedImages: state.uploadedImages,
@@ -706,9 +577,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toggleAnnotation,
     clearAnnotations,
     handleAnalysisComplete,
-    clientStateManager,
     offlineCache,
-    optimisticUpdates,
     handleAnnotationClick,
     handleGalleryToolChange,
     handleAddComment,
