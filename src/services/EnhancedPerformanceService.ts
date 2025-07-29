@@ -123,6 +123,30 @@ export class EnhancedPerformanceService {
     return { ...this.canvasMetrics };
   }
   
+  static async collectPerformanceMetrics(): Promise<{
+    pageLoadTime: number;
+    apiResponseTime: number;
+    memoryUsage: number;
+    renderTime: number;
+  }> {
+    const loadTime = performance.timing ? 
+      performance.timing.loadEventEnd - performance.timing.navigationStart : 0;
+    
+    // Get recent navigation entries for API timing
+    const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const apiTime = navEntries.length > 0 ? navEntries[0].responseEnd - navEntries[0].requestStart : 0;
+    
+    const memoryUsage = 'memory' in performance ? 
+      (performance as any).memory.usedJSHeapSize / 1024 / 1024 : 0;
+    
+    return {
+      pageLoadTime: loadTime,
+      apiResponseTime: apiTime,
+      memoryUsage,
+      renderTime: this.canvasMetrics.nodeRenderTime
+    };
+  }
+
   static getPerformanceReport(): {
     metrics: CanvasMetrics;
     recommendations: string[];
