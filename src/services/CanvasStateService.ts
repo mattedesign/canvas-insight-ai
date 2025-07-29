@@ -93,7 +93,7 @@ export class CanvasStateService {
       const cached = this.getCachedCanvasState(projectId);
       
       // Load from database
-      const result = await supabase
+      const result: any = await supabase
         .from('canvas_states')
         .select('*')
         .eq('project_id', projectId)
