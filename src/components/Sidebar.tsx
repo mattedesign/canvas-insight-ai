@@ -9,7 +9,8 @@ import {
   Activity,
   Trash2,
   LogOut,
-  Brain
+  Brain,
+  Monitor
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { useAuth } from '@/context/AuthContext';
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isOnProjects = location.pathname === '/projects';
   const isOnAnalytics = location.pathname === '/analytics';
   const isOnTestOpenAI = location.pathname === '/test-openai';
+  const isOnProduction = location.pathname === '/production';
   const isOnSubscription = location.pathname === '/subscription';
   
   
@@ -57,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Folder, label: 'Previous', active: isOnProjects },
     { icon: Activity, label: 'Analytics', active: isOnAnalytics },
+    { icon: Monitor, label: 'Production', active: isOnProduction },
     { icon: Brain, label: 'Test OpenAI', active: isOnTestOpenAI },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: isOnSubscription },
@@ -79,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Dashboard' ? () => navigate('/dashboard') :
               item.label === 'Previous' ? () => navigate('/projects') :
               item.label === 'Analytics' ? () => navigate('/analytics') :
+              item.label === 'Production' ? () => navigate('/production') :
               item.label === 'Test OpenAI' ? () => navigate('/test-openai') :
               item.label === 'Subscription' ? () => navigate('/subscription') :
               undefined
@@ -94,6 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Previous' ? 'Previous Analyses' :
               item.label === 'Analytics' ? 'System Analytics' :
+              item.label === 'Production' ? 'Production Readiness' :
               item.label === 'Test OpenAI' ? 'Test OpenAI Analysis' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :

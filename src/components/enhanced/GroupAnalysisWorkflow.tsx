@@ -212,10 +212,11 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
     ));
 
     const startTime = Date.now();
+    let progressInterval: NodeJS.Timeout | null = null;
 
     try {
       // Simulate progress updates
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setAnalysisStages(prev => prev.map((stage, index) => 
           index === stageIndex 
             ? { ...stage, progress: Math.min(stage.progress + 10, 90) }
@@ -244,7 +245,10 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
         }
       });
 
-      clearInterval(progressInterval);
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
 
       if (error) throw error;
 
@@ -273,7 +277,10 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       setCurrentStage(stageIndex + 1);
 
     } catch (error) {
-      if (progressInterval) clearInterval(progressInterval);
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
       
       setAnalysisStages(prev => prev.map((stage, index) => 
         index === stageIndex 
