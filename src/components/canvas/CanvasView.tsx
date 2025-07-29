@@ -104,11 +104,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
   
-  // Debug log to check onImageUpload
-    console.log('CanvasView onImageUpload:', onImageUpload);
-    console.log('CanvasView uploadedImages count:', uploadedImages.length);
-    console.log('CanvasView analyses count:', analyses.length);
-    const [groups, setGroups] = useState<ImageGroup[]>([]);
+  const [groups, setGroups] = useState<ImageGroup[]>([]);
   
   
   const { toast } = useFilteredToast();

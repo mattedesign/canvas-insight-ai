@@ -231,7 +231,7 @@ const Canvas = () => {
     };
 
     loadProjectBySlug();
-  }, [projectSlug, navigate, toast, user, hasExistingData]);
+  }, [projectSlug, navigate, toast, user]); // Removed hasExistingData dependency
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
