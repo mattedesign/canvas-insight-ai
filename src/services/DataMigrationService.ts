@@ -507,28 +507,50 @@ export class GroupMigrationService {
   static async loadGroupsFromDatabase(): Promise<ImageGroup[]> {
     const projectId = await ProjectService.getCurrentProject();
     
-    // Get groups with their image associations
-    const { data: groups, error } = await supabase
+    // First, get all groups for the project
+    const { data: groups, error: groupsError } = await supabase
       .from('image_groups')
-      .select(`
-        *,
-        group_images(image_id)
-      `)
+      .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (groupsError) throw groupsError;
     if (!groups) return [];
 
-    return groups.map(group => ({
-      id: group.id,
-      name: group.name,
-      description: group.description || '',
-      imageIds: group.group_images?.map((gi: any) => gi.image_id) || [],
-      position: (group.position as any) || { x: 100, y: 100 },
-      color: group.color,
-      createdAt: new Date(group.created_at)
-    }));
+    // Then, for each group, get its images separately to avoid ambiguous relationships
+    const groupsWithImages = await Promise.all(
+      groups.map(async (group) => {
+        const { data: groupImages, error: imagesError } = await supabase
+          .from('group_images')
+          .select('image_id')
+          .eq('group_id', group.id);
+
+        if (imagesError) {
+          console.error(`Failed to load images for group ${group.id}:`, imagesError);
+          return {
+            id: group.id,
+            name: group.name,
+            description: group.description || '',
+            imageIds: [],
+            position: (group.position as any) || { x: 100, y: 100 },
+            color: group.color,
+            createdAt: new Date(group.created_at)
+          };
+        }
+
+        return {
+          id: group.id,
+          name: group.name,
+          description: group.description || '',
+          imageIds: groupImages?.map((gi: any) => gi.image_id) || [],
+          position: (group.position as any) || { x: 100, y: 100 },
+          color: group.color,
+          createdAt: new Date(group.created_at)
+        };
+      })
+    );
+
+    return groupsWithImages;
   }
 }
 
