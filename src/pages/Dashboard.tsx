@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, BarChart3, Images, Lightbulb, Users } from 'lucide-react';
+import { ProjectService } from '@/services/DataMigrationService';
+import { CanvasStateService } from '@/services/CanvasStateService';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 
 interface DashboardStats {
   totalProjects: number;
@@ -25,10 +28,39 @@ interface DashboardStats {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
+  const toast = useFilteredToast();
   const { metrics, loading: metricsLoading, error: metricsError } = useDashboardMetrics();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCreateProject = async () => {
+    try {
+      // Create project with auto-generated name and slug
+      const project = await ProjectService.createNewProject();
+      
+      // Create a default blank canvas state for the new project
+      const defaultState = CanvasStateService.createDefaultState(project.id, 'New Analysis Session');
+      await CanvasStateService.saveCanvasState(project.id, defaultState);
+      
+      toast.toast({
+        category: 'success',
+        title: "New project created",
+        description: `${project.name} is ready for analysis.`,
+      });
+      
+      // Navigate directly to canvas with the project slug
+      navigate(`/canvas/${project.slug}`);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast.toast({
+        category: 'error',
+        title: "Error creating project",
+        description: "Failed to create a new project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Fetch projects data separately for recent projects section
   useEffect(() => {
@@ -176,7 +208,7 @@ const Dashboard = () => {
 
             {/* Quick Actions */}
             <div className="flex gap-4">
-              <Button onClick={() => navigate('/canvas')} className="gap-2">
+              <Button onClick={handleCreateProject} className="gap-2">
                 <Plus className="h-4 w-4" />
                 New Project
               </Button>
@@ -241,7 +273,7 @@ const Dashboard = () => {
                 {stats?.recentProjects.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No projects yet</p>
-                    <Button onClick={() => navigate('/canvas')}>
+                    <Button onClick={handleCreateProject}>
                       Create Your First Project
                     </Button>
                   </div>
