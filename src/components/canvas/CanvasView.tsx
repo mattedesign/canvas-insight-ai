@@ -72,6 +72,7 @@ interface CanvasViewProps {
   onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
   onImageUpload?: (files: File[]) => void;
   isGeneratingConcept?: boolean;
+  canvasStateManager?: any; // Optional canvas state manager
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
@@ -99,7 +100,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onOpenAnalysisPanel,
   onAnalysisComplete,
   onImageUpload,
-  isGeneratingConcept
+  isGeneratingConcept,
+  canvasStateManager
 }) => {
   const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);

@@ -6,6 +6,7 @@ import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { CanvasUploadZone } from '@/components/CanvasUploadZone';
 
 import { useAppContext } from '@/context/AppContext';
+import { useCanvasStateManager } from '@/hooks/useCanvasStateManager';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -61,6 +62,35 @@ const Canvas = () => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   
   const toast = useFilteredToast();
+  
+  // Initialize canvas state manager for race-condition-free state management
+  const canvasStateManager = useCanvasStateManager({
+    projectId: projectSlug || 'default',
+    appState: {
+      uploadedImages,
+      analyses,
+      imageGroups,
+      groupAnalysesWithPrompts,
+      generatedConcepts,
+      groupAnalyses,
+      groupPromptSessions,
+      selectedImageId,
+      showAnnotations,
+      galleryTool: 'cursor',
+      groupDisplayModes,
+      isLoading,
+      isSyncing: false,
+      isUploading,
+      isGeneratingConcept,
+      pendingBackgroundSync: new Set(),
+      version: 1,
+      lastSyncTimestamp: Date.now()
+    },
+    onStateChange: (canvasState) => {
+      // Handle canvas state changes for real-time updates
+      console.log('Canvas state updated:', canvasState);
+    }
+  });
 
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
@@ -195,22 +225,29 @@ const Canvas = () => {
     loadProjectBySlug();
   }, [projectSlug, navigate, toast]); // Removed user dependency to prevent conflicts
 
-  // Set up keyboard shortcuts
+  // Set up keyboard shortcuts with canvas state manager integration
   useKeyboardShortcuts({
     onGroup: () => {
-      if (uploadedImages.length > 0) {
-        // If on canvas, trigger group creation if multiple items selected
-        // You could add additional logic here to select multiple items first
-        console.log('Group shortcut triggered');
+      if (uploadedImages.length > 0 && canvasStateManager.canvasState.selectedNodes.length > 1) {
+        // Get selected image IDs from canvas
+        const selectedImageIds = canvasStateManager.canvasState.selectedNodes
+          .filter(nodeId => nodeId.startsWith('image-'))
+          .map(nodeId => nodeId.replace('image-', ''));
+        
+        if (selectedImageIds.length > 1) {
+          canvasStateManager.createGroupOptimistic(
+            `Group ${Date.now()}`,
+            selectedImageIds,
+            { x: 100, y: 100 }
+          );
+        }
       }
     },
     onUndo: () => {
-      console.log('Undo shortcut triggered');
-      // Wire this up to your undo functionality
+      canvasStateManager.performUndo();
     },
     onRedo: () => {
-      console.log('Redo shortcut triggered');
-      // Wire this up to your redo functionality
+      canvasStateManager.performRedo();
     },
   });
 
@@ -286,6 +323,7 @@ const Canvas = () => {
           onAnalysisComplete={handleAnalysisComplete}
           onImageUpload={handleCanvasUpload}
           isGeneratingConcept={isGeneratingConcept}
+          canvasStateManager={canvasStateManager}
         />
         
         {/* Upload Zone - shows full overlay when no images, floating button when images exist */}
