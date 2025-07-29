@@ -57,6 +57,9 @@ export function useCanvasStateManager({
   const lastSaveTime = useRef<number>(0);
   const pendingChanges = useRef<boolean>(false);
   
+  // Track project to prevent re-initialization
+  const initializedForProjectRef = useRef<string | null>(null);
+  
   // Add these refs for version tracking
   const lastSyncedVersion = useRef<string>('');
   const syncInProgress = useRef(false);
@@ -72,10 +75,19 @@ export function useCanvasStateManager({
 
   // Load initial canvas state
   useEffect(() => {
-    if (!projectId || projectId === 'temp-project' || isInitialized.current) return;
+    // Skip if same project
+    if (initializedForProjectRef.current === projectId) {
+      console.log('[CanvasStateManager] Already initialized for project:', projectId);
+      return;
+    }
+    
+    if (!projectId || projectId === 'temp-project') return;
     
     const loadCanvasState = async () => {
       try {
+        console.log('[CanvasStateManager] Initializing for project:', projectId);
+        initializedForProjectRef.current = projectId;
+        
         const savedState = await CanvasStateService.loadCanvasState();
         if (savedState) {
           // Convert saved state to canvas state
@@ -101,14 +113,14 @@ export function useCanvasStateManager({
         }
         isInitialized.current = true;
       } catch (error) {
-        console.error('Failed to load canvas state:', error);
+        console.error('[CanvasStateManager] Failed to load:', error);
         initializeFromAppState();
         isInitialized.current = true;
       }
     };
 
     loadCanvasState();
-  }, [projectId]);
+  }, [projectId]); // Only depend on projectId
 
   // Initialize canvas from app state
   const initializeFromAppState = useCallback(() => {
