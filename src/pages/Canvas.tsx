@@ -112,9 +112,16 @@ const Canvas = () => {
   const [loadAttempted, setLoadAttempted] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string>('temp-project');
 
-  // Add refs to prevent multiple loads
-  const projectLoadingRef = useRef(false);
-  const loadedProjectSlugRef = useRef<string | null>(null);
+  // Track loaded project to prevent loops
+  const loadedProjectRef = useRef<{
+    slug: string | null;
+    projectId: string | null;
+    timestamp: number;
+  }>({
+    slug: null,
+    projectId: null,
+    timestamp: 0
+  });
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -217,57 +224,84 @@ const Canvas = () => {
     setSelectedGroupId(null);
   };
 
-  // Load project by slug if provided - let AppContext handle general data loading
+  // Listen for project changes instead of triggering them
+  useEffect(() => {
+    const handleProjectChange = (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      console.log('[Canvas] Project changed externally:', projectId);
+      setCurrentProjectId(projectId);
+    };
+    
+    window.addEventListener('projectChanged', handleProjectChange as any);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange as any);
+    };
+  }, []);
+  
+  // Load project by slug - with proper deduplication
   const { user } = useAuth();
   useEffect(() => {
-    // Skip if already loading or loaded this slug
-    if (projectLoadingRef.current || loadedProjectSlugRef.current === projectSlug) {
+    // Skip if we've recently loaded this slug
+    const now = Date.now();
+    if (loadedProjectRef.current.slug === projectSlug && 
+        now - loadedProjectRef.current.timestamp < 2000) {
+      console.log('[Canvas] Skipping duplicate load for slug:', projectSlug);
       return;
     }
     
     const loadProjectBySlug = async () => {
       try {
-        projectLoadingRef.current = true;
-        loadedProjectSlugRef.current = projectSlug;
+        // Update tracking
+        loadedProjectRef.current = {
+          slug: projectSlug,
+          projectId: null,
+          timestamp: now
+        };
         
         if (projectSlug) {
-          console.log('Loading project by slug:', projectSlug);
+          console.log('[Canvas] Loading project by slug:', projectSlug);
           const project = await SlugService.getProjectBySlug(projectSlug);
           
           if (!project) {
-            console.error('Project not found for slug:', projectSlug);
+            console.error('[Canvas] Project not found for slug:', projectSlug);
             toast.toast({
               category: 'error',
               title: "Project not found",
-              description: "The project you're looking for doesn't exist or you don't have access to it.",
+              description: "The project you're looking for doesn't exist.",
               variant: "destructive",
             });
             navigate('/projects');
             return;
           }
-
-          await ProjectService.switchToProject(project.id);
+          
+          // Only switch if different from current
+          const currentProject = await ProjectService.getCurrentProject();
+          if (currentProject !== project.id) {
+            await ProjectService.switchToProject(project.id);
+          }
+          
           setCurrentProjectId(project.id);
+          loadedProjectRef.current.projectId = project.id;
         } else {
+          // No slug - use current project
           const currentProject = await ProjectService.getCurrentProject();
           setCurrentProjectId(currentProject);
+          loadedProjectRef.current.projectId = currentProject;
         }
       } catch (error) {
-        console.error('Error loading project by slug:', error);
+        console.error('[Canvas] Error loading project:', error);
         toast.toast({
           category: 'error',
           title: "Error loading project",
-          description: "Failed to load the project. Please try again.",
+          description: "Failed to load the project.",
           variant: "destructive",
         });
         navigate('/projects');
-      } finally {
-        projectLoadingRef.current = false;
       }
     };
-
+    
     loadProjectBySlug();
-  }, [projectSlug]); // Only depend on projectSlug
+  }, [projectSlug]); // Only depend on slug
 
   // Simplified keyboard shortcuts
   useKeyboardShortcuts({
