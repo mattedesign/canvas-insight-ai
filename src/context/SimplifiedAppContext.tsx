@@ -1,6 +1,6 @@
 /**
- * Simplified App Context - Phase 2: Consolidated State Management
- * Pure reducer pattern with stable action dispatch and simplified context value
+ * Simplified App Context - Phase 3: Optimized Data Loading with State Machine
+ * Implements explicit loading states and removes loading logic from useEffect dependencies
  */
 
 import React, { 
@@ -13,6 +13,7 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { useLoadingStateMachine } from '@/hooks/useLoadingStateMachine';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { loadImageDimensions } from '@/utils/imageUtils';
@@ -28,11 +29,12 @@ import type {
 import { appStateReducer } from './AppStateReducer';
 import { initialAppState } from './AppStateTypes';
 
-// Simplified context interface - Core values only
+// PHASE 3.1: Simplified context interface with loading state machine
 interface SimplifiedAppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   stableHelpers: StableHelpers;
+  loadingMachine: ReturnType<typeof useLoadingStateMachine>;
 }
 
 // Stable helper functions with no dependencies on changing state
@@ -60,19 +62,19 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [state, dispatch] = useReducer(appStateReducer, initialAppState);
   const { user } = useAuth();
   const { toast } = useFilteredToast();
+  
+  // PHASE 3.1: Integrate loading state machine
+  const loadingMachine = useLoadingStateMachine();
 
   // Use refs for stable function references that don't cause re-renders
-  const isLoadingRef = useRef(false);
-  const isSyncingRef = useRef(false);
-  const isUploadingRef = useRef(false);
+  const isInitializedRef = useRef(false);
 
-  // Stable helper functions - dependencies only on dispatch, never on state
+  // PHASE 3.1: Stable helper functions using loading state machine
   const stableHelpers = useMemo<StableHelpers>(() => ({
-    loadData: async () => {
-      if (!user || isLoadingRef.current) return;
+    loadData: async (): Promise<void> => {
+      if (!user || loadingMachine.state.appData === 'loading') return;
       
-      isLoadingRef.current = true;
-      dispatch({ type: 'SET_LOADING', payload: true });
+      loadingMachine.actions.startAppLoad();
       
       try {
         const migrationResult = await DataMigrationService.loadAllFromDatabase();
@@ -89,33 +91,33 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             payload: migrationResult.data, 
             meta: { forceReplace: false } 
           });
+          
+          loadingMachine.actions.appLoadSuccess();
+        } else {
+          throw new Error('No data available or load failed');
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
         console.error('[SimplifiedAppContext] Failed to load data:', error);
+        
+        loadingMachine.actions.appLoadError(errorMessage);
+        
         toast({
           title: "Failed to load data",
           description: "Error loading your data. Please try refreshing.",
           variant: "destructive",
           category: "error"
         });
-      } finally {
-        isLoadingRef.current = false;
-        dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
 
-    syncData: async () => {
-      if (!user || isSyncingRef.current) return;
+    syncData: async (): Promise<void> => {
+      if (!user || loadingMachine.state.sync === 'loading') return;
       
-      isSyncingRef.current = true;
-      dispatch({ type: 'SET_SYNCING', payload: true });
+      loadingMachine.actions.startSync();
       
       try {
-        // Phase 3.2: Event-driven approach - trigger a reload from database
-        // instead of trying to access potentially stale state
-        console.log('[SimplifiedAppContext] Triggering data reload for sync...');
-        
-        // Reload data from database (this is event-driven sync)
+        // PHASE 3.2: Event-driven approach - reload from database instead of accessing state
         const migrationResult = await DataMigrationService.loadAllFromDatabase();
         
         if (migrationResult.success && migrationResult.data) {
@@ -125,15 +127,23 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             meta: { forceReplace: false } 
           });
           
+          loadingMachine.actions.syncSuccess();
+          
           toast({
             title: "Sync complete",
             description: "Your data has been synchronized with the cloud.",
             category: "success"
           });
+        } else {
+          throw new Error('Sync failed - no data retrieved');
         }
         
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Sync failed';
         console.error('[SimplifiedAppContext] Sync failed:', error);
+        
+        loadingMachine.actions.syncError(errorMessage);
+        
         toast({
           title: "Sync failed",
           description: "Failed to save data. Please try again.",
@@ -141,25 +151,20 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
           category: "error"
         });
         
-        // Phase 3.2: Proper error boundary support
-        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Sync failed' });
-      } finally {
-        isSyncingRef.current = false;
-        dispatch({ type: 'SET_SYNCING', payload: false });
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
       }
     },
 
-    uploadImages: async (files: File[]) => {
-      if (isUploadingRef.current) return;
+    uploadImages: async (files: File[]): Promise<void> => {
+      if (loadingMachine.state.imageUpload === 'loading') return;
       
-      isUploadingRef.current = true;
-      dispatch({ type: 'SET_UPLOADING', payload: true });
+      loadingMachine.actions.startUpload();
       
       try {
         const newImages: UploadedImage[] = [];
         const newAnalyses: UXAnalysis[] = [];
         
-        const dimensionsPromises = files.map(async (file, i) => {
+        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
           const imageId = `img-${Date.now()}-${i}`;
           const imageUrl = URL.createObjectURL(file);
           
@@ -188,6 +193,8 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         });
         
         dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+        
+        loadingMachine.actions.uploadSuccess();
 
         toast({
           title: "Upload complete",
@@ -195,31 +202,31 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
           category: "success"
         });
         
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
         console.error('[SimplifiedAppContext] Upload failed:', error);
+        
+        loadingMachine.actions.uploadError(errorMessage);
+        
         toast({
           title: "Upload failed", 
           description: "Failed to upload images. Please try again.",
           variant: "destructive",
           category: "error"
         });
-      } finally {
-        isUploadingRef.current = false;
-        dispatch({ type: 'SET_UPLOADING', payload: false });
       }
     },
 
-    uploadImagesImmediate: async (files: File[]) => {
-      if (isUploadingRef.current) return;
+    uploadImagesImmediate: async (files: File[]): Promise<void> => {
+      if (loadingMachine.state.imageUpload === 'loading') return;
       
-      isUploadingRef.current = true;
-      dispatch({ type: 'SET_UPLOADING', payload: true });
+      loadingMachine.actions.startUpload();
 
       try {
         const newImages: UploadedImage[] = [];
         const newAnalyses: UXAnalysis[] = [];
         
-        const dimensionsPromises = files.map(async (file, i) => {
+        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
           const imageId = `temp-${Date.now()}-${i}`;
           const imageUrl = URL.createObjectURL(file);
           
@@ -248,22 +255,25 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         });
         
         dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+        
+        loadingMachine.actions.uploadSuccess();
 
         toast({
           title: "Upload complete",
           description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
           category: "success"
         });
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Immediate upload failed';
         console.error('Error in immediate image upload:', error);
+        
+        loadingMachine.actions.uploadError(errorMessage);
+        
         toast({
           title: "Upload error",
           description: "Some images failed to load properly. Please try again.",
           category: "error"
         });
-      } finally {
-        isUploadingRef.current = false;
-        dispatch({ type: 'SET_UPLOADING', payload: false });
       }
     },
 
@@ -293,8 +303,10 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
 
-    generateConcept: async (prompt: string, selectedImages?: string[]) => {
-      dispatch({ type: 'SET_GENERATING_CONCEPT', payload: true });
+    generateConcept: async (prompt: string, selectedImages?: string[]): Promise<void> => {
+      if (loadingMachine.state.conceptGeneration === 'loading') return;
+      
+      loadingMachine.actions.startConceptGeneration();
       
       try {
         const conceptId = `concept-${Date.now()}`;
@@ -310,58 +322,63 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
 
         dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
         
+        loadingMachine.actions.conceptGenerationSuccess();
+        
         toast({
           title: "Concept Generated",
           description: "New concept has been generated successfully",
           category: "success"
         });
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Concept generation failed';
         console.error('Concept generation failed:', error);
+        
+        loadingMachine.actions.conceptGenerationError(errorMessage);
+        
         toast({
           title: "Generation Failed",
           description: "Failed to generate concept. Please try again.",
           variant: "destructive",
           category: "error"
         });
-      } finally {
-        dispatch({ type: 'SET_GENERATING_CONCEPT', payload: false });
       }
     },
 
     clearCanvas: () => {
       dispatch({ type: 'RESET_STATE' });
     }
-  }), [user, toast]); // Removed state dependency - helpers now truly stable
+  }), [user, toast, loadingMachine.state, loadingMachine.actions]); // PHASE 3.1: Added loading machine dependencies
 
-  // Load initial data when user logs in - ONE TIME EFFECT
+  // PHASE 3.2: Load initial data when user logs in - ONE TIME EFFECT
   useEffect(() => {
-    if (user) {
+    if (user && !isInitializedRef.current) {
       console.log('[SimplifiedAppContext] User authenticated, loading data...');
+      isInitializedRef.current = true;
       stableHelpers.loadData();
-    } else {
+    } else if (!user) {
       console.log('[SimplifiedAppContext] User logged out, clearing state...');
+      isInitializedRef.current = false;
+      loadingMachine.actions.resetAll();
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user]); // Only user dependency - loadData is stable
+  }, [user, stableHelpers.loadData, loadingMachine.actions]); // PHASE 3.2: Proper dependencies
 
-  // Phase 5.2: Cleanup on unmount to prevent memory leaks
+  // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       console.log('[SimplifiedAppContext] Cleaning up context...');
-      // Stop any ongoing operations
-      if (isLoadingRef.current || isSyncingRef.current) {
-        isLoadingRef.current = false;
-        isSyncingRef.current = false;
-      }
+      loadingMachine.actions.resetAll();
+      isInitializedRef.current = false;
     };
-  }, []);
+  }, [loadingMachine.actions]);
 
-  // Create context value with stable references
+  // PHASE 3.1: Create context value with stable references including loading machine
   const contextValue = useMemo(() => ({
     state,
     dispatch,
-    stableHelpers
-  }), [state, stableHelpers]);
+    stableHelpers,
+    loadingMachine
+  }), [state, stableHelpers, loadingMachine]);
 
   return (
     <DataLoadingErrorBoundary>

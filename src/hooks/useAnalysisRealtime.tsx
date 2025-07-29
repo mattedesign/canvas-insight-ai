@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UXAnalysis } from '@/types/ux-analysis';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
@@ -28,12 +28,24 @@ export const useAnalysisRealtime = ({
 
   const { toast } = useFilteredToast();
 
-  // Retry failed analysis with exponential backoff (stable callback)
+  // PHASE 1.3 FIX: Use refs for stable function references
+  const onAnalysisUpdateRef = useRef(onAnalysisUpdate);
+  const onAnalysisErrorRef = useRef(onAnalysisError);
+  const onAnalysisStatusChangeRef = useRef(onAnalysisStatusChange);
+  const toastRef = useRef(toast);
+
+  // Update refs when callbacks change but don't trigger re-subscription
+  onAnalysisUpdateRef.current = onAnalysisUpdate;
+  onAnalysisErrorRef.current = onAnalysisError;
+  onAnalysisStatusChangeRef.current = onAnalysisStatusChange;
+  toastRef.current = toast;
+
+  // Retry failed analysis with exponential backoff (FIXED: stable callback)
   const retryAnalysis = useCallback(async (imageId: string) => {
     setState(prev => {
       const retryCount = prev.failedAnalyses.get(imageId) || 0;
       if (retryCount >= 3) {
-        toast({
+        toastRef.current({
           title: "Analysis failed",
           description: "Maximum retry attempts reached. Please try again later.",
           category: "error",
@@ -49,7 +61,7 @@ export const useAnalysisRealtime = ({
       };
     });
 
-    onAnalysisStatusChange(imageId, 'processing');
+    onAnalysisStatusChangeRef.current(imageId, 'processing');
 
     try {
       // Get image data for retry
@@ -86,7 +98,7 @@ export const useAnalysisRealtime = ({
           pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== imageId)),
           failedAnalyses: new Map([...prev.failedAnalyses].filter(([id]) => id !== imageId))
         }));
-        onAnalysisUpdate(analysisData.data);
+        onAnalysisUpdateRef.current(analysisData.data);
       } else {
         throw new Error('Analysis processing failed');
       }
@@ -96,30 +108,30 @@ export const useAnalysisRealtime = ({
         ...prev,
         pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== imageId))
       }));
-      onAnalysisStatusChange(imageId, 'error');
-      onAnalysisError(imageId, error instanceof Error ? error.message : 'Unknown error');
+      onAnalysisStatusChangeRef.current(imageId, 'error');
+      onAnalysisErrorRef.current(imageId, error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [onAnalysisUpdate, onAnalysisError, onAnalysisStatusChange, toast]);
+  }, []); // FIXED: Empty dependency array
 
-  // Track analysis progress
+  // Track analysis progress (FIXED: stable callback)
   const trackAnalysis = useCallback((imageId: string) => {
     setState(prev => ({
       ...prev,
       pendingAnalyses: new Set(prev.pendingAnalyses.add(imageId))
     }));
-    onAnalysisStatusChange(imageId, 'processing');
-  }, [onAnalysisStatusChange]);
+    onAnalysisStatusChangeRef.current(imageId, 'processing');
+  }, []); // FIXED: Empty dependency array
 
-  // Remove analysis from tracking
+  // Remove analysis from tracking (FIXED: stable callback)
   const completeAnalysis = useCallback((imageId: string) => {
     setState(prev => ({
       ...prev,
       pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== imageId)),
       failedAnalyses: new Map([...prev.failedAnalyses].filter(([id]) => id !== imageId))
     }));
-  }, []); // Empty dependency array to prevent infinite re-subscriptions
+  }, []); // FIXED: Empty dependency array
 
-  // Set up real-time subscription with proper cleanup and connection management
+  // PHASE 1.3 FIX: Set up real-time subscription with NO function dependencies
   useEffect(() => {
     let channel: any = null;
     let isSubscribed = true;
@@ -160,8 +172,13 @@ export const useAnalysisRealtime = ({
               status: newAnalysis.status || 'completed'
             };
 
-            completeAnalysis(newAnalysis.image_id);
-            onAnalysisUpdate(analysis);
+            // Use ref to avoid dependency cycles
+            setState(prev => ({
+              ...prev,
+              pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== newAnalysis.image_id)),
+              failedAnalyses: new Map([...prev.failedAnalyses].filter(([id]) => id !== newAnalysis.image_id))
+            }));
+            onAnalysisUpdateRef.current(analysis);
           }
         )
         .on(
@@ -192,11 +209,16 @@ export const useAnalysisRealtime = ({
             };
 
             if (analysis.status === 'completed') {
-              completeAnalysis(updatedAnalysis.image_id);
+              setState(prev => ({
+                ...prev,
+                pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== updatedAnalysis.image_id)),
+                failedAnalyses: new Map([...prev.failedAnalyses].filter(([id]) => id !== updatedAnalysis.image_id))
+              }));
             }
             
-            onAnalysisStatusChange(updatedAnalysis.image_id, analysis.status || 'completed');
-            onAnalysisUpdate(analysis);
+            // Use refs to avoid dependency cycles
+            onAnalysisStatusChangeRef.current(updatedAnalysis.image_id, analysis.status || 'completed');
+            onAnalysisUpdateRef.current(analysis);
           }
         )
         .subscribe((status) => {
@@ -223,7 +245,7 @@ export const useAnalysisRealtime = ({
         channel = null;
       }
     };
-  }, []); // Fixed: Remove all dependencies to prevent re-subscription loops
+  }, []); // PHASE 1.3 CRITICAL FIX: EMPTY dependencies array prevents re-subscription loops
 
   return {
     ...state,
