@@ -40,8 +40,8 @@ const Dashboard = () => {
       const project = await ProjectService.createNewProject();
       
       // Create a default blank canvas state for the new project
-      const defaultState = CanvasStateService.createDefaultState(project.id, 'New Analysis Session');
-      await CanvasStateService.saveCanvasState(project.id, defaultState);
+      const defaultState = await CanvasStateService.createDefaultState('New Analysis Session');
+      await CanvasStateService.saveCanvasState(defaultState);
       
       toast.toast({
         category: 'success',

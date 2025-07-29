@@ -72,17 +72,17 @@ export function useCanvasStateManager({
     
     const loadCanvasState = async () => {
       try {
-        const savedState = await CanvasStateService.loadCanvasState(projectId);
+        const savedState = await CanvasStateService.loadCanvasState();
         if (savedState) {
           // Convert saved state to canvas state
           const restoredState: CanvasState = {
-            nodes: generateNodesFromAppState(appState, savedState.node_positions),
-            edges: generateEdgesFromAppState(appState),
+            nodes: savedState.nodes || [],
+            edges: savedState.edges || [],
             viewport: savedState.viewport,
-            selectedNodes: savedState.selected_nodes,
+            selectedNodes: savedState.ui_state?.selectedNodes || [],
             canvasSettings: {
-              showAnnotations: savedState.canvas_settings.showAnnotations,
-              currentTool: savedState.canvas_settings.tool,
+              showAnnotations: savedState.ui_state?.showAnnotations ?? true,
+              currentTool: savedState.ui_state?.galleryTool || 'cursor',
               zoom: savedState.viewport.zoom
             }
           };
@@ -152,23 +152,22 @@ export function useCanvasStateManager({
       operationId,
       'SYNC',
       async () => {
-        const saveData: Omit<SavedCanvasState, 'id' | 'project_id' | 'updated_at'> = {
+        const saveData = {
+          nodes: canvasState.nodes,
+          edges: canvasState.edges,
           viewport: canvasState.viewport,
-          node_positions: canvasState.nodes.reduce((acc, node) => {
-            acc[node.id] = node.position;
-            return acc;
-          }, {} as Record<string, { x: number; y: number }>),
-          selected_nodes: canvasState.selectedNodes,
-          canvas_settings: {
+          ui_state: {
             showAnnotations: canvasState.canvasSettings.showAnnotations,
-            tool: canvasState.canvasSettings.currentTool
+            galleryTool: canvasState.canvasSettings.currentTool,
+            groupDisplayModes: {},
+            selectedNodes: canvasState.selectedNodes
           }
         };
         
-        const result = await CanvasStateService.saveCanvasState(projectId, saveData);
+        const result = await CanvasStateService.saveCanvasState(saveData);
         offlineCache.set(`canvas-${projectId}`, canvasState, 'high', 'synced');
         lastSaveTime.current = now;
-        return result.success;
+        return (result as any).success;
       }
     );
   }, [canvasState, projectId, offlineCache]);

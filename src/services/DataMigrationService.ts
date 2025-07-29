@@ -265,10 +265,12 @@ export class ImageMigrationService {
         .upsert({
           id: uploadedImage.id,
           project_id: projectId,
+          user_id: user.id,
           filename: uploadedImage.name,
           original_name: uploadedImage.name,
           storage_path: fileName,
-          dimensions: uploadedImage.dimensions
+          dimensions: uploadedImage.dimensions,
+          status: 'completed'
         }, {
           onConflict: 'id'
         })
@@ -321,7 +323,8 @@ export class ImageMigrationService {
           name: img.original_name,
           url: urlData.publicUrl,
           file: emptyFile, // Canvas components use URL, not File content
-          dimensions: img.dimensions as { width: number; height: number }
+          dimensions: img.dimensions as { width: number; height: number },
+          status: 'completed' as const
         };
       });
     } catch (error) {
@@ -359,16 +362,22 @@ export class AnalysisMigrationService {
       if (error) throw error;
       return data.id;
     } else {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       // Create new analysis
       const { data, error } = await supabase
         .from('ux_analyses')
         .insert({
+          id: analysis.id,
           image_id: analysis.imageId,
+          user_id: user.id,
           user_context: analysis.userContext,
           visual_annotations: analysis.visualAnnotations as any,
           suggestions: analysis.suggestions as any,
           summary: analysis.summary as any,
-          metadata: analysis.metadata as any
+          metadata: analysis.metadata as any,
+          status: 'completed'
         })
         .select('id')
         .single();
@@ -421,6 +430,7 @@ export class AnalysisMigrationService {
         suggestions: (analysis.suggestions as any) || [],
         summary: (analysis.summary as any) || {},
         metadata: (analysis.metadata as any) || {},
+        status: 'completed' as const,
         createdAt: new Date(analysis.created_at)
       };
     });
@@ -431,6 +441,8 @@ export class AnalysisMigrationService {
 export class GroupMigrationService {
   static async migrateGroupToDatabase(group: ImageGroup): Promise<string> {
     const projectId = await ProjectService.getCurrentProject();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
     
     // Insert group
     const { data: groupData, error: groupError } = await supabase
@@ -438,6 +450,7 @@ export class GroupMigrationService {
       .insert({
         id: group.id,
         project_id: projectId,
+        user_id: user.id,
         name: group.name,
         description: group.description,
         color: group.color,
@@ -496,11 +509,15 @@ export class GroupMigrationService {
 // Group analysis migration service
 export class GroupAnalysisMigrationService {
   static async migrateGroupAnalysisToDatabase(analysis: GroupAnalysisWithPrompt): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('group_analyses')
       .insert({
         id: analysis.id,
         group_id: analysis.groupId,
+        user_id: user.id,
         prompt: analysis.prompt,
         is_custom: analysis.prompt !== 'default',
         summary: analysis.summary as any,

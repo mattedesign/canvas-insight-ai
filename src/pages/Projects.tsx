@@ -52,8 +52,8 @@ const Projects = () => {
       const project = await ProjectService.createNewProject();
       
       // Create a default blank canvas state for the new project
-      const defaultState = CanvasStateService.createDefaultState(project.id, 'New Analysis Session');
-      await CanvasStateService.saveCanvasState(project.id, defaultState);
+      const defaultState = await CanvasStateService.createDefaultState('New Analysis Session');
+      await CanvasStateService.saveCanvasState(defaultState);
       
       toast({
         title: "New project created",
@@ -80,7 +80,7 @@ const Projects = () => {
       await ProjectService.switchToProject(project.id);
       
       // Clear any existing canvas state for clean start
-      await CanvasStateService.clearCanvasState(project.id);
+      await CanvasStateService.clearCanvasState();
       
       toast({
         title: "Project switched",
