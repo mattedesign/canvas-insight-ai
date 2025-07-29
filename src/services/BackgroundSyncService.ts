@@ -414,7 +414,7 @@ class BackgroundSyncService {
       throw new Error('Full sync failed');
     }
 
-    return result.data;
+    return result;
   }
 
   // Cleanup

@@ -22,7 +22,7 @@ export const StateRecoveryProvider: React.FC<StateRecoveryProviderProps> = ({ ch
       const lastSnapshot = atomicStateManager.getLastSnapshot();
       if (lastSnapshot) {
         console.log('[StateRecovery] Rolling back to snapshot:', lastSnapshot.operationId);
-        updateAppStateFromDatabase(lastSnapshot, { forceReplace: true });
+        updateAppStateFromDatabase(lastSnapshot);
       } else {
         // If no snapshot, trigger a fresh data load
         console.log('[StateRecovery] No snapshot available, triggering fresh load');

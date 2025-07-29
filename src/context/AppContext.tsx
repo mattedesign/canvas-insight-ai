@@ -523,9 +523,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       // Show success feedback for upload completion
+      const uploadedImages = result.data?.newImages || [];
       toast({
         title: "Upload complete",
-        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
+        description: `Successfully uploaded ${uploadedImages.length} image${uploadedImages.length > 1 ? 's' : ''} and generated analyses.`,
         category: "success",
       });
     } else {
