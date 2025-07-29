@@ -71,7 +71,7 @@ const Canvas = () => {
     timestamp: 0
   });
 
-  // Load project data ONCE with stable reference - this is the key fix
+  // Load project data ONCE with stable reference - FIXED: removed problematic dependency
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
@@ -82,15 +82,17 @@ const Canvas = () => {
       // Prevent duplicate loads
       if (loadedProjectRef.current.projectId === projectId && 
           now - loadedProjectRef.current.timestamp < 5000) {
+        console.log('[Canvas] Skipping duplicate load for project:', projectId);
         return;
       }
       
+      console.log('[Canvas] Loading data for project:', projectId);
       loadedProjectRef.current = { projectId, timestamp: now };
       await stableHelpers.loadData();
     };
     
     loadData();
-  }, [user, stableHelpers.loadData]); // Include stableHelpers.loadData
+  }, [user?.id]); // 🚨 CRITICAL FIX: Only depend on user.id, NOT stableHelpers.loadData
 
   const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations } = state;
   const isLoading = loadingMachine.state.appData === 'loading';
