@@ -317,6 +317,17 @@ const Canvas = () => {
     },
   });
 
+  // Debug helper
+  useEffect(() => {
+    console.log('[Canvas] Render:', {
+      projectSlug,
+      currentProjectId,
+      imageCount: uploadedImages.length,
+      isLoading,
+      timestamp: Date.now()
+    });
+  });
+
   // Don't redirect to upload anymore - show upload zone in canvas instead
 
   // Show loading state while data is being loaded
