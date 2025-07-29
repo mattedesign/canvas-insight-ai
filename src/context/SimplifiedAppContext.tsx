@@ -82,9 +82,13 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   toastRef.current = toast;
   loadingMachineRef.current = loadingMachine;
 
+  // 🚨 CRITICAL FIX: Create a stable loadData function in a ref
+  const loadDataFunctionRef = useRef<() => Promise<void>>();
+
   // PHASE 1.2: Stable helper functions with EMPTY dependencies (no re-render triggers)
-  const stableHelpers = useMemo<StableHelpers>(() => ({
-    loadData: async (): Promise<void> => {
+  const stableHelpers = useMemo<StableHelpers>(() => {
+    // Define loadData function
+    const loadDataFunction = async (): Promise<void> => {
       if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
       
       loadingMachineRef.current.actions.startAppLoad();
@@ -122,244 +126,251 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
           category: "error"
         });
       }
-    },
+    };
 
-    syncData: async (): Promise<void> => {
-      if (!userRef.current || loadingMachineRef.current.state.sync === 'loading') return;
-      
-      loadingMachineRef.current.actions.startSync();
-      
-      try {
-        const migrationResult = await DataMigrationService.loadAllFromDatabase();
+    // Store in ref for stable access
+    loadDataFunctionRef.current = loadDataFunction;
+
+    return {
+      loadData: loadDataFunction,
+
+      syncData: async (): Promise<void> => {
+        if (!userRef.current || loadingMachineRef.current.state.sync === 'loading') return;
         
-        if (migrationResult.success && migrationResult.data) {
-          dispatch({ 
-            type: 'MERGE_FROM_DATABASE', 
-            payload: migrationResult.data, 
-            meta: { forceReplace: false } 
-          });
+        loadingMachineRef.current.actions.startSync();
+        
+        try {
+          const migrationResult = await DataMigrationService.loadAllFromDatabase();
           
-          loadingMachineRef.current.actions.syncSuccess();
+          if (migrationResult.success && migrationResult.data) {
+            dispatch({ 
+              type: 'MERGE_FROM_DATABASE', 
+              payload: migrationResult.data, 
+              meta: { forceReplace: false } 
+            });
+            
+            loadingMachineRef.current.actions.syncSuccess();
+            
+            toastRef.current({
+              title: "Sync complete",
+              description: "Your data has been synchronized with the cloud.",
+              category: "success"
+            });
+          } else {
+            throw new Error('Sync failed - no data retrieved');
+          }
+          
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Sync failed';
+          console.error('[SimplifiedAppContext] Sync failed:', error);
+          
+          loadingMachineRef.current.actions.syncError(errorMessage);
           
           toastRef.current({
-            title: "Sync complete",
-            description: "Your data has been synchronized with the cloud.",
+            title: "Sync failed",
+            description: "Failed to save data. Please try again.",
+            variant: "destructive",
+            category: "error"
+          });
+          
+          dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        }
+      },
+
+      uploadImages: async (files: File[]): Promise<void> => {
+        if (loadingMachineRef.current.state.imageUpload === 'loading') return;
+        
+        loadingMachineRef.current.actions.startUpload();
+        
+        try {
+          const newImages: UploadedImage[] = [];
+          const newAnalyses: UXAnalysis[] = [];
+          
+          const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
+            const imageId = `img-${Date.now()}-${i}`;
+            const imageUrl = URL.createObjectURL(file);
+            
+            const dimensions = await loadImageDimensions(file);
+            
+            const uploadedImage: UploadedImage = {
+              id: imageId,
+              name: file.name,
+              url: imageUrl,
+              file,
+              dimensions,
+              status: 'completed'
+            };
+            
+            return {
+              image: uploadedImage,
+              analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+            };
+          });
+          
+          const results = await Promise.all(dimensionsPromises);
+          
+          results.forEach(result => {
+            newImages.push(result.image);
+            newAnalyses.push(result.analysis);
+          });
+          
+          dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+          
+          loadingMachineRef.current.actions.uploadSuccess();
+
+          toastRef.current({
+            title: "Upload complete",
+            description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
             category: "success"
           });
-        } else {
-          throw new Error('Sync failed - no data retrieved');
+          
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+          console.error('[SimplifiedAppContext] Upload failed:', error);
+          
+          loadingMachineRef.current.actions.uploadError(errorMessage);
+          
+          toastRef.current({
+            title: "Upload failed", 
+            description: "Failed to upload images. Please try again.",
+            variant: "destructive",
+            category: "error"
+          });
         }
-        
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Sync failed';
-        console.error('[SimplifiedAppContext] Sync failed:', error);
-        
-        loadingMachineRef.current.actions.syncError(errorMessage);
-        
-        toastRef.current({
-          title: "Sync failed",
-          description: "Failed to save data. Please try again.",
-          variant: "destructive",
-          category: "error"
-        });
-        
-        dispatch({ type: 'SET_ERROR', payload: errorMessage });
-      }
-    },
+      },
 
-    uploadImages: async (files: File[]): Promise<void> => {
-      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
-      
-      loadingMachineRef.current.actions.startUpload();
-      
-      try {
-        const newImages: UploadedImage[] = [];
-        const newAnalyses: UXAnalysis[] = [];
+      uploadImagesImmediate: async (files: File[]): Promise<void> => {
+        if (loadingMachineRef.current.state.imageUpload === 'loading') return;
         
-        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
-          const imageId = `img-${Date.now()}-${i}`;
-          const imageUrl = URL.createObjectURL(file);
+        loadingMachineRef.current.actions.startUpload();
+
+        try {
+          const newImages: UploadedImage[] = [];
+          const newAnalyses: UXAnalysis[] = [];
           
-          const dimensions = await loadImageDimensions(file);
+          const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
+            const imageId = `temp-${Date.now()}-${i}`;
+            const imageUrl = URL.createObjectURL(file);
+            
+            const dimensions = await loadImageDimensions(file);
+            
+            const uploadedImage: UploadedImage = {
+              id: imageId,
+              name: file.name,
+              url: imageUrl,
+              file,
+              dimensions,
+              status: 'completed'
+            };
+            
+            return {
+              image: uploadedImage,
+              analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+            };
+          });
           
-          const uploadedImage: UploadedImage = {
-            id: imageId,
-            name: file.name,
-            url: imageUrl,
-            file,
-            dimensions,
-            status: 'completed'
-          };
+          const results = await Promise.all(dimensionsPromises);
           
-          return {
-            image: uploadedImage,
-            analysis: generateMockAnalysis(imageId, file.name, imageUrl)
-          };
-        });
-        
-        const results = await Promise.all(dimensionsPromises);
-        
-        results.forEach(result => {
-          newImages.push(result.image);
-          newAnalyses.push(result.analysis);
-        });
-        
-        dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
-        
-        loadingMachineRef.current.actions.uploadSuccess();
-
-        toastRef.current({
-          title: "Upload complete",
-          description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
-          category: "success"
-        });
-        
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-        console.error('[SimplifiedAppContext] Upload failed:', error);
-        
-        loadingMachineRef.current.actions.uploadError(errorMessage);
-        
-        toastRef.current({
-          title: "Upload failed", 
-          description: "Failed to upload images. Please try again.",
-          variant: "destructive",
-          category: "error"
-        });
-      }
-    },
-
-    uploadImagesImmediate: async (files: File[]): Promise<void> => {
-      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
-      
-      loadingMachineRef.current.actions.startUpload();
-
-      try {
-        const newImages: UploadedImage[] = [];
-        const newAnalyses: UXAnalysis[] = [];
-        
-        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
-          const imageId = `temp-${Date.now()}-${i}`;
-          const imageUrl = URL.createObjectURL(file);
+          results.forEach(result => {
+            newImages.push(result.image);
+            newAnalyses.push(result.analysis);
+          });
           
-          const dimensions = await loadImageDimensions(file);
+          dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
           
-          const uploadedImage: UploadedImage = {
-            id: imageId,
-            name: file.name,
-            url: imageUrl,
-            file,
-            dimensions,
-            status: 'completed'
-          };
+          loadingMachineRef.current.actions.uploadSuccess();
+
+          toastRef.current({
+            title: "Upload complete",
+            description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
+            category: "success"
+          });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Immediate upload failed';
+          console.error('Error in immediate image upload:', error);
           
-          return {
-            image: uploadedImage,
-            analysis: generateMockAnalysis(imageId, file.name, imageUrl)
-          };
-        });
-        
-        const results = await Promise.all(dimensionsPromises);
-        
-        results.forEach(result => {
-          newImages.push(result.image);
-          newAnalyses.push(result.analysis);
-        });
-        
-        dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
-        
-        loadingMachineRef.current.actions.uploadSuccess();
+          loadingMachineRef.current.actions.uploadError(errorMessage);
+          
+          toastRef.current({
+            title: "Upload error",
+            description: "Some images failed to load properly. Please try again.",
+            category: "error"
+          });
+        }
+      },
 
-        toastRef.current({
-          title: "Upload complete",
-          description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
-          category: "success"
-        });
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Immediate upload failed';
-        console.error('Error in immediate image upload:', error);
-        
-        loadingMachineRef.current.actions.uploadError(errorMessage);
-        
-        toastRef.current({
-          title: "Upload error",
-          description: "Some images failed to load properly. Please try again.",
-          category: "error"
-        });
-      }
-    },
-
-    createGroup: (
-      name: string, 
-      description: string, 
-      color: string, 
-      imageIds: string[], 
-      position = { x: 100, y: 100 }
-    ) => {
-      const newGroup: ImageGroup = {
-        id: `group-${Date.now()}`,
-        name,
-        description,
-        color,
-        imageIds,
-        position,
-        createdAt: new Date()
-      };
-
-      dispatch({ type: 'ADD_GROUP', payload: newGroup });
-      
-      toastRef.current({
-        title: "Group Created",
-        description: `Created group "${name}" with ${imageIds.length} images`,
-        category: "success"
-      });
-    },
-
-    generateConcept: async (prompt: string, selectedImages?: string[]): Promise<void> => {
-      if (loadingMachineRef.current.state.conceptGeneration === 'loading') return;
-      
-      loadingMachineRef.current.actions.startConceptGeneration();
-      
-      try {
-        const conceptId = `concept-${Date.now()}`;
-        const concept: GeneratedConcept = {
-          id: conceptId,
-          title: 'Generated Concept',
-          imageUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmY2OTQyIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5Db25jZXB0PC90ZXh0Pjwvc3ZnPg==',
-          analysisId: selectedImages?.[0] || '',
-          description: `Generated concept based on: ${prompt}`,
-          improvements: [],
+      createGroup: (
+        name: string, 
+        description: string, 
+        color: string, 
+        imageIds: string[], 
+        position = { x: 100, y: 100 }
+      ) => {
+        const newGroup: ImageGroup = {
+          id: `group-${Date.now()}`,
+          name,
+          description,
+          color,
+          imageIds,
+          position,
           createdAt: new Date()
         };
 
-        dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
-        
-        loadingMachineRef.current.actions.conceptGenerationSuccess();
+        dispatch({ type: 'ADD_GROUP', payload: newGroup });
         
         toastRef.current({
-          title: "Concept Generated",
-          description: "New concept has been generated successfully",
+          title: "Group Created",
+          description: `Created group "${name}" with ${imageIds.length} images`,
           category: "success"
         });
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Concept generation failed';
-        console.error('Concept generation failed:', error);
-        
-        loadingMachineRef.current.actions.conceptGenerationError(errorMessage);
-        
-        toastRef.current({
-          title: "Generation Failed",
-          description: "Failed to generate concept. Please try again.",
-          variant: "destructive",
-          category: "error"
-        });
-      }
-    },
+      },
 
-    clearCanvas: () => {
-      dispatch({ type: 'RESET_STATE' });
-    }
-  }), []); // PHASE 1.2 CRITICAL FIX: EMPTY dependencies - truly stable
+      generateConcept: async (prompt: string, selectedImages?: string[]): Promise<void> => {
+        if (loadingMachineRef.current.state.conceptGeneration === 'loading') return;
+        
+        loadingMachineRef.current.actions.startConceptGeneration();
+        
+        try {
+          const conceptId = `concept-${Date.now()}`;
+          const concept: GeneratedConcept = {
+            id: conceptId,
+            title: 'Generated Concept',
+            imageUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmY2OTQyIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5Db25jZXB0PC90ZXh0Pjwvc3ZnPg==',
+            analysisId: selectedImages?.[0] || '',
+            description: `Generated concept based on: ${prompt}`,
+            improvements: [],
+            createdAt: new Date()
+          };
+
+          dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
+          
+          loadingMachineRef.current.actions.conceptGenerationSuccess();
+          
+          toastRef.current({
+            title: "Concept Generated",
+            description: "New concept has been generated successfully",
+            category: "success"
+          });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Concept generation failed';
+          console.error('Concept generation failed:', error);
+          
+          loadingMachineRef.current.actions.conceptGenerationError(errorMessage);
+          
+          toastRef.current({
+            title: "Generation Failed",
+            description: "Failed to generate concept. Please try again.",
+            variant: "destructive",
+            category: "error"
+          });
+        }
+      },
+
+      clearCanvas: () => {
+        dispatch({ type: 'RESET_STATE' });
+      }
+    };
+  }, []); // PHASE 1.2 CRITICAL FIX: EMPTY dependencies - truly stable
 
   // Track loading state with ref
   const hasLoadedRef = useRef(false);
@@ -371,34 +382,10 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       lastUserIdRef.current = user.id;
       hasLoadedRef.current = false;
       
-      // CRITICAL FIX: Call loadData directly without depending on stableHelpers
-      const loadDataDirectly = async () => {
-        if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
-        
-        loadingMachineRef.current.actions.startAppLoad();
-        
-        try {
-          const migrationResult = await DataMigrationService.loadAllFromDatabase();
-          
-          if (migrationResult.success && migrationResult.data) {
-            console.log('[SimplifiedAppContext] Data loaded successfully');
-            dispatch({ 
-              type: 'MERGE_FROM_DATABASE', 
-              payload: migrationResult.data, 
-              meta: { forceReplace: false } 
-            });
-            loadingMachineRef.current.actions.appLoadSuccess();
-          } else {
-            throw new Error('No data available or load failed');
-          }
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
-          console.error('[SimplifiedAppContext] Failed to load data:', error);
-          loadingMachineRef.current.actions.appLoadError(errorMessage);
-        }
-      };
-      
-      loadDataDirectly();
+      // 🚨 CRITICAL FIX: Use the ref function to avoid closure issues
+      if (loadDataFunctionRef.current) {
+        loadDataFunctionRef.current();
+      }
     } else if (!user && lastUserIdRef.current) {
       console.log('[SimplifiedAppContext] User logged out, clearing state...');
       lastUserIdRef.current = null;
@@ -407,7 +394,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [user?.id]); // ✅ FIXED - only user.id
 
-  // Listen for project changes
+  // 🚨 CRITICAL FIX: Project change listener - use ref instead of stableHelpers
   useEffect(() => {
     const handleProjectChange = async (event: CustomEvent) => {
       const { projectId } = event.detail;
@@ -424,8 +411,10 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       // Clear current state
       dispatch({ type: 'RESET_STATE' });
       
-      // Load new project data
-      await stableHelpers.loadData();
+      // 🚨 CRITICAL FIX: Use the ref function instead of stableHelpers.loadData()
+      if (loadDataFunctionRef.current) {
+        await loadDataFunctionRef.current();
+      }
     };
     
     window.addEventListener('projectChanged', handleProjectChange as any);
@@ -441,7 +430,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       loadingMachineRef.current.actions.resetAll();
       isInitializedRef.current = false;
     };
-  }, []); // CRITICAL FIX: Remove loadingMachine.actions dependency!
+  }, []); // ✅ FIXED: Remove loadingMachine.actions dependency!
 
   // PHASE 3.1: Create context value with stable references including loading machine
   const contextValue = useMemo(() => ({
