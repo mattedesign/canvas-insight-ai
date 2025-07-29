@@ -467,6 +467,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleImageUploadImmediate = useCallback(async (files: File[]) => {
     const newImages: UploadedImage[] = [];
     const newAnalyses: UXAnalysis[] = [];
+    
+    setIsUploading(true);
 
     try {
       console.log('Starting optimized immediate upload for', files.length, 'files');
@@ -549,8 +551,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('Phase 2: Starting background processing');
       
       // Process each image in background without blocking UI
-      newImages.forEach(async (uploadedImage) => {
-        await processImageInBackground(uploadedImage);
+      newImages.forEach((uploadedImage) => {
+        processImageInBackground(uploadedImage).catch(error => {
+          console.error(`Background processing failed for ${uploadedImage.name}:`, error);
+        });
       });
 
     } catch (error) {
@@ -560,6 +564,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
         category: "error",
       });
+    } finally {
+      setIsUploading(false);
     }
   }, [selectedImageId, user, toast]);
 

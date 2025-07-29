@@ -179,11 +179,13 @@ const Canvas = () => {
           // Load project data and merge with AppContext state
           const result = await DataMigrationService.loadAllFromDatabase();
           if (result.success && result.data) {
-            console.log('Project data loaded successfully, merging with context state...');
-            // Only update if we have actual data to prevent clearing current state
-            if (result.data.uploadedImages.length > 0 || result.data.analyses.length > 0) {
-              updateAppStateFromDatabase(result.data);
-            }
+            console.log('Project data loaded successfully, merging with context state...', {
+              uploadedImages: result.data.uploadedImages?.length || 0,
+              analyses: result.data.analyses?.length || 0,
+              imageGroups: result.data.imageGroups?.length || 0
+            });
+            // Always update with loaded data, even if empty, to ensure proper state sync
+            updateAppStateFromDatabase(result.data);
           }
         } catch (error) {
           console.error('Error loading project by slug:', error);
@@ -206,11 +208,13 @@ const Canvas = () => {
                   console.log('Loading existing project data...');
                   const result = await DataMigrationService.loadAllFromDatabase();
                   if (result.success && result.data) {
-                    console.log('Existing data loaded, merging with context state...');
-                    // Only update if we have data to prevent clearing current uploads
-                    if (result.data.uploadedImages.length > 0 || result.data.analyses.length > 0) {
-                      updateAppStateFromDatabase(result.data);
-                    }
+                    console.log('Existing data loaded, merging with context state...', {
+                      uploadedImages: result.data.uploadedImages?.length || 0,
+                      analyses: result.data.analyses?.length || 0,
+                      imageGroups: result.data.imageGroups?.length || 0
+                    });
+                    // Always update with loaded data to ensure proper state sync
+                    updateAppStateFromDatabase(result.data);
                   }
                 }
             } catch (error) {
