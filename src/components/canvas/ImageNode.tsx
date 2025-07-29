@@ -214,7 +214,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
             </div>
             <div className="mb-2">
               <AnalysisStatusIndicator 
-                status={analysis?.status || (image.status === 'uploading' ? 'processing' : image.status as UXAnalysis['status'])} 
+                status={analysis?.status || image.status} 
                 compact 
               />
             </div>

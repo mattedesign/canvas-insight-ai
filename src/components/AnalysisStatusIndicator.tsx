@@ -2,10 +2,12 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { UXAnalysis } from '@/types/ux-analysis';
+import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
+
+type StatusType = UXAnalysis['status'] | UploadedImage['status'];
 
 interface AnalysisStatusIndicatorProps {
-  status?: UXAnalysis['status'];
+  status?: StatusType;
   isProcessing?: boolean;
   onRetry?: () => void;
   compact?: boolean;
@@ -52,6 +54,31 @@ export const AnalysisStatusIndicator: React.FC<AnalysisStatusIndicatorProps> = (
           variant: 'destructive' as const,
           className: 'text-red-600 bg-red-50 border-red-200',
           animate: false
+        };
+      // New status for immediate upload flow
+      case 'uploading':
+        return {
+          icon: Loader2,
+          label: 'Uploading',
+          variant: 'outline' as const,
+          className: 'text-blue-500 bg-blue-50 border-blue-200',
+          animate: true
+        };
+      case 'uploaded':
+        return {
+          icon: CheckCircle,
+          label: 'Uploaded',
+          variant: 'outline' as const,
+          className: 'text-green-500 bg-green-50 border-green-200',
+          animate: false
+        };
+      case 'syncing':
+        return {
+          icon: Loader2,
+          label: 'Syncing',
+          variant: 'outline' as const,
+          className: 'text-orange-500 bg-orange-50 border-orange-200',
+          animate: true
         };
       default:
         return {

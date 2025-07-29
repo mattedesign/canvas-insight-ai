@@ -138,5 +138,5 @@ export interface UploadedImage {
     width: number;
     height: number;
   };
-  status?: 'uploading' | 'processing' | 'analyzing' | 'completed' | 'error';
+  status?: 'uploading' | 'uploaded' | 'syncing' | 'processing' | 'analyzing' | 'completed' | 'error';
 }

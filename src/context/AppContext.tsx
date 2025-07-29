@@ -469,15 +469,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newAnalyses: UXAnalysis[] = [];
 
     try {
-      // Remove informational upload feedback toast
+      console.log('Starting optimized immediate upload for', files.length, 'files');
 
-      console.log('Starting immediate upload process for', files.length, 'files');
-
+      // Phase 1: Immediate display - process files synchronously for instant UI updates
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const imageId = crypto.randomUUID();
 
-        // Get dimensions immediately
+        // Get dimensions immediately for proper canvas sizing
         const img = new Image();
         const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
           const imageUrl = URL.createObjectURL(file);
@@ -492,17 +491,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           img.src = imageUrl;
         });
 
-        // Create image with processing status
+        // Create image with blob URL for immediate display
         const uploadedImage: UploadedImage = {
           id: imageId,
           name: file.name,
-          url: URL.createObjectURL(file),
+          url: URL.createObjectURL(file), // Immediate blob URL
           file,
           dimensions,
-          status: 'processing',
+          status: 'uploaded', // Uploaded to UI, processing in background
         };
 
-        // Create placeholder analysis with processing status
+        // Create minimal analysis with processing status
         const placeholderAnalysis: UXAnalysis = {
           id: `analysis-${imageId}`,
           imageId,
@@ -519,7 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               visual: 0,
               content: 0,
             },
-            keyIssues: [],
+            keyIssues: ['Analysis in progress...'],
             strengths: [],
           },
           metadata: {
@@ -536,12 +535,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         newAnalyses.push(placeholderAnalysis);
       }
 
-      // Update state immediately
-      console.log('handleImageUploadImmediate: Adding images to state:', newImages.length);
-      setUploadedImages(prev => {
-        console.log('Previous images:', prev.length, 'Adding:', newImages.length);
-        return [...prev, ...newImages];
-      });
+      // Update state immediately - users see images instantly
+      console.log('Phase 1: Displaying images immediately');
+      setUploadedImages(prev => [...prev, ...newImages]);
       setAnalyses(prev => [...prev, ...newAnalyses]);
       
       // Auto-select first image if none selected
@@ -549,111 +545,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedImageId(newImages[0].id);
       }
 
-      // Process each image in background
-      newImages.forEach(async (uploadedImage, index) => {
-        try {
-          // Update status to analyzing
-          setUploadedImages(prev => prev.map(img => 
-            img.id === uploadedImage.id ? { ...img, status: 'analyzing' } : img
-          ));
-          setAnalyses(prev => prev.map(analysis => 
-            analysis.imageId === uploadedImage.id ? { ...analysis, status: 'analyzing' } : analysis
-          ));
-
-          let imageUrl = uploadedImage.url;
-          
-          // Upload to storage if authenticated
-          if (user) {
-            try {
-              const { data: { user: authUser } } = await supabase.auth.getUser();
-              if (authUser) {
-                const projectId = await ProjectService.getCurrentProject();
-                const fileName = `${authUser.id}/${uploadedImage.id}/${uploadedImage.file.name}`;
-                
-                const { error: uploadError } = await supabase.storage
-                  .from('images')
-                  .upload(fileName, uploadedImage.file);
-
-                if (!uploadError || uploadError.message?.includes('already exists')) {
-                  const { data: urlData } = supabase.storage
-                    .from('images')
-                    .getPublicUrl(fileName);
-                  imageUrl = urlData.publicUrl;
-                  
-                  // Update image record
-                  await supabase
-                    .from('images')
-                    .upsert({
-                      id: uploadedImage.id,
-                      project_id: projectId,
-                      filename: uploadedImage.id,
-                      original_name: uploadedImage.file.name,
-                      storage_path: fileName,
-                      dimensions: uploadedImage.dimensions,
-                      file_size: uploadedImage.file.size,
-                      file_type: uploadedImage.file.type
-                    }, {
-                      onConflict: 'id'
-                    });
-                }
-              }
-            } catch (error) {
-              console.error('Storage upload failed, using local URL:', error);
-            }
-          }
-
-          // Generate analysis
-          let finalAnalysis;
-          if (user) {
-            try {
-              const { data, error } = await supabase.functions.invoke('ux-analysis', {
-                body: {
-                  type: 'ANALYZE_IMAGE',
-                  payload: {
-                    imageId: uploadedImage.id,
-                    imageUrl,
-                    imageName: uploadedImage.file.name,
-                    userContext: ''
-                  }
-                }
-              });
-              
-              if (error) throw error;
-              if (data.success) {
-                finalAnalysis = { ...data.data, status: 'completed' };
-              } else {
-                throw new Error('Analysis failed');
-              }
-            } catch (error) {
-              console.error('Edge function analysis failed, using mock:', error);
-              finalAnalysis = { ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, imageUrl), status: 'completed' };
-            }
-          } else {
-            finalAnalysis = { ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, imageUrl), status: 'completed' };
-          }
-
-          // Update final states
-          setUploadedImages(prev => prev.map(img => 
-            img.id === uploadedImage.id ? { ...img, url: imageUrl, status: 'completed' } : img
-          ));
-          setAnalyses(prev => prev.map(analysis => 
-            analysis.imageId === uploadedImage.id ? finalAnalysis : analysis
-          ));
-
-        } catch (error) {
-          console.error(`Failed to process image ${uploadedImage.name}:`, error);
-          // Update to error state
-          setUploadedImages(prev => prev.map(img => 
-            img.id === uploadedImage.id ? { ...img, status: 'error' } : img
-          ));
-          setAnalyses(prev => prev.map(analysis => 
-            analysis.imageId === uploadedImage.id ? { ...analysis, status: 'error' } : analysis
-          ));
-        }
+      // Phase 2: Background processing - non-blocking database and analysis operations
+      console.log('Phase 2: Starting background processing');
+      
+      // Process each image in background without blocking UI
+      newImages.forEach(async (uploadedImage) => {
+        await processImageInBackground(uploadedImage);
       });
 
     } catch (error) {
-      console.error('Immediate upload process failed:', error);
+      console.error('Immediate upload failed:', error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
@@ -661,6 +562,131 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
   }, [selectedImageId, user, toast]);
+
+  // Background processing function for uploaded images
+  const processImageInBackground = useCallback(async (uploadedImage: UploadedImage) => {
+    try {
+      let storedImageUrl = uploadedImage.url; // Start with blob URL
+      
+      // Step 1: Upload to Supabase Storage (if authenticated)
+      if (user) {
+        try {
+          setUploadedImages(prev => prev.map(img => 
+            img.id === uploadedImage.id ? { ...img, status: 'syncing' } : img
+          ));
+
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            const projectId = await ProjectService.getCurrentProject();
+            const fileName = `${authUser.id}/${uploadedImage.id}/${uploadedImage.file.name}`;
+            
+            // Upload file to storage
+            const { error: uploadError } = await supabase.storage
+              .from('images')
+              .upload(fileName, uploadedImage.file);
+
+            if (!uploadError || uploadError.message?.includes('already exists')) {
+              // Get permanent URL
+              const { data: urlData } = supabase.storage
+                .from('images')
+                .getPublicUrl(fileName);
+              storedImageUrl = urlData.publicUrl;
+              
+              // Create database record
+              await supabase
+                .from('images')
+                .upsert({
+                  id: uploadedImage.id,
+                  project_id: projectId,
+                  filename: uploadedImage.id,
+                  original_name: uploadedImage.file.name,
+                  storage_path: fileName,
+                  dimensions: uploadedImage.dimensions,
+                  file_size: uploadedImage.file.size,
+                  file_type: uploadedImage.file.type
+                }, {
+                  onConflict: 'id'
+                });
+
+              // Update image with stored URL (while keeping blob URL as fallback)
+              setUploadedImages(prev => prev.map(img => 
+                img.id === uploadedImage.id ? { 
+                  ...img, 
+                  url: storedImageUrl,
+                  status: 'analyzing' 
+                } : img
+              ));
+
+              console.log(`Storage sync complete for ${uploadedImage.name}`);
+            }
+          }
+        } catch (error) {
+          console.error('Background storage upload failed:', error);
+          // Continue with analysis using blob URL
+        }
+      }
+
+      // Step 2: Generate AI Analysis
+      setAnalyses(prev => prev.map(analysis => 
+        analysis.imageId === uploadedImage.id ? { ...analysis, status: 'analyzing' } : analysis
+      ));
+
+      let finalAnalysis;
+      if (user) {
+        try {
+          const { data, error } = await supabase.functions.invoke('ux-analysis', {
+            body: {
+              type: 'ANALYZE_IMAGE',
+              payload: {
+                imageId: uploadedImage.id,
+                imageUrl: storedImageUrl,
+                imageName: uploadedImage.file.name,
+                userContext: ''
+              }
+            }
+          });
+          
+          if (error) throw error;
+          if (data.success) {
+            finalAnalysis = { ...data.data, status: 'completed' };
+          } else {
+            throw new Error('Analysis failed');
+          }
+        } catch (error) {
+          console.error('AI analysis failed, using mock:', error);
+          finalAnalysis = { 
+            ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, storedImageUrl), 
+            status: 'completed' 
+          };
+        }
+      } else {
+        finalAnalysis = { 
+          ...generateMockAnalysis(uploadedImage.id, uploadedImage.file.name, storedImageUrl), 
+          status: 'completed' 
+        };
+      }
+
+      // Step 3: Update with final analysis
+      setUploadedImages(prev => prev.map(img => 
+        img.id === uploadedImage.id ? { ...img, status: 'completed' } : img
+      ));
+      setAnalyses(prev => prev.map(analysis => 
+        analysis.imageId === uploadedImage.id ? finalAnalysis : analysis
+      ));
+
+      console.log(`Background processing complete for ${uploadedImage.name}`);
+
+    } catch (error) {
+      console.error(`Background processing failed for ${uploadedImage.name}:`, error);
+      // Update to error state
+      setUploadedImages(prev => prev.map(img => 
+        img.id === uploadedImage.id ? { ...img, status: 'error' } : img
+      ));
+      setAnalyses(prev => prev.map(analysis => 
+        analysis.imageId === uploadedImage.id ? { ...analysis, status: 'error' } : analysis
+      ));
+    }
+  }, [user, toast]);
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
     setIsGeneratingConcept(true);
@@ -1093,7 +1119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [toast]);
 
-  // Update app state with data loaded from database
+  // Update app state with data loaded from database - hybrid approach
   const updateAppStateFromDatabase = useCallback((data: {
     uploadedImages: UploadedImage[];
     analyses: UXAnalysis[];
@@ -1103,32 +1129,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     groupAnalyses?: GroupAnalysis[];
     groupPromptSessions?: GroupPromptSession[];
   }) => {
-    console.log('Updating app state from database:', {
-      images: data.uploadedImages?.length || 0,
-      analyses: data.analyses?.length || 0,
-      groups: data.imageGroups?.length || 0
+    console.log('Hybrid state update - merging database with current state:', {
+      dbImages: data.uploadedImages?.length || 0,
+      dbAnalyses: data.analyses?.length || 0,
+      currentImages: uploadedImages.length,
+      currentAnalyses: analyses.length
     });
     
-    // Merge with existing state instead of replacing to prevent clearing uploaded images
+    // Smart merge: combine database images with current in-memory images
     setUploadedImages(prev => {
-      const existing = data.uploadedImages || [];
-      if (existing.length === 0) return prev; // Don't clear existing images
-      console.log('Setting uploaded images:', existing.length);
-      return existing;
+      const dbImages = data.uploadedImages || [];
+      
+      if (dbImages.length === 0) {
+        // No database images, keep current state
+        return prev;
+      }
+      
+      if (prev.length === 0) {
+        // No current images, use database images
+        return dbImages;
+      }
+      
+      // Merge: Database images + new in-memory images not yet in database
+      const dbImageIds = new Set(dbImages.map(img => img.id));
+      const newInMemoryImages = prev.filter(img => !dbImageIds.has(img.id));
+      
+      console.log('Merging images:', {
+        fromDB: dbImages.length,
+        newInMemory: newInMemoryImages.length,
+        total: dbImages.length + newInMemoryImages.length
+      });
+      
+      return [...dbImages, ...newInMemoryImages];
     });
     
+    // Smart merge: combine database analyses with current in-memory analyses
     setAnalyses(prev => {
-      const existing = data.analyses || [];
-      if (existing.length === 0) return prev; // Don't clear existing analyses
-      return existing;
+      const dbAnalyses = data.analyses || [];
+      
+      if (dbAnalyses.length === 0) {
+        return prev;
+      }
+      
+      if (prev.length === 0) {
+        return dbAnalyses;
+      }
+      
+      // Merge: Database analyses + new in-memory analyses not yet in database
+      const dbAnalysisIds = new Set(dbAnalyses.map(analysis => analysis.id));
+      const newInMemoryAnalyses = prev.filter(analysis => !dbAnalysisIds.has(analysis.id));
+      
+      return [...dbAnalyses, ...newInMemoryAnalyses];
     });
     
+    // Other state items can be directly set since they're not part of immediate upload flow
     setImageGroups(data.imageGroups || []);
     setGroupAnalysesWithPrompts(data.groupAnalysesWithPrompts || []);
     setGeneratedConcepts(data.generatedConcepts || []);
     setGroupAnalyses(data.groupAnalyses || []);
     setGroupPromptSessions(data.groupPromptSessions || []);
-  }, []);
+  }, [uploadedImages, analyses]);
 
   const value: AppContextType = {
     // State
