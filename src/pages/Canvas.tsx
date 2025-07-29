@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useStableApp } from '@/context/StableAppContext';
+import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 
@@ -29,7 +29,7 @@ const LoadingSpinner: React.FC<{ message: string }> = ({ message }) => (
 );
 
 const Canvas = () => {
-  const { state, actions } = useStableApp();
+  const { state, stableHelpers, loadingMachine } = useSimplifiedAppContext();
   const { user } = useAuth();
   
   const loadedProjectRef = useRef<{ projectId: string | null; timestamp: number }>({
@@ -52,15 +52,16 @@ const Canvas = () => {
       }
       
       loadedProjectRef.current = { projectId, timestamp: now };
-      await actions.loadProjectData(projectId);
+      await stableHelpers.loadData();
     };
     
     loadData();
-  }, [user]); // Empty dependency array - load once only
+  }, [user, stableHelpers.loadData]); // Include stableHelpers.loadData
 
-  const { uploadedImages, analyses, imageGroups, groupAnalyses, loading, error } = state;
+  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error } = state;
+  const isLoading = loadingMachine.state.appData === 'loading';
 
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner message="Loading project data..." />;
   }
 
@@ -68,7 +69,7 @@ const Canvas = () => {
     return (
       <ErrorDisplay 
         error={error} 
-        onRetry={() => actions.loadProjectData('current')} 
+        onRetry={() => stableHelpers.loadData()} 
       />
     );
   }
@@ -96,8 +97,8 @@ const Canvas = () => {
           ))}
         </div>
         <div className="border p-4 rounded">
-          <h2 className="text-lg font-semibold mb-2">Group Analyses ({groupAnalyses.length})</h2>
-          {groupAnalyses.map(ga => (
+          <h2 className="text-lg font-semibold mb-2">Group Analyses ({groupAnalysesWithPrompts.length})</h2>
+          {groupAnalysesWithPrompts.map(ga => (
             <div key={ga.id} className="text-sm">{ga.prompt}</div>
           ))}
         </div>

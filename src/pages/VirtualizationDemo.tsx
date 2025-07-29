@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
-import { useStableApp } from '@/context/StableAppContext';
+import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const VirtualizationDemo: React.FC = () => {
-  const { state } = useStableApp();
+  const { state } = useSimplifiedAppContext();
   const [demoImageCount, setDemoImageCount] = useState(10);
   
   // Generate demo images for testing virtualization
