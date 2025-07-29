@@ -17,16 +17,36 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const Canvas = () => {
+  // 1. Hooks at the top
   const navigate = useNavigate();
   const { projectSlug } = useParams<{ projectSlug: string }>();
-  const { 
-    state,
-    dispatch,
-    stableHelpers,
-    loadingMachine
-  } = useSimplifiedAppContext();
+  const { user } = useAuth();
+  const toast = useFilteredToast();
+  const { state, dispatch, stableHelpers, loadingMachine } = useSimplifiedAppContext();
+  const { debounce } = useDebounce();
 
-  // Extract state properties (Phase 2.2: Simplified Context Value)
+  // 2. Local state
+  const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
+  const [loadAttempted, setLoadAttempted] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('temp-project');
+  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [groupEditDialogOpen, setGroupEditDialogOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // 3. Refs
+  const loadedProjectRef = useRef<{
+    slug: string | null;
+    projectId: string | null;
+    timestamp: number;
+  }>({
+    slug: null,
+    projectId: null,
+    timestamp: 0
+  });
+
+  // 4. Extract from context
   const {
     uploadedImages,
     analyses,
@@ -41,7 +61,6 @@ const Canvas = () => {
     isUploading
   } = state;
 
-  // Extract helper functions
   const {
     uploadImages: handleImageUpload,
     uploadImagesImmediate: handleImageUploadImmediate,
@@ -51,7 +70,7 @@ const Canvas = () => {
     clearCanvas
   } = stableHelpers;
 
-  // Create missing handler functions using dispatch - wrapped in useCallback for stability
+  // 5. useCallback handlers (all of them)
   const handleClearCanvas = useCallback(() => clearCanvas(), [clearCanvas]);
   const handleImageSelect = useCallback((imageId: string) => dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId }), [dispatch]);
   const handleToggleAnnotations = useCallback(() => dispatch({ type: 'TOGGLE_ANNOTATIONS' }), [dispatch]);
@@ -103,41 +122,10 @@ const Canvas = () => {
     dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId, analysis } });
   }, [dispatch]);
 
-  // Backward compatibility aliases
-  const groupAnalyses = groupAnalysesWithPrompts;
-  const groupPromptSessions = groupAnalysesWithPrompts;
-
-  // Track if user has existing data in the database
-  const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
-  const [loadAttempted, setLoadAttempted] = useState(false);
-  const [currentProjectId, setCurrentProjectId] = useState<string>('temp-project');
-
-  // Track loaded project to prevent loops
-  const loadedProjectRef = useRef<{
-    slug: string | null;
-    projectId: string | null;
-    timestamp: number;
-  }>({
-    slug: null,
-    projectId: null,
-    timestamp: 0
-  });
-
-  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
-  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
-  const [groupEditDialogOpen, setGroupEditDialogOpen] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  
-  const toast = useFilteredToast();
-  
-  // Simple state - no more complex canvas state manager
-
   const handleAddImages = useCallback(() => {
     fileInputRef?.click();
   }, [fileInputRef]);
 
-  // Debounced metadata extraction
   const extractMetadataForImage = useCallback(async (imageId: string) => {
     try {
       const { data: imageData, error: imageError } = await supabase
@@ -162,10 +150,8 @@ const Canvas = () => {
     }
   }, []);
 
-  const { debounce } = useDebounce();
   const debouncedMetadataExtraction = debounce(extractMetadataForImage, 300);
 
-  // Simplified canvas upload - load images immediately, upload in background
   const handleCanvasUpload = useCallback((files: File[]) => {
     toast.toast({
       category: 'success',
@@ -182,7 +168,6 @@ const Canvas = () => {
     }
     event.target.value = '';
   }, [handleCanvasUpload]);
-
 
   const handleNavigateToPreviousAnalyses = useCallback(() => {
     navigate('/projects');
@@ -217,22 +202,7 @@ const Canvas = () => {
     setSelectedGroupId(null);
   }, []);
 
-  // Listen for project changes with stable handler
-  useEffect(() => {
-    const handleProjectChange = (event: CustomEvent) => {
-      const { projectId } = event.detail;
-      console.log('[Canvas] Project changed externally:', projectId);
-      setCurrentProjectId(projectId);
-    };
-    
-    window.addEventListener('projectChanged', handleProjectChange as any);
-    return () => {
-      window.removeEventListener('projectChanged', handleProjectChange as any);
-    };
-  }, []); // ✅ Empty dependencies - stable event listener
-  
-  // STEP 2.1: Create stable project loading function
-  const { user } = useAuth();
+  // 6. Stable project loading function  
   const loadProjectBySlug = useCallback(async (slug: string | undefined) => {
     if (!user) return;
 
@@ -292,25 +262,41 @@ const Canvas = () => {
       });
       navigate('/projects');
     }
-  }, [user, toast, navigate]); // ✅ All dependencies included
+  }, [user, toast, navigate]);
 
-  // STEP 2.2: Use the stable function in useEffect
+  // Backward compatibility aliases
+  const groupAnalyses = groupAnalysesWithPrompts;
+  const groupPromptSessions = groupAnalysesWithPrompts;
+
+  // 7. useEffect hooks
+  useEffect(() => {
+    const handleProjectChange = (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      console.log('[Canvas] Project changed externally:', projectId);
+      setCurrentProjectId(projectId);
+    };
+    
+    window.addEventListener('projectChanged', handleProjectChange as any);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange as any);
+    };
+  }, []); // ✅ Empty dependencies - stable event listener
+
   useEffect(() => {
     loadProjectBySlug(projectSlug);
   }, [projectSlug, loadProjectBySlug]); // ✅ Both dependencies included
 
-  // Simplified keyboard shortcuts
+  // 8. Other hooks
   useKeyboardShortcuts({
-    onGroup: () => {
-      // Group functionality handled by app context
+    onGroup: useCallback(() => {
       console.log('Group shortcut triggered');
-    },
-    onUndo: () => {
+    }, []),
+    onUndo: useCallback(() => {
       console.log('Undo shortcut triggered');
-    },
-    onRedo: () => {
+    }, []),
+    onRedo: useCallback(() => {
       console.log('Redo shortcut triggered');
-    },
+    }, [])
   });
 
   // Debug helper
