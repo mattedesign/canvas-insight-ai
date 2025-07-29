@@ -300,10 +300,11 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     case 'MERGE_FROM_DATABASE': {
       const { forceReplace = false } = action.meta || {};
       const hasPendingSync = state.pendingBackgroundSync.size > 0;
+      const isUploading = state.isUploading;
       
-      // If we have pending sync operations and not forcing, defer the update
-      if (hasPendingSync && !forceReplace) {
-        console.log('Deferring database merge due to pending sync operations');
+      // Prevent database merges during upload or when there are pending sync operations
+      if ((hasPendingSync || isUploading) && !forceReplace) {
+        console.log('Deferring database merge due to', isUploading ? 'active upload' : 'pending sync operations');
         return state;
       }
       
@@ -330,7 +331,11 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
           mergedState.uploadedImages = dbImages;
         } else if (dbImages.length > 0) {
           const dbImageIds = new Set(dbImages.map(img => img.id));
-          const newInMemoryImages = state.uploadedImages.filter(img => !dbImageIds.has(img.id));
+          
+          // Preserve temporary images (those with temp IDs) and any other in-memory images
+          const tempImages = state.uploadedImages.filter(img => 
+            img.id.startsWith('temp-') || !dbImageIds.has(img.id)
+          );
           
           const mergedImages = dbImages.map(dbImg => {
             const memoryImg = state.uploadedImages.find(img => img.id === dbImg.id);
@@ -344,7 +349,8 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
             return dbImg;
           });
           
-          mergedState.uploadedImages = [...mergedImages, ...newInMemoryImages];
+          // Keep temp images at the beginning so they appear first on canvas
+          mergedState.uploadedImages = [...tempImages, ...mergedImages];
         }
       }
       
