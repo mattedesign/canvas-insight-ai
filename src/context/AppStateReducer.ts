@@ -36,7 +36,7 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
         uploadedImages: state.uploadedImages.filter(img => img.id !== imageId),
         analyses: state.analyses.filter(analysis => analysis.imageId !== imageId),
         selectedImageId: state.selectedImageId === imageId ? null : state.selectedImageId,
-        generatedConcepts: state.generatedConcepts.filter(concept => concept.imageId !== imageId),
+        generatedConcepts: state.generatedConcepts.filter(concept => concept.analysisId !== imageId),
         // Remove from groups
         imageGroups: state.imageGroups.map(group => ({
           ...group,
@@ -68,12 +68,20 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
       };
     
     case 'UPDATE_ANALYSIS': {
-      const { id, updates } = action.payload;
+      const { imageId, analysis } = action.payload;
+      const existingIndex = state.analyses.findIndex(a => a.imageId === imageId);
+      let newAnalyses;
+      
+      if (existingIndex >= 0) {
+        newAnalyses = [...state.analyses];
+        newAnalyses[existingIndex] = analysis;
+      } else {
+        newAnalyses = [...state.analyses, analysis];
+      }
+      
       return {
         ...state,
-        analyses: state.analyses.map(analysis =>
-          analysis.id === id ? { ...analysis, ...updates } : analysis
-        ),
+        analyses: newAnalyses,
         version: state.version + 1,
       };
     }
@@ -81,10 +89,11 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     case 'REMOVE_ANALYSIS':
       return {
         ...state,
-        analyses: state.analyses.filter(analysis => analysis.id !== action.payload),
+        analyses: state.analyses.filter(analysis => analysis.imageId !== action.payload),
         version: state.version + 1,
       };
     
+    case 'ADD_GROUP':
     case 'CREATE_GROUP':
       return {
         ...state,
@@ -103,7 +112,8 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
       };
     }
     
-    case 'DELETE_GROUP': {
+    case 'DELETE_GROUP':
+    case 'REMOVE_GROUP': {
       const groupId = action.payload;
       return {
         ...state,
@@ -129,8 +139,15 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
         version: state.version + 1,
       };
     
+    case 'SET_CONCEPTS':
+      return {
+        ...state,
+        generatedConcepts: action.payload,
+        version: state.version + 1,
+      };
+    
     case 'TOGGLE_ANNOTATIONS':
-      return { ...state, showAnnotations: !state.showAnnotations };
+      return { ...state, showAnnotations: !state.showAnnotations, version: state.version + 1 };
     
     case 'SET_GALLERY_TOOL':
       return { ...state, galleryTool: action.payload };
@@ -185,6 +202,7 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     }
     
     case 'CLEAR_ALL_DATA':
+    case 'RESET_STATE':
       return {
         ...state,
         uploadedImages: [],

@@ -1,10 +1,10 @@
 /**
- * Type-Safe Analysis Service
- * Handles all analysis operations with proper error handling and type safety
+ * Type-Safe Analysis Service - UPDATED
+ * Enhanced with proper error handling and type safety
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { UXAnalysis, ImageFile } from '@/context/AppStateTypes';
+import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
   imageUrl: string;
@@ -204,9 +204,7 @@ class TypeSafeAnalysisService {
       Array.isArray(analysis.visualAnnotations) &&
       Array.isArray(analysis.suggestions) &&
       typeof analysis.summary === 'object' &&
-      analysis.summary !== null &&
-      typeof analysis.metadata === 'object' &&
-      analysis.metadata !== null
+      analysis.summary !== null
     );
   }
   

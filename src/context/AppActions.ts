@@ -5,11 +5,11 @@
 
 import type { 
   AppAction, 
-  ImageFile, 
-  UXAnalysis, 
-  ImageGroup, 
-  GroupAnalysis, 
-  GeneratedConcept,
+  UploadedImage, 
+  LegacyUXAnalysis as UXAnalysis,
+  LegacyImageGroup as ImageGroup,
+  GroupAnalysisWithPrompt as GroupAnalysis,
+  LegacyGeneratedConcept as GeneratedConcept,
   AppState 
 } from './AppStateTypes';
 
@@ -31,13 +31,13 @@ export const createActions = (dispatch: React.Dispatch<AppAction>) => ({
     dispatch({ type: 'SET_ERROR', payload: error }),
   
   // Image management
-  addImages: (images: ImageFile[]) => 
+  addImages: (images: UploadedImage[]) => 
     dispatch({ type: 'ADD_IMAGES', payload: images }),
   
   removeImage: (imageId: string) => 
     dispatch({ type: 'REMOVE_IMAGE', payload: imageId }),
   
-  updateImage: (id: string, updates: Partial<ImageFile>) => 
+  updateImage: (id: string, updates: Partial<UploadedImage>) => 
     dispatch({ type: 'UPDATE_IMAGE', payload: { id, updates } }),
   
   setSelectedImage: (imageId: string | null) => 
@@ -47,8 +47,8 @@ export const createActions = (dispatch: React.Dispatch<AppAction>) => ({
   addAnalysis: (analysis: UXAnalysis) => 
     dispatch({ type: 'ADD_ANALYSIS', payload: analysis }),
   
-  updateAnalysis: (id: string, updates: Partial<UXAnalysis>) => 
-    dispatch({ type: 'UPDATE_ANALYSIS', payload: { id, updates } }),
+  updateAnalysis: (imageId: string, analysis: UXAnalysis) => 
+    dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId, analysis } }),
   
   removeAnalysis: (analysisId: string) => 
     dispatch({ type: 'REMOVE_ANALYSIS', payload: analysisId }),
@@ -74,10 +74,10 @@ export const createActions = (dispatch: React.Dispatch<AppAction>) => ({
   toggleAnnotations: () => 
     dispatch({ type: 'TOGGLE_ANNOTATIONS' }),
   
-  setGalleryTool: (tool: 'select' | 'group' | 'analyze') => 
+  setGalleryTool: (tool: 'cursor' | 'draw') => 
     dispatch({ type: 'SET_GALLERY_TOOL', payload: tool }),
   
-  setGroupDisplayMode: (groupId: string, mode: 'collapsed' | 'expanded') => 
+  setGroupDisplayMode: (groupId: string, mode: 'standard' | 'stacked') => 
     dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } }),
   
   // Sync state
@@ -94,11 +94,11 @@ export const createActions = (dispatch: React.Dispatch<AppAction>) => ({
     dispatch({ type: 'INCREMENT_VERSION' }),
   
   // Batch operations
-  batchUpload: (images: ImageFile[], analyses: UXAnalysis[]) => 
+  batchUpload: (images: UploadedImage[], analyses: UXAnalysis[]) => 
     dispatch({ type: 'BATCH_UPLOAD', payload: { images, analyses } }),
   
-  mergeFromDatabase: (data: Partial<AppState>) => 
-    dispatch({ type: 'MERGE_FROM_DATABASE', payload: data }),
+  mergeFromDatabase: (data: Partial<AppState>, forceReplace?: boolean) => 
+    dispatch({ type: 'MERGE_FROM_DATABASE', payload: data, meta: { forceReplace } }),
   
   clearAllData: () => 
     dispatch({ type: 'CLEAR_ALL_DATA' }),

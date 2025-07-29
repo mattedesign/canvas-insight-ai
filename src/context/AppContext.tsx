@@ -1,66 +1,69 @@
 /**
- * Simplified App Context - Single Source of Truth
- * Eliminates race conditions by removing complex state managers
+ * Refactored App Context - Clean Architecture Implementation
+ * Eliminates circular dependencies and implements performance optimizations
  */
 
-import React, { createContext, useReducer, useCallback, useEffect, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import React, { 
+  createContext, 
+  useContext, 
+  useReducer, 
+  useMemo, 
+  useCallback,
+  useEffect
+} from 'react';
+import { useAuth } from './AuthContext';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
-import { useOfflineCache } from '@/hooks/useOfflineCache';
-import { appStateReducer } from './AppStateReducer';
-import { initialAppState, type AppState, type AppAction } from './AppStateTypes';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { loadImageDimensions } from '@/utils/imageUtils';
-import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt, GeneratedConcept } from '@/types/ux-analysis';
+import type { 
+  AppState, 
+  AppAction,
+  UploadedImage, 
+  LegacyUXAnalysis as UXAnalysis,
+  LegacyImageGroup as ImageGroup,
+  GroupAnalysisWithPrompt,
+  LegacyGeneratedConcept as GeneratedConcept
+} from './AppStateTypes';
+import { appStateReducer } from './AppStateReducer';
+import { createActions, type AppActionsType } from './AppActions';
+import { initialAppState } from './AppStateTypes';
 
+// Context interface with enhanced type safety
 interface AppContextType {
-  // State
   state: AppState;
-  
-  // Actions
-  dispatch: React.Dispatch<AppAction>;
+  actions: AppActionsType;
   
   // High-level operations
   handleImageUpload: (files: File[]) => Promise<void>;
   handleImageUploadImmediate: (files: File[]) => Promise<void>;
-  syncToDatabase: () => Promise<void>;
-  loadDataFromDatabase: () => Promise<void>;
-  updateAppStateFromDatabase: (data: any) => void;
+  handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
   
-  // Canvas operations
+  // Data operations
+  loadDataFromDatabase: () => Promise<void>;
+  syncToDatabase: () => Promise<void>;
+  updateAppStateFromDatabase: (data: any) => void;
   clearCanvas: () => void;
   
   // Group operations
-  createGroup: (name: string, description: string, color: string, imageIds: string[], position?: { x: number; y: number }) => void;
+  createGroup: (name: string, description: string, color: string, imageIds: string[], position: { x: number; y: number }) => void;
   updateGroup: (groupId: string, updates: Partial<ImageGroup>) => void;
   deleteGroup: (groupId: string) => void;
   
   // Concept generation
   generateConcept: (prompt: string, selectedImages?: string[]) => Promise<void>;
   
-  // Image viewer integration
-  viewerState: any;
-  toggleAnnotation: (annotationId: string) => void;
-  clearAnnotations: () => void;
-  
-  // AI Analysis actions
-  handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
-  
-  // Cache features
-  offlineCache?: any;
-  
-  // Backward compatibility - direct state access
+  // Legacy support (for backward compatibility)
   uploadedImages: UploadedImage[];
   analyses: UXAnalysis[];
+  selectedImageId: string | null;
   imageGroups: ImageGroup[];
   groupAnalysesWithPrompts: GroupAnalysisWithPrompt[];
   generatedConcepts: GeneratedConcept[];
-  groupAnalyses: any[];
-  groupPromptSessions: any[];
-  selectedImageId: string | null;
+  groupAnalyses: GroupAnalysisWithPrompt[];
+  groupPromptSessions: GroupAnalysisWithPrompt[];
   showAnnotations: boolean;
   galleryTool: 'cursor' | 'draw';
   groupDisplayModes: Record<string, 'standard' | 'stacked'>;
@@ -68,8 +71,25 @@ interface AppContextType {
   isSyncing: boolean;
   isUploading: boolean;
   isGeneratingConcept: boolean;
+  pendingBackgroundSync: Set<string>;
+  lastSyncTimestamp: Date | null;
+  version: number;
   
-  // Backward compatibility - legacy handlers
+  // Legacy functions (deprecated but maintained for compatibility)
+  addImage: (image: UploadedImage) => void;
+  updateImageAnalysisStatus: (imageId: string, status: string) => void;
+  addAnalysis: (analysis: UXAnalysis) => void;
+  setSelectedImage: (imageId: string | null) => void;
+  toggleAnnotations: () => void;
+  setGalleryTool: (tool: 'cursor' | 'draw') => void;
+  
+  // Image viewer integration
+  imageViewer: ReturnType<typeof useImageViewer>;
+  
+  // Realtime analysis
+  analysisRealtime: ReturnType<typeof useAnalysisRealtime>;
+  
+  // Backward compatibility handlers
   handleClearCanvas: () => void;
   handleImageSelect: (imageId: string) => void;
   handleToggleAnnotations: () => void;
@@ -85,80 +105,75 @@ interface AppContextType {
   handleSubmitGroupPrompt: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   handleEditGroupPrompt: (sessionId: string) => void;
   handleCreateFork: (sessionId: string) => void;
+  
+  // Additional integration points
+  viewerState: any;
+  toggleAnnotation: (annotationId: string) => void;
+  clearAnnotations: () => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
 
-interface AppProviderProps {
-  children: React.ReactNode;
-}
-
-// Custom hook to use the context
 export function useAppContext() {
-  const context = React.useContext(AppContext);
+  const context = useContext(AppContext);
   if (context === undefined) {
     throw new Error('useAppContext must be used within an AppProvider');
   }
   return context;
 }
 
-export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appStateReducer, initialAppState);
   const { user } = useAuth();
   const { toast } = useFilteredToast();
-  const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
+  const imageViewer = useImageViewer();
+  const { state: viewerState, toggleAnnotation, clearAnnotations } = imageViewer;
   
-  // Simplified hooks for basic functionality
-  const offlineCache = useOfflineCache();
-
-  // Real-time analysis handling with optimized updates
+  // Create action creators
+  const actions = useMemo(() => createActions(dispatch), []);
+  
+  // Real-time analysis handling
   const handleAnalysisUpdate = useCallback((analysis: UXAnalysis) => {
     console.log('Real-time analysis update received:', analysis);
-    dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId: analysis.imageId, analysis } });
-  }, []);
+    actions.updateAnalysis(analysis.imageId, analysis);
+  }, [actions]);
 
   const handleAnalysisError = useCallback((imageId: string, error: string) => {
     console.error('Analysis error for image:', imageId, error);
-    dispatch({ type: 'UPDATE_IMAGE', payload: { id: imageId, updates: { status: 'error' } } });
+    actions.updateImage(imageId, { status: 'error' });
     
     toast({
       title: "Analysis failed",
       description: `Analysis failed for image: ${error}`,
       category: "error",
-      variant: "destructive"
     });
-  }, [toast]);
+  }, [actions, toast]);
 
-  // Set up real-time analysis handling
-  useAnalysisRealtime({
+  const analysisRealtime = useAnalysisRealtime({
     onAnalysisUpdate: handleAnalysisUpdate,
     onAnalysisError: handleAnalysisError,
     onAnalysisStatusChange: (imageId: string, status: UXAnalysis['status']) => {
-      dispatch({ type: 'UPDATE_IMAGE', payload: { id: imageId, updates: { status } } });
+      actions.updateImage(imageId, { status });
     },
   });
 
-  // Simplified data loading function
+  // Data loading function
   const loadDataFromDatabase = useCallback(async () => {
     if (!user) return;
 
-    dispatch({ type: 'SET_LOADING', payload: true });
+    actions.setLoading(true);
     
     try {
       const migrationResult = await DataMigrationService.loadAllFromDatabase();
       
       if (migrationResult.success && migrationResult.data) {
         console.log('[AppContext] Data loaded successfully:', {
-          images: migrationResult.data.uploadedImages.length,
-          analyses: migrationResult.data.analyses.length,
-          groups: migrationResult.data.imageGroups.length
+          images: migrationResult.data.uploadedImages?.length || 0,
+          analyses: migrationResult.data.analyses?.length || 0,
+          groups: migrationResult.data.imageGroups?.length || 0
         });
         
-        dispatch({ 
-          type: 'MERGE_FROM_DATABASE', 
-          payload: migrationResult.data,
-          meta: { forceReplace: false }
-        });
+        actions.mergeFromDatabase(migrationResult.data, false);
       } else {
         console.log('[AppContext] No data loaded or load failed');
       }
@@ -167,13 +182,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       toast({
         title: "Failed to load data",
         description: "Error loading your data. Please try refreshing.",
-        category: "error",
         variant: "destructive"
       });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      actions.setLoading(false);
     }
-  }, [user, toast]);
+  }, [user, actions, toast]);
 
   // Load initial data when user logs in
   useEffect(() => {
@@ -184,13 +198,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.log('[AppContext] User logged out, clearing state...');
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user]); // Only depend on user, not loadDataFromDatabase to avoid infinite loop
+  }, [user, loadDataFromDatabase]);
 
-  // Simplified database sync function
+  // Database sync function
   const syncToDatabase = useCallback(async () => {
     if (!user) return;
 
-    dispatch({ type: 'SET_SYNCING', payload: true });
+    actions.setSyncing(true);
     
     try {
       const migrationResult = await DataMigrationService.migrateAllToDatabase({
@@ -205,7 +219,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         toast({
           title: "Sync complete",
           description: "Your data has been saved to the cloud.",
-          category: "success",
         });
       } else {
         throw new Error(migrationResult.error || 'Sync failed');
@@ -215,28 +228,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       toast({
         title: "Sync failed",
         description: "Failed to save data. Please try again.",
-        category: "error",
         variant: "destructive"
       });
     } finally {
-      dispatch({ type: 'SET_SYNCING', payload: false });
+      actions.setSyncing(false);
     }
-  }, [user, state, toast]);
+  }, [user, state, actions, toast]);
 
-  // Simplified image upload - direct state update with proper dimensions
+  // Image upload with proper dimensions
   const handleImageUpload = useCallback(async (files: File[]) => {
-    dispatch({ type: 'SET_UPLOADING', payload: true });
+    actions.setUploading(true);
     
     try {
       const newImages: UploadedImage[] = [];
       const newAnalyses: UXAnalysis[] = [];
       
-      // Load dimensions for all files in parallel
       const dimensionsPromises = files.map(async (file, i) => {
         const imageId = `img-${Date.now()}-${i}`;
         const imageUrl = URL.createObjectURL(file);
         
-        // Load actual dimensions
         const dimensions = await loadImageDimensions(file);
         
         const uploadedImage: UploadedImage = {
@@ -254,10 +264,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         };
       });
       
-      // Wait for all dimensions to load
       const results = await Promise.all(dimensionsPromises);
       
-      // Extract images and analyses
       results.forEach(result => {
         newImages.push(result.image);
         newAnalyses.push(result.analysis);
@@ -265,16 +273,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       
       console.log('[AppContext] Uploading', newImages.length, 'images with dimensions');
       
-      // Single atomic update
-      dispatch({ 
-        type: 'BATCH_UPLOAD', 
-        payload: { images: newImages, analyses: newAnalyses } 
-      });
+      actions.batchUpload(newImages, newAnalyses);
 
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
-        category: "success",
       });
       
     } catch (error) {
@@ -282,28 +285,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       toast({
         title: "Upload failed", 
         description: "Failed to upload images. Please try again.",
-        category: "error",
         variant: "destructive"
       });
     } finally {
-      dispatch({ type: 'SET_UPLOADING', payload: false });
+      actions.setUploading(false);
     }
-  }, [toast]);
+  }, [actions, toast]);
 
-  // Immediate upload for demo purposes with proper dimension loading
+  // Immediate upload for demo purposes
   const handleImageUploadImmediate = useCallback(async (files: File[]) => {
-    dispatch({ type: 'SET_UPLOADING', payload: true });
+    actions.setUploading(true);
 
     try {
       const newImages: UploadedImage[] = [];
       const newAnalyses: UXAnalysis[] = [];
       
-      // Load dimensions for all files in parallel
       const dimensionsPromises = files.map(async (file, i) => {
         const imageId = `temp-${Date.now()}-${i}`;
         const imageUrl = URL.createObjectURL(file);
         
-        // Load actual dimensions
         const dimensions = await loadImageDimensions(file);
         
         const uploadedImage: UploadedImage = {
@@ -321,60 +321,47 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         };
       });
       
-      // Wait for all dimensions to load
       const results = await Promise.all(dimensionsPromises);
       
-      // Extract images and analyses
       results.forEach(result => {
         newImages.push(result.image);
         newAnalyses.push(result.analysis);
       });
       
-      // Single atomic update
-      dispatch({ 
-        type: 'BATCH_UPLOAD', 
-        payload: { images: newImages, analyses: newAnalyses } 
-      });
+      actions.batchUpload(newImages, newAnalyses);
 
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
-        category: "success",
       });
     } catch (error) {
       console.error('Error in image upload:', error);
       toast({
         title: "Upload error",
         description: "Some images failed to load properly. Please try again.",
-        category: "error",
       });
     } finally {
-      dispatch({ type: 'SET_UPLOADING', payload: false });
+      actions.setUploading(false);
     }
-  }, [toast]);
+  }, [actions, toast]);
 
   // Analysis completion handler
   const handleAnalysisComplete = useCallback((imageId: string, analysis: UXAnalysis) => {
     console.log('[AppContext] Analysis completed for image:', imageId);
     
-    dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId, analysis } });
-    dispatch({ type: 'REMOVE_PENDING_SYNC', payload: imageId });
+    actions.updateAnalysis(imageId, analysis);
+    actions.removePendingSync(imageId);
     
     toast({
       title: "Analysis Complete",
       description: "New AI analysis has been generated for your image.",
-      category: "success",
     });
-  }, [toast]);
+  }, [actions, toast]);
 
-  // Update app state from database with conflict resolution
+  // Update app state from database
   const updateAppStateFromDatabase = useCallback((data: any) => {
-    dispatch({ 
-      type: 'MERGE_FROM_DATABASE', 
-      payload: data,
-      meta: { forceReplace: false }
-    });
-  }, []);
+    actions.mergeFromDatabase(data, false);
+  }, [actions]);
 
   // Canvas operations
   const clearCanvas = useCallback(() => {
@@ -405,13 +392,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toast({
       title: "Group Created",
       description: `Created group "${name}" with ${imageIds.length} images`,
-      category: "success"
     });
   }, [toast]);
 
   const updateGroup = useCallback((groupId: string, updates: Partial<ImageGroup>) => {
-    dispatch({ type: 'UPDATE_GROUP', payload: { id: groupId, updates } });
-  }, []);
+    actions.updateGroup(groupId, updates);
+  }, [actions]);
 
   const deleteGroup = useCallback((groupId: string) => {
     dispatch({ type: 'REMOVE_GROUP', payload: groupId });
@@ -419,16 +405,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toast({
       title: "Group Deleted",
       description: "Group has been deleted successfully",
-      category: "success"
     });
   }, [toast]);
 
   // Concept generation
   const generateConcept = useCallback(async (prompt: string, selectedImages?: string[]) => {
-    dispatch({ type: 'SET_GENERATING_CONCEPT', payload: true });
+    actions.setGeneratingConcept(true);
     
     try {
-      // Mock concept generation for now
       const conceptId = `concept-${Date.now()}`;
       const concept: GeneratedConcept = {
         id: conceptId,
@@ -445,38 +429,61 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       toast({
         title: "Concept Generated",
         description: "New concept has been generated successfully",
-        category: "success"
       });
     } catch (error) {
       console.error('Concept generation failed:', error);
       toast({
         title: "Generation Failed",
         description: "Failed to generate concept. Please try again.",
-        category: "error",
         variant: "destructive"
       });
     } finally {
-      dispatch({ type: 'SET_GENERATING_CONCEPT', payload: false });
+      actions.setGeneratingConcept(false);
     }
-  }, [toast]);
+  }, [actions, toast]);
+
+  // Legacy support functions
+  const addImage = useCallback((image: UploadedImage) => {
+    actions.addImages([image]);
+  }, [actions]);
+
+  const updateImageAnalysisStatus = useCallback((imageId: string, status: string) => {
+    actions.updateImage(imageId, { status: status as any });
+  }, [actions]);
+
+  const addAnalysis = useCallback((analysis: UXAnalysis) => {
+    actions.addAnalysis(analysis);
+  }, [actions]);
+
+  const setSelectedImage = useCallback((imageId: string | null) => {
+    actions.setSelectedImage(imageId);
+  }, [actions]);
+
+  const toggleAnnotations = useCallback(() => {
+    actions.toggleAnnotations();
+  }, [actions]);
+
+  const setGalleryTool = useCallback((tool: 'cursor' | 'draw') => {
+    actions.setGalleryTool(tool);
+  }, [actions]);
 
   // Backward compatibility handlers
   const handleClearCanvas = useCallback(() => clearCanvas(), [clearCanvas]);
   const handleImageSelect = useCallback((imageId: string) => {
-    dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId });
-  }, []);
+    actions.setSelectedImage(imageId);
+  }, [actions]);
   
   const handleToggleAnnotations = useCallback(() => {
-    dispatch({ type: 'TOGGLE_ANNOTATIONS' });
-  }, [state.showAnnotations]);
+    actions.toggleAnnotations();
+  }, [actions]);
   
   const handleAnnotationClick = useCallback((annotationId: string) => {
     toggleAnnotation(annotationId);
   }, [toggleAnnotation]);
   
   const handleGalleryToolChange = useCallback((tool: 'cursor' | 'draw') => {
-    dispatch({ type: 'SET_GALLERY_TOOL', payload: tool });
-  }, []);
+    actions.setGalleryTool(tool);
+  }, [actions]);
   
   const handleAddComment = useCallback(() => {
     console.log('Add comment triggered');
@@ -503,17 +510,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   }, [updateGroup]);
   
   const handleGroupDisplayModeChange = useCallback((groupId: string, mode: 'standard' | 'stacked') => {
-    dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } });
-  }, []);
+    actions.setGroupDisplayMode(groupId, mode);
+  }, [actions]);
   
   const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
     console.log('Group prompt submitted:', { groupId, prompt, isCustom });
-    toast({
-      title: "Group Analysis",
-      description: "Group analysis has been submitted for processing",
-      category: "success"
-    });
-  }, [toast]);
+  }, []);
   
   const handleEditGroupPrompt = useCallback((sessionId: string) => {
     console.log('Edit group prompt:', sessionId);
@@ -523,44 +525,39 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     console.log('Create fork:', sessionId);
   }, []);
 
-  // Memoized context value for performance
-  const value = useMemo(() => ({
-    // State and dispatch
+  // Memoized context value
+  const contextValue = useMemo(() => ({
     state,
-    dispatch,
+    actions,
     
-    // Operations
+    // High-level operations
     handleImageUpload,
     handleImageUploadImmediate,
-    syncToDatabase,
+    handleAnalysisComplete,
+    
+    // Data operations
     loadDataFromDatabase,
+    syncToDatabase,
     updateAppStateFromDatabase,
     clearCanvas,
+    
+    // Group operations
     createGroup,
     updateGroup,
     deleteGroup,
+    
+    // Concept generation
     generateConcept,
-    
-    // Viewer integration
-    viewerState,
-    toggleAnnotation,
-    clearAnnotations,
-    
-    // Analysis
-    handleAnalysisComplete,
-    
-    // Cache features
-    offlineCache,
     
     // Direct state access for backward compatibility
     uploadedImages: state.uploadedImages,
     analyses: state.analyses,
+    selectedImageId: state.selectedImageId,
     imageGroups: state.imageGroups,
     groupAnalysesWithPrompts: state.groupAnalysesWithPrompts,
     generatedConcepts: state.generatedConcepts,
     groupAnalyses: state.groupAnalyses,
     groupPromptSessions: state.groupPromptSessions,
-    selectedImageId: state.selectedImageId,
     showAnnotations: state.showAnnotations,
     galleryTool: state.galleryTool,
     groupDisplayModes: state.groupDisplayModes,
@@ -568,8 +565,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     isSyncing: state.isSyncing,
     isUploading: state.isUploading,
     isGeneratingConcept: state.isGeneratingConcept,
+    pendingBackgroundSync: state.pendingBackgroundSync,
+    lastSyncTimestamp: state.lastSyncTimestamp,
+    version: state.version,
     
-    // Legacy handlers
+    // Legacy functions
+    addImage,
+    updateImageAnalysisStatus,
+    addAnalysis,
+    setSelectedImage,
+    toggleAnnotations,
+    setGalleryTool,
+    
+    // Integration points
+    imageViewer,
+    analysisRealtime,
+    viewerState,
+    toggleAnnotation,
+    clearAnnotations,
+    
+    // Backward compatibility handlers
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
@@ -587,22 +602,29 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     handleCreateFork,
   }), [
     state,
-    dispatch,
+    actions,
     handleImageUpload,
     handleImageUploadImmediate,
-    syncToDatabase,
+    handleAnalysisComplete,
     loadDataFromDatabase,
+    syncToDatabase,
     updateAppStateFromDatabase,
     clearCanvas,
     createGroup,
     updateGroup,
     deleteGroup,
     generateConcept,
+    addImage,
+    updateImageAnalysisStatus,
+    addAnalysis,
+    setSelectedImage,
+    toggleAnnotations,
+    setGalleryTool,
+    imageViewer,
+    analysisRealtime,
     viewerState,
     toggleAnnotation,
     clearAnnotations,
-    handleAnalysisComplete,
-    offlineCache,
     handleClearCanvas,
     handleImageSelect,
     handleToggleAnnotations,
@@ -621,7 +643,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   ]);
 
   return (
-    <AppContext.Provider value={value}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );
