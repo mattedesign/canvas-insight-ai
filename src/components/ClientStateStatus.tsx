@@ -12,13 +12,13 @@ import { AlertCircle, CheckCircle, Clock, HardDrive, Wifi, WifiOff } from 'lucid
 import { useAppContext } from '@/context/AppContext';
 
 export const ClientStateStatus: React.FC = () => {
-  const { offlineCache } = useAppContext();
-
-  if (!offlineCache) {
-    return null; // Hide if client features aren't available
-  }
-
-  const { stats, isHealthy } = offlineCache;
+  // Simplified component without offlineCache dependency
+  const stats = {
+    totalSize: 0,
+    hitRate: 0,
+    compressionRatio: 0,
+  };
+  const isHealthy = true;
 
   const pendingOps: any[] = [];
   const retryableOps: any[] = [];

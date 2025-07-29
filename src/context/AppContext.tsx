@@ -182,7 +182,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Failed to load data",
         description: "Error loading your data. Please try refreshing.",
-        variant: "destructive"
+        variant: "destructive",
+        category: "error"
       });
     } finally {
       actions.setLoading(false);
@@ -219,6 +220,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast({
           title: "Sync complete",
           description: "Your data has been saved to the cloud.",
+          category: "success"
         });
       } else {
         throw new Error(migrationResult.error || 'Sync failed');
@@ -228,7 +230,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Sync failed",
         description: "Failed to save data. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        category: "error"
       });
     } finally {
       actions.setSyncing(false);
@@ -278,6 +281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
+        category: "success"
       });
       
     } catch (error) {
@@ -285,7 +289,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Upload failed", 
         description: "Failed to upload images. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        category: "error"
       });
     } finally {
       actions.setUploading(false);
@@ -333,12 +338,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Upload complete",
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
+        category: "success"
       });
     } catch (error) {
       console.error('Error in image upload:', error);
       toast({
         title: "Upload error",
         description: "Some images failed to load properly. Please try again.",
+        category: "error"
       });
     } finally {
       actions.setUploading(false);
@@ -355,6 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast({
       title: "Analysis Complete",
       description: "New AI analysis has been generated for your image.",
+      category: "success"
     });
   }, [actions, toast]);
 
@@ -392,6 +400,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast({
       title: "Group Created",
       description: `Created group "${name}" with ${imageIds.length} images`,
+      category: "success"
     });
   }, [toast]);
 
@@ -405,6 +414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast({
       title: "Group Deleted",
       description: "Group has been deleted successfully",
+      category: "success"
     });
   }, [toast]);
 
@@ -429,13 +439,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast({
         title: "Concept Generated",
         description: "New concept has been generated successfully",
+        category: "success"
       });
     } catch (error) {
       console.error('Concept generation failed:', error);
       toast({
         title: "Generation Failed",
         description: "Failed to generate concept. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        category: "error"
       });
     } finally {
       actions.setGeneratingConcept(false);

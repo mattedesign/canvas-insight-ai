@@ -274,7 +274,14 @@ const Canvas = () => {
           generatedConcepts={generatedConcepts}
           imageGroups={imageGroups}
           groupAnalyses={groupAnalyses}
-          groupPromptSessions={groupPromptSessions}
+          groupPromptSessions={groupAnalysesWithPrompts.map(gap => ({ 
+            id: gap.id,
+            groupId: gap.groupId,
+            prompt: gap.prompt,
+            isCustom: false,
+            status: 'completed' as const,
+            createdAt: gap.createdAt
+          }))}
           groupAnalysesWithPrompts={groupAnalysesWithPrompts}
           groupDisplayModes={groupDisplayModes}
           showAnnotations={showAnnotations}

@@ -435,7 +435,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         createdAt: new Date()
       };
       
-      dispatch({ type: 'ADD_CONCEPT', payload: newConcept });
+      dispatch({ type: 'SET_CONCEPTS', payload: [...state.generatedConcepts, newConcept] });
       
     } catch (error) {
       console.error('Failed to generate concept:', error);

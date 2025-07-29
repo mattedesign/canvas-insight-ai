@@ -73,6 +73,7 @@ export function useErrorBoundary(options: UseErrorBoundaryOptions = {}) {
       title: "Something went wrong",
       description: error.message,
       variant: "destructive",
+      category: "error",
     });
   }, [logError, onError, toast]);
   
@@ -84,6 +85,7 @@ export function useErrorBoundary(options: UseErrorBoundaryOptions = {}) {
         title: "Max retries reached",
         description: "Please refresh the page or contact support.",
         variant: "destructive",
+        category: "error",
       });
       return;
     }
@@ -102,6 +104,7 @@ export function useErrorBoundary(options: UseErrorBoundaryOptions = {}) {
       toast({
         title: "Attempting recovery...",
         description: `Retry ${newRetryCount}/${maxRetries}`,
+        category: "info",
       });
     }, delay);
     
