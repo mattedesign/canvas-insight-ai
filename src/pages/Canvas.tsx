@@ -5,7 +5,7 @@ import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { GroupEditDialog } from '@/components/GroupEditDialog';
 import { CanvasUploadZone } from '@/components/CanvasUploadZone';
 
-import { useAppContext } from '@/context/AppContext';
+import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -46,10 +46,10 @@ const Canvas = () => {
     handleEditGroupPrompt,
     handleCreateFork,
     handleAnalysisComplete,
-    handleImageUpload,
-    handleImageUploadImmediate,
-    updateAppStateFromDatabase
-  } = useAppContext();
+    uploadImages: handleImageUpload,
+    uploadImagesImmediate: handleImageUploadImmediate,
+    syncData: updateAppStateFromDatabase
+  } = useSimplifiedAppContext();
 
   // Track if user has existing data in the database
   const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);

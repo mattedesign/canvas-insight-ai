@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { SubscriptionManagement } from '@/components/SubscriptionManagement';
-import { useAppContext } from '@/context/AppContext';
+import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
@@ -13,10 +13,8 @@ const Subscription = () => {
     analyses, 
     selectedImageId,
     showAnnotations,
-    handleClearCanvas,
-    handleImageSelect,
-    handleToggleAnnotations
-  } = useAppContext();
+    stableHelpers: { clearCanvas: handleClearCanvas }
+  } = useSimplifiedAppContext();
   const { subscription } = useAuth();
 
   const { refreshMetrics } = useDashboardMetrics();
