@@ -183,7 +183,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.log('[AppContext] User logged out, clearing state...');
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user, loadDataFromDatabase]);
+  }, [user]); // Only depend on user, not loadDataFromDatabase to avoid infinite loop
 
   // Simplified database sync function
   const syncToDatabase = useCallback(async () => {
