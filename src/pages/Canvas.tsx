@@ -52,6 +52,7 @@ const Canvas = () => {
 
   // Track if user has existing data in the database
   const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
+  const [loadAttempted, setLoadAttempted] = useState(false);
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -155,9 +156,13 @@ const Canvas = () => {
   // Load project by slug if provided, otherwise check for existing data
   const { user } = useAuth();
   useEffect(() => {
+    // Prevent multiple load attempts
+    if (loadAttempted) return;
+    
     const loadProjectBySlug = async () => {
       if (projectSlug) {
         try {
+          setLoadAttempted(true);
           console.log('Loading project by slug:', projectSlug);
           const project = await SlugService.getProjectBySlug(projectSlug);
           
@@ -186,6 +191,15 @@ const Canvas = () => {
             });
             // Use smart state update that respects pending sync operations
             updateAppStateFromDatabase(result.data);
+          } else {
+            console.error('Failed to load project data:', result.error);
+            // Still allow the canvas to load even if data loading fails
+            toast.toast({
+              category: 'error',
+              title: "Failed to load project data",
+              description: "The project loaded but some data couldn't be retrieved. You can still use the canvas.",
+              variant: "destructive",
+            });
           }
         } catch (error) {
           console.error('Error loading project by slug:', error);
@@ -198,10 +212,11 @@ const Canvas = () => {
           navigate('/projects');
         }
       } else {
-        // Check for existing data in current project
+        // Check for existing data in current project - only if not attempted yet
         const checkExistingData = async () => {
-          if (user && hasExistingData === null) {
+          if (user && hasExistingData === null && !loadAttempted) {
             try {
+              setLoadAttempted(true);
               const hasData = await DataMigrationService.hasExistingData();
               setHasExistingData(hasData);
                 if (hasData) {
@@ -215,6 +230,9 @@ const Canvas = () => {
                     });
                     // Use smart state update that respects pending sync operations
                     updateAppStateFromDatabase(result.data);
+                  } else {
+                    console.error('Failed to load existing data:', result.error);
+                    setHasExistingData(false);
                   }
                 }
             } catch (error) {

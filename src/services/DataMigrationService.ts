@@ -347,7 +347,7 @@ export class AnalysisMigrationService {
       .from('ux_analyses')
       .select(`
         *,
-        images!inner(project_id, original_name, storage_path)
+        images!ux_analyses_image_id_fkey(project_id, original_name, storage_path)
       `)
       .eq('images.project_id', projectId)
       .order('created_at', { ascending: false });
