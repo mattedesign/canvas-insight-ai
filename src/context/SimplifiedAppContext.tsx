@@ -14,7 +14,7 @@ import React, {
 import { useAuth } from './AuthContext';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { useLoadingStateMachine } from '@/hooks/useLoadingStateMachine';
-import { DataMigrationService } from '@/services/DataMigrationService';
+import { DataMigrationService, ImageMigrationService, AnalysisMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { loadImageDimensions } from '@/utils/imageUtils';
 import { DataLoadingErrorBoundary } from '@/components/DataLoadingErrorBoundary';
@@ -249,19 +249,29 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
           const newAnalyses: UXAnalysis[] = [];
           
           const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
-            const imageId = `temp-${Date.now()}-${i}`;
+            // 🚨 FIX: Use permanent IDs and save to database immediately
+            const imageId = `img-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
             const imageUrl = URL.createObjectURL(file);
             
             const dimensions = await loadImageDimensions(file);
             
             const uploadedImage: UploadedImage = {
-              id: imageId,
+              id: imageId, // ✅ Permanent ID, not temp
               name: file.name,
               url: imageUrl,
               file,
               dimensions,
               status: 'completed'
             };
+
+            // 🚨 FIX: Save to database immediately to prevent race condition
+            try {
+              await ImageMigrationService.migrateImageToDatabase(uploadedImage);
+              console.log('[Upload] Image saved to database:', imageId);
+            } catch (error) {
+              console.warn('[Upload] Failed to save image to database, will retry:', error);
+              // Continue with local state, background sync will handle it
+            }
             
             return {
               image: uploadedImage,
@@ -276,7 +286,17 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             newAnalyses.push(result.analysis);
           });
           
+          // 🚨 FIX: Add images to state AND save analyses to database
           dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+          
+          // Save analyses to database as well
+          try {
+            for (const analysis of newAnalyses) {
+              await AnalysisMigrationService.migrateAnalysisToDatabase(analysis);
+            }
+          } catch (error) {
+            console.warn('[Upload] Failed to save analyses, will retry later:', error);
+          }
           
           loadingMachineRef.current.actions.uploadSuccess();
 
