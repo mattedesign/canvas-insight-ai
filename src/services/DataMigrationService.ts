@@ -62,16 +62,40 @@ export class ProjectService {
     // Get counts for each project
     const projectsWithCounts = await Promise.all(
       projects.map(async (project) => {
-        const [imageCount, analysisCount] = await Promise.all([
-          supabase.from('images').select('id', { count: 'exact' }).eq('project_id', project.id),
-          supabase.from('ux_analyses').select('ux_analyses.id', { count: 'exact' }).eq('images.project_id', project.id).eq('images.id', 'ux_analyses.image_id')
-        ]);
+        try {
+          // Get image count
+          const { count: imageCount } = await supabase
+            .from('images')
+            .select('id', { count: 'exact' })
+            .eq('project_id', project.id);
 
-        return {
-          ...project,
-          images: [{ count: imageCount.count || 0 }],
-          ux_analyses: [{ count: analysisCount.count || 0 }]
-        };
+          // Get image IDs for this project to count analyses
+          const { data: projectImages } = await supabase
+            .from('images')
+            .select('id')
+            .eq('project_id', project.id);
+          
+          const imageIds = projectImages?.map(img => img.id) || [];
+          
+          // Get analysis count for these images
+          const { count: analysisCount } = await supabase
+            .from('ux_analyses')
+            .select('id', { count: 'exact' })
+            .in('image_id', imageIds.length > 0 ? imageIds : ['']);
+
+          return {
+            ...project,
+            images: [{ count: imageCount || 0 }],
+            ux_analyses: [{ count: analysisCount || 0 }]
+          };
+        } catch (error) {
+          console.error('Error getting counts for project', project.id, error);
+          return {
+            ...project,
+            images: [{ count: 0 }],
+            ux_analyses: [{ count: 0 }]
+          };
+        }
       })
     );
 
