@@ -427,31 +427,33 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   // 🚨 CRITICAL FIX: Project change listener - use ref instead of stableHelpers
   useEffect(() => {
     const handleProjectChange = async (event: CustomEvent) => {
-      const { projectId } = event.detail;
-      
+      const { projectId, oldProjectId } = event.detail;
+
       // Skip if same project
-      if (currentProjectRef.current === projectId) {
-        console.log('[AppContext] Same project, skipping reload');
+      if (currentProjectRef.current === projectId || oldProjectId === projectId) {
+        console.log('[AppContext] Same project or switching back, skipping reload');
         return;
       }
-      
-      console.log('[AppContext] Project changed, reloading data for:', projectId);
+
+      console.log('[AppContext] Project changed, clearing and reloading data for:', projectId);
       currentProjectRef.current = projectId;
-      
-      // Clear current state
+
+      // 🚨 FIX: Clear current state completely
       dispatch({ type: 'RESET_STATE' });
-      
-      // 🚨 CRITICAL FIX: Use the ref function instead of stableHelpers.loadData()
-      if (loadDataFunctionRef.current) {
-        await loadDataFunctionRef.current();
-      }
+
+      // 🚨 FIX: Wait a bit for state to clear, then load new data
+      setTimeout(() => {
+        if (loadDataFunctionRef.current) {
+          loadDataFunctionRef.current();
+        }
+      }, 100);
     };
-    
+
     window.addEventListener('projectChanged', handleProjectChange as any);
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as any);
     };
-  }, []); // ✅ FIXED - empty dependencies
+  }, []); // ✅ Empty dependencies
 
   // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
