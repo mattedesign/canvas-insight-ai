@@ -32,7 +32,7 @@ interface StableAppStateReturn {
 }
 
 export const useStableAppState = (): StableAppStateReturn => {
-  const { state, stableHelpers } = useSimplifiedAppContext();
+  const { state, stableHelpers, dispatch } = useSimplifiedAppContext();
   
   // Memoized selectors to prevent object recreation
   const getImageById = useCallback((id: string) => {
@@ -57,24 +57,24 @@ export const useStableAppState = (): StableAppStateReturn => {
   
   // Stable action references
   const uploadImages = useCallback((files: File[]) => {
-    return handleImageUpload(files);
-  }, [handleImageUpload]);
+    return stableHelpers.uploadImages(files);
+  }, [stableHelpers]);
   
   const selectImage = useCallback((imageId: string | null) => {
-    actions.setSelectedImage(imageId);
-  }, [actions]);
+    dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId });
+  }, [dispatch]);
   
   const toggleAnnotations = useCallback(() => {
-    actions.toggleAnnotations();
-  }, [actions]);
+    dispatch({ type: 'TOGGLE_ANNOTATIONS' });
+  }, [dispatch]);
   
   const syncData = useCallback(() => {
-    return syncToDatabase();
-  }, [syncToDatabase]);
+    return stableHelpers.syncData();
+  }, [stableHelpers]);
   
   const loadData = useCallback(() => {
-    return loadDataFromDatabase();
-  }, [loadDataFromDatabase]);
+    return stableHelpers.loadData();
+  }, [stableHelpers]);
   
   // Return stable object (memoized)
   return useMemo(() => ({

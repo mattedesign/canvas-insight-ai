@@ -9,9 +9,49 @@ import { useLoadingStateMachine } from '@/hooks/useLoadingStateMachine';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
 import { useAppActions, useAppHelpers } from '@/hooks/useOptimizedSelectors';
-import type { AppContextType } from './AppContext';
-
-type LegacyAppContextType = AppContextType;
+// Create the interface directly since we need legacy compatibility
+interface LegacyAppContextType {
+  state: any;
+  actions: any;
+  handleImageUpload: (files: File[]) => Promise<void>;
+  handleImageUploadImmediate: (files: File[]) => Promise<void>;
+  handleAnalysisComplete: (imageId: string, analysis: any) => void;
+  loadDataFromDatabase: () => Promise<void>;
+  syncToDatabase: () => Promise<void>;
+  updateAppStateFromDatabase: (data: any) => void;
+  clearCanvas: () => void;
+  createGroup: (...args: any[]) => void;
+  updateGroup: (groupId: string, updates: any) => void;
+  deleteGroup: (groupId: string) => void;
+  generateConcept: (...args: any[]) => Promise<void>;
+  uploadedImages: any[];
+  analyses: any[];
+  selectedImageId: string | null;
+  imageGroups: any[];
+  groupAnalysesWithPrompts: any[];
+  generatedConcepts: any[];
+  groupAnalyses: any[];
+  groupPromptSessions: any[];
+  showAnnotations: boolean;
+  galleryTool: string;
+  groupDisplayModes: any;
+  isLoading: boolean;
+  isSyncing: boolean;
+  isUploading: boolean;
+  isGeneratingConcept: boolean;
+  pendingBackgroundSync: Set<string>;
+  lastSyncTimestamp: number | null;
+  version: number;
+  addImage: (image: any) => void;
+  updateImageAnalysisStatus: (imageId: string, status: string) => void;
+  addAnalysis: (analysis: any) => void;
+  setSelectedImage: (imageId: string | null) => void;
+  toggleAnnotations: () => void;
+  setGalleryTool: (tool: 'cursor' | 'draw') => void;
+  imageViewer: any;
+  analysisRealtime: any;
+  [key: string]: any; // For additional legacy properties
+}
 
 // Legacy compatibility wrapper
 const LegacyCompatibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -117,7 +157,7 @@ const LegacyCompatibilityProvider: React.FC<{ children: React.ReactNode }> = ({ 
     isUploading: state.isUploading,
     isGeneratingConcept: state.isGeneratingConcept,
     pendingBackgroundSync: state.pendingBackgroundSync,
-    lastSyncTimestamp: state.lastSyncTimestamp,
+    lastSyncTimestamp: state.lastSyncTimestamp?.getTime() || null,
     version: state.version,
     
     // Legacy functions
