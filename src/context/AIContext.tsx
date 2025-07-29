@@ -68,7 +68,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             imageName,
             userContext
           },
-          aiModel: selectedAIModel
+          aiModel: selectedAIModel === 'auto' ? 'auto' : selectedAIModel
         }
       });
       

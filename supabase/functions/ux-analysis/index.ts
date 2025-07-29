@@ -1700,19 +1700,36 @@ function generateMockGroupAnalysis() {
   return { success: true, data: mockGroupAnalysis };
 }
 
-async function generateConcept(payload: any) {
-  console.log('Generating concept:', payload)
+async function generateConcept(payload: any, aiModel = 'auto') {
+  console.log('Generating concept:', payload, 'with AI model:', aiModel)
   
   try {
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    
-    if (openaiApiKey && payload.analysisData) {
-      console.log('Using AI for concept generation');
-      return await performAIConceptGeneration(payload, openaiApiKey);
-    } else {
-      console.log('Using mock concept generation');
+    // Check if we have analysis data for concept generation
+    if (!payload.analysisData) {
+      console.log('No analysis data provided, using mock concept generation');
       return generateMockConcept();
     }
+
+    // Select the best AI model for concept generation
+    const selectedModel = await selectConceptGenerationModel(aiModel);
+    console.log('Selected concept generation model:', selectedModel);
+
+    switch (selectedModel) {
+      case 'stability-ai':
+        return await performStabilityAIConceptGeneration(payload);
+      case 'openai':
+        const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+        if (openaiApiKey) {
+          return await performAIConceptGeneration(payload, openaiApiKey);
+        }
+        break;
+      default:
+        console.log('No suitable AI model available, using mock generation');
+        break;
+    }
+
+    // Fallback to mock concept if no AI model is available
+    return generateMockConcept();
   } catch (error) {
     console.error('Error in concept generation, falling back to mock:', error);
     return generateMockConcept();
@@ -1836,6 +1853,142 @@ Respond with a JSON object:
 
   } catch (error) {
     console.error('AI group analysis failed:', error);
+    throw error;
+  }
+}
+
+async function selectConceptGenerationModel(preferredModel: string = 'auto'): Promise<string> {
+  console.log('Selecting concept generation model, preference:', preferredModel);
+  
+  // If user specified a model, try to use it
+  if (preferredModel === 'stability-ai' && Deno.env.get('STABILITY_API_KEY')) {
+    return 'stability-ai';
+  }
+  
+  if (preferredModel === 'openai' && Deno.env.get('OPENAI_API_KEY')) {
+    return 'openai';
+  }
+  
+  // Auto selection based on available API keys
+  if (preferredModel === 'auto') {
+    // Prefer Stability.ai for visual concept generation
+    if (Deno.env.get('STABILITY_API_KEY')) {
+      return 'stability-ai';
+    }
+    
+    if (Deno.env.get('OPENAI_API_KEY')) {
+      return 'openai';
+    }
+  }
+  
+  return 'none';
+}
+
+async function performStabilityAIConceptGeneration(payload: any) {
+  console.log('Performing Stability.ai concept generation');
+  
+  try {
+    const stabilityApiKey = Deno.env.get('STABILITY_API_KEY');
+    if (!stabilityApiKey) {
+      throw new Error('Stability AI API key not found');
+    }
+
+    const analysisData = payload.analysisData;
+    const imageUrl = payload.imageUrl;
+    const imageName = payload.imageName || 'design';
+    
+    // Detect domain context for targeted improvements
+    const domainContext = detectDomainFromContext(
+      analysisData.userContext || '', 
+      imageName
+    );
+
+    // Create detailed context from analysis data
+    const topIssues = analysisData.suggestions?.slice(0, 3).map((s: any) => 
+      `${s.title}: ${s.description}`
+    ).join(', ') || 'General UX improvements needed';
+    
+    const keyProblemAreas = analysisData.summary?.keyIssues?.join(', ') || 'General usability concerns';
+    
+    // Create improved prompt for Stability AI
+    const conceptPrompt = `Create an improved ${domainContext.domain} UI design that addresses these key issues: ${keyProblemAreas}. Focus on: ${topIssues}. Maintain the original design intent while improving usability, accessibility, and visual hierarchy. Modern, clean design with better contrast and spacing.`;
+
+    console.log('Stability.ai concept prompt:', conceptPrompt);
+
+    // Generate improved design concept with Stability AI
+    const response = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stabilityApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt: conceptPrompt,
+        output_format: 'png',
+        aspect_ratio: '16:9'
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Stability AI API error:', response.status, errorText);
+      throw new Error(`Stability AI API error: ${response.status}`);
+    }
+
+    const imageBuffer = await response.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const conceptImageUrl = `data:image/png;base64,${base64Image}`;
+
+    // Create comprehensive concept data structure
+    const concept = {
+      title: `Enhanced ${domainContext.domain} Design`,
+      description: `Improved design concept addressing key UX issues: ${keyProblemAreas}. This concept focuses on enhancing usability, accessibility, and visual hierarchy while maintaining the original design intent.`,
+      improvements: [
+        "Enhanced visual hierarchy with better typography and spacing",
+        "Improved color contrast for better accessibility compliance", 
+        "Optimized layout structure for better user flow",
+        `Domain-specific optimizations for ${domainContext.domain} users`
+      ],
+      designChanges: {
+        layout: "Restructured layout for improved information architecture and user flow",
+        navigation: `Enhanced navigation patterns optimized for ${domainContext.domain} users`,
+        visual: "Improved visual design with better contrast, spacing, and typography",
+        content: "Better content organization and hierarchy for enhanced readability"
+      },
+      preservedElements: [
+        "Core brand identity and color scheme",
+        "Essential functionality and user workflows",
+        "Key interactive elements and call-to-actions"
+      ],
+      expectedOutcomes: {
+        usabilityScore: Math.min(100, (analysisData.summary?.usabilityScore || 70) + 15),
+        accessibilityScore: Math.min(100, (analysisData.summary?.accessibilityScore || 70) + 20),
+        domainSpecificScore: 85
+      },
+      implementationPriority: [
+        "Improve color contrast and typography",
+        "Optimize layout and spacing", 
+        "Enhance navigation structure"
+      ],
+      conceptImage: conceptImageUrl,
+      metadata: {
+        aiGenerated: true,
+        model: 'stability-ai',
+        processingTime: Date.now(),
+        domain: domainContext.domain,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    console.log('Stability.ai concept generation completed successfully');
+
+    return {
+      success: true,
+      data: concept
+    };
+
+  } catch (error) {
+    console.error('Stability.ai concept generation failed:', error);
     throw error;
   }
 }
@@ -2361,46 +2514,107 @@ Deno.serve(async (req) => {
 
   try {
     const requestData = await req.json()
+    
+    // Validate request data structure
+    if (!requestData || typeof requestData !== 'object') {
+      throw new Error('Invalid request data: must be a JSON object')
+    }
+
     const { type, payload, aiModel }: AnalysisRequest = requestData
     
+    // Validate required fields
+    if (!type) {
+      throw new Error('Missing required field: type')
+    }
+    
+    if (!payload) {
+      throw new Error('Missing required field: payload')
+    }
+    
     console.log(`Processing ${type} request with AI model: ${aiModel || 'auto'}`)
-    console.log('Request payload:', JSON.stringify(payload, null, 2))
+    console.log('Request payload keys:', Object.keys(payload))
     
     let result
     const startTime = Date.now()
     
-    switch (type) {
-      case 'ANALYZE_IMAGE':
-        result = await analyzeImage(payload, aiModel)
-        break
-      case 'ANALYZE_GROUP':
-        result = await analyzeGroup(payload)
-        break
-      case 'GENERATE_CONCEPT':
-        result = await generateConcept(payload)
-        break
-      case 'INPAINT_REGION':
-        result = await inpaintRegion(payload, aiModel)
-        break
-      default:
-        throw new Error(`Unknown analysis type: ${type}`)
+    // Enhanced routing with better error handling
+    try {
+      switch (type) {
+        case 'ANALYZE_IMAGE':
+          if (!payload.imageId || !payload.imageUrl) {
+            throw new Error('ANALYZE_IMAGE requires imageId and imageUrl in payload')
+          }
+          result = await analyzeImage(payload, aiModel)
+          break
+          
+        case 'ANALYZE_GROUP':
+          if (!payload.imageUrls || !Array.isArray(payload.imageUrls)) {
+            throw new Error('ANALYZE_GROUP requires imageUrls array in payload')
+          }
+          result = await analyzeGroup(payload)
+          break
+          
+        case 'GENERATE_CONCEPT':
+          if (!payload.analysisData) {
+            console.log('No analysis data provided for concept generation, will use mock data')
+          }
+          result = await generateConcept(payload, aiModel)
+          break
+          
+        case 'INPAINT_REGION':
+          if (!payload.imageUrl || !payload.action) {
+            throw new Error('INPAINT_REGION requires imageUrl and action in payload')
+          }
+          result = await inpaintRegion(payload, aiModel)
+          break
+          
+        default:
+          throw new Error(`Unknown analysis type: ${type}. Supported types: ANALYZE_IMAGE, ANALYZE_GROUP, GENERATE_CONCEPT, INPAINT_REGION`)
+      }
+    } catch (operationError) {
+      console.error(`Error in ${type} operation:`, operationError)
+      
+      // Return a more structured error response for operation failures
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `${type} operation failed: ${operationError.message}`,
+          type: 'operation_error',
+          operation: type
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 422, // Unprocessable Entity
+        }
+      )
     }
 
     const duration = Date.now() - startTime
     console.log(`${type} completed successfully in ${duration}ms`)
     
+    // Ensure result has the expected structure
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Invalid result structure from ${type} operation`)
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
+    
   } catch (error) {
     console.error('Error processing request:', error)
     
+    // Enhanced error response with more context
+    const errorResponse = {
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      type: 'request_error',
+      timestamp: new Date().toISOString()
+    }
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
-      }),
+      JSON.stringify(errorResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
