@@ -192,8 +192,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [user, toast]);
 
-  // Database sync function  
-  const syncToDatabase = useCallback(async () => {
+  // Database sync function - pass state as parameter to avoid dependency issues
+  const syncToDatabase = useCallback(async (stateToSync = state) => {
     if (!user) return;
 
     const operationId = `sync-${Date.now()}`;
@@ -206,10 +206,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         
         try {
           const migrationResult = await DataMigrationService.migrateAllToDatabase({
-            uploadedImages: state.uploadedImages,
-            analyses: state.analyses,
-            imageGroups: state.imageGroups,
-            groupAnalysesWithPrompts: state.groupAnalysesWithPrompts,
+            uploadedImages: stateToSync.uploadedImages,
+            analyses: stateToSync.analyses,
+            imageGroups: stateToSync.imageGroups,
+            groupAnalysesWithPrompts: stateToSync.groupAnalysesWithPrompts,
           });
           
           if (migrationResult.success) {
@@ -239,7 +239,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         variant: "destructive"
       });
     }
-  }, [user, state, toast]);
+  }, [user, toast]);
 
   // Image upload with atomic operation
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -472,10 +472,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     console.log('Add comment mode activated');
   }, []);
 
-  // Restored original group creation with default colors
+  // Restored original group creation with default colors - avoid state dependency by using dynamic values
   const handleCreateGroup = useCallback((imageIds: string[]) => {
     const groupId = `group-${Date.now()}`;
-    const groupNumber = state.imageGroups.length + 1;
+    // Use timestamp to ensure unique group numbers instead of relying on array length
+    const groupNumber = Math.floor(Date.now() / 1000) % 100 + 1;
     const defaultColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
     const color = defaultColors[(groupNumber - 1) % defaultColors.length];
     
@@ -490,7 +491,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     };
     
     dispatch({ type: 'ADD_GROUP', payload: newGroup });
-  }, [state.imageGroups.length]);
+  }, []);
 
   // Restored original generateConcept (different from the concept generation above)
   const handleGenerateConcept = useCallback(async (analysisId: string) => {

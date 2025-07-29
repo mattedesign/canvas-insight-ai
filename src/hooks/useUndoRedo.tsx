@@ -17,8 +17,9 @@ export const useUndoRedo = (initialNodes: Node[], initialEdges: Edge[]) => {
     // Prevent infinite loops when restoring state
     if (isUpdating.current) return;
     
-    // Remove any future history when making a new change
-    const newHistory = history.current.slice(0, currentIndex + 1);
+    // Use current index from ref to avoid stale closure
+    const currentIdx = currentIndex;
+    const newHistory = history.current.slice(0, currentIdx + 1);
     newHistory.push({ nodes: [...nodes], edges: [...edges] });
     
     // Limit history size to prevent memory issues
@@ -29,7 +30,7 @@ export const useUndoRedo = (initialNodes: Node[], initialEdges: Edge[]) => {
     }
     
     history.current = newHistory;
-  }, []); // Remove currentIndex dependency to prevent infinite loops
+  }, [currentIndex]);
 
   const undo = useCallback(() => {
     if (currentIndex > 0) {

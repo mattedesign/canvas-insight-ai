@@ -893,7 +893,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const timeoutId = setTimeout(cleanup, 0);
     
     return () => clearTimeout(timeoutId);
-  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, saveState, setIsUpdating]);
+  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, setIsUpdating]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
