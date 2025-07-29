@@ -49,6 +49,37 @@ interface AppContextType {
   
   // AI Analysis actions
   handleAnalysisComplete: (imageId: string, analysis: UXAnalysis) => void;
+  
+  // Backward compatibility - direct state access
+  uploadedImages: UploadedImage[];
+  analyses: UXAnalysis[];
+  imageGroups: ImageGroup[];
+  groupAnalysesWithPrompts: GroupAnalysisWithPrompt[];
+  generatedConcepts: GeneratedConcept[];
+  groupAnalyses: any[];
+  groupPromptSessions: any[];
+  selectedImageId: string | null;
+  showAnnotations: boolean;
+  galleryTool: 'cursor' | 'draw';
+  groupDisplayModes: Record<string, 'standard' | 'stacked'>;
+  isLoading: boolean;
+  isSyncing: boolean;
+  isUploading: boolean;
+  isGeneratingConcept: boolean;
+  
+  // Backward compatibility - legacy handlers
+  handleClearCanvas: () => void;
+  handleImageSelect: (imageId: string) => void;
+  handleToggleAnnotations: () => void;
+  handleGenerateConcept: (prompt: string, selectedImages?: string[]) => Promise<void>;
+  handleCreateGroup: (imageIds: string[]) => void;
+  handleUngroup: (groupId: string) => void;
+  handleDeleteGroup: (groupId: string) => void;
+  handleEditGroup: (groupId: string, name: string, description: string, color: string) => void;
+  handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => void;
+  handleSubmitGroupPrompt: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
+  handleEditGroupPrompt: () => void;
+  handleCreateFork: () => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -453,8 +484,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [toast]);
 
-  // Context value
+  // Context value with backward compatibility
   const value = useMemo(() => ({
+    // New interface
     state,
     dispatch,
     handleImageUpload,
@@ -471,6 +503,39 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     toggleAnnotation,
     clearAnnotations,
     handleAnalysisComplete,
+    
+    // Backward compatibility - direct state access
+    uploadedImages: state.uploadedImages,
+    analyses: state.analyses,
+    imageGroups: state.imageGroups,
+    groupAnalysesWithPrompts: state.groupAnalysesWithPrompts,
+    generatedConcepts: state.generatedConcepts,
+    groupAnalyses: state.groupAnalyses,
+    groupPromptSessions: state.groupPromptSessions,
+    selectedImageId: state.selectedImageId,
+    showAnnotations: state.showAnnotations,
+    galleryTool: state.galleryTool,
+    groupDisplayModes: state.groupDisplayModes,
+    isLoading: state.isLoading,
+    isSyncing: state.isSyncing,
+    isUploading: state.isUploading,
+    isGeneratingConcept: state.isGeneratingConcept,
+    
+    // Backward compatibility - legacy handlers
+    handleClearCanvas: clearCanvas,
+    handleImageSelect: (imageId: string) => dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId }),
+    handleToggleAnnotations: () => dispatch({ type: 'TOGGLE_ANNOTATIONS' }),
+    handleGenerateConcept: generateConcept,
+    handleCreateGroup: (imageIds: string[]) => createGroup(`Group ${Date.now()}`, '', '#3b82f6', imageIds),
+    handleUngroup: (groupId: string) => deleteGroup(groupId),
+    handleDeleteGroup: deleteGroup,
+    handleEditGroup: (groupId: string, name: string, description: string, color: string) => 
+      updateGroup(groupId, { name, description, color }),
+    handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => 
+      dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } }),
+    handleSubmitGroupPrompt: async () => {}, // Placeholder
+    handleEditGroupPrompt: () => {}, // Placeholder  
+    handleCreateFork: () => {}, // Placeholder
   }), [
     state,
     handleImageUpload,
