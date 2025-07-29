@@ -60,8 +60,19 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   // Update zoom level when zoom changes
   React.useEffect(() => {
     const updateZoom = () => {
-      const currentZoom = getZoom();
-      setZoomLevel(Math.round(currentZoom * 100));
+      try {
+        const currentZoom = getZoom();
+        // Ensure currentZoom is a valid number before calculation
+        if (typeof currentZoom === 'number' && !isNaN(currentZoom) && isFinite(currentZoom)) {
+          setZoomLevel(Math.round(currentZoom * 100));
+        } else {
+          // Fallback to 100% if zoom is invalid
+          setZoomLevel(100);
+        }
+      } catch (error) {
+        console.error('Error getting zoom level:', error);
+        setZoomLevel(100);
+      }
     };
     
     // Update immediately

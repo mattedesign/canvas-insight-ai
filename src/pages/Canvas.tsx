@@ -54,6 +54,7 @@ const Canvas = () => {
   // Track if user has existing data in the database
   const [hasExistingData, setHasExistingData] = useState<boolean | null>(null);
   const [loadAttempted, setLoadAttempted] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('temp-project');
 
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -65,7 +66,7 @@ const Canvas = () => {
   
   // Initialize canvas state manager for race-condition-free state management
   const canvasStateManager = useCanvasStateManager({
-    projectId: projectSlug || 'default',
+    projectId: currentProjectId, // Use the current project ID state
     appState: {
       uploadedImages,
       analyses,
@@ -186,30 +187,39 @@ const Canvas = () => {
   // Load project by slug if provided - let AppContext handle general data loading
   const { user } = useAuth();
   useEffect(() => {
-    // Only handle specific project slug loading - AppContext handles general data loading
-    if (!projectSlug || loadAttempted) return;
+    // Handle both project slug loading and direct canvas access
+    if (loadAttempted) return;
     
     const loadProjectBySlug = async () => {
       try {
         setLoadAttempted(true);
-        console.log('Loading project by slug:', projectSlug);
-        const project = await SlugService.getProjectBySlug(projectSlug);
         
-        if (!project) {
-          console.error('Project not found for slug:', projectSlug);
-          toast.toast({
-            category: 'error',
-            title: "Project not found",
-            description: "The project you're looking for doesn't exist or you don't have access to it.",
-            variant: "destructive",
-          });
-          navigate('/projects');
-          return;
-        }
+        if (projectSlug) {
+          console.log('Loading project by slug:', projectSlug);
+          const project = await SlugService.getProjectBySlug(projectSlug);
+          
+          if (!project) {
+            console.error('Project not found for slug:', projectSlug);
+            toast.toast({
+              category: 'error',
+              title: "Project not found",
+              description: "The project you're looking for doesn't exist or you don't have access to it.",
+              variant: "destructive",
+            });
+            navigate('/projects');
+            return;
+          }
 
-        // Switch to the project and let AppContext load the data
-        await ProjectService.switchToProject(project.id);
-        console.log('Project switched, AppContext will handle data loading...');
+          // Switch to the project and let AppContext load the data
+          await ProjectService.switchToProject(project.id);
+          setCurrentProjectId(project.id); // Update the project ID for canvas state manager
+          console.log('Project switched, AppContext will handle data loading...');
+        } else {
+          // No project slug - get or create current project
+          const currentProject = await ProjectService.getCurrentProject();
+          setCurrentProjectId(currentProject);
+          console.log('Using current project:', currentProject);
+        }
       } catch (error) {
         console.error('Error loading project by slug:', error);
         toast.toast({

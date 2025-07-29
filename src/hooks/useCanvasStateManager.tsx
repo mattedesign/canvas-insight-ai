@@ -68,7 +68,7 @@ export function useCanvasStateManager({
 
   // Load initial canvas state
   useEffect(() => {
-    if (!projectId || isInitialized.current) return;
+    if (!projectId || projectId === 'temp-project' || isInitialized.current) return;
     
     const loadCanvasState = async () => {
       try {
@@ -138,6 +138,9 @@ export function useCanvasStateManager({
 
   // Perform auto-save
   const performAutoSave = useCallback(async () => {
+    // Don't save with temporary project ID
+    if (projectId === 'temp-project') return;
+    
     const now = Date.now();
     if (now - lastSaveTime.current < 1000) return; // Debounce saves
 
