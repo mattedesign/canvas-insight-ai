@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { DashboardMetrics } from '@/services/DashboardService';
 import { useWhyDidYouUpdate } from '@/hooks/useWhyDidYouUpdate';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,6 +69,10 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add this ref after state declarations
+  const projectsLoadedRef = useRef(false);
+  const lastMetricsRef = useRef<DashboardMetrics | null>(null);
 
   // Phase 5.1: Re-render detection for performance monitoring
   useWhyDidYouUpdate('Dashboard', {
@@ -109,12 +114,18 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch projects data separately for recent projects section
+  // Update the useEffect for fetching projects
   useEffect(() => {
+    // Skip if already loaded or no user
+    if (projectsLoadedRef.current || !user || metricsLoading) return;
+    
+    // Skip if metrics haven't changed
+    if (metrics === lastMetricsRef.current) return;
+    
     const fetchProjectsData = async () => {
-      if (!user) return;
-
       try {
+        projectsLoadedRef.current = true;
+        lastMetricsRef.current = metrics;
         setLoading(true);
         setError(metricsError);
 
@@ -160,10 +171,8 @@ const Dashboard = () => {
       }
     };
 
-    if (!metricsLoading) {
-      fetchProjectsData();
-    }
-  }, [user, metrics, metricsLoading, metricsError]);
+    fetchProjectsData();
+  }, [user?.id, metrics?.totalAnalyses]); // Specific dependencies
 
   if (loading || metricsLoading) {
     return (
