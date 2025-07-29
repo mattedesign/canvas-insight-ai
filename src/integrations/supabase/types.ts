@@ -292,6 +292,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_canvas_states_project_id"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       error_logs: {
@@ -372,6 +379,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_group_analyses_group_id"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "image_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "group_analyses_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
@@ -401,6 +415,20 @@ export type Database = {
           image_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_group_images_group_id"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "image_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_group_images_image_id"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "group_images_group_id_fkey"
             columns: ["group_id"]
@@ -446,6 +474,13 @@ export type Database = {
           project_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_image_groups_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "image_groups_project_id_fkey"
             columns: ["project_id"]
@@ -496,6 +531,13 @@ export type Database = {
           uploaded_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_images_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "images_project_id_fkey"
             columns: ["project_id"]
@@ -744,6 +786,13 @@ export type Database = {
           visual_annotations?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_ux_analyses_image_id"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ux_analyses_image_id_fkey"
             columns: ["image_id"]
