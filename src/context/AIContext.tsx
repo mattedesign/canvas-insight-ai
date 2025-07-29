@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { edgeFunctionLogger } from '@/services/EdgeFunctionLogger';
 
 interface AIContextType {
   selectedAIModel: 'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai';
@@ -59,6 +60,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       console.log('Starting AI analysis with model:', selectedAIModel);
       console.log('Analysis payload:', { imageId, imageUrl, imageName, userContext });
       
+      // Log edge function start
+      const requestId = await edgeFunctionLogger.logFunctionStart('ux-analysis', {
+        type: 'ANALYZE_IMAGE',
+        imageId,
+        imageName,
+        aiModel: selectedAIModel
+      });
+      
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
           type: 'ANALYZE_IMAGE',
@@ -71,6 +80,13 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           aiModel: selectedAIModel === 'auto' ? 'auto' : selectedAIModel
         }
       });
+      
+      // Log edge function completion
+      if (error) {
+        await edgeFunctionLogger.logFunctionEnd(requestId, null, new Error(error.message || 'Edge function error'));
+      } else {
+        await edgeFunctionLogger.logFunctionEnd(requestId, data);
+      }
       
       console.log('Edge function response:', { data, error });
 

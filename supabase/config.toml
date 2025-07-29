@@ -6,9 +6,6 @@ verify_jwt = false
 [functions.ux-analysis]
 verify_jwt = true
 
-[functions.google-vision-analysis]
-verify_jwt = false
-
 [functions.google-vision-metadata]
 verify_jwt = false
 
@@ -18,12 +15,6 @@ verify_jwt = true
 [functions.inpainting-service]
 verify_jwt = true
 
-[functions.claude-vision-analysis] 
-verify_jwt = false
-
-[functions.stability-ai-analysis]
-verify_jwt = false
-
 [functions.check-subscription]
 verify_jwt = false
 
@@ -31,7 +22,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.customer-portal]
-verify_jwt = false
-
-[functions.api-access]
 verify_jwt = false

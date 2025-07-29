@@ -237,16 +237,17 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
 
 // Multi-stage pipeline helper functions
 async function selectBestVisionModel(): Promise<string> {
-  const hasClaudeVision = !!Deno.env.get('ANTHROPIC_API_KEY');
   const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
+  const hasClaudeVision = !!Deno.env.get('ANTHROPIC_API_KEY');
   
-  // Prefer Claude for vision analysis, fallback to OpenAI
-  if (hasClaudeVision) {
-    console.log('Selected vision model: Claude');
-    return 'claude';
-  } else if (hasOpenAI) {
-    console.log('Selected vision model: OpenAI');
+  // Prefer OpenAI for vision analysis to avoid double Claude calls
+  // Reserve Claude for the comprehensive analysis stage
+  if (hasOpenAI) {
+    console.log('Selected vision model: OpenAI (avoiding double Claude calls)');
     return 'openai';
+  } else if (hasClaudeVision) {
+    console.log('Selected vision model: Claude (OpenAI not available)');
+    return 'claude';
   }
   
   console.log('No vision models available, using fallback');
