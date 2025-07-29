@@ -9,12 +9,25 @@ import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 const Subscription = () => {
   const navigate = useNavigate();
   const { 
-    uploadedImages, 
-    analyses, 
-    selectedImageId,
-    showAnnotations,
-    stableHelpers: { clearCanvas: handleClearCanvas }
+    state: {
+      uploadedImages,
+      analyses,
+      selectedImageId,
+      showAnnotations
+    },
+    stableHelpers: { clearCanvas }
   } = useSimplifiedAppContext();
+
+  // Create missing handler functions
+  const handleClearCanvas = () => clearCanvas();
+  const handleImageSelect = (imageId: string) => {
+    // This would normally dispatch an action, but for subscription page it's not needed
+    console.log('Image selected:', imageId);
+  };
+  const handleToggleAnnotations = () => {
+    // This would normally dispatch an action, but for subscription page it's not needed  
+    console.log('Toggle annotations');
+  };
   const { subscription } = useAuth();
 
   const { refreshMetrics } = useDashboardMetrics();
