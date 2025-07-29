@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useWhyDidYouUpdate } from '@/hooks/useWhyDidYouUpdate';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,40 @@ interface DashboardStats {
   }>;
 }
 
+// Memoized sub-components for better performance
+const StatsCard = React.memo<{
+  title: string;
+  value: number | string;
+  icon: React.ComponentType<{ className?: string }>;
+}>(({ title, value, icon: Icon }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <Icon className="h-4 w-4 text-muted-foreground" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold">{value}</div>
+    </CardContent>
+  </Card>
+));
+
+const RecentProjectItem = React.memo<{
+  project: { id: string; name: string; imageCount: number; updatedAt: string };
+  onOpen: (projectId: string) => void;
+}>(({ project, onOpen }) => (
+  <div className="flex items-center justify-between p-4 border rounded-lg">
+    <div>
+      <h3 className="font-medium">{project.name}</h3>
+      <p className="text-sm text-muted-foreground">
+        {project.imageCount} images • Updated {new Date(project.updatedAt).toLocaleDateString()}
+      </p>
+    </div>
+    <Button variant="outline" size="sm" onClick={() => onOpen(project.id)}>
+      Open
+    </Button>
+  </div>
+));
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
@@ -33,6 +68,18 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase 5.1: Re-render detection for performance monitoring
+  useWhyDidYouUpdate('Dashboard', {
+    user,
+    subscription,
+    metrics,
+    metricsLoading,
+    metricsError,
+    stats,
+    loading,
+    error
+  });
 
   const handleCreateProject = async () => {
     try {
@@ -220,47 +267,26 @@ const Dashboard = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.totalProjects || 0}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Images Analyzed</CardTitle>
-                  <Images className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.totalImages || 0}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">AI Analyses</CardTitle>
-                  <Lightbulb className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.totalAnalyses || 0}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Account Type</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {subscription?.subscription_tier || 'Free'}
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard
+                title="Total Projects"
+                value={stats?.totalProjects || 0}
+                icon={BarChart3}
+              />
+              <StatsCard
+                title="Images Analyzed"
+                value={stats?.totalImages || 0}
+                icon={Images}
+              />
+              <StatsCard
+                title="AI Analyses"
+                value={stats?.totalAnalyses || 0}
+                icon={Lightbulb}
+              />
+              <StatsCard
+                title="Account Type"
+                value={subscription?.subscription_tier || 'Free'}
+                icon={Users}
+              />
             </div>
 
             {/* Recent Projects */}
@@ -280,17 +306,11 @@ const Dashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     {stats?.recentProjects.map((project) => (
-                      <div key={project.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h3 className="font-medium">{project.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {project.imageCount} images • Updated {new Date(project.updatedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/canvas/${project.id}`)}>
-                          Open
-                        </Button>
-                      </div>
+                      <RecentProjectItem
+                        key={project.id}
+                        project={project}
+                        onOpen={(projectId) => navigate(`/canvas/${projectId}`)}
+                      />
                     ))}
                   </div>
                 )}
@@ -303,4 +323,5 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+// Memoize the main component to prevent unnecessary re-renders
+export default React.memo(Dashboard);
