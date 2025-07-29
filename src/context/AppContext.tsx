@@ -10,6 +10,8 @@ import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAnalysisRealtime } from '@/hooks/useAnalysisRealtime';
 import { AnalysisPerformanceService } from '@/services/AnalysisPerformanceService';
+import { atomicStateManager } from '@/services/AtomicStateManager';
+import { backgroundSyncService } from '@/services/BackgroundSyncService';
 
 interface AppContextType {
   // State
@@ -176,285 +178,349 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     onAnalysisStatusChange: handleAnalysisStatusChange
   });
 
-  // Add ref to track loading state and prevent race conditions
+  // Atomic state management refs
   const loadingRef = useRef(false);
+  const syncingRef = useRef(false);
+  const initializationRef = useRef(false);
 
-  // Load data from database when user authenticates
+  // Coordinated data loading with atomic state management
   useEffect(() => {
-    if (user && !isLoading && !loadingRef.current) {
-      // Only load if we don't have recent uploads in progress
-      const hasRecentUploads = uploadedImages.some(img => 
-        img.status === 'uploading' || img.status === 'syncing'
-      );
-      
-      if (!hasRecentUploads && !isUploading) {
-        loadDataFromDatabase();
-      }
+    if (user && !loadingRef.current && !initializationRef.current) {
+      initializationRef.current = true;
+      loadDataFromDatabase();
     } else if (!user) {
-      // Reset project ID when user logs out
-      ProjectService.resetProject();
-      // Clear state when user logs out
-      setUploadedImages([]);
-      setAnalyses([]);
-      setImageGroups([]);
-      setGroupAnalysesWithPrompts([]);
-      setGeneratedConcepts([]);
-      setGroupAnalyses([]);
-      setGroupPromptSessions([]);
-      loadingRef.current = false; // Reset loading flag
+      handleUserLogout();
     }
-  }, [user]); // Remove isUploading dependency to prevent unnecessary re-runs
+  }, [user]);
 
-  const loadDataFromDatabase = async () => {
-    // Prevent concurrent loading operations
-    if (loadingRef.current) {
-      console.log('Data loading already in progress, skipping...');
-      return;
-    }
+  const handleUserLogout = useCallback(async () => {
+    console.log('[AppContext] User logged out, clearing state...');
     
-    loadingRef.current = true;
-    setIsLoading(true);
+    // Use atomic state manager to ensure clean logout
+    await atomicStateManager.executeOperation(
+      'user-logout',
+      'CLEAR',
+      async () => {
+        // Reset project service
+        ProjectService.resetProject();
+        
+        // Clear all state atomically
+        setUploadedImages([]);
+        setAnalyses([]);
+        setImageGroups([]);
+        setGroupAnalysesWithPrompts([]);
+        setGeneratedConcepts([]);
+        setGroupAnalyses([]);
+        setGroupPromptSessions([]);
+        
+        // Reset refs
+        loadingRef.current = false;
+        syncingRef.current = false;
+        initializationRef.current = false;
+        
+        // Clear background sync queue
+        backgroundSyncService.clearCompleted();
+        
+        return { success: true };
+      },
+      10 // Highest priority
+    );
+  }, []);
+
+  const loadDataFromDatabase = useCallback(async () => {
+    const operationId = `load-data-${Date.now()}`;
     
-    try {
-      console.log('Loading data from database...');
-      const result = await DataMigrationService.loadAllFromDatabase();
-      if (result.success && result.data) {
-        console.log('Data loaded successfully:', {
-          images: result.data.uploadedImages.length,
-          analyses: result.data.analyses.length,
-          groups: result.data.imageGroups.length
-        });
-        
-        // Smart update: merge database data with current uploads, preserving blob URLs and File objects
-        updateAppStateFromDatabase(result.data);
-        
-        setImageGroups(result.data.imageGroups);
-        setGroupAnalysesWithPrompts(result.data.groupAnalysesWithPrompts);
-        setGeneratedConcepts(result.data.generatedConcepts);
-        setGroupAnalyses(result.data.groupAnalyses);
-        setGroupPromptSessions(result.data.groupPromptSessions);
-        
-        // Auto-select first image if none selected and we have images
-        if (!selectedImageId && result.data.uploadedImages.length > 0) {
-          setSelectedImageId(result.data.uploadedImages[0].id);
+    const result = await atomicStateManager.executeOperation(
+      operationId,
+      'LOAD',
+      async () => {
+        if (loadingRef.current) {
+          console.log('[AppContext] Data loading already in progress, skipping...');
+          throw new Error('Load already in progress');
         }
         
-        // Remove informational toast - this is routine data loading
-      } else {
-        console.log('No data found in database or loading failed');
-      }
-    } catch (error) {
-      console.error('Failed to load data from database:', error);
+        loadingRef.current = true;
+        setIsLoading(true);
+        
+        try {
+          console.log('[AppContext] Loading data from database...');
+          
+          // Save current state snapshot before loading
+          atomicStateManager.saveStateSnapshot({
+            uploadedImages,
+            analyses,
+            imageGroups,
+            groupAnalysesWithPrompts
+          }, operationId);
+          
+          const result = await DataMigrationService.loadAllFromDatabase();
+          
+          if (result.success && result.data) {
+            console.log('[AppContext] Data loaded successfully:', {
+              images: result.data.uploadedImages.length,
+              analyses: result.data.analyses.length,
+              groups: result.data.imageGroups.length
+            });
+            
+            // Update state atomically
+            updateAppStateFromDatabase(result.data);
+            setImageGroups(result.data.imageGroups);
+            setGroupAnalysesWithPrompts(result.data.groupAnalysesWithPrompts);
+            setGeneratedConcepts(result.data.generatedConcepts);
+            setGroupAnalyses(result.data.groupAnalyses);
+            setGroupPromptSessions(result.data.groupPromptSessions);
+            
+            // Auto-select first image if none selected
+            if (!selectedImageId && result.data.uploadedImages.length > 0) {
+              setSelectedImageId(result.data.uploadedImages[0].id);
+            }
+            
+            return result.data;
+          } else {
+            console.log('[AppContext] No data found in database');
+            return null;
+          }
+        } catch (error) {
+          console.error('[AppContext] Failed to load data from database:', error);
+          throw error;
+        } finally {
+          setIsLoading(false);
+          loadingRef.current = false;
+        }
+      },
+      8 // High priority
+    );
+
+    if (!result.success) {
+      console.error('[AppContext] Database loading failed:', result.error);
       toast({
         title: "Loading failed",
         description: "Could not load your data. You can continue working and sync later.",
         category: "error",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, selectedImageId, toast]);
 
-  const syncToDatabase = async () => {
-    if (!user) return;
+  const syncToDatabase = useCallback(async () => {
+    if (!user || syncingRef.current) return;
     
-    setIsSyncing(true);
-    try {
-      const result = await DataMigrationService.migrateAllToDatabase({
-        uploadedImages,
-        analyses,
-        imageGroups,
-        groupAnalysesWithPrompts
+    const operationId = `sync-to-db-${Date.now()}`;
+    
+    const result = await atomicStateManager.executeOperation(
+      operationId,
+      'SYNC',
+      async () => {
+        syncingRef.current = true;
+        setIsSyncing(true);
+        
+        try {
+          console.log('[AppContext] Starting database sync...');
+          
+          // Save state snapshot before sync
+          atomicStateManager.saveStateSnapshot({
+            uploadedImages,
+            analyses,
+            imageGroups,
+            groupAnalysesWithPrompts
+          }, operationId);
+          
+          const result = await DataMigrationService.migrateAllToDatabase({
+            uploadedImages,
+            analyses,
+            imageGroups,
+            groupAnalysesWithPrompts
+          });
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Sync failed');
+          }
+          
+          console.log('[AppContext] Database sync completed successfully');
+          return result;
+          
+        } finally {
+          setIsSyncing(false);
+          syncingRef.current = false;
+        }
+      },
+      7 // High priority for sync
+    );
+
+    if (result.success) {
+      toast({
+        title: "Synced successfully",
+        description: "Your data has been saved to the cloud.",
+        category: "success",
       });
-      
-      if (result.success) {
-        toast({
-          title: "Synced successfully",
-          description: "Your data has been saved to the cloud.",
-          category: "success",
-        });
-      } else {
-        throw new Error('Sync failed');
-      }
-    } catch (error) {
-      console.error('Failed to sync to database:', error);
+    } else {
+      console.error('[AppContext] Sync failed:', result.error);
       toast({
         title: "Sync failed",
         description: "Could not save your data. Please try again later.",
         category: "error",
+        variant: "destructive",
       });
-    } finally {
-      setIsSyncing(false);
     }
-  };
+  }, [user, uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, toast]);
 
   const handleImageUpload = useCallback(async (files: File[]) => {
-    const newImages: UploadedImage[] = [];
-    const newAnalyses: UXAnalysis[] = [];
-
-    setIsUploading(true);
+    const operationId = `upload-${Date.now()}`;
     
-    try {
-      // Remove informational upload progress toast
-
-      console.log('Starting upload process for', files.length, 'files');
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        console.log(`Processing file ${i + 1}/${files.length}:`, file.name);
+    const result = await atomicStateManager.executeOperation(
+      operationId,
+      'UPLOAD',
+      async () => {
+        setIsUploading(true);
         
-        // Generate proper UUID for database compatibility
-        const imageId = crypto.randomUUID();
+        try {
+          console.log('[AppContext] Starting atomic upload process for', files.length, 'files');
+          
+          // Save state snapshot before upload
+          atomicStateManager.saveStateSnapshot({
+            uploadedImages,
+            analyses,
+            imageGroups,
+            groupAnalysesWithPrompts
+          }, operationId);
 
-        // Get actual image dimensions first
-        const img = new Image();
-        const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-          const imageUrl = URL.createObjectURL(file);
-          img.onload = () => {
-            URL.revokeObjectURL(imageUrl); // Clean up
-            resolve({ width: img.naturalWidth, height: img.naturalHeight });
-          };
-          img.onerror = () => {
-            URL.revokeObjectURL(imageUrl);
-            reject(new Error('Failed to load image'));
-          };
-          img.src = imageUrl;
-        });
+          const newImages: UploadedImage[] = [];
+          const newAnalyses: UXAnalysis[] = [];
+          const backgroundTasks: string[] = [];
 
-        console.log('Image dimensions obtained:', dimensions);
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            console.log(`[AppContext] Processing file ${i + 1}/${files.length}:`, file.name);
+            
+            const imageId = crypto.randomUUID();
 
-        let imageUrl = URL.createObjectURL(file);
-        
-        // If user is authenticated, upload to Supabase Storage AND create DB record with better error handling
-        if (user) {
-          try {
-            console.log('User authenticated, uploading to Supabase...');
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            if (authUser) {
-              console.log('Getting current project...');
-              const projectId = await ProjectService.getCurrentProject();
-              console.log('Project ID obtained:', projectId);
-              
-              const fileName = `${authUser.id}/${imageId}/${file.name}`;
-              
-              // Check if file already exists to handle duplicates gracefully
-              const { data: existingFiles } = await supabase.storage
-                .from('images')
-                .list(`${authUser.id}/${imageId}`);
+            // Get image dimensions
+            const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+              const imageUrl = URL.createObjectURL(file);
+              const img = new Image();
+              img.onload = () => {
+                URL.revokeObjectURL(imageUrl);
+                resolve({ width: img.naturalWidth, height: img.naturalHeight });
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(imageUrl);
+                reject(new Error('Failed to load image'));
+              };
+              img.src = imageUrl;
+            });
 
-              let uploadSuccessful = false;
-              if (!existingFiles || existingFiles.length === 0) {
-                // Upload to storage
-                console.log('Uploading to storage with filename:', fileName);
-                const { error: uploadError } = await supabase.storage
-                  .from('images')
-                  .upload(fileName, file);
-
-                if (!uploadError) {
-                  uploadSuccessful = true;
-                  console.log('Storage upload successful');
-                } else if (uploadError.message?.includes('already exists')) {
-                  uploadSuccessful = true; // File already exists, that's okay
-                  console.log('File already exists in storage, continuing...');
-                } else {
-                  console.error('Storage upload failed:', uploadError);
-                  throw uploadError;
-                }
-              } else {
-                uploadSuccessful = true; // File already exists
-                console.log('File already exists in storage, continuing...');
-              }
-
-              if (uploadSuccessful) {
-                const { data: urlData } = supabase.storage
-                  .from('images')
-                  .getPublicUrl(fileName);
-                imageUrl = urlData.publicUrl;
-                console.log('Public URL obtained:', imageUrl);
-                
-                // Create image record in database with upsert to handle conflicts
-                console.log('Creating/updating image record in database...');
-                const { error: dbError } = await supabase
-                  .from('images')
-                  .upsert({
-                    id: imageId,
-                    project_id: projectId,
-                    filename: imageId, // Use imageId as filename for edge function compatibility
-                    original_name: file.name,
-                    storage_path: fileName,
-                    dimensions: dimensions,
-                    file_size: file.size,
-                    file_type: file.type
-                  }, {
-                    onConflict: 'id'
-                  });
+            let imageUrl = URL.createObjectURL(file);
+            
+            // Handle authenticated uploads with background processing
+            if (user) {
+              try {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (authUser) {
+                  const projectId = await ProjectService.getCurrentProject();
+                  const fileName = `${authUser.id}/${imageId}/${file.name}`;
                   
-                if (dbError) {
-                  console.error('Failed to create/update image record:', dbError);
-                  // Continue anyway - we can still analyze with the image URL
-                } else {
-                  console.log('Image record created/updated successfully:', imageId);
+                  // Upload to storage atomically
+                  const { error: uploadError } = await supabase.storage
+                    .from('images')
+                    .upload(fileName, file, { upsert: true });
+
+                  if (!uploadError) {
+                    const { data: urlData } = supabase.storage
+                      .from('images')
+                      .getPublicUrl(fileName);
+                    imageUrl = urlData.publicUrl;
+                    
+                    // Create database record
+                    await supabase
+                      .from('images')
+                      .upsert({
+                        id: imageId,
+                        project_id: projectId,
+                        filename: imageId,
+                        original_name: file.name,
+                        storage_path: fileName,
+                        dimensions: dimensions,
+                        file_size: file.size,
+                        file_type: file.type
+                      }, { onConflict: 'id' });
+
+                    console.log('[AppContext] Image uploaded and DB record created:', imageId);
+                  }
                 }
+              } catch (error) {
+                console.error('[AppContext] Upload failed, using local URL:', error);
               }
             }
-          } catch (error) {
-            console.error('Failed to upload to storage, using local URL:', error);
-          }
-        }
 
-        // Create uploaded image record with actual storage URL or local fallback
-        const uploadedImage: UploadedImage = {
-          id: imageId,
-          name: file.name,
-          url: imageUrl,
-          file,
-          dimensions,
-          status: 'completed',
-        };
+            // Create uploaded image record
+            const uploadedImage: UploadedImage = {
+              id: imageId,
+              name: file.name,
+              url: imageUrl,
+              file,
+              dimensions,
+              status: 'completed',
+            };
 
-        // Generate analysis with enhanced performance service
-        let analysis;
-        if (user) {
-          try {
-            console.log('Performing analysis with retry and caching...');
-            trackAnalysis(imageId); // Track for real-time updates
-            
-            const result = await AnalysisPerformanceService.performAnalysisWithRetry(
-              imageId,
-              imageUrl,
-              file.name,
-              ''
-            );
-            
-            if (result.success && result.analysis) {
-              analysis = result.analysis;
-              console.log('Analysis completed successfully with performance service');
+            newImages.push(uploadedImage);
+
+            // Queue background analysis generation
+            if (user) {
+              const syncTaskId = await backgroundSyncService.queueAnalysisGeneration(
+                imageId,
+                imageUrl,
+                file.name,
+                ''
+              );
+              backgroundTasks.push(syncTaskId);
+              
+              // Create placeholder analysis
+              const placeholderAnalysis = generateMockAnalysis(imageId, file.name, imageUrl);
+              placeholderAnalysis.status = 'processing';
+              newAnalyses.push(placeholderAnalysis);
+              
+              trackAnalysis(imageId);
             } else {
-              throw new Error(result.error || 'Analysis failed');
+              // Use mock analysis for non-authenticated users
+              newAnalyses.push(generateMockAnalysis(imageId, file.name, imageUrl));
             }
-          } catch (error) {
-            console.error('Performance service analysis failed, using mock:', error);
-            analysis = generateMockAnalysis(imageId, file.name, imageUrl);
           }
-        } else {
-          console.log('User not authenticated, using mock analysis');
-          analysis = generateMockAnalysis(imageId, file.name, imageUrl);
+
+          console.log('[AppContext] Atomically updating state with new images...');
+          
+          // Update state atomically
+          setUploadedImages(prev => [...prev, ...newImages]);
+          setAnalyses(prev => [...prev, ...newAnalyses]);
+          
+          // Auto-select first image if none selected
+          if (!selectedImageId && newImages.length > 0) {
+            setSelectedImageId(newImages[0].id);
+          }
+
+          return { newImages, newAnalyses, backgroundTasks };
+          
+        } finally {
+          setIsUploading(false);
         }
+      },
+      9 // Very high priority for uploads
+    );
 
-        newImages.push(uploadedImage);
-        newAnalyses.push(analysis);
-        console.log(`Completed processing file ${i + 1}/${files.length}`);
-      }
-
-      console.log('All files processed, updating state...');
-      setUploadedImages(prev => [...prev, ...newImages]);
-      setAnalyses(prev => [...prev, ...newAnalyses]);
+    if (result.success) {
+      console.log('[AppContext] Upload completed successfully');
       
-      // Auto-select first image if none selected
-      if (!selectedImageId && newImages.length > 0) {
-        setSelectedImageId(newImages[0].id);
-      }
+      // Set up background sync event handlers
+      backgroundSyncService.setEventHandlers({
+        onSyncComplete: (syncResult) => {
+          if (syncResult.success && syncResult.data) {
+            console.log('[AppContext] Background analysis completed:', syncResult.operationId);
+            handleAnalysisComplete(syncResult.data.imageId, syncResult.data);
+          }
+        },
+        onSyncError: (operationId, error) => {
+          console.error('[AppContext] Background sync failed:', operationId, error);
+        }
+      });
 
       // Show success feedback for upload completion
       toast({
@@ -462,21 +528,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} and generated analyses.`,
         category: "success",
       });
-
-      // Note: Removed auto-sync to prevent database conflicts
-      // Users can manually sync via the interface when ready
-      console.log('Upload complete. Manual sync available via interface.');
-      
-    } catch (error) {
-      console.error('Upload process failed:', error);
+    } else {
+      console.error('[AppContext] Upload failed:', result.error);
       toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to process images. Please try again.",
+        title: "Upload failed", 
+        description: result.error || "Unknown error occurred",
         category: "error",
+        variant: "destructive"
       });
-    } finally {
-      console.log('Upload process completed, setting isUploading to false');
-      setIsUploading(false);
     }
   }, [selectedImageId, user, toast]);
 
