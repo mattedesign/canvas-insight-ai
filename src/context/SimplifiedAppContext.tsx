@@ -69,12 +69,22 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   // Use refs for stable function references that don't cause re-renders
   const isInitializedRef = useRef(false);
 
-  // PHASE 3.1: Stable helper functions using loading state machine
+  // PHASE 1.2: Create truly stable helper functions using useRef pattern
+  const userRef = useRef(user);
+  const toastRef = useRef(toast);
+  const loadingMachineRef = useRef(loadingMachine);
+
+  // Update refs without causing re-renders
+  userRef.current = user;
+  toastRef.current = toast;
+  loadingMachineRef.current = loadingMachine;
+
+  // PHASE 1.2: Stable helper functions with EMPTY dependencies (no re-render triggers)
   const stableHelpers = useMemo<StableHelpers>(() => ({
     loadData: async (): Promise<void> => {
-      if (!user || loadingMachine.state.appData === 'loading') return;
+      if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
       
-      loadingMachine.actions.startAppLoad();
+      loadingMachineRef.current.actions.startAppLoad();
       
       try {
         const migrationResult = await DataMigrationService.loadAllFromDatabase();
@@ -92,7 +102,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             meta: { forceReplace: false } 
           });
           
-          loadingMachine.actions.appLoadSuccess();
+          loadingMachineRef.current.actions.appLoadSuccess();
         } else {
           throw new Error('No data available or load failed');
         }
@@ -100,9 +110,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
         console.error('[SimplifiedAppContext] Failed to load data:', error);
         
-        loadingMachine.actions.appLoadError(errorMessage);
+        loadingMachineRef.current.actions.appLoadError(errorMessage);
         
-        toast({
+        toastRef.current({
           title: "Failed to load data",
           description: "Error loading your data. Please try refreshing.",
           variant: "destructive",
@@ -112,12 +122,11 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     },
 
     syncData: async (): Promise<void> => {
-      if (!user || loadingMachine.state.sync === 'loading') return;
+      if (!userRef.current || loadingMachineRef.current.state.sync === 'loading') return;
       
-      loadingMachine.actions.startSync();
+      loadingMachineRef.current.actions.startSync();
       
       try {
-        // PHASE 3.2: Event-driven approach - reload from database instead of accessing state
         const migrationResult = await DataMigrationService.loadAllFromDatabase();
         
         if (migrationResult.success && migrationResult.data) {
@@ -127,9 +136,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             meta: { forceReplace: false } 
           });
           
-          loadingMachine.actions.syncSuccess();
+          loadingMachineRef.current.actions.syncSuccess();
           
-          toast({
+          toastRef.current({
             title: "Sync complete",
             description: "Your data has been synchronized with the cloud.",
             category: "success"
@@ -142,9 +151,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         const errorMessage = error instanceof Error ? error.message : 'Sync failed';
         console.error('[SimplifiedAppContext] Sync failed:', error);
         
-        loadingMachine.actions.syncError(errorMessage);
+        loadingMachineRef.current.actions.syncError(errorMessage);
         
-        toast({
+        toastRef.current({
           title: "Sync failed",
           description: "Failed to save data. Please try again.",
           variant: "destructive",
@@ -156,9 +165,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     },
 
     uploadImages: async (files: File[]): Promise<void> => {
-      if (loadingMachine.state.imageUpload === 'loading') return;
+      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
       
-      loadingMachine.actions.startUpload();
+      loadingMachineRef.current.actions.startUpload();
       
       try {
         const newImages: UploadedImage[] = [];
@@ -194,9 +203,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         
         dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
         
-        loadingMachine.actions.uploadSuccess();
+        loadingMachineRef.current.actions.uploadSuccess();
 
-        toast({
+        toastRef.current({
           title: "Upload complete",
           description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
           category: "success"
@@ -206,9 +215,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         const errorMessage = error instanceof Error ? error.message : 'Upload failed';
         console.error('[SimplifiedAppContext] Upload failed:', error);
         
-        loadingMachine.actions.uploadError(errorMessage);
+        loadingMachineRef.current.actions.uploadError(errorMessage);
         
-        toast({
+        toastRef.current({
           title: "Upload failed", 
           description: "Failed to upload images. Please try again.",
           variant: "destructive",
@@ -218,9 +227,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     },
 
     uploadImagesImmediate: async (files: File[]): Promise<void> => {
-      if (loadingMachine.state.imageUpload === 'loading') return;
+      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
       
-      loadingMachine.actions.startUpload();
+      loadingMachineRef.current.actions.startUpload();
 
       try {
         const newImages: UploadedImage[] = [];
@@ -256,9 +265,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         
         dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
         
-        loadingMachine.actions.uploadSuccess();
+        loadingMachineRef.current.actions.uploadSuccess();
 
-        toast({
+        toastRef.current({
           title: "Upload complete",
           description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
           category: "success"
@@ -267,9 +276,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         const errorMessage = error instanceof Error ? error.message : 'Immediate upload failed';
         console.error('Error in immediate image upload:', error);
         
-        loadingMachine.actions.uploadError(errorMessage);
+        loadingMachineRef.current.actions.uploadError(errorMessage);
         
-        toast({
+        toastRef.current({
           title: "Upload error",
           description: "Some images failed to load properly. Please try again.",
           category: "error"
@@ -296,7 +305,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       dispatch({ type: 'ADD_GROUP', payload: newGroup });
       
-      toast({
+      toastRef.current({
         title: "Group Created",
         description: `Created group "${name}" with ${imageIds.length} images`,
         category: "success"
@@ -304,9 +313,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     },
 
     generateConcept: async (prompt: string, selectedImages?: string[]): Promise<void> => {
-      if (loadingMachine.state.conceptGeneration === 'loading') return;
+      if (loadingMachineRef.current.state.conceptGeneration === 'loading') return;
       
-      loadingMachine.actions.startConceptGeneration();
+      loadingMachineRef.current.actions.startConceptGeneration();
       
       try {
         const conceptId = `concept-${Date.now()}`;
@@ -322,9 +331,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
 
         dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
         
-        loadingMachine.actions.conceptGenerationSuccess();
+        loadingMachineRef.current.actions.conceptGenerationSuccess();
         
-        toast({
+        toastRef.current({
           title: "Concept Generated",
           description: "New concept has been generated successfully",
           category: "success"
@@ -333,9 +342,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
         const errorMessage = error instanceof Error ? error.message : 'Concept generation failed';
         console.error('Concept generation failed:', error);
         
-        loadingMachine.actions.conceptGenerationError(errorMessage);
+        loadingMachineRef.current.actions.conceptGenerationError(errorMessage);
         
-        toast({
+        toastRef.current({
           title: "Generation Failed",
           description: "Failed to generate concept. Please try again.",
           variant: "destructive",
@@ -347,7 +356,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     clearCanvas: () => {
       dispatch({ type: 'RESET_STATE' });
     }
-  }), [user, toast, loadingMachine.state, loadingMachine.actions]); // PHASE 3.1: Added loading machine dependencies
+  }), []); // PHASE 1.2 CRITICAL FIX: EMPTY dependencies - truly stable
 
   // PHASE 3.2: Load initial data when user logs in - ONE TIME EFFECT
   useEffect(() => {
