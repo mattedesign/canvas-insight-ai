@@ -1,5 +1,5 @@
-import { supabase } from '@/integrations/supabase/client';
-import { ProjectService } from './DataMigrationService';
+// Canvas State Service - isolated to avoid Supabase type recursion
+// Using direct HTTP calls to bypass TypeScript type inference issues
 
 export interface CanvasState {
   id?: string;
@@ -26,15 +26,56 @@ export class CanvasStateService {
   private static saveDebounceTimer: NodeJS.Timeout | null = null;
   private static readonly SAVE_DEBOUNCE_MS = 1000;
   
-  // Save canvas state to database with debouncing
+  // Get minimal HTTP client to avoid all Supabase type inference
+  private static getClient() {
+    const SUPABASE_URL = "https://sdcmbfdtafkzpimwjpij.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkY21iZmR0YWZrenBpbXdqcGlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1NTc1MDEsImV4cCI6MjA2OTEzMzUwMX0.aYBZucbfmPjABOjmVjXd96eSeZHKAhnq2QOj4K4FWKM";
+    
+    return {
+      async request(method: string, endpoint: string, body?: any) {
+        const token = localStorage.getItem('sb-sdcmbfdtafkzpimwjpij-auth-token');
+        const authData = token ? JSON.parse(token) : null;
+        const accessToken = authData?.access_token || SUPABASE_KEY;
+        
+        const response = await fetch(`${SUPABASE_URL}${endpoint}`, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': method === 'POST' ? 'return=representation' : undefined
+          },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+      },
+      
+      async getCurrentUser() {
+        try {
+          const token = localStorage.getItem('sb-sdcmbfdtafkzpimwjpij-auth-token');
+          if (!token) throw new Error('No auth token');
+          
+          const authData = JSON.parse(token);
+          return { user: authData.user, error: null };
+        } catch (error) {
+          return { user: null, error };
+        }
+      }
+    };
+  }
+
+  // Save canvas state with debouncing
   static async saveCanvasState(state: Omit<CanvasState, 'id' | 'project_id' | 'user_id' | 'updated_at'>) {
     return new Promise((resolve) => {
-      // Clear existing timer
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
       }
 
-      // Set new timer
       this.saveDebounceTimer = setTimeout(async () => {
         try {
           const result = await this.saveCanvasStateImmediate(state);
@@ -46,74 +87,68 @@ export class CanvasStateService {
     });
   }
 
-  // Save canvas state immediately - using direct SQL to avoid type issues
+  // Save canvas state immediately
   static async saveCanvasStateImmediate(state: Omit<CanvasState, 'id' | 'project_id' | 'user_id' | 'updated_at'>) {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) throw new Error('User not authenticated');
+      const client = this.getClient();
+      const { user } = await client.getCurrentUser();
+      
+      if (!user) throw new Error('User not authenticated');
 
-      const projectId = await ProjectService.getCurrentProject();
+      // Get project ID from localStorage or default
+      const projectId = localStorage.getItem('current_project_id') || user.id;
 
-      // Direct upsert with explicit typing
-      const { data, error } = await supabase
-        .from('canvas_states')
-        .upsert({
-          project_id: projectId,
-          user_id: authData.user.id,
-          nodes: state.nodes,
-          edges: state.edges,
-          viewport: state.viewport,
-          ui_state: state.ui_state
-        })
-        .select('*');
+      const payload = {
+        project_id: projectId,
+        user_id: user.id,
+        nodes: state.nodes,
+        edges: state.edges,
+        viewport: state.viewport,
+        ui_state: state.ui_state
+      };
 
-      if (error) throw error;
+      const result = await client.request(
+        'POST', 
+        '/rest/v1/canvas_states?on_conflict=project_id,user_id',
+        payload
+      );
       
       // Cache locally for instant loading
-      if (data && data[0]) {
-        this.cacheCanvasState(projectId, data[0] as unknown as CanvasState);
+      if (result && result[0]) {
+        this.cacheCanvasState(projectId, result[0] as CanvasState);
       }
       
-      return { success: true, data: data?.[0] };
+      return { success: true, data: result?.[0] };
     } catch (error) {
       console.error('Failed to save canvas state:', error);
       return { success: false, error };
     }
   }
 
-  // Load canvas state from database - using direct SQL to avoid type issues
+  // Load canvas state from database
   static async loadCanvasState(): Promise<CanvasState | null> {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) throw new Error('User not authenticated');
+      const client = this.getClient();
+      const { user } = await client.getCurrentUser();
+      
+      if (!user) throw new Error('User not authenticated');
 
-      const projectId = await ProjectService.getCurrentProject();
+      const projectId = localStorage.getItem('current_project_id') || user.id;
       
       // Try cache first for instant loading
       const cached = this.getCachedCanvasState(projectId);
       
-      // Break the type recursion by completely avoiding the problematic query builder
       try {
-        const query = supabase.from('canvas_states');
-        const selectQuery = query.select('*');
-        const projectQuery = selectQuery.eq('project_id', projectId);
-        const userQuery = projectQuery.eq('user_id', authData.user.id);
-        const limitQuery = userQuery.limit(1);
-        const result = await limitQuery;
+        const result = await client.request(
+          'GET',
+          `/rest/v1/canvas_states?project_id=eq.${projectId}&user_id=eq.${user.id}&limit=1`
+        );
         
-        const data = result.data;
-        const error = result.error;
-
-        if (error) {
-          console.error('Failed to load canvas state:', error);
+        if (!result || result.length === 0) {
           return cached;
         }
 
-        if (!data || data.length === 0) {
-          return cached;
-        }
-
-        const canvasState = data[0] as unknown as CanvasState;
+        const canvasState = result[0] as CanvasState;
         
         // Cache the latest data
         this.cacheCanvasState(projectId, canvasState);
@@ -127,9 +162,8 @@ export class CanvasStateService {
       console.error('Failed to load canvas state:', error);
       // Return cached data as fallback
       try {
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData.user) {
-          const projectId = await ProjectService.getCurrentProject();
+        const projectId = localStorage.getItem('current_project_id');
+        if (projectId) {
           return this.getCachedCanvasState(projectId);
         }
       } catch {
@@ -189,14 +223,16 @@ export class CanvasStateService {
 
   // Create default canvas state
   static async createDefaultState(sessionName?: string): Promise<CanvasState> {
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) throw new Error('User not authenticated');
+    const client = this.getClient();
+    const { user } = await client.getCurrentUser();
+    
+    if (!user) throw new Error('User not authenticated');
 
-    const projectId = await ProjectService.getCurrentProject();
+    const projectId = localStorage.getItem('current_project_id') || user.id;
     
     return {
       project_id: projectId,
-      user_id: authData.user.id,
+      user_id: user.id,
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -209,22 +245,20 @@ export class CanvasStateService {
     };
   }
 
-  // Clear canvas state for new session - using direct SQL to avoid type issues
+  // Clear canvas state for new session
   static async clearCanvasState(): Promise<void> {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) throw new Error('User not authenticated');
+      const client = this.getClient();
+      const { user } = await client.getCurrentUser();
+      
+      if (!user) throw new Error('User not authenticated');
 
-      const projectId = await ProjectService.getCurrentProject();
+      const projectId = localStorage.getItem('current_project_id') || user.id;
 
-      // Direct delete with explicit typing
-      const { error } = await supabase
-        .from('canvas_states')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('user_id', authData.user.id);
-
-      if (error) throw error;
+      await client.request(
+        'DELETE',
+        `/rest/v1/canvas_states?project_id=eq.${projectId}&user_id=eq.${user.id}`
+      );
 
       // Clear local cache for this project
       this.clearCache(projectId);
