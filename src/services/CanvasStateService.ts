@@ -1,46 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectService } from './DataMigrationService';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-// Create a proper type override that extends the Database type
-// This maintains type safety while fixing the recursion issue
-type NonRecursiveJson = 
-  | string 
-  | number 
-  | boolean 
-  | null 
-  | { [key: string]: any }
-  | any[];
-
-// Override just the canvas_states table with safe types
-interface CanvasStateRow {
-  id: string;
-  project_id: string | null;
-  user_id: string;
-  nodes: NonRecursiveJson;
-  edges: NonRecursiveJson;
-  viewport: NonRecursiveJson;
-  ui_state: NonRecursiveJson;
-  node_positions: NonRecursiveJson;
-  selected_nodes: NonRecursiveJson;
-  canvas_settings: NonRecursiveJson;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-interface CanvasStateInsert {
-  id?: string;
-  project_id?: string | null;
-  user_id?: string;
-  nodes?: NonRecursiveJson;
-  edges?: NonRecursiveJson;
-  viewport?: NonRecursiveJson;
-  ui_state?: NonRecursiveJson;
-  node_positions?: NonRecursiveJson;
-  selected_nodes?: NonRecursiveJson;
-  canvas_settings?: NonRecursiveJson;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
+// Use native Supabase types
+type CanvasStateRow = Tables<'canvas_states'>;
+type CanvasStateInsert = TablesInsert<'canvas_states'>;
 
 export interface CanvasState {
   id?: string;
@@ -64,27 +28,29 @@ export interface CanvasState {
 
 export class CanvasStateService {
   private static readonly STORAGE_KEY = 'canvas_state_cache';
-  private static saveDebounceTimer: NodeJS.Timeout | null = null;
-  private static readonly SAVE_DEBOUNCE_MS = 1000;
   
-  // Save canvas state to database with debouncing
+  // Save canvas state to database with optimistic updates (no debouncing)
   static async saveCanvasState(state: Omit<CanvasState, 'id' | 'project_id' | 'user_id' | 'updated_at'>) {
-    return new Promise((resolve) => {
-      // Clear existing timer
-      if (this.saveDebounceTimer) {
-        clearTimeout(this.saveDebounceTimer);
-      }
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) throw new Error('User not authenticated');
 
-      // Set new timer
-      this.saveDebounceTimer = setTimeout(async () => {
-        try {
-          const result = await this.saveCanvasStateImmediate(state);
-          resolve(result);
-        } catch (error) {
-          resolve({ success: false, error });
-        }
-      }, this.SAVE_DEBOUNCE_MS);
-    });
+      const projectId = await ProjectService.getCurrentProject();
+
+      // Optimistically cache the state immediately
+      const optimisticState: CanvasState = {
+        project_id: projectId,
+        user_id: authData.user.id,
+        ...state
+      };
+      this.cacheCanvasState(projectId, optimisticState);
+
+      // Then persist to database
+      return await this.saveCanvasStateImmediate(state);
+    } catch (error) {
+      console.error('Failed to save canvas state:', error);
+      return { success: false, error };
+    }
   }
 
   // Save canvas state immediately with proper typing
@@ -95,22 +61,21 @@ export class CanvasStateService {
 
       const projectId = await ProjectService.getCurrentProject();
 
-      // Use type assertion only for the upsert data, maintaining type safety elsewhere
+      // Create upsert data with proper JSON types
       const upsertData: CanvasStateInsert = {
         project_id: projectId,
         user_id: authData.user.id,
-        nodes: state.nodes as NonRecursiveJson,
-        edges: state.edges as NonRecursiveJson,
-        viewport: state.viewport as NonRecursiveJson,
-        ui_state: state.ui_state as NonRecursiveJson
+        nodes: state.nodes as any,
+        edges: state.edges as any,
+        viewport: state.viewport as any,
+        ui_state: state.ui_state as any
       };
 
-      // Use the typed approach with our custom interface
+      // Use native Supabase types without .returns override
       const { data, error } = await supabase
         .from('canvas_states')
         .upsert(upsertData)
-        .select('*')
-        .returns<CanvasStateRow[]>();
+        .select('*');
 
       if (error) throw error;
       
@@ -139,14 +104,13 @@ export class CanvasStateService {
       const cached = this.getCachedCanvasState(projectId);
       
       try {
-        // Use typed query with our custom interface
+        // Use native Supabase types
         const { data, error } = await supabase
           .from('canvas_states')
           .select('*')
           .eq('project_id', projectId)
           .eq('user_id', authData.user.id)
-          .limit(1)
-          .returns<CanvasStateRow[]>();
+          .limit(1);
 
         if (error) {
           console.error('Failed to load canvas state:', error);
@@ -295,11 +259,8 @@ export class CanvasStateService {
     }
   }
 
-  // Clean up timers
+  // No cleanup needed since we removed debouncing
   static cleanup(): void {
-    if (this.saveDebounceTimer) {
-      clearTimeout(this.saveDebounceTimer);
-      this.saveDebounceTimer = null;
-    }
+    // Reserved for future cleanup operations
   }
 }

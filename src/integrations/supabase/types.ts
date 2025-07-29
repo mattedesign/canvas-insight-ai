@@ -257,31 +257,43 @@ export type Database = {
         Row: {
           canvas_settings: Json
           created_at: string | null
+          edges: Json
           id: string
           node_positions: Json
+          nodes: Json
           project_id: string | null
           selected_nodes: Json
+          ui_state: Json
           updated_at: string | null
+          user_id: string
           viewport: Json
         }
         Insert: {
           canvas_settings?: Json
           created_at?: string | null
+          edges?: Json
           id?: string
           node_positions?: Json
+          nodes?: Json
           project_id?: string | null
           selected_nodes?: Json
+          ui_state?: Json
           updated_at?: string | null
+          user_id: string
           viewport?: Json
         }
         Update: {
           canvas_settings?: Json
           created_at?: string | null
+          edges?: Json
           id?: string
           node_positions?: Json
+          nodes?: Json
           project_id?: string | null
           selected_nodes?: Json
+          ui_state?: Json
           updated_at?: string | null
+          user_id?: string
           viewport?: Json
         }
         Relationships: [
