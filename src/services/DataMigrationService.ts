@@ -7,42 +7,65 @@ export class ProjectService {
   private static currentProjectId: string | null = null;
 
   static async getCurrentProject() {
-    if (this.currentProjectId) return this.currentProjectId;
+    try {
+      if (this.currentProjectId) {
+        console.log('[ProjectService] Using cached project ID:', this.currentProjectId);
+        return this.currentProjectId;
+      }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('[ProjectService] User not authenticated');
+        throw new Error('User not authenticated');
+      }
 
-    // Get or create default project for user
-    const { data: projects, error } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1);
+      console.log('[ProjectService] Looking for existing projects for user:', user.id);
 
-    if (error) throw error;
+      // Get or create default project for user
+      const { data: projects, error } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
 
-    if (projects && projects.length > 0) {
-      this.currentProjectId = projects[0].id;
+      if (error) {
+        console.error('[ProjectService] Error fetching projects:', error);
+        throw error;
+      }
+
+      if (projects && projects.length > 0) {
+        this.currentProjectId = projects[0].id;
+        console.log('[ProjectService] Found existing project:', this.currentProjectId);
+        return this.currentProjectId;
+      }
+
+      console.log('[ProjectService] No projects found, creating default project...');
+
+      // Create default project with slug
+      const slug = await SlugService.generateUniqueSlug('Default Project');
+      const { data: newProject, error: createError } = await supabase
+        .from('projects')
+        .insert({
+          user_id: user.id,
+          name: 'Default Project',
+          description: 'Your UX analysis workspace',
+          slug
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('[ProjectService] Error creating project:', createError);
+        throw createError;
+      }
+      
+      this.currentProjectId = newProject.id;
+      console.log('[ProjectService] Created new project:', this.currentProjectId);
       return this.currentProjectId;
+    } catch (error) {
+      console.error('[ProjectService] getCurrentProject failed:', error);
+      throw error;
     }
-
-    // Create default project with slug
-    const slug = await SlugService.generateUniqueSlug('Default Project');
-    const { data: newProject, error: createError } = await supabase
-      .from('projects')
-      .insert({
-        user_id: user.id,
-        name: 'Default Project',
-        description: 'Your UX analysis workspace',
-        slug
-      })
-      .select('id')
-      .single();
-
-    if (createError) throw createError;
-    
-    this.currentProjectId = newProject.id;
-    return this.currentProjectId;
   }
 
   static async getAllProjects() {
@@ -262,34 +285,49 @@ export class ImageMigrationService {
 
   // Load images from database back to UploadedImage format
   static async loadImagesFromDatabase(): Promise<UploadedImage[]> {
-    const projectId = await ProjectService.getCurrentProject();
-    
-    const { data: images, error } = await supabase
-      .from('images')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('uploaded_at', { ascending: false });
-
-    if (error) throw error;
-    if (!images) return [];
-
-    return images.map(img => {
-      // Get public URL for the image
-      const { data: urlData } = supabase.storage
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      console.log('[ImageMigrationService] Loading images for project:', projectId);
+      
+      const { data: images, error } = await supabase
         .from('images')
-        .getPublicUrl(img.storage_path);
+        .select('*')
+        .eq('project_id', projectId)
+        .order('uploaded_at', { ascending: false });
 
-      // Create a minimal File object for backward compatibility
-      const emptyFile = new File([], img.original_name, { type: 'image/*' });
+      if (error) {
+        console.error('[ImageMigrationService] Error loading images:', error);
+        throw error;
+      }
 
-      return {
-        id: img.id,
-        name: img.original_name,
-        url: urlData.publicUrl,
-        file: emptyFile, // Canvas components use URL, not File content
-        dimensions: img.dimensions as { width: number; height: number }
-      };
-    });
+      if (!images || images.length === 0) {
+        console.log('[ImageMigrationService] No images found for project:', projectId);
+        return [];
+      }
+
+      console.log('[ImageMigrationService] Found', images.length, 'images');
+
+      return images.map(img => {
+        // Get public URL for the image
+        const { data: urlData } = supabase.storage
+          .from('images')
+          .getPublicUrl(img.storage_path);
+
+        // Create a minimal File object for backward compatibility
+        const emptyFile = new File([], img.original_name, { type: 'image/*' });
+
+        return {
+          id: img.id,
+          name: img.original_name,
+          url: urlData.publicUrl,
+          file: emptyFile, // Canvas components use URL, not File content
+          dimensions: img.dimensions as { width: number; height: number }
+        };
+      });
+    } catch (error) {
+      console.error('[ImageMigrationService] loadImagesFromDatabase failed:', error);
+      return [];
+    }
   }
 }
 
@@ -553,12 +591,21 @@ export class DataMigrationService {
   // Load all data from database back to in-memory format
   static async loadAllFromDatabase() {
     try {
+      console.log('[DataMigrationService] Starting data load from database...');
+      
       const [images, analyses, groups, groupAnalyses] = await Promise.all([
         ImageMigrationService.loadImagesFromDatabase(),
         AnalysisMigrationService.loadAnalysesFromDatabase(),
         GroupMigrationService.loadGroupsFromDatabase(),
         GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase()
       ]);
+
+      console.log('[DataMigrationService] Data load completed:', {
+        images: images.length,
+        analyses: analyses.length,
+        groups: groups.length,
+        groupAnalyses: groupAnalyses.length
+      });
 
       return {
         success: true,
@@ -574,8 +621,8 @@ export class DataMigrationService {
         }
       };
     } catch (error) {
-      console.error('Loading from database failed:', error);
-      return { success: false, error };
+      console.error('[DataMigrationService] Loading from database failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
