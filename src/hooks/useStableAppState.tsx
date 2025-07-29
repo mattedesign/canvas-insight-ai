@@ -4,7 +4,7 @@
  */
 
 import { useContext, useMemo, useCallback } from 'react';
-import { AppContext } from '@/context/AppContext';
+import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import type { AppState, UploadedImage, LegacyUXAnalysis as UXAnalysis } from '@/context/AppStateTypes';
 
 interface StableAppStateReturn {
@@ -32,13 +32,7 @@ interface StableAppStateReturn {
 }
 
 export const useStableAppState = (): StableAppStateReturn => {
-  const context = useContext(AppContext);
-  
-  if (!context) {
-    throw new Error('useStableAppState must be used within AppProvider');
-  }
-  
-  const { state, actions, handleImageUpload, syncToDatabase, loadDataFromDatabase } = context;
+  const { state, stableHelpers } = useSimplifiedAppContext();
   
   // Memoized selectors to prevent object recreation
   const getImageById = useCallback((id: string) => {
