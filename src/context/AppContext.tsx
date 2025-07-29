@@ -407,7 +407,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         createdAt: new Date()
       };
 
-      dispatch({ type: 'SET_GENERATED_CONCEPTS', payload: [concept] });
+      dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
       
       toast({
         title: "Concept Generated",

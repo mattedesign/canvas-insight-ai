@@ -6,8 +6,8 @@
 import { useContext, useMemo } from 'react';
 import type { AppState, StateSelector } from '@/context/AppStateTypes';
 
-// We'll import the actual context once we create it
-import { AppContext } from '@/context/AppContextRefactored';
+// Import the actual context
+import { AppContext } from '@/context/AppContext';
 
 export function useAppState(): AppState;
 export function useAppState<T>(selector: StateSelector<T>): T;
