@@ -108,6 +108,7 @@ export function useCanvasStateManager({
 
   // Initialize canvas from app state
   const initializeFromAppState = useCallback(() => {
+    console.log('Initializing canvas from app state with', appState.uploadedImages.length, 'images');
     const initialState: CanvasState = {
       nodes: generateNodesFromAppState(appState),
       edges: generateEdgesFromAppState(appState),
@@ -122,6 +123,7 @@ export function useCanvasStateManager({
     
     setCanvasState(initialState);
     undoRedoManager.saveState(initialState.nodes, initialState.edges);
+    isInitialized.current = true; // Mark as initialized here too
   }, [appState, undoRedoManager]);
 
   // Auto-save mechanism
@@ -370,20 +372,36 @@ export function useCanvasStateManager({
   useEffect(() => {
     if (!isInitialized.current) return;
     
-    const newNodes = generateNodesFromAppState(appState, 
-      canvasState.nodes.reduce((acc, node) => {
-        acc[node.id] = node.position;
-        return acc;
-      }, {} as Record<string, { x: number; y: number }>)
-    );
+    // Preserve existing node positions
+    const existingPositions = canvasState.nodes.reduce((acc, node) => {
+      acc[node.id] = node.position;
+      return acc;
+    }, {} as Record<string, { x: number; y: number }>);
     
+    const newNodes = generateNodesFromAppState(appState, existingPositions);
     const newEdges = generateEdgesFromAppState(appState);
     
-    updateCanvasState({
-      nodes: newNodes,
-      edges: newEdges
-    });
-  }, [appState.uploadedImages, appState.analyses, appState.imageGroups]);
+    // Only update if there are actual changes to prevent infinite loops
+    const hasNodeChanges = newNodes.length !== canvasState.nodes.length || 
+      newNodes.some(newNode => {
+        const existingNode = canvasState.nodes.find(n => n.id === newNode.id);
+        return !existingNode || JSON.stringify(existingNode.data) !== JSON.stringify(newNode.data);
+      });
+    
+    const hasEdgeChanges = newEdges.length !== canvasState.edges.length ||
+      newEdges.some(newEdge => {
+        const existingEdge = canvasState.edges.find(e => e.id === newEdge.id);
+        return !existingEdge;
+      });
+    
+    if (hasNodeChanges || hasEdgeChanges) {
+      console.log('Canvas state sync: updating nodes/edges due to app state changes');
+      updateCanvasState({
+        nodes: newNodes,
+        edges: newEdges
+      });
+    }
+  }, [appState.uploadedImages, appState.analyses, appState.imageGroups]); // Only watch specific dependencies
 
   return {
     // State
