@@ -51,24 +51,24 @@ const Canvas = () => {
     clearCanvas
   } = stableHelpers;
 
-  // Create missing handler functions using dispatch
-  const handleClearCanvas = () => clearCanvas();
-  const handleImageSelect = (imageId: string) => dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId });
-  const handleToggleAnnotations = () => dispatch({ type: 'TOGGLE_ANNOTATIONS' });
-  const handleGenerateConcept = (analysisId: string) => generateConcept(`Generate concept for analysis ${analysisId}`);
-  const handleCreateGroup = (imageIds: string[]) => {
+  // Create missing handler functions using dispatch - wrapped in useCallback for stability
+  const handleClearCanvas = useCallback(() => clearCanvas(), [clearCanvas]);
+  const handleImageSelect = useCallback((imageId: string) => dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId }), [dispatch]);
+  const handleToggleAnnotations = useCallback(() => dispatch({ type: 'TOGGLE_ANNOTATIONS' }), [dispatch]);
+  const handleGenerateConcept = useCallback((analysisId: string) => generateConcept(`Generate concept for analysis ${analysisId}`), [generateConcept]);
+  const handleCreateGroup = useCallback((imageIds: string[]) => {
     const position = { x: 100, y: 100 };
     createGroup('New Group', 'Created from selection', '#3B82F6', imageIds, position);
-  };
-  const handleUngroup = (groupId: string) => dispatch({ type: 'DELETE_GROUP', payload: groupId });
-  const handleDeleteGroup = (groupId: string) => dispatch({ type: 'DELETE_GROUP', payload: groupId });
-  const handleEditGroup = (groupId: string, name: string, description: string, color: string) => {
+  }, [createGroup]);
+  const handleUngroup = useCallback((groupId: string) => dispatch({ type: 'DELETE_GROUP', payload: groupId }), [dispatch]);
+  const handleDeleteGroup = useCallback((groupId: string) => dispatch({ type: 'DELETE_GROUP', payload: groupId }), [dispatch]);
+  const handleEditGroup = useCallback((groupId: string, name: string, description: string, color: string) => {
     dispatch({ type: 'UPDATE_GROUP', payload: { id: groupId, updates: { name, description, color } } });
-  };
-  const handleGroupDisplayModeChange = (groupId: string, mode: 'standard' | 'stacked') => {
+  }, [dispatch]);
+  const handleGroupDisplayModeChange = useCallback((groupId: string, mode: 'standard' | 'stacked') => {
     dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } });
-  };
-  const handleSubmitGroupPrompt = async (groupId: string, prompt: string, isCustom: boolean) => {
+  }, [dispatch]);
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
     // Mock group analysis for now
     const groupAnalysis = {
       id: `analysis-${Date.now()}`,
@@ -92,16 +92,16 @@ const Canvas = () => {
       createdAt: new Date()
     };
     dispatch({ type: 'ADD_GROUP_ANALYSIS', payload: groupAnalysis });
-  };
-  const handleEditGroupPrompt = (sessionId: string) => {
+  }, [dispatch]);
+  const handleEditGroupPrompt = useCallback((sessionId: string) => {
     console.log('Edit group prompt:', sessionId);
-  };
-  const handleCreateFork = (sessionId: string) => {
+  }, []);
+  const handleCreateFork = useCallback((sessionId: string) => {
     console.log('Create fork:', sessionId);
-  };
-  const handleAnalysisComplete = (imageId: string, analysis: any) => {
+  }, []);
+  const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
     dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId, analysis } });
-  };
+  }, [dispatch]);
 
   // Backward compatibility aliases
   const groupAnalyses = groupAnalysesWithPrompts;
@@ -191,38 +191,38 @@ const Canvas = () => {
   }, [handleCanvasUpload]);
 
 
-  const handleNavigateToPreviousAnalyses = () => {
+  const handleNavigateToPreviousAnalyses = useCallback(() => {
     navigate('/projects');
-  };
+  }, [navigate]);
 
-  const handleViewChange = (view: 'gallery' | 'canvas' | 'summary') => {
+  const handleViewChange = useCallback((view: 'gallery' | 'canvas' | 'summary') => {
     if (view === 'gallery') {
       // Gallery route removed - stay on canvas
       return;
     } else if (view === 'summary') {
       navigate('/dashboard');
     }
-  };
+  }, [navigate]);
 
-  const handleOpenAnalysisPanel = (analysisId: string) => {
+  const handleOpenAnalysisPanel = useCallback((analysisId: string) => {
     setSelectedAnalysisId(analysisId);
     setAnalysisPanelOpen(true);
-  };
+  }, []);
 
-  const handleCloseAnalysisPanel = () => {
+  const handleCloseAnalysisPanel = useCallback(() => {
     setAnalysisPanelOpen(false);
     setSelectedAnalysisId(null);
-  };
+  }, []);
 
-  const handleOpenGroupEdit = (groupId: string) => {
+  const handleOpenGroupEdit = useCallback((groupId: string) => {
     setSelectedGroupId(groupId);
     setGroupEditDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseGroupEdit = () => {
+  const handleCloseGroupEdit = useCallback(() => {
     setGroupEditDialogOpen(false);
     setSelectedGroupId(null);
-  };
+  }, []);
 
   // Listen for project changes instead of triggering them
   useEffect(() => {
