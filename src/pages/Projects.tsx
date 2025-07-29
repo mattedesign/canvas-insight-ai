@@ -1,24 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileImage, Clock, Users, Plus, Settings, MoreVertical } from 'lucide-react';
+import { FileImage, Clock, Users, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { ProjectService } from '@/services/DataMigrationService';
 import { CanvasStateService } from '@/services/CanvasStateService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 interface Project {
   id: string;
@@ -37,9 +26,6 @@ const Projects = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
 
   const loadProjects = async () => {
     if (!user) return;
@@ -61,30 +47,17 @@ const Projects = () => {
   };
 
   const handleCreateProject = async () => {
-    if (!newProjectName.trim()) {
-      toast({
-        title: "Error",
-        description: "Project name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      // Create project with custom name and description
-      const project = await ProjectService.createNewProject(newProjectName, newProjectDescription);
+      // Create project with auto-generated name and slug
+      const project = await ProjectService.createNewProject();
       
       // Create a default blank canvas state for the new project
-      const defaultState = CanvasStateService.createDefaultState(project.id, newProjectName);
+      const defaultState = CanvasStateService.createDefaultState(project.id, 'New Analysis Session');
       await CanvasStateService.saveCanvasState(project.id, defaultState);
       
-      setNewProjectName('');
-      setNewProjectDescription('');
-      setShowCreateDialog(false);
-      
       toast({
-        title: "Success",
-        description: `${project.name} created successfully`,
+        title: "New project created",
+        description: `${project.name} is ready for analysis.`,
       });
       
       // Navigate directly to canvas with the project slug
@@ -92,8 +65,8 @@ const Projects = () => {
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
-        title: "Error",
-        description: "Failed to create project",
+        title: "Error creating project",
+        description: "Failed to create a new project. Please try again.",
         variant: "destructive",
       });
     }
@@ -193,7 +166,7 @@ const Projects = () => {
               <h1 className="text-3xl font-bold text-foreground">Projects</h1>
               <p className="text-muted-foreground">View and manage your UX analysis projects</p>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
+            <Button onClick={handleCreateProject}>
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -259,7 +232,7 @@ const Projects = () => {
               <p className="text-muted-foreground mb-4">
                 Create your first project to start organizing your UX analyses.
               </p>
-              <Button onClick={() => setShowCreateDialog(true)}>
+              <Button onClick={handleCreateProject}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create New Project
               </Button>
@@ -268,44 +241,6 @@ const Projects = () => {
         </div>
       </div>
 
-      {/* Create Project Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Create a new project to organize your UX analysis work.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Project Name</Label>
-              <Input
-                id="name"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Enter project name..."
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description (optional)</Label>
-              <Textarea
-                id="description"
-                value={newProjectDescription}
-                onChange={(e) => setNewProjectDescription(e.target.value)}
-                placeholder="Describe your project..."
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateProject}>Create Project</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
