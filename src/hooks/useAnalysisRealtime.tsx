@@ -115,13 +115,19 @@ export const useAnalysisRealtime = ({
       pendingAnalyses: new Set([...prev.pendingAnalyses].filter(id => id !== imageId)),
       failedAnalyses: new Map([...prev.failedAnalyses].filter(([id]) => id !== imageId))
     }));
-  }, []);
+  }, []); // Empty dependency array to prevent infinite re-subscriptions
 
-  // Set up real-time subscription
+  // Set up real-time subscription with proper cleanup and connection management
   useEffect(() => {
     let channel: any = null;
+    let isSubscribed = true;
 
     const setupRealtimeSubscription = () => {
+      // Prevent multiple subscriptions
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+
       channel = supabase
         .channel('ux-analyses-changes')
         .on(
@@ -132,6 +138,8 @@ export const useAnalysisRealtime = ({
             table: 'ux_analyses'
           },
           (payload) => {
+            if (!isSubscribed) return; // Prevent processing after cleanup
+            
             console.log('New analysis created:', payload.new);
             const newAnalysis = payload.new as any;
             
@@ -162,6 +170,8 @@ export const useAnalysisRealtime = ({
             table: 'ux_analyses'
           },
           (payload) => {
+            if (!isSubscribed) return; // Prevent processing after cleanup
+            
             console.log('Analysis updated:', payload.new);
             const updatedAnalysis = payload.new as any;
             
@@ -188,7 +198,13 @@ export const useAnalysisRealtime = ({
           }
         )
         .subscribe((status) => {
-          console.log('Realtime subscription status:', status);
+          if (!isSubscribed) return; // Prevent logging after cleanup
+          
+          // Only log status changes, not continuous CLOSED statuses
+          if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR') {
+            console.log('Realtime subscription status:', status);
+          }
+          
           setState(prev => ({
             ...prev,
             isConnected: status === 'SUBSCRIBED'
@@ -199,11 +215,13 @@ export const useAnalysisRealtime = ({
     setupRealtimeSubscription();
 
     return () => {
+      isSubscribed = false; // Mark as unsubscribed first
       if (channel) {
         supabase.removeChannel(channel);
+        channel = null;
       }
     };
-  }, [onAnalysisUpdate, onAnalysisStatusChange, completeAnalysis]);
+  }, [onAnalysisUpdate, onAnalysisStatusChange]); // Removed completeAnalysis from dependencies
 
   return {
     ...state,
