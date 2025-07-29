@@ -56,15 +56,8 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
       console.log('Stage 1 completed: Metadata extracted successfully');
     } catch (error) {
-      console.log('Stage 1 failed, using fallback metadata:', error.message);
-      metadataResult = generateFallbackMetadata();
-      stages.push({
-        stage: 'metadata_extraction',
-        data: metadataResult,
-        timestamp: new Date().toISOString(),
-        model: 'fallback',
-        success: false
-      });
+      console.error('Stage 1 failed - Google Vision metadata extraction:', error.message);
+      throw new Error(`Metadata extraction failed: ${error.message}`);
     }
 
     // STAGE 2: Initial Vision Analysis (Claude or OpenAI)
@@ -89,15 +82,8 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
       console.log('Stage 2 completed: Initial vision analysis done');
     } catch (error) {
-      console.log('Stage 2 failed, using fallback analysis:', error.message);
-      visionAnalysisResult = generateFallbackVisionAnalysis(payload, metadataResult);
-      stages.push({
-        stage: 'vision_analysis',
-        data: visionAnalysisResult,
-        timestamp: new Date().toISOString(),
-        model: 'fallback',
-        success: false
-      });
+      console.error('Stage 2 failed - Vision analysis:', error.message);
+      throw new Error(`Vision analysis failed: ${error.message}`);
     }
 
     // STAGE 3: Comprehensive UX Analysis (Claude Sonnet)
@@ -114,15 +100,8 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
       console.log('Stage 3 completed: Comprehensive analysis done');
     } catch (error) {
-      console.log('Stage 3 failed, enhancing with available data:', error.message);
-      finalAnalysisResult = enhanceAnalysisWithFallback(visionAnalysisResult, metadataResult);
-      stages.push({
-        stage: 'comprehensive_analysis',
-        data: finalAnalysisResult,
-        timestamp: new Date().toISOString(),
-        model: 'enhanced-fallback',
-        success: false
-      });
+      console.error('Stage 3 failed - Comprehensive analysis:', error.message);
+      throw new Error(`Comprehensive analysis failed: ${error.message}`);
     }
 
     // Combine all results into final analysis
@@ -193,45 +172,7 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       payload: payload
     });
     
-    // Fallback to basic analysis if pipeline completely fails
-    try {
-      const fallbackResult = await performBasicFallbackAnalysis(payload);
-      
-      await supabase
-        .from('ux_analyses')
-        .insert({
-          image_id: payload.imageId,
-          user_context: payload.userContext || '',
-          visual_annotations: fallbackResult.visualAnnotations,
-          suggestions: fallbackResult.suggestions,
-          summary: fallbackResult.summary,
-          metadata: { 
-            error: true, 
-            fallbackToBasic: true, 
-            timestamp: new Date().toISOString(),
-            originalError: error?.message || 'Unknown error',
-            errorType: error?.name || 'UnknownError'
-          }
-        });
-        
-      return {
-        success: true,
-        data: {
-          imageId: payload.imageId,
-          imageName: payload.imageName,
-          imageUrl: payload.imageUrl,
-          userContext: payload.userContext || '',
-          visualAnnotations: fallbackResult.visualAnnotations,
-          suggestions: fallbackResult.suggestions,
-          summary: fallbackResult.summary,
-          metadata: { fallback: true },
-          aiModel: 'fallback'
-        }
-      };
-    } catch (dbError) {
-      console.error('Failed to store fallback analysis:', dbError);
-      return generateMockAnalysisResponse(payload);
-    }
+    throw new Error(`Analysis pipeline failed: ${error?.message || 'Unknown error'}`);
   }
 }
 
@@ -321,25 +262,6 @@ async function performGoogleVisionMetadataExtraction(payload: any): Promise<Visi
   }
 }
 
-function generateFallbackMetadata(): VisionMetadata {
-  return {
-    objects: [
-      { name: 'interface', confidence: 0.9 },
-      { name: 'screen', confidence: 0.8 }
-    ],
-    text: ['UI', 'Interface', 'Design'],
-    colors: [
-      { color: '#ffffff', percentage: 40 },
-      { color: '#000000', percentage: 20 },
-      { color: '#3b82f6', percentage: 15 }
-    ],
-    faces: 0,
-    labels: [
-      { name: 'user interface', confidence: 0.9 },
-      { name: 'web design', confidence: 0.8 }
-    ]
-  };
-}
 
 async function performClaudeVisionAnalysisWithMetadata(payload: any, metadata: VisionMetadata) {
   console.log('Performing Claude vision analysis with metadata');
@@ -621,16 +543,6 @@ Return JSON format:
   }
 }
 
-function generateFallbackVisionAnalysis(payload: any, metadata: VisionMetadata) {
-  return {
-    componentAnalysis: ['interface components', 'navigation elements'],
-    layoutStructure: 'Standard web layout structure',
-    visualHierarchy: 'Basic hierarchy present',
-    contentAnalysis: 'Content requires detailed review',
-    interactionElements: ['clickable elements', 'input fields'],
-    metadata: metadata
-  };
-}
 
 async function performClaudeOpus4ComprehensiveAnalysis(payload: any, metadata: VisionMetadata, visionAnalysis: any) {
   console.log('Performing comprehensive analysis with Claude Opus 4');
@@ -1034,47 +946,6 @@ function generateBasicAnalysisFromStages(stages: AnalysisStageResult[], metadata
   };
 }
 
-async function performBasicFallbackAnalysis(payload: any) {
-  // Simple fallback that doesn't require any AI services
-  const timestamp = Date.now();
-  
-  return {
-    visualAnnotations: [
-      {
-        id: `annotation-${timestamp}-0`,
-        x: 1,
-        y: 1,
-        type: 'issue',
-        title: 'Analysis Service Unavailable',
-        description: 'AI analysis services temporarily unavailable',
-        severity: 'low'
-      }
-    ],
-    suggestions: [
-      {
-        id: `suggestion-${timestamp}-0`,
-        category: 'usability',
-        title: 'Manual Review Required',
-        description: 'Perform manual UX review when AI services are restored',
-        impact: 'low',
-        effort: 'high',
-        actionItems: ['Schedule manual review', 'Check service availability'],
-        relatedAnnotations: [`annotation-${timestamp}-0`]
-      }
-    ],
-    summary: {
-      overallScore: 60,
-      categoryScores: {
-        usability: 60,
-        accessibility: 60,
-        visual: 60,
-        content: 60
-      },
-      keyIssues: ['AI analysis temporarily unavailable'],
-      strengths: ['Basic fallback analysis provided']
-    }
-  };
-}
 
 async function selectBestModel(): Promise<string> {
   // Check which AI models are available based on API keys
@@ -1104,8 +975,8 @@ async function selectBestModel(): Promise<string> {
     return 'stability-ai';
   }
   
-  console.log('No AI models available, falling back to mock data');
-  return 'mock';
+  console.error('No AI models available - all API keys missing');
+  throw new Error('No AI analysis models available. Please configure at least one API key (OpenAI, Anthropic, Google Vision, or Stability AI).');
 }
 
 async function performGoogleVisionAnalysis(payload: any) {
@@ -1598,25 +1469,6 @@ function generateMockAnalysisData() {
   };
 }
 
-function generateMockAnalysisResponse(payload: any) {
-  const mockData = generateMockAnalysisData();
-  
-  return {
-    success: true,
-    data: {
-      id: crypto.randomUUID(),
-      imageId: payload.imageId,
-      imageName: payload.imageName,
-      imageUrl: payload.imageUrl,
-      userContext: payload.userContext || '',
-      visualAnnotations: mockData.visualAnnotations,
-      suggestions: mockData.suggestions,
-      summary: mockData.summary,
-      metadata: mockData.metadata,
-      createdAt: new Date().toISOString()
-    }
-  };
-}
 
 async function analyzeGroup(payload: any) {
   console.log('Analyzing group:', payload)
@@ -1625,8 +1477,8 @@ async function analyzeGroup(payload: any) {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     
     if (!openaiApiKey) {
-      console.log('No OpenAI API key found, using mock group analysis');
-      return generateMockGroupAnalysis();
+      console.error('No OpenAI API key found');
+      throw new Error('OpenAI API key required for group analysis');
     }
 
     // If we have imageIds, fetch the image URLs from the database
@@ -1665,41 +1517,16 @@ async function analyzeGroup(payload: any) {
       const updatedPayload = { ...payload, imageUrls };
       return await performAIGroupAnalysis(updatedPayload, openaiApiKey);
     } else {
-      console.log('No image URLs available, using mock group analysis');
-      return generateMockGroupAnalysis();
+      console.error('No image URLs available for group analysis');
+      throw new Error('No images found for group analysis');
     }
   } catch (error) {
-    console.error('Error in group analysis, falling back to mock:', error);
+    console.error('Error in group analysis:', error);
     console.error('Error details:', error.message, error.stack);
-    return generateMockGroupAnalysis();
+    throw error;
   }
 }
 
-function generateMockGroupAnalysis() {
-  const mockGroupAnalysis = {
-    summary: {
-      overallScore: 78,
-      consistency: 85,
-      thematicCoherence: 80,
-      userFlowContinuity: 70
-    },
-    insights: [
-      'Visual hierarchy is consistently applied across all screens',
-      'Color palette maintains brand consistency throughout the group'
-    ],
-    recommendations: [
-      'Consider standardizing button sizes across all screens',
-      'Implement consistent spacing patterns for better visual rhythm'
-    ],
-    patterns: {
-      commonElements: ['Primary buttons', 'Navigation bar', 'Card components'],
-      designInconsistencies: ['Button sizes', 'Icon styles'],
-      userJourneyGaps: ['Missing back navigation', 'Unclear progress indicators']
-    }
-  };
-  
-  return { success: true, data: mockGroupAnalysis };
-}
 
 async function generateConcept(payload: any, aiModel = 'auto') {
   console.log('Generating concept:', payload, 'with AI model:', aiModel)
@@ -1707,8 +1534,8 @@ async function generateConcept(payload: any, aiModel = 'auto') {
   try {
     // Check if we have analysis data for concept generation
     if (!payload.analysisData) {
-      console.log('No analysis data provided, using mock concept generation');
-      return generateMockConcept();
+      console.error('No analysis data provided for concept generation');
+      throw new Error('Analysis data required for concept generation');
     }
 
     // Select the best AI model for concept generation
@@ -1725,32 +1552,17 @@ async function generateConcept(payload: any, aiModel = 'auto') {
         }
         break;
       default:
-        console.log('No suitable AI model available, using mock generation');
-        break;
+        console.error('No suitable AI model available for concept generation');
+        throw new Error('No AI model available for concept generation');
     }
 
-    // Fallback to mock concept if no AI model is available
-    return generateMockConcept();
+    throw new Error('Failed to generate concept - no suitable AI model found');
   } catch (error) {
-    console.error('Error in concept generation, falling back to mock:', error);
-    return generateMockConcept();
+    console.error('Error in concept generation:', error);
+    throw error;
   }
 }
 
-function generateMockConcept() {
-  const mockConcept = {
-    title: 'Enhanced Design Concept',
-    description: 'A conceptual design addressing key usability issues identified in the analysis',
-    imageUrl: `https://picsum.photos/1024/768?random=${Date.now()}`,
-    improvements: [
-      'Improved navigation hierarchy',
-      'Enhanced button consistency',
-      'Better visual contrast'
-    ]
-  };
-  
-  return { success: true, data: mockConcept };
-}
 
 async function performAIGroupAnalysis(payload: any, apiKey: string) {
   console.log('Performing AI group analysis');
@@ -2319,22 +2131,7 @@ async function analyzeMarkedRegion(imageUrl: string, prompt: string, bounds?: { 
     console.error('Region analysis failed:', error);
     
     // Fallback response
-    return {
-      success: false,
-      data: {
-        type: 'region_analysis',
-        analysis: {
-          observation: 'Unable to analyze region at this time',
-          issues: ['Analysis service temporarily unavailable'],
-          recommendations: ['Please try again later'],
-          context: 'Fallback response'
-        },
-        prompt: prompt,
-        bounds: bounds,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      }
-    };
+    throw error;
   }
 }
 

@@ -130,17 +130,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     },
   });
 
-  // Load initial data when user logs in
-  useEffect(() => {
-    if (user) {
-      console.log('[AppContext] User authenticated, loading data...');
-      loadDataFromDatabase();
-    } else {
-      console.log('[AppContext] User logged out, clearing state...');
-      dispatch({ type: 'RESET_STATE' });
-    }
-  }, [user]);
-
   // Data loading function
   const loadDataFromDatabase = useCallback(async () => {
     if (!user) return;
@@ -191,6 +180,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       });
     }
   }, [user, toast]);
+
+  // Load initial data when user logs in
+  useEffect(() => {
+    if (user) {
+      console.log('[AppContext] User authenticated, loading data...');
+      loadDataFromDatabase();
+    } else {
+      console.log('[AppContext] User logged out, clearing state...');
+      dispatch({ type: 'RESET_STATE' });
+    }
+  }, [user, loadDataFromDatabase]);
 
   // Database sync function - pass state as parameter to avoid dependency issues
   const syncToDatabase = useCallback(async (stateToSync = state) => {
