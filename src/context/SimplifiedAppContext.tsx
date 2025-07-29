@@ -390,11 +390,11 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   }), [state, stableHelpers, loadingMachine]);
 
   return (
-    <DataLoadingErrorBoundary>
-      <SimplifiedAppContext.Provider value={contextValue}>
+    <SimplifiedAppContext.Provider value={contextValue}>
+      <DataLoadingErrorBoundary>
         {children}
-      </SimplifiedAppContext.Provider>
-    </DataLoadingErrorBoundary>
+      </DataLoadingErrorBoundary>
+    </SimplifiedAppContext.Provider>
   );
 };
 
