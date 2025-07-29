@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AppProvider } from "./context/AppContext";
+import { SimplifiedAppProvider } from "./context/SimplifiedAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
@@ -29,7 +29,7 @@ const App = () => (
       <BrowserRouter>
       <AuthProvider>
         <AIProvider>
-          <AppProvider>
+          <SimplifiedAppProvider>
             <PerformanceMonitor componentName="App" />
             <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -81,7 +81,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AppProvider>
+          </SimplifiedAppProvider>
         </AIProvider>
       </AuthProvider>
       </BrowserRouter>
