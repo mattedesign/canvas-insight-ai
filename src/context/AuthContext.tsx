@@ -42,26 +42,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkSubscription = async () => {
     if (!session) return;
     
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      
-      if (error) throw error;
-      setSubscription(data);
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      // Set default free tier on error
-      setSubscription({
-        subscribed: false,
-        subscription_tier: 'free',
-        subscription_end: null,
-        analysis_count: 0,
-        analysis_limit: 10
-      });
-    }
+    let retries = 0;
+    const maxRetries = 3;
+    
+    const attemptRequest = async (): Promise<void> => {
+      try {
+        const { data, error } = await supabase.functions.invoke('check-subscription', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (error) throw error;
+        setSubscription(data);
+      } catch (error: any) {
+        console.error(`Error checking subscription (attempt ${retries + 1}):`, error);
+        
+        // Check if it's a network error and we can retry
+        if (retries < maxRetries && (
+          error.message?.includes('fetch') ||
+          error.message?.includes('network') ||
+          error.message?.includes('CORS') ||
+          error.status >= 500
+        )) {
+          retries++;
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, retries) * 1000;
+          setTimeout(attemptRequest, delay);
+          return;
+        }
+        
+        // Set default free tier on final error
+        setSubscription({
+          subscribed: false,
+          subscription_tier: 'free',
+          subscription_end: null,
+          analysis_count: 0,
+          analysis_limit: 10
+        });
+        
+        // Show user-friendly error message for CORS/network issues
+        if (error.message?.includes('CORS') || error.message?.includes('fetch')) {
+          toast({
+            title: "Connection Issue",
+            description: "Please check your internet connection and try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+    
+    await attemptRequest();
   };
 
   useEffect(() => {
@@ -107,7 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const redirectUrl = `${window.location.origin}/`;
+      // Use production domain if available, fallback to current origin
+      const currentOrigin = window.location.origin;
+      const redirectUrl = currentOrigin.includes('lovableproject.com') 
+        ? 'https://app.figmant.ai/'
+        : `${currentOrigin}/`;
       
       const { error } = await supabase.auth.signUp({
         email,
@@ -118,9 +153,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        // Provide user-friendly error messages
+        let errorMessage = error.message;
+        if (error.message.includes('CORS') || error.message.includes('fetch')) {
+          errorMessage = "Connection issue. Please check your internet connection and try again.";
+        } else if (error.message.includes('User already registered')) {
+          errorMessage = "This email is already registered. Try signing in instead.";
+        }
+        
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
       } else {
@@ -132,9 +175,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error };
     } catch (error: any) {
+      let errorMessage = error.message;
+      if (error.message?.includes('CORS') || error.message?.includes('fetch')) {
+        errorMessage = "Connection issue. Please check your internet connection and try again.";
+      }
+      
       toast({
         title: "Sign up failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return { error };
@@ -152,9 +200,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        // Provide user-friendly error messages
+        let errorMessage = error.message;
+        if (error.message.includes('CORS') || error.message.includes('fetch')) {
+          errorMessage = "Connection issue. Please check your internet connection and try again.";
+        } else if (error.message.includes('Invalid login credentials')) {
+          errorMessage = "Invalid email or password. Please check your credentials and try again.";
+        }
+        
         toast({
           title: "Sign in failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
       } else {
@@ -166,9 +222,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error };
     } catch (error: any) {
+      let errorMessage = error.message;
+      if (error.message?.includes('CORS') || error.message?.includes('fetch')) {
+        errorMessage = "Connection issue. Please check your internet connection and try again.";
+      }
+      
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       return { error };

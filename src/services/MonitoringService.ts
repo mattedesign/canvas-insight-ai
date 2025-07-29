@@ -86,8 +86,8 @@ export class MonitoringService {
 
     this.eventBuffer.push(event);
     
-    // Flush if buffer is getting large
-    if (this.eventBuffer.length >= 10) {
+    // Flush if buffer is getting large (increased threshold)
+    if (this.eventBuffer.length >= 20) {
       this.flushEvents();
     }
   }
@@ -114,8 +114,8 @@ export class MonitoringService {
 
     this.metricsBuffer.push(metric);
 
-    // Flush if buffer is getting large
-    if (this.metricsBuffer.length >= 5) {
+    // Flush if buffer is getting large (increased threshold)
+    if (this.metricsBuffer.length >= 15) {
       this.flushMetrics();
     }
   }
@@ -353,10 +353,10 @@ export class MonitoringService {
       this.flushAllBuffers();
     });
 
-    // Also flush periodically
+    // Flush periodically with reduced frequency to prevent spam
     setInterval(() => {
       this.flushAllBuffers();
-    }, 30000); // Every 30 seconds
+    }, 120000); // Every 2 minutes instead of 30 seconds
   }
 
   /**
@@ -377,9 +377,10 @@ export class MonitoringService {
     const events = [...this.eventBuffer];
     this.eventBuffer = [];
 
-    // For now, just log events since types aren't regenerated yet
-    // TODO: Update to use real monitoring tables once types are available
-    console.log('Monitoring: Flushing events', events.length);
+    // Throttled logging to prevent spam
+    if (events.length > 0 && Math.random() < 0.1) { // Only log 10% of the time
+      console.log('Monitoring: Flushing events', events.length);
+    }
     
     try {
       // This will be enabled once types are regenerated
@@ -401,8 +402,10 @@ export class MonitoringService {
     const metrics = [...this.metricsBuffer];
     this.metricsBuffer = [];
 
-    // For now, just log metrics since types aren't regenerated yet
-    console.log('Monitoring: Flushing metrics', metrics.length);
+    // Throttled logging to prevent spam
+    if (metrics.length > 0 && Math.random() < 0.1) { // Only log 10% of the time
+      console.log('Monitoring: Flushing metrics', metrics.length);
+    }
     
     try {
       // This will be enabled once types are regenerated
