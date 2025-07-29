@@ -31,6 +31,7 @@ interface AppContextType {
   isLoading: boolean;
   isSyncing: boolean;
   isUploading: boolean;
+  hasPendingSync: boolean;
   
   // Actions
   handleImageUpload: (files: File[]) => Promise<void>;
@@ -94,6 +95,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [pendingBackgroundSync, setPendingBackgroundSync] = useState<Set<string>>(new Set());
   
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
@@ -552,8 +554,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Process each image in background without blocking UI
       newImages.forEach((uploadedImage) => {
+        // Track pending background sync
+        setPendingBackgroundSync(prev => new Set([...prev, uploadedImage.id]));
+        
         processImageInBackground(uploadedImage).catch(error => {
           console.error(`Background processing failed for ${uploadedImage.name}:`, error);
+        }).finally(() => {
+          // Remove from pending sync when complete
+          setPendingBackgroundSync(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(uploadedImage.id);
+            return newSet;
+          });
         });
       });
 
@@ -1125,7 +1137,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [toast]);
 
-  // Update app state with data loaded from database - hybrid approach
+  // Update app state with data loaded from database - hybrid approach with smart conflict resolution
   const updateAppStateFromDatabase = useCallback((data: {
     uploadedImages: UploadedImage[];
     analyses: UXAnalysis[];
@@ -1134,35 +1146,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     generatedConcepts?: GeneratedConcept[];
     groupAnalyses?: GroupAnalysis[];
     groupPromptSessions?: GroupPromptSession[];
-  }) => {
-    console.log('Hybrid state update - merging database with current state:', {
+  }, options: { forceReplace?: boolean } = {}) => {
+    const hasPendingSync = pendingBackgroundSync.size > 0;
+    
+    console.log('Smart state update:', {
       dbImages: data.uploadedImages?.length || 0,
       dbAnalyses: data.analyses?.length || 0,
       currentImages: uploadedImages.length,
-      currentAnalyses: analyses.length
+      currentAnalyses: analyses.length,
+      hasPendingSync,
+      pendingSyncIds: Array.from(pendingBackgroundSync),
+      isUploading,
+      forceReplace: options.forceReplace
     });
+    
+    // If we have pending background sync or are uploading, be more conservative with database updates
+    if ((hasPendingSync || isUploading) && !options.forceReplace) {
+      console.log('Deferring database state update due to pending sync operations');
+      return;
+    }
     
     // Smart merge: combine database images with current in-memory images
     setUploadedImages(prev => {
       const dbImages = data.uploadedImages || [];
       
-      if (dbImages.length === 0) {
-        // No database images, keep current state
-        return prev;
+      // If force replace or no current images, use database images
+      if (options.forceReplace || prev.length === 0) {
+        return dbImages;
       }
       
-      if (prev.length === 0) {
-        // No current images, use database images
-        return dbImages;
+      // If no database images, keep current state
+      if (dbImages.length === 0) {
+        return prev;
       }
       
       // Merge: Database images + new in-memory images not yet in database
       const dbImageIds = new Set(dbImages.map(img => img.id));
       const newInMemoryImages = prev.filter(img => !dbImageIds.has(img.id));
       
+      // Also prioritize in-memory images that are being synced
+      const prioritizedInMemory = newInMemoryImages.filter(img => 
+        pendingBackgroundSync.has(img.id) || img.status === 'syncing'
+      );
+      
       console.log('Merging images:', {
         fromDB: dbImages.length,
         newInMemory: newInMemoryImages.length,
+        prioritized: prioritizedInMemory.length,
         total: dbImages.length + newInMemoryImages.length
       });
       
@@ -1173,17 +1203,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAnalyses(prev => {
       const dbAnalyses = data.analyses || [];
       
-      if (dbAnalyses.length === 0) {
-        return prev;
+      // If force replace or no current analyses, use database analyses
+      if (options.forceReplace || prev.length === 0) {
+        return dbAnalyses;
       }
       
-      if (prev.length === 0) {
-        return dbAnalyses;
+      // If no database analyses, keep current state
+      if (dbAnalyses.length === 0) {
+        return prev;
       }
       
       // Merge: Database analyses + new in-memory analyses not yet in database
       const dbAnalysisIds = new Set(dbAnalyses.map(analysis => analysis.id));
       const newInMemoryAnalyses = prev.filter(analysis => !dbAnalysisIds.has(analysis.id));
+      
+      // Prioritize analyses for images being synced
+      const prioritizedAnalyses = newInMemoryAnalyses.filter(analysis => 
+        pendingBackgroundSync.has(analysis.imageId) || analysis.status === 'processing'
+      );
       
       return [...dbAnalyses, ...newInMemoryAnalyses];
     });
@@ -1194,7 +1231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGeneratedConcepts(data.generatedConcepts || []);
     setGroupAnalyses(data.groupAnalyses || []);
     setGroupPromptSessions(data.groupPromptSessions || []);
-  }, [uploadedImages, analyses]);
+  }, [uploadedImages, analyses, pendingBackgroundSync, isUploading]);
 
   const value: AppContextType = {
     // State
@@ -1214,6 +1251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isLoading,
     isSyncing,
     isUploading,
+    hasPendingSync: pendingBackgroundSync.size > 0,
     
     // Actions
     handleImageUpload,

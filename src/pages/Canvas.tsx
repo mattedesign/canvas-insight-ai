@@ -184,7 +184,7 @@ const Canvas = () => {
               analyses: result.data.analyses?.length || 0,
               imageGroups: result.data.imageGroups?.length || 0
             });
-            // Always update with loaded data, even if empty, to ensure proper state sync
+            // Use smart state update that respects pending sync operations
             updateAppStateFromDatabase(result.data);
           }
         } catch (error) {
@@ -213,7 +213,7 @@ const Canvas = () => {
                       analyses: result.data.analyses?.length || 0,
                       imageGroups: result.data.imageGroups?.length || 0
                     });
-                    // Always update with loaded data to ensure proper state sync
+                    // Use smart state update that respects pending sync operations
                     updateAppStateFromDatabase(result.data);
                   }
                 }
