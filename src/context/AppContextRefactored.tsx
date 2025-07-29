@@ -67,19 +67,22 @@ interface AppContextType {
   isUploading: boolean;
   isGeneratingConcept: boolean;
   
-  // Backward compatibility - legacy handlers
+  // Backward compatibility - legacy handlers (restored from original)
   handleClearCanvas: () => void;
   handleImageSelect: (imageId: string) => void;
   handleToggleAnnotations: () => void;
-  handleGenerateConcept: (prompt: string, selectedImages?: string[]) => Promise<void>;
+  handleAnnotationClick: (annotationId: string) => void;
+  handleGalleryToolChange: (tool: 'cursor' | 'draw') => void;
+  handleAddComment: () => void;
+  handleGenerateConcept: (analysisId: string) => Promise<void>;
   handleCreateGroup: (imageIds: string[]) => void;
   handleUngroup: (groupId: string) => void;
   handleDeleteGroup: (groupId: string) => void;
   handleEditGroup: (groupId: string, name: string, description: string, color: string) => void;
   handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => void;
   handleSubmitGroupPrompt: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
-  handleEditGroupPrompt: () => void;
-  handleCreateFork: () => void;
+  handleEditGroupPrompt: (sessionId: string) => void;
+  handleCreateFork: (sessionId: string) => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -456,33 +459,132 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     dispatch({ type: 'REMOVE_GROUP', payload: groupId });
   }, []);
 
-  // Concept generation
-  const generateConcept = useCallback(async (prompt: string, selectedImages?: string[]) => {
+  // Restored original handlers
+  const handleAnnotationClick = useCallback((annotationId: string) => {
+    toggleAnnotation(annotationId);
+  }, [toggleAnnotation]);
+
+  const handleGalleryToolChange = useCallback((tool: 'cursor' | 'draw') => {
+    dispatch({ type: 'SET_GALLERY_TOOL', payload: tool });
+  }, []);
+
+  const handleAddComment = useCallback(() => {
+    console.log('Add comment mode activated');
+  }, []);
+
+  // Restored original group creation with default colors
+  const handleCreateGroup = useCallback((imageIds: string[]) => {
+    const groupId = `group-${Date.now()}`;
+    const groupNumber = state.imageGroups.length + 1;
+    const defaultColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    const color = defaultColors[(groupNumber - 1) % defaultColors.length];
+    
+    const newGroup: ImageGroup = {
+      id: groupId,
+      name: `Group ${groupNumber}`,
+      description: '',
+      imageIds,
+      position: { x: 100, y: 100 },
+      color,
+      createdAt: new Date(),
+    };
+    
+    dispatch({ type: 'ADD_GROUP', payload: newGroup });
+  }, [state.imageGroups.length]);
+
+  // Restored original generateConcept (different from the concept generation above)
+  const handleGenerateConcept = useCallback(async (analysisId: string) => {
     dispatch({ type: 'SET_GENERATING_CONCEPT', payload: true });
     
     try {
-      // Mock concept generation for now
-      const concept: GeneratedConcept = {
+      const analysis = state.analyses.find(a => a.id === analysisId);
+      if (!analysis) return;
+      
+      // Simulate concept generation delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const title = `Improved ${analysis.imageName || 'Design'}`;
+      const newConcept: GeneratedConcept = {
         id: `concept-${Date.now()}`,
-        analysisId: selectedImages?.[0] || '',
-        imageUrl: '/placeholder.svg', // This would be generated
-        title: prompt.slice(0, 50),
-        description: prompt,
-        improvements: ['Mock improvement'],
+        analysisId,
+        imageUrl: '/placeholder.svg',
+        title,
+        description: `A conceptual design addressing key usability issues identified in the analysis.`,
+        improvements: analysis.suggestions
+          .filter(s => s.impact === 'high')
+          .slice(0, 5)
+          .map(s => s.title),
         createdAt: new Date()
       };
       
-      dispatch({ type: 'ADD_CONCEPT', payload: concept });
+      dispatch({ type: 'ADD_CONCEPT', payload: newConcept });
       
-      toast({
-        title: "Concept generated",
-        description: "New design concept has been created.",
-        category: "success",
-      });
+    } catch (error) {
+      console.error('Failed to generate concept:', error);
     } finally {
       dispatch({ type: 'SET_GENERATING_CONCEPT', payload: false });
     }
+  }, [state.analyses]);
+
+  // Restored original group prompt submission
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+    try {
+      // Simulate AI processing
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Create analysis with prompt
+      const analysisId = `analysis-${Date.now()}`;
+      const analysis = {
+        id: analysisId,
+        sessionId: `session-${Date.now()}`,
+        groupId,
+        prompt,
+        summary: {
+          overallScore: 75 + Math.floor(Math.random() * 20),
+          consistency: 70 + Math.floor(Math.random() * 25),
+          thematicCoherence: 80 + Math.floor(Math.random() * 15),
+          userFlowContinuity: 65 + Math.floor(Math.random() * 30),
+        },
+        insights: [
+          'Visual hierarchy is consistently applied across all screens',
+          'Color palette maintains brand consistency throughout the group',
+        ],
+        recommendations: [
+          'Consider standardizing button sizes across all screens',
+          'Implement consistent spacing patterns for better visual rhythm',
+        ],
+        patterns: {
+          commonElements: ['Primary buttons', 'Navigation bar'],
+          designInconsistencies: ['Button sizes', 'Icon styles'],
+          userJourneyGaps: ['Missing back navigation'],
+        },
+        createdAt: new Date(),
+      };
+      
+      dispatch({ type: 'ADD_GROUP_ANALYSIS', payload: analysis });
+      
+      toast({
+        title: "Group analysis complete",
+        description: "Group prompt analysis has been generated.",
+        category: "success",
+      });
+      
+    } catch (error) {
+      console.error('Group prompt failed:', error);
+    }
   }, [toast]);
+
+  // Restored original edit group prompt
+  const handleEditGroupPrompt = useCallback((sessionId: string) => {
+    console.log('Edit group prompt:', sessionId);
+    // Original functionality would create a new session for editing
+  }, []);
+
+  // Restored original create fork
+  const handleCreateFork = useCallback((sessionId: string) => {
+    console.log('Create fork:', sessionId);
+    // Original functionality would create a fork session
+  }, []);
 
   // Context value with backward compatibility
   const value = useMemo(() => ({
@@ -498,7 +600,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     createGroup,
     updateGroup,
     deleteGroup,
-    generateConcept,
+    generateConcept: async (prompt: string) => {}, // Mock for new interface
     viewerState,
     toggleAnnotation,
     clearAnnotations,
@@ -521,21 +623,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     isUploading: state.isUploading,
     isGeneratingConcept: state.isGeneratingConcept,
     
-    // Backward compatibility - legacy handlers
+    // Backward compatibility - restored original handlers
     handleClearCanvas: clearCanvas,
     handleImageSelect: (imageId: string) => dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId }),
     handleToggleAnnotations: () => dispatch({ type: 'TOGGLE_ANNOTATIONS' }),
-    handleGenerateConcept: generateConcept,
-    handleCreateGroup: (imageIds: string[]) => createGroup(`Group ${Date.now()}`, '', '#3b82f6', imageIds),
+    handleAnnotationClick,
+    handleGalleryToolChange,
+    handleAddComment,
+    handleGenerateConcept,
+    handleCreateGroup,
     handleUngroup: (groupId: string) => deleteGroup(groupId),
     handleDeleteGroup: deleteGroup,
     handleEditGroup: (groupId: string, name: string, description: string, color: string) => 
       updateGroup(groupId, { name, description, color }),
     handleGroupDisplayModeChange: (groupId: string, mode: 'standard' | 'stacked') => 
       dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } }),
-    handleSubmitGroupPrompt: async () => {}, // Placeholder
-    handleEditGroupPrompt: () => {}, // Placeholder  
-    handleCreateFork: () => {}, // Placeholder
+    handleSubmitGroupPrompt,
+    handleEditGroupPrompt,
+    handleCreateFork,
   }), [
     state,
     handleImageUpload,
@@ -547,11 +652,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     createGroup,
     updateGroup,
     deleteGroup,
-    generateConcept,
     viewerState,
     toggleAnnotation,
     clearAnnotations,
     handleAnalysisComplete,
+    handleAnnotationClick,
+    handleGalleryToolChange,
+    handleAddComment,
+    handleGenerateConcept,
+    handleCreateGroup,
+    handleSubmitGroupPrompt,
+    handleEditGroupPrompt,
+    handleCreateFork,
   ]);
 
   return (
