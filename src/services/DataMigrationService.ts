@@ -148,46 +148,33 @@ export class ProjectService {
     return newProject;
   }
 
-  static async switchToProject(projectId: string) {
-    // Prevent duplicate switches
-    if (this.currentProjectId === projectId || this.isSwitching) {
-      console.log('[ProjectService] Already on project or switching:', projectId);
-      return projectId;
+  static async switchToProject(projectId: string): Promise<void> {
+    if (this.isSwitching) {
+      console.log('[ProjectService] Already switching projects, waiting…');
+      return;
     }
-    
+
     try {
       this.isSwitching = true;
       console.log('[ProjectService] Switching to project:', projectId);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
 
-      // Verify user owns this project
-      const { data: project, error } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('id', projectId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (error || !project) throw new Error('Project not found or access denied');
-      
+      // 🚨 FIX: Clear ALL cached data when switching projects
+      const oldProjectId = this.currentProjectId;
       this.currentProjectId = projectId;
-      
-      // Store in localStorage
-      localStorage.setItem('currentProjectId', projectId);
-      
-      // Emit event for other components to listen
-      window.dispatchEvent(new CustomEvent('projectChanged', { 
-        detail: { projectId } 
-      }));
-      
-      return projectId;
+
+      // Emit project change event for contexts to clear their state
+      const event = new CustomEvent('projectChanged', { 
+        detail: { 
+          projectId, 
+          oldProjectId,
+          timestamp: Date.now()
+        } 
+      });
+      window.dispatchEvent(event);
+
+      console.log('[ProjectService] Project switched successfully to:', projectId);
     } finally {
-      // Reset flag after a delay to prevent rapid switches
-      setTimeout(() => {
-        this.isSwitching = false;
-      }, 500);
+      this.isSwitching = false;
     }
   }
 
