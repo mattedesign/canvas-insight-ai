@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,68 +25,68 @@ interface DashboardStats {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
+  const { metrics, loading: metricsLoading, error: metricsError } = useDashboardMetrics();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Simple data fetching for dashboard
+  // Fetch projects data separately for recent projects section
   useEffect(() => {
-    const fetchDashboardStats = async () => {
+    const fetchProjectsData = async () => {
       if (!user) return;
 
       try {
         setLoading(true);
-        setError(null);
+        setError(metricsError);
 
-        // Fetch projects with image counts
+        // Fetch projects with image counts for recent projects section
         const { data: projects, error: projectsError } = await supabase
           .from('projects')
-          .select(`
-            id,
-            name,
-            updated_at,
-            images(count)
-          `)
+          .select('id, name, updated_at')
           .eq('user_id', user.id)
-          .order('updated_at', { ascending: false });
+          .order('updated_at', { ascending: false })
+          .limit(5);
 
         if (projectsError) throw projectsError;
 
-        // Calculate stats
-        const totalProjects = projects?.length || 0;
-        const totalImages = projects?.reduce((sum, p) => sum + (p.images?.[0]?.count || 0), 0) || 0;
+        // Get image counts for each project
+        const projectsWithCounts = await Promise.all(
+          (projects || []).map(async (project) => {
+            const { count: imageCount } = await supabase
+              .from('images')
+              .select('id', { count: 'exact' })
+              .eq('project_id', project.id);
 
-        // Fetch total analyses
-        const { count: totalAnalyses } = await supabase
-          .from('ux_analyses')
-          .select('*', { count: 'exact', head: true });
+            return {
+              id: project.id,
+              name: project.name,
+              imageCount: imageCount || 0,
+              updatedAt: project.updated_at
+            };
+          })
+        );
 
-        // Format recent projects
-        const recentProjects = projects?.slice(0, 5).map(p => ({
-          id: p.id,
-          name: p.name,
-          imageCount: p.images?.[0]?.count || 0,
-          updatedAt: p.updated_at
-        })) || [];
-
+        // Combine metrics data with projects data
         setStats({
-          totalProjects,
-          totalImages,
-          totalAnalyses: totalAnalyses || 0,
-          recentProjects
+          totalProjects: metrics?.totalAnalyses ? Math.ceil(metrics.totalAnalyses / 5) : 0, // Estimate
+          totalImages: metrics?.totalImages || 0,
+          totalAnalyses: metrics?.totalAnalyses || 0,
+          recentProjects: projectsWithCounts
         });
       } catch (err) {
-        console.error('Failed to fetch dashboard stats:', err);
+        console.error('Failed to fetch projects data:', err);
         setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDashboardStats();
-  }, [user]);
+    if (!metricsLoading) {
+      fetchProjectsData();
+    }
+  }, [user, metrics, metricsLoading, metricsError]);
 
-  if (loading) {
+  if (loading || metricsLoading) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar 
