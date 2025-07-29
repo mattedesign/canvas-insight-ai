@@ -11,7 +11,7 @@ import { atomicStateManager } from '@/services/AtomicStateManager';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode);
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   onRecovery?: () => void;
   name?: string;
@@ -265,9 +265,25 @@ export class ErrorRecoveryBoundary extends Component<Props, State> {
     }
   };
 
+  private handleReset = () => {
+    this.setState({
+      hasError: false,
+      error: undefined,
+      errorInfo: undefined,
+      errorId: '',
+      attemptedRecovery: false,
+      isRecovering: false
+    });
+  };
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
+        // Handle fallback as a function that receives error and reset
+        if (typeof this.props.fallback === 'function') {
+          return this.props.fallback(this.state.error!, this.handleReset);
+        }
+        // Handle fallback as a ReactNode
         return this.props.fallback;
       }
 

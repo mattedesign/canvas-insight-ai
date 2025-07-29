@@ -72,21 +72,18 @@ export const DataLoadingErrorBoundary: React.FC<DataLoadingErrorBoundaryProps> =
     window.location.reload();
   };
 
-  // Create the error UI as a component instance, not a function
-  const errorFallback = (
-    <DataLoadingErrorUI 
-      error={new Error('Data loading failed')} 
-      onRetry={handleRetry}
-      onClear={handleClear}
-    />
-  );
-
   return (
     <ErrorRecoveryBoundary
       name="DataLoading"
       enableRecovery={true}
       enableStateRollback={false}
-      fallback={errorFallback}
+      fallback={(error, reset) => (
+        <DataLoadingErrorUI 
+          error={error} 
+          onRetry={handleRetry}
+          onClear={handleClear}
+        />
+      )}
     >
       {children}
     </ErrorRecoveryBoundary>
