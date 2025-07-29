@@ -343,39 +343,47 @@ export class AnalysisMigrationService {
   static async loadAnalysesFromDatabase(): Promise<UXAnalysis[]> {
     const projectId = await ProjectService.getCurrentProject();
     
+    // First get all images for this project to get their IDs
+    const { data: projectImages, error: imagesError } = await supabase
+      .from('images')
+      .select('id, original_name, storage_path')
+      .eq('project_id', projectId);
+      
+    if (imagesError) throw imagesError;
+    if (!projectImages || projectImages.length === 0) return [];
+    
+    const imageIds = projectImages.map(img => img.id);
+    
+    // Then get analyses for those images
     const { data: analyses, error } = await supabase
       .from('ux_analyses')
-      .select(`
-        *,
-        images!ux_analyses_image_id_fkey(project_id, original_name, storage_path)
-      `)
-      .eq('images.project_id', projectId)
+      .select('*')
+      .in('image_id', imageIds)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     if (!analyses) return [];
 
     return analyses.map(analysis => {
-      // Handle potential typing issues by casting to any first
-      const analysisData = analysis as any;
-      const imageData = analysisData.images || {};
+      // Find the corresponding image data
+      const imageData = projectImages.find(img => img.id === analysis.image_id);
       
       // Get public URL for the image
       const { data: urlData } = supabase.storage
         .from('images')
-        .getPublicUrl(imageData.storage_path || '');
+        .getPublicUrl(imageData?.storage_path || '');
 
       return {
-        id: analysisData.id,
-        imageId: analysisData.image_id,
-        imageName: imageData.original_name || 'Unknown',
+        id: analysis.id,
+        imageId: analysis.image_id,
+        imageName: imageData?.original_name || 'Unknown',
         imageUrl: urlData.publicUrl,
-        userContext: analysisData.user_context || '',
-        visualAnnotations: (analysisData.visual_annotations as any) || [],
-        suggestions: (analysisData.suggestions as any) || [],
-        summary: (analysisData.summary as any) || {},
-        metadata: (analysisData.metadata as any) || {},
-        createdAt: new Date(analysisData.created_at)
+        userContext: analysis.user_context || '',
+        visualAnnotations: (analysis.visual_annotations as any) || [],
+        suggestions: (analysis.suggestions as any) || [],
+        summary: (analysis.summary as any) || {},
+        metadata: (analysis.metadata as any) || {},
+        createdAt: new Date(analysis.created_at)
       };
     });
   }
