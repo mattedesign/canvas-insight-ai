@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { CanvasView } from '@/components/canvas/CanvasView';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
@@ -112,6 +112,10 @@ const Canvas = () => {
   const [loadAttempted, setLoadAttempted] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string>('temp-project');
 
+  // Add refs to prevent multiple loads
+  const projectLoadingRef = useRef(false);
+  const loadedProjectSlugRef = useRef<string | null>(null);
+
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
@@ -216,12 +220,15 @@ const Canvas = () => {
   // Load project by slug if provided - let AppContext handle general data loading
   const { user } = useAuth();
   useEffect(() => {
-    // Handle both project slug loading and direct canvas access
-    if (loadAttempted) return;
+    // Skip if already loading or loaded this slug
+    if (projectLoadingRef.current || loadedProjectSlugRef.current === projectSlug) {
+      return;
+    }
     
     const loadProjectBySlug = async () => {
       try {
-        setLoadAttempted(true);
+        projectLoadingRef.current = true;
+        loadedProjectSlugRef.current = projectSlug;
         
         if (projectSlug) {
           console.log('Loading project by slug:', projectSlug);
@@ -239,15 +246,11 @@ const Canvas = () => {
             return;
           }
 
-          // Switch to the project and let AppContext load the data
           await ProjectService.switchToProject(project.id);
-          setCurrentProjectId(project.id); // Update the project ID for canvas state manager
-          console.log('Project switched, AppContext will handle data loading...');
+          setCurrentProjectId(project.id);
         } else {
-          // No project slug - get or create current project
           const currentProject = await ProjectService.getCurrentProject();
           setCurrentProjectId(currentProject);
-          console.log('Using current project:', currentProject);
         }
       } catch (error) {
         console.error('Error loading project by slug:', error);
@@ -258,11 +261,13 @@ const Canvas = () => {
           variant: "destructive",
         });
         navigate('/projects');
+      } finally {
+        projectLoadingRef.current = false;
       }
     };
 
     loadProjectBySlug();
-  }, [projectSlug, navigate, toast]); // Removed user dependency to prevent conflicts
+  }, [projectSlug]); // Only depend on projectSlug
 
   // Simplified keyboard shortcuts
   useKeyboardShortcuts({
