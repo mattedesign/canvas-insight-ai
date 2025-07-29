@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
@@ -95,6 +95,57 @@ const Canvas = () => {
     loadData();
   }, [user?.id]); // 🚨 CRITICAL FIX: Only depend on user.id, NOT stableHelpers.loadData
 
+  // ✅ CRITICAL FIX: Create stable callback references to prevent infinite re-renders
+  const handleToggleAnnotations = useCallback(() => {
+    console.log('Toggle annotations - TODO: implement');
+  }, []);
+
+  const handleImageSelect = useCallback((imageId: string) => {
+    console.log('Image selected:', imageId);
+  }, []);
+
+  const handleGenerateConcept = useCallback(async (analysisId: string) => {
+    console.log('Generate concept for analysis:', analysisId);
+  }, []);
+
+  const handleCreateGroup = useCallback((imageIds: string[]) => {
+    stableHelpers.createGroup(
+      'New Group',
+      'Group created from canvas',
+      '#3b82f6',
+      imageIds,
+      { x: 100, y: 100 }
+    );
+  }, [stableHelpers]);
+
+  const handleUngroup = useCallback((groupId: string) => {
+    console.log('Ungroup:', groupId);
+  }, []);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    console.log('Delete group:', groupId);
+  }, []);
+
+  const handleEditGroup = useCallback((groupId: string) => {
+    console.log('Edit group:', groupId);
+  }, []);
+
+  const handleGroupDisplayModeChange = useCallback((groupId: string, mode: 'standard' | 'stacked') => {
+    console.log('Change group display mode:', groupId, mode);
+  }, []);
+
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+    console.log('Submit group prompt:', groupId, prompt, isCustom);
+  }, []);
+
+  const handleOpenAnalysisPanel = useCallback((analysisId: string) => {
+    console.log('Open analysis panel:', analysisId);
+  }, []);
+
+  const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
+    console.log('Analysis complete:', imageId, analysis);
+  }, []);
+
   const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations } = state;
   const isLoading = loadingMachine.state.appData === 'loading';
 
@@ -132,35 +183,17 @@ const Canvas = () => {
         groupAnalysesWithPrompts={groupAnalysesWithPrompts || []}
         groupDisplayModes={groupDisplayModes || {}}
         showAnnotations={showAnnotations}
-        onToggleAnnotations={() => console.log('Toggle annotations - TODO: implement')}
-        onImageSelect={(imageId: string) => console.log('Image selected:', imageId)}
-        onGenerateConcept={async (analysisId: string) => {
-          console.log('Generate concept for analysis:', analysisId);
-          // TODO: Implement concept generation with analysisId
-        }}
-        onCreateGroup={(imageIds: string[]) => {
-          // Use default values for missing required parameters
-          stableHelpers.createGroup(
-            'New Group',
-            'Group created from canvas',
-            '#3b82f6',
-            imageIds,
-            { x: 100, y: 100 }
-          );
-        }}
-        onUngroup={(groupId: string) => console.log('Ungroup:', groupId)}
-        onDeleteGroup={(groupId: string) => console.log('Delete group:', groupId)}
-        onEditGroup={(groupId: string) => console.log('Edit group:', groupId)}
-        onGroupDisplayModeChange={(groupId: string, mode: 'standard' | 'stacked') => 
-          console.log('Change group display mode:', groupId, mode)
-        }
-        onSubmitGroupPrompt={async (groupId: string, prompt: string, isCustom: boolean) => 
-          console.log('Submit group prompt:', groupId, prompt, isCustom)
-        }
-        onOpenAnalysisPanel={(analysisId: string) => console.log('Open analysis panel:', analysisId)}
-        onAnalysisComplete={(imageId: string, analysis: any) => 
-          console.log('Analysis complete:', imageId, analysis)
-        }
+        onToggleAnnotations={handleToggleAnnotations}
+        onImageSelect={handleImageSelect}
+        onGenerateConcept={handleGenerateConcept}
+        onCreateGroup={handleCreateGroup}
+        onUngroup={handleUngroup}
+        onDeleteGroup={handleDeleteGroup}
+        onEditGroup={handleEditGroup}
+        onGroupDisplayModeChange={handleGroupDisplayModeChange}
+        onSubmitGroupPrompt={handleSubmitGroupPrompt}
+        onOpenAnalysisPanel={handleOpenAnalysisPanel}
+        onAnalysisComplete={handleAnalysisComplete}
         onImageUpload={stableHelpers.uploadImages}
         isGeneratingConcept={state.isGeneratingConcept}
       />
