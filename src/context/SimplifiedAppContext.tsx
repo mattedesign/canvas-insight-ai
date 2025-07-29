@@ -68,6 +68,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Use refs for stable function references that don't cause re-renders
   const isInitializedRef = useRef(false);
+  
+  // Track current project to prevent duplicate loads
+  const currentProjectRef = useRef<string | null>(null);
 
   // PHASE 1.2: Create truly stable helper functions using useRef pattern
   const userRef = useRef(user);
@@ -375,6 +378,33 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({ type: 'RESET_STATE' });
     }
   }, [user?.id, stableHelpers]); // Stable dependencies
+
+  // Listen for project changes
+  useEffect(() => {
+    const handleProjectChange = async (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      
+      // Skip if same project
+      if (currentProjectRef.current === projectId) {
+        console.log('[AppContext] Same project, skipping reload');
+        return;
+      }
+      
+      console.log('[AppContext] Project changed, reloading data for:', projectId);
+      currentProjectRef.current = projectId;
+      
+      // Clear current state
+      dispatch({ type: 'RESET_STATE' });
+      
+      // Load new project data
+      await stableHelpers.loadData();
+    };
+    
+    window.addEventListener('projectChanged', handleProjectChange as any);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange as any);
+    };
+  }, [stableHelpers.loadData]);
 
   // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
