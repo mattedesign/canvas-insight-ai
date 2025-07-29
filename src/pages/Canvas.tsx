@@ -166,20 +166,13 @@ const Canvas = () => {
   const debouncedMetadataExtraction = debounce(extractMetadataForImage, 300);
 
   // Simplified canvas upload - load images immediately, upload in background
-  const handleCanvasUpload = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-
-    console.log('Canvas upload started for', files.length, 'files');
-    
-    // Use immediate upload for fast canvas loading
-    await handleImageUploadImmediate(files);
-    
+  const handleCanvasUpload = useCallback((files: File[]) => {
     toast.toast({
       category: 'success',
-      title: "Images Added",
-      description: `Successfully added ${files.length} image${files.length > 1 ? 's' : ''} to canvas`,
+      title: `Added ${files.length} image${files.length > 1 ? 's' : ''} to canvas`,
       variant: "default"
     });
+    handleImageUploadImmediate(files);
   }, [handleImageUploadImmediate, toast]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
