@@ -405,7 +405,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       hasLoadedRef.current = false;
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user?.id]); // CRITICAL FIX: Remove stableHelpers dependency!
+  }, [user?.id]); // ✅ FIXED - only user.id
 
   // Listen for project changes
   useEffect(() => {
@@ -432,7 +432,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as any);
     };
-  }, []); // CRITICAL FIX: Remove stableHelpers.loadData dependency!
+  }, []); // ✅ FIXED - empty dependencies
 
   // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
