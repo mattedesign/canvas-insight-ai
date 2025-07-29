@@ -28,24 +28,26 @@ export const useAnalysisRealtime = ({
 
   const { toast } = useFilteredToast();
 
-  // Retry failed analysis with exponential backoff
+  // Retry failed analysis with exponential backoff (stable callback)
   const retryAnalysis = useCallback(async (imageId: string) => {
-    const retryCount = state.failedAnalyses.get(imageId) || 0;
-    if (retryCount >= 3) {
-      toast({
-        title: "Analysis failed",
-        description: "Maximum retry attempts reached. Please try again later.",
-        category: "error",
-        variant: "destructive"
-      });
-      return;
-    }
+    setState(prev => {
+      const retryCount = prev.failedAnalyses.get(imageId) || 0;
+      if (retryCount >= 3) {
+        toast({
+          title: "Analysis failed",
+          description: "Maximum retry attempts reached. Please try again later.",
+          category: "error",
+          variant: "destructive"
+        });
+        return prev;
+      }
 
-    setState(prev => ({
-      ...prev,
-      failedAnalyses: new Map(prev.failedAnalyses.set(imageId, retryCount + 1)),
-      pendingAnalyses: new Set(prev.pendingAnalyses.add(imageId))
-    }));
+      return {
+        ...prev,
+        failedAnalyses: new Map(prev.failedAnalyses.set(imageId, retryCount + 1)),
+        pendingAnalyses: new Set(prev.pendingAnalyses.add(imageId))
+      };
+    });
 
     onAnalysisStatusChange(imageId, 'processing');
 
@@ -97,7 +99,7 @@ export const useAnalysisRealtime = ({
       onAnalysisStatusChange(imageId, 'error');
       onAnalysisError(imageId, error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [state.failedAnalyses, onAnalysisUpdate, onAnalysisError, onAnalysisStatusChange, toast]);
+  }, [onAnalysisUpdate, onAnalysisError, onAnalysisStatusChange, toast]);
 
   // Track analysis progress
   const trackAnalysis = useCallback((imageId: string) => {
@@ -221,7 +223,7 @@ export const useAnalysisRealtime = ({
         channel = null;
       }
     };
-  }, [onAnalysisUpdate, onAnalysisStatusChange]); // Removed completeAnalysis from dependencies
+  }, []); // Fixed: Remove all dependencies to prevent re-subscription loops
 
   return {
     ...state,

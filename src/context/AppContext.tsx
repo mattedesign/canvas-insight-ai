@@ -129,39 +129,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const imageViewer = useImageViewer();
   const { state: viewerState, toggleAnnotation, clearAnnotations } = imageViewer;
   
-  // Create action creators
-  const actions = useMemo(() => createActions(dispatch), []);
+  // Create stable action creators (fixed circular dependency)
+  const actions = useMemo(() => createActions(dispatch), [dispatch]);
   
-  // Real-time analysis handling
+  // Real-time analysis handling with stable callbacks
   const handleAnalysisUpdate = useCallback((analysis: UXAnalysis) => {
     console.log('Real-time analysis update received:', analysis);
-    actions.updateAnalysis(analysis.imageId, analysis);
-  }, [actions]);
+    dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId: analysis.imageId, analysis } });
+  }, []);
 
   const handleAnalysisError = useCallback((imageId: string, error: string) => {
     console.error('Analysis error for image:', imageId, error);
-    actions.updateImage(imageId, { status: 'error' });
+    dispatch({ type: 'UPDATE_IMAGE', payload: { id: imageId, updates: { status: 'error' } } });
     
     toast({
       title: "Analysis failed",
       description: `Analysis failed for image: ${error}`,
       category: "error",
     });
-  }, [actions, toast]);
+  }, [toast]);
+
+  const handleAnalysisStatusChange = useCallback((imageId: string, status: UXAnalysis['status']) => {
+    dispatch({ type: 'UPDATE_IMAGE', payload: { id: imageId, updates: { status } } });
+  }, []);
 
   const analysisRealtime = useAnalysisRealtime({
     onAnalysisUpdate: handleAnalysisUpdate,
     onAnalysisError: handleAnalysisError,
-    onAnalysisStatusChange: (imageId: string, status: UXAnalysis['status']) => {
-      actions.updateImage(imageId, { status });
-    },
+    onAnalysisStatusChange: handleAnalysisStatusChange,
   });
 
-  // Data loading function
+  // Data loading function (fixed circular dependency)
   const loadDataFromDatabase = useCallback(async () => {
     if (!user) return;
 
-    actions.setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     
     try {
       const migrationResult = await DataMigrationService.loadAllFromDatabase();
@@ -173,7 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           groups: migrationResult.data.imageGroups?.length || 0
         });
         
-        actions.mergeFromDatabase(migrationResult.data, false);
+        dispatch({ type: 'MERGE_FROM_DATABASE', payload: migrationResult.data, meta: { forceReplace: false } });
       } else {
         console.log('[AppContext] No data loaded or load failed');
       }
@@ -186,11 +188,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: "error"
       });
     } finally {
-      actions.setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [user, actions, toast]);
+  }, [user, toast]);
 
-  // Load initial data when user logs in
+  // Load initial data when user logs in (fixed circular dependency)
   useEffect(() => {
     if (user) {
       console.log('[AppContext] User authenticated, loading data...');
@@ -199,7 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('[AppContext] User logged out, clearing state...');
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user, loadDataFromDatabase]);
+  }, [user]); // Removed loadDataFromDatabase dependency to break circular loop
 
   // Database sync function
   const syncToDatabase = useCallback(async () => {
@@ -537,8 +539,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     console.log('Create fork:', sessionId);
   }, []);
 
-  // Memoized context value
+  // Simplified context value (reduced dependencies to prevent infinite re-renders)
   const contextValue = useMemo(() => ({
+    // Core state and actions
     state,
     actions,
     
@@ -546,19 +549,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleImageUpload,
     handleImageUploadImmediate,
     handleAnalysisComplete,
-    
-    // Data operations
     loadDataFromDatabase,
     syncToDatabase,
     updateAppStateFromDatabase,
     clearCanvas,
-    
-    // Group operations
     createGroup,
     updateGroup,
     deleteGroup,
-    
-    // Concept generation
     generateConcept,
     
     // Direct state access for backward compatibility
@@ -612,47 +609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     handleSubmitGroupPrompt,
     handleEditGroupPrompt,
     handleCreateFork,
-  }), [
-    state,
-    actions,
-    handleImageUpload,
-    handleImageUploadImmediate,
-    handleAnalysisComplete,
-    loadDataFromDatabase,
-    syncToDatabase,
-    updateAppStateFromDatabase,
-    clearCanvas,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    generateConcept,
-    addImage,
-    updateImageAnalysisStatus,
-    addAnalysis,
-    setSelectedImage,
-    toggleAnnotations,
-    setGalleryTool,
-    imageViewer,
-    analysisRealtime,
-    viewerState,
-    toggleAnnotation,
-    clearAnnotations,
-    handleClearCanvas,
-    handleImageSelect,
-    handleToggleAnnotations,
-    handleAnnotationClick,
-    handleGalleryToolChange,
-    handleAddComment,
-    handleGenerateConcept,
-    handleCreateGroup,
-    handleUngroup,
-    handleDeleteGroup,
-    handleEditGroup,
-    handleGroupDisplayModeChange,
-    handleSubmitGroupPrompt,
-    handleEditGroupPrompt,
-    handleCreateFork,
-  ]);
+  }), [state, actions, imageViewer, analysisRealtime, viewerState, toggleAnnotation, clearAnnotations]);
 
   return (
     <AppContext.Provider value={contextValue}>

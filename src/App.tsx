@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
+import { PerformanceMonitor } from "./components/PerformanceMonitor";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Canvas from "./pages/Canvas";
@@ -29,6 +30,7 @@ const App = () => (
       <AuthProvider>
         <AIProvider>
           <AppProvider>
+            <PerformanceMonitor componentName="App" />
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={
