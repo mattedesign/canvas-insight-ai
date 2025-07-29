@@ -179,7 +179,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load data from database when user authenticates
   useEffect(() => {
     if (user && !isLoading) {
-      loadDataFromDatabase();
+      // Only load if we don't have recent uploads in progress
+      const hasRecentUploads = uploadedImages.some(img => 
+        img.status === 'uploading' || img.status === 'syncing'
+      );
+      
+      if (!hasRecentUploads && !isUploading) {
+        loadDataFromDatabase();
+      }
     } else if (!user) {
       // Reset project ID when user logs out
       ProjectService.resetProject();
@@ -192,7 +199,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setGroupAnalyses([]);
       setGroupPromptSessions([]);
     }
-  }, [user]);
+  }, [user, isUploading]);
 
   const loadDataFromDatabase = async () => {
     setIsLoading(true);
@@ -206,13 +213,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           groups: result.data.imageGroups.length
         });
         
-        // Only update state if there's actual data to prevent clearing current uploads
-        if (result.data.uploadedImages.length > 0 || uploadedImages.length === 0) {
-          setUploadedImages(result.data.uploadedImages);
-        }
-        if (result.data.analyses.length > 0 || analyses.length === 0) {
-          setAnalyses(result.data.analyses);
-        }
+        // Smart update: merge database data with current uploads, preserving blob URLs and File objects
+        updateAppStateFromDatabase(result.data);
         
         setImageGroups(result.data.imageGroups);
         setGroupAnalysesWithPrompts(result.data.groupAnalysesWithPrompts);
@@ -626,11 +628,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   onConflict: 'id'
                 });
 
-              // Update image with stored URL (while keeping blob URL as fallback)
+              // Update image with stored URL (preserving original file for fallback)
               setUploadedImages(prev => prev.map(img => 
                 img.id === uploadedImage.id ? { 
                   ...img, 
                   url: storedImageUrl,
+                  file: uploadedImage.file, // Keep original file for error recovery
                   status: 'analyzing' 
                 } : img
               ));
@@ -1180,23 +1183,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return prev;
       }
       
-      // Merge: Database images + new in-memory images not yet in database
+      // Merge with URL and File preservation
       const dbImageIds = new Set(dbImages.map(img => img.id));
       const newInMemoryImages = prev.filter(img => !dbImageIds.has(img.id));
       
-      // Also prioritize in-memory images that are being synced
-      const prioritizedInMemory = newInMemoryImages.filter(img => 
-        pendingBackgroundSync.has(img.id) || img.status === 'syncing'
-      );
+      // For images in both DB and memory, preserve blob URLs and File objects when storage fails
+      const mergedImages = dbImages.map(dbImg => {
+        const memoryImg = prev.find(img => img.id === dbImg.id);
+        if (memoryImg) {
+          // Preserve the File object and fallback URL
+          return {
+            ...dbImg,
+            file: memoryImg.file || dbImg.file,
+            url: dbImg.url || memoryImg.url, // Use storage URL if available, fallback to blob
+          };
+        }
+        return dbImg;
+      });
       
       console.log('Merging images:', {
         fromDB: dbImages.length,
         newInMemory: newInMemoryImages.length,
-        prioritized: prioritizedInMemory.length,
-        total: dbImages.length + newInMemoryImages.length
+        merged: mergedImages.length,
+        total: mergedImages.length + newInMemoryImages.length
       });
       
-      return [...dbImages, ...newInMemoryImages];
+      return [...mergedImages, ...newInMemoryImages];
     });
     
     // Smart merge: combine database analyses with current in-memory analyses

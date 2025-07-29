@@ -160,6 +160,20 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           alt={image.name}
           className="w-full h-auto object-contain"
           style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
+          onError={(e) => {
+            console.error(`Image failed to load: ${image.url}`);
+            // Try to regenerate blob URL if we have the file
+            if (image.file && image.url.startsWith('http')) {
+              console.log('Fallback to blob URL for:', image.name);
+              const fallbackUrl = URL.createObjectURL(image.file);
+              e.currentTarget.src = fallbackUrl;
+            } else {
+              console.error('No fallback available for:', image.name);
+            }
+          }}
+          onLoad={() => {
+            console.log(`Image loaded successfully: ${image.name}`);
+          }}
         />
 
         {/* Drawing Overlay for Draw Mode */}
