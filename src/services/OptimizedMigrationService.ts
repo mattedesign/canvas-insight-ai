@@ -1,0 +1,416 @@
+import { supabase } from '@/integrations/supabase/client';
+import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
+import { ImageMigrationService, AnalysisMigrationService, GroupMigrationService, GroupAnalysisMigrationService } from './DataMigrationService';
+
+export class OptimizedImageMigrationService extends ImageMigrationService {
+  static async loadImagesFromDatabaseOptimized(
+    projectId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      includeProcessing?: boolean;
+      status?: 'completed' | 'processing' | 'error';
+    } = {}
+  ): Promise<UploadedImage[]> {
+    const { limit = 50, offset = 0, includeProcessing = true, status } = options;
+    
+    // Use existing indexes for performance
+    let query = supabase
+      .from('images')
+      .select(`
+        id,
+        original_name,
+        storage_path,
+        dimensions,
+        file_size,
+        file_type,
+        uploaded_at,
+        project_id,
+        metadata
+      `)
+      .eq('project_id', projectId)
+      .order('uploaded_at', { ascending: false });
+    
+    // Filter by status if specified
+    if (status) {
+      query = query.eq('security_scan_status', status);
+    } else if (!includeProcessing) {
+      query = query.neq('security_scan_status', 'processing');
+    }
+    
+    // Apply pagination
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1);
+    }
+    
+    const { data: images, error } = await query;
+    
+    if (error) throw error;
+    if (!images) return [];
+    
+    // Process images with optimized URL generation
+    return images.map(img => {
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(img.storage_path);
+        
+      return {
+        id: img.id,
+        name: img.original_name,
+        url: urlData.publicUrl,
+        file: null, // Not needed for loaded images
+        size: img.file_size || 0,
+        type: img.file_type || 'image/jpeg',
+        dimensions: img.dimensions as { width: number; height: number } || { width: 0, height: 0 },
+        status: 'completed' as const, // Map from security_scan_status
+        createdAt: new Date(img.uploaded_at),
+        userId: '', // Will be populated by context
+        projectId: img.project_id,
+        analysis: null // Will be populated separately
+      };
+    });
+  }
+  
+  static async getImageCount(projectId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('images')
+      .select('id', { count: 'exact' })
+      .eq('project_id', projectId);
+      
+    if (error) throw error;
+    return count || 0;
+  }
+
+  static async getImagesByIds(imageIds: string[]): Promise<UploadedImage[]> {
+    if (imageIds.length === 0) return [];
+
+    const { data: images, error } = await supabase
+      .from('images')
+      .select(`
+        id,
+        original_name,
+        storage_path,
+        dimensions,
+        file_size,
+        file_type,
+        uploaded_at,
+        project_id,
+        metadata
+      `)
+      .in('id', imageIds);
+
+    if (error) throw error;
+    if (!images) return [];
+
+    return images.map(img => {
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(img.storage_path);
+        
+      return {
+        id: img.id,
+        name: img.original_name,
+        url: urlData.publicUrl,
+        file: null,
+        size: img.file_size || 0,
+        type: img.file_type || 'image/jpeg',
+        dimensions: img.dimensions as { width: number; height: number } || { width: 0, height: 0 },
+        status: 'completed' as const,
+        createdAt: new Date(img.uploaded_at),
+        userId: '',
+        projectId: img.project_id,
+        analysis: null
+      };
+    });
+  }
+}
+
+export class OptimizedAnalysisMigrationService extends AnalysisMigrationService {
+  static async loadAnalysesForImagesOptimized(
+    imageIds: string[],
+    options: {
+      limit?: number;
+      status?: 'completed' | 'processing' | 'error';
+    } = {}
+  ): Promise<UXAnalysis[]> {
+    if (imageIds.length === 0) return [];
+    
+    const { limit, status } = options;
+    
+    let query = supabase
+      .from('ux_analyses')
+      .select(`
+        id,
+        image_id,
+        visual_annotations,
+        suggestions,
+        summary,
+        metadata,
+        user_context,
+        analysis_type,
+        status,
+        created_at
+      `)
+      .in('image_id', imageIds)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data: analyses, error } = await query;
+    
+    if (error) throw error;
+    if (!analyses) return [];
+
+    return analyses.map(analysis => ({
+      id: analysis.id,
+      imageId: analysis.image_id,
+      imageName: '', // Will be populated when needed
+      imageUrl: '', // Will be populated when needed
+      visualAnnotations: analysis.visual_annotations as any || [],
+      suggestions: analysis.suggestions as any || [],
+      summary: analysis.summary as any || {},
+      metadata: analysis.metadata as any || {},
+      userContext: analysis.user_context || '',
+      analysisType: analysis.analysis_type as 'full_analysis' | 'quick_scan' || 'full_analysis',
+      status: analysis.status as 'completed' | 'processing' | 'error' || 'completed',
+      createdAt: new Date(analysis.created_at)
+    }));
+  }
+
+  static async getAnalysisCount(projectId: string): Promise<number> {
+    // First get all image IDs for the project
+    const { data: images } = await supabase
+      .from('images')
+      .select('id')
+      .eq('project_id', projectId);
+
+    if (!images || images.length === 0) return 0;
+
+    const imageIds = images.map(img => img.id);
+    
+    const { count, error } = await supabase
+      .from('ux_analyses')
+      .select('id', { count: 'exact' })
+      .in('image_id', imageIds);
+
+    if (error) throw error;
+    return count || 0;
+  }
+}
+
+export class OptimizedGroupMigrationService extends GroupMigrationService {
+  static async loadGroupsFromDatabaseOptimized(
+    projectId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      includeImages?: boolean;
+    } = {}
+  ): Promise<ImageGroup[]> {
+    const { limit = 50, offset = 0, includeImages = true } = options;
+
+    // Load groups first
+    let query = supabase
+      .from('image_groups')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (limit > 0) {
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: groups, error } = await query;
+
+    if (error) throw error;
+    if (!groups) return [];
+
+    // Load group images separately if needed
+    let groupImages: any[] = [];
+    if (includeImages && groups.length > 0) {
+      const groupIds = groups.map(g => g.id);
+      const { data: images } = await supabase
+        .from('group_images')
+        .select('group_id, image_id')
+        .in('group_id', groupIds);
+      
+      groupImages = images || [];
+    }
+
+    return groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      description: group.description || '',
+      color: group.color,
+      imageIds: includeImages ? groupImages
+        .filter(gi => gi.group_id === group.id)
+        .map(gi => gi.image_id) : [],
+      position: group.position as { x: number; y: number } || { x: 0, y: 0 },
+      createdAt: new Date(group.created_at),
+      projectId: group.project_id
+    }));
+  }
+
+  static async getGroupCount(projectId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('image_groups')
+      .select('id', { count: 'exact' })
+      .eq('project_id', projectId);
+
+    if (error) throw error;
+    return count || 0;
+  }
+}
+
+export class OptimizedGroupAnalysisMigrationService extends GroupAnalysisMigrationService {
+  static async loadGroupAnalysesOptimized(
+    groupIds: string[],
+    options: {
+      limit?: number;
+      includePatterns?: boolean;
+    } = {}
+  ): Promise<GroupAnalysisWithPrompt[]> {
+    if (groupIds.length === 0) return [];
+    
+    const { limit, includePatterns = true } = options;
+
+    let query = supabase
+      .from('group_analyses')
+      .select('*')
+      .in('group_id', groupIds)
+      .order('created_at', { ascending: false });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data: analyses, error } = await query;
+    
+    if (error) throw error;
+    if (!analyses) return [];
+
+    return analyses.map(analysis => ({
+      id: analysis.id,
+      sessionId: `session-${analysis.id}`,
+      groupId: analysis.group_id,
+      prompt: analysis.prompt,
+      isCustom: analysis.is_custom || false,
+      summary: {
+        overallScore: (analysis.summary as any)?.overallScore || 0,
+        consistency: (analysis.summary as any)?.consistency || 0,
+        thematicCoherence: (analysis.summary as any)?.thematicCoherence || 0,
+        userFlowContinuity: (analysis.summary as any)?.userFlowContinuity || 0
+      },
+      insights: analysis.insights as any || [],
+      recommendations: analysis.recommendations as any || [],
+      patterns: includePatterns ? {
+        commonElements: (analysis.patterns as any)?.commonElements || [],
+        designInconsistencies: (analysis.patterns as any)?.designInconsistencies || [],
+        userJourneyGaps: (analysis.patterns as any)?.userJourneyGaps || []
+      } : {
+        commonElements: [],
+        designInconsistencies: [],
+        userJourneyGaps: []
+      },
+      createdAt: new Date(analysis.created_at)
+    }));
+  }
+
+  static async getGroupAnalysisCount(projectId: string): Promise<number> {
+    // First get all group IDs for the project
+    const { data: groups } = await supabase
+      .from('image_groups')
+      .select('id')
+      .eq('project_id', projectId);
+
+    if (!groups || groups.length === 0) return 0;
+
+    const groupIds = groups.map(group => group.id);
+    
+    const { count, error } = await supabase
+      .from('group_analyses')
+      .select('id', { count: 'exact' })
+      .in('group_id', groupIds);
+
+    if (error) throw error;
+    return count || 0;
+  }
+}
+
+// Combined optimized service for batch operations
+export class OptimizedDataService {
+  static async getProjectStats(projectId: string): Promise<{
+    imageCount: number;
+    analysisCount: number;
+    groupCount: number;
+    groupAnalysisCount: number;
+  }> {
+    const [imageCount, analysisCount, groupCount, groupAnalysisCount] = await Promise.all([
+      OptimizedImageMigrationService.getImageCount(projectId),
+      OptimizedAnalysisMigrationService.getAnalysisCount(projectId),
+      OptimizedGroupMigrationService.getGroupCount(projectId),
+      OptimizedGroupAnalysisMigrationService.getGroupAnalysisCount(projectId)
+    ]);
+
+    return {
+      imageCount,
+      analysisCount,
+      groupCount,
+      groupAnalysisCount
+    };
+  }
+
+  static async loadProjectDataBatch(
+    projectId: string,
+    options: {
+      imageLimit?: number;
+      groupLimit?: number;
+      analysisLimit?: number;
+    } = {}
+  ): Promise<{
+    images: UploadedImage[];
+    analyses: UXAnalysis[];
+    groups: ImageGroup[];
+    groupAnalyses: GroupAnalysisWithPrompt[];
+  }> {
+    const { imageLimit = 20, groupLimit = 10, analysisLimit = 50 } = options;
+
+    // Load images first
+    const images = await OptimizedImageMigrationService.loadImagesFromDatabaseOptimized(
+      projectId,
+      { limit: imageLimit }
+    );
+
+    // Load groups
+    const groups = await OptimizedGroupMigrationService.loadGroupsFromDatabaseOptimized(
+      projectId,
+      { limit: groupLimit }
+    );
+
+    // Load analyses for the loaded images
+    const imageIds = images.map(img => img.id);
+    const analyses = await OptimizedAnalysisMigrationService.loadAnalysesForImagesOptimized(
+      imageIds,
+      { limit: analysisLimit }
+    );
+
+    // Load group analyses for the loaded groups
+    const groupIds = groups.map(group => group.id);
+    const groupAnalyses = await OptimizedGroupAnalysisMigrationService.loadGroupAnalysesOptimized(
+      groupIds
+    );
+
+    return {
+      images,
+      analyses,
+      groups,
+      groupAnalyses
+    };
+  }
+}

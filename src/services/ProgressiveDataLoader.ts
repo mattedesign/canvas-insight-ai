@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
-import { GroupMigrationService } from './DataMigrationService';
+import { OptimizedDataService } from './OptimizedMigrationService';
 
 export class ProgressiveDataLoader {
   private static loadingState = new Map<string, boolean>();
@@ -24,28 +24,20 @@ export class ProgressiveDataLoader {
     this.loadingState.set(cacheKey, true);
     
     try {
-      // Stage 1: Load essential data first (20%)
-      onProgress?.('Loading images...', 20);
-      const images = await this.loadImagesWithPagination(projectId, 0, 20);
+      // Use optimized batch loading for better performance
+      onProgress?.('Loading project data...', 50);
+      const data = await OptimizedDataService.loadProjectDataBatch(projectId, {
+        imageLimit: 20,
+        groupLimit: 10,
+        analysisLimit: 50
+      });
       
-      // Stage 2: Load analyses for visible images (40%)
-      onProgress?.('Loading analyses...', 40);
-      const visibleImageIds = images.slice(0, 10).map(img => img.id);
-      const analyses = await this.loadAnalysesForImages(visibleImageIds);
-      
-      // Stage 3: Load groups (60%)
-      onProgress?.('Loading groups...', 60);
-      const groups = await this.loadGroupsFromDatabase(projectId);
-      
-      // Stage 4: Load group analyses (80%)
-      onProgress?.('Loading group analyses...', 80);
-      const groupAnalyses = await this.loadGroupAnalysesLazy(groups.slice(0, 5));
-      
-      // Stage 5: Background load remaining data (100%)
       onProgress?.('Finalizing...', 100);
-      this.backgroundLoadRemainingData(projectId, images.length);
       
-      return { images, analyses, groups, groupAnalyses };
+      // Background load remaining data
+      this.backgroundLoadRemainingData(projectId, data.images.length);
+      
+      return data;
       
     } finally {
       this.loadingState.delete(cacheKey);
