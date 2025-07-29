@@ -217,7 +217,7 @@ const Canvas = () => {
     setSelectedGroupId(null);
   }, []);
 
-  // Listen for project changes instead of triggering them
+  // Listen for project changes with stable handler
   useEffect(() => {
     const handleProjectChange = (event: CustomEvent) => {
       const { projectId } = event.detail;
@@ -229,7 +229,7 @@ const Canvas = () => {
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as any);
     };
-  }, []);
+  }, []); // ✅ Empty dependencies - stable event listener
   
   // STEP 2.1: Create stable project loading function
   const { user } = useAuth();
