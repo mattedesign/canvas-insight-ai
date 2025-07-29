@@ -370,14 +370,42 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log('[SimplifiedAppContext] User authenticated, loading data...');
       lastUserIdRef.current = user.id;
       hasLoadedRef.current = false;
-      stableHelpers.loadData();
+      
+      // CRITICAL FIX: Call loadData directly without depending on stableHelpers
+      const loadDataDirectly = async () => {
+        if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
+        
+        loadingMachineRef.current.actions.startAppLoad();
+        
+        try {
+          const migrationResult = await DataMigrationService.loadAllFromDatabase();
+          
+          if (migrationResult.success && migrationResult.data) {
+            console.log('[SimplifiedAppContext] Data loaded successfully');
+            dispatch({ 
+              type: 'MERGE_FROM_DATABASE', 
+              payload: migrationResult.data, 
+              meta: { forceReplace: false } 
+            });
+            loadingMachineRef.current.actions.appLoadSuccess();
+          } else {
+            throw new Error('No data available or load failed');
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+          console.error('[SimplifiedAppContext] Failed to load data:', error);
+          loadingMachineRef.current.actions.appLoadError(errorMessage);
+        }
+      };
+      
+      loadDataDirectly();
     } else if (!user && lastUserIdRef.current) {
       console.log('[SimplifiedAppContext] User logged out, clearing state...');
       lastUserIdRef.current = null;
       hasLoadedRef.current = false;
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user?.id, stableHelpers]); // Stable dependencies
+  }, [user?.id]); // CRITICAL FIX: Remove stableHelpers dependency!
 
   // Listen for project changes
   useEffect(() => {
@@ -404,16 +432,16 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as any);
     };
-  }, [stableHelpers.loadData]);
+  }, []); // CRITICAL FIX: Remove stableHelpers.loadData dependency!
 
   // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       console.log('[SimplifiedAppContext] Cleaning up context...');
-      loadingMachine.actions.resetAll();
+      loadingMachineRef.current.actions.resetAll();
       isInitializedRef.current = false;
     };
-  }, [loadingMachine.actions]);
+  }, []); // CRITICAL FIX: Remove loadingMachine.actions dependency!
 
   // PHASE 3.1: Create context value with stable references including loading machine
   const contextValue = useMemo(() => ({

@@ -9,6 +9,7 @@ import { SimplifiedAppProvider } from "./context/SimplifiedAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
+import { RenderDiagnostic } from "./components/RenderDiagnostic";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Canvas from "./pages/Canvas";
@@ -71,6 +72,7 @@ const App = () => {
       <AuthProvider>
         <AIProvider>
           <SimplifiedAppProvider>
+            <RenderDiagnostic />
             <PerformanceMonitor componentName="App" />
             <Routes>
               <Route path="/auth" element={<Auth />} />

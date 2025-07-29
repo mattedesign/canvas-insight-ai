@@ -157,36 +157,8 @@ export const useLoadingStateMachine = () => {
   const [state, dispatch] = useReducer(loadingReducer, initialState);
   const operationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  // Auto-reset success states after a delay to prevent stale UI
-  const scheduleSuccessReset = useCallback((operationType: string, delay = 3000) => {
-    const timeoutId = setTimeout(() => {
-      if (operationType === 'appData' && state.appData === 'success') {
-        // Don't reset app data success state automatically
-        return;
-      }
-      
-      // Reset other success states to idle after delay
-      switch (operationType) {
-        case 'upload':
-          if (state.imageUpload === 'success') {
-            // Custom reset logic for upload if needed
-          }
-          break;
-        case 'sync':
-          if (state.sync === 'success') {
-            // Custom reset logic for sync if needed
-          }
-          break;
-        case 'concept':
-          if (state.conceptGeneration === 'success') {
-            // Custom reset logic for concept generation if needed
-          }
-          break;
-      }
-    }, delay);
-
-    operationTimeouts.current.set(operationType, timeoutId);
-  }, [state]);
+  // CRITICAL FIX: Remove scheduleSuccessReset to prevent dependency loops
+  // This was causing infinite re-renders because it depends on state
 
   // Stable action creators that prevent re-render loops
   const actions = useMemo(() => ({
@@ -208,7 +180,6 @@ export const useLoadingStateMachine = () => {
 
     uploadSuccess: () => {
       dispatch({ type: 'UPLOAD_SUCCESS' });
-      scheduleSuccessReset('upload');
     },
 
     uploadError: (error: string) => {
@@ -221,7 +192,6 @@ export const useLoadingStateMachine = () => {
 
     syncSuccess: () => {
       dispatch({ type: 'SYNC_SUCCESS' });
-      scheduleSuccessReset('sync');
     },
 
     syncError: (error: string) => {
@@ -234,7 +204,6 @@ export const useLoadingStateMachine = () => {
 
     conceptGenerationSuccess: () => {
       dispatch({ type: 'CONCEPT_GENERATION_SUCCESS' });
-      scheduleSuccessReset('concept');
     },
 
     conceptGenerationError: (error: string) => {
@@ -251,7 +220,7 @@ export const useLoadingStateMachine = () => {
       operationTimeouts.current.clear();
       dispatch({ type: 'RESET_ALL' });
     },
-  }), [scheduleSuccessReset]);
+  }), []); // CRITICAL FIX: Remove scheduleSuccessReset dependency!
 
   // Computed states for easy consumption
   const computed = {
