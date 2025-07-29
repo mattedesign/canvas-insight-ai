@@ -1,5 +1,6 @@
 /**
- * EMERGENCY FIX: SimplifiedAppContext with circular dependencies removed
+ * Simplified App Context - Phase 3: Optimized Data Loading with State Machine
+ * Implements explicit loading states and removes loading logic from useEffect dependencies
  */
 
 import React, { 
@@ -8,37 +9,43 @@ import React, {
   useReducer, 
   useMemo, 
   useRef,
-  useEffect,
-  useCallback
+  useEffect
 } from 'react';
 import { useAuth } from './AuthContext';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { useLoadingStateMachine } from '@/hooks/useLoadingStateMachine';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { loadImageDimensions } from '@/utils/imageUtils';
-import type { AppState, AppAction } from './AppStateTypes';
+import { DataLoadingErrorBoundary } from '@/components/DataLoadingErrorBoundary';
+import type { 
+  AppState, 
+  AppAction,
+  UploadedImage, 
+  LegacyUXAnalysis as UXAnalysis,
+  LegacyImageGroup as ImageGroup,
+  LegacyGeneratedConcept as GeneratedConcept
+} from './AppStateTypes';
 import { appStateReducer } from './AppStateReducer';
 import { initialAppState } from './AppStateTypes';
 
+// PHASE 3.1: Simplified context interface with loading state machine
 interface SimplifiedAppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
+  stableHelpers: StableHelpers;
+  loadingMachine: ReturnType<typeof useLoadingStateMachine>;
+}
+
+// Stable helper functions with no dependencies on changing state
+interface StableHelpers {
   loadData: () => Promise<void>;
-  isLoading: boolean;
-  // Backward compatibility properties
-  stableHelpers?: {
-    loadData: () => Promise<void>;
-    syncData: () => Promise<void>;
-    uploadImages: (files: File[]) => Promise<void>;
-    uploadImagesImmediate: (files: File[]) => Promise<void>;
-    createGroup: (name: string, description: string, color: string, imageIds: string[], position: { x: number; y: number }) => void;
-    generateConcept: (prompt: string, selectedImages?: string[]) => Promise<void>;
-    clearCanvas: () => void;
-  };
-  loadingMachine?: {
-    state: Record<string, string>;
-    actions: Record<string, () => void>;
-  };
+  syncData: () => Promise<void>;
+  uploadImages: (files: File[]) => Promise<void>;
+  uploadImagesImmediate: (files: File[]) => Promise<void>;
+  createGroup: (name: string, description: string, color: string, imageIds: string[], position: { x: number; y: number }) => void;
+  generateConcept: (prompt: string, selectedImages?: string[]) => Promise<void>;
+  clearCanvas: () => void;
 }
 
 const SimplifiedAppContext = createContext<SimplifiedAppContextType | undefined>(undefined);
@@ -56,129 +63,374 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const { toast } = useFilteredToast();
   
-  // Use refs to prevent circular dependencies
-  const isLoadingRef = useRef(false);
-  const hasLoadedRef = useRef(false);
-  const loadingPromiseRef = useRef<Promise<void> | null>(null);
+  // PHASE 3.1: Integrate loading state machine
+  const loadingMachine = useLoadingStateMachine();
+
+  // Use refs for stable function references that don't cause re-renders
+  const isInitializedRef = useRef(false);
   
-  // Stable load function that doesn't cause re-renders
-  const loadData = useCallback(async (): Promise<void> => {
-    // Prevent concurrent loads
-    if (isLoadingRef.current || !user) {
-      console.log('[AppContext] Skipping load - already loading or no user');
-      return Promise.resolve();
-    }
-    
-    // If already loaded for this user, skip
-    if (hasLoadedRef.current) {
-      console.log('[AppContext] Data already loaded');
-      return Promise.resolve();
-    }
-    
-    console.log('[AppContext] Starting data load...');
-    isLoadingRef.current = true;
-    
-    // Create a single promise for this load operation
-    return DataMigrationService.loadAllFromDatabase()
-      .then((migrationResult) => {
+  // Track current project to prevent duplicate loads
+  const currentProjectRef = useRef<string | null>(null);
+
+  // PHASE 1.2: Create truly stable helper functions using useRef pattern
+  const userRef = useRef(user);
+  const toastRef = useRef(toast);
+  const loadingMachineRef = useRef(loadingMachine);
+
+  // Update refs without causing re-renders
+  userRef.current = user;
+  toastRef.current = toast;
+  loadingMachineRef.current = loadingMachine;
+
+  // PHASE 1.2: Stable helper functions with EMPTY dependencies (no re-render triggers)
+  const stableHelpers = useMemo<StableHelpers>(() => ({
+    loadData: async (): Promise<void> => {
+      if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
+      
+      loadingMachineRef.current.actions.startAppLoad();
+      
+      try {
+        const migrationResult = await DataMigrationService.loadAllFromDatabase();
+        
         if (migrationResult.success && migrationResult.data) {
-          console.log('[AppContext] Data loaded successfully');
+          console.log('[SimplifiedAppContext] Data loaded successfully:', {
+            images: migrationResult.data.uploadedImages?.length || 0,
+            analyses: migrationResult.data.analyses?.length || 0,
+            groups: migrationResult.data.imageGroups?.length || 0
+          });
+          
           dispatch({ 
             type: 'MERGE_FROM_DATABASE', 
             payload: migrationResult.data, 
             meta: { forceReplace: false } 
           });
-          hasLoadedRef.current = true;
+          
+          loadingMachineRef.current.actions.appLoadSuccess();
+        } else {
+          throw new Error('No data available or load failed');
         }
-      })
-      .catch((error) => {
-        console.error('[AppContext] Failed to load data:', error);
-        toast({
-          category: "error",
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+        console.error('[SimplifiedAppContext] Failed to load data:', error);
+        
+        loadingMachineRef.current.actions.appLoadError(errorMessage);
+        
+        toastRef.current({
           title: "Failed to load data",
-          description: "Please refresh the page",
+          description: "Error loading your data. Please try refreshing.",
           variant: "destructive",
+          category: "error"
         });
-      })
-      .finally(() => {
-        isLoadingRef.current = false;
-        loadingPromiseRef.current = null;
+      }
+    },
+
+    syncData: async (): Promise<void> => {
+      if (!userRef.current || loadingMachineRef.current.state.sync === 'loading') return;
+      
+      loadingMachineRef.current.actions.startSync();
+      
+      try {
+        const migrationResult = await DataMigrationService.loadAllFromDatabase();
+        
+        if (migrationResult.success && migrationResult.data) {
+          dispatch({ 
+            type: 'MERGE_FROM_DATABASE', 
+            payload: migrationResult.data, 
+            meta: { forceReplace: false } 
+          });
+          
+          loadingMachineRef.current.actions.syncSuccess();
+          
+          toastRef.current({
+            title: "Sync complete",
+            description: "Your data has been synchronized with the cloud.",
+            category: "success"
+          });
+        } else {
+          throw new Error('Sync failed - no data retrieved');
+        }
+        
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Sync failed';
+        console.error('[SimplifiedAppContext] Sync failed:', error);
+        
+        loadingMachineRef.current.actions.syncError(errorMessage);
+        
+        toastRef.current({
+          title: "Sync failed",
+          description: "Failed to save data. Please try again.",
+          variant: "destructive",
+          category: "error"
+        });
+        
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      }
+    },
+
+    uploadImages: async (files: File[]): Promise<void> => {
+      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
+      
+      loadingMachineRef.current.actions.startUpload();
+      
+      try {
+        const newImages: UploadedImage[] = [];
+        const newAnalyses: UXAnalysis[] = [];
+        
+        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
+          const imageId = `img-${Date.now()}-${i}`;
+          const imageUrl = URL.createObjectURL(file);
+          
+          const dimensions = await loadImageDimensions(file);
+          
+          const uploadedImage: UploadedImage = {
+            id: imageId,
+            name: file.name,
+            url: imageUrl,
+            file,
+            dimensions,
+            status: 'completed'
+          };
+          
+          return {
+            image: uploadedImage,
+            analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+          };
+        });
+        
+        const results = await Promise.all(dimensionsPromises);
+        
+        results.forEach(result => {
+          newImages.push(result.image);
+          newAnalyses.push(result.analysis);
+        });
+        
+        dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+        
+        loadingMachineRef.current.actions.uploadSuccess();
+
+        toastRef.current({
+          title: "Upload complete",
+          description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
+          category: "success"
+        });
+        
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+        console.error('[SimplifiedAppContext] Upload failed:', error);
+        
+        loadingMachineRef.current.actions.uploadError(errorMessage);
+        
+        toastRef.current({
+          title: "Upload failed", 
+          description: "Failed to upload images. Please try again.",
+          variant: "destructive",
+          category: "error"
+        });
+      }
+    },
+
+    uploadImagesImmediate: async (files: File[]): Promise<void> => {
+      if (loadingMachineRef.current.state.imageUpload === 'loading') return;
+      
+      loadingMachineRef.current.actions.startUpload();
+
+      try {
+        const newImages: UploadedImage[] = [];
+        const newAnalyses: UXAnalysis[] = [];
+        
+        const dimensionsPromises = files.map(async (file, i): Promise<{ image: UploadedImage; analysis: UXAnalysis }> => {
+          const imageId = `temp-${Date.now()}-${i}`;
+          const imageUrl = URL.createObjectURL(file);
+          
+          const dimensions = await loadImageDimensions(file);
+          
+          const uploadedImage: UploadedImage = {
+            id: imageId,
+            name: file.name,
+            url: imageUrl,
+            file,
+            dimensions,
+            status: 'completed'
+          };
+          
+          return {
+            image: uploadedImage,
+            analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+          };
+        });
+        
+        const results = await Promise.all(dimensionsPromises);
+        
+        results.forEach(result => {
+          newImages.push(result.image);
+          newAnalyses.push(result.analysis);
+        });
+        
+        dispatch({ type: 'BATCH_UPLOAD', payload: { images: newImages, analyses: newAnalyses } });
+        
+        loadingMachineRef.current.actions.uploadSuccess();
+
+        toastRef.current({
+          title: "Upload complete",
+          description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
+          category: "success"
+        });
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Immediate upload failed';
+        console.error('Error in immediate image upload:', error);
+        
+        loadingMachineRef.current.actions.uploadError(errorMessage);
+        
+        toastRef.current({
+          title: "Upload error",
+          description: "Some images failed to load properly. Please try again.",
+          category: "error"
+        });
+      }
+    },
+
+    createGroup: (
+      name: string, 
+      description: string, 
+      color: string, 
+      imageIds: string[], 
+      position = { x: 100, y: 100 }
+    ) => {
+      const newGroup: ImageGroup = {
+        id: `group-${Date.now()}`,
+        name,
+        description,
+        color,
+        imageIds,
+        position,
+        createdAt: new Date()
+      };
+
+      dispatch({ type: 'ADD_GROUP', payload: newGroup });
+      
+      toastRef.current({
+        title: "Group Created",
+        description: `Created group "${name}" with ${imageIds.length} images`,
+        category: "success"
       });
-  }, [user, dispatch, toast]); // Minimal stable dependencies
-  
-  // Create mock stableHelpers for backward compatibility
-  const stableHelpers = useMemo(() => ({
-    loadData: () => loadData(),
-    syncData: () => Promise.resolve(), // Mock sync function
-    uploadImages: async (files: File[]) => {
-      console.log('Mock uploadImages called with', files.length, 'files');
     },
-    uploadImagesImmediate: async (files: File[]) => {
-      console.log('Mock uploadImagesImmediate called with', files.length, 'files');
+
+    generateConcept: async (prompt: string, selectedImages?: string[]): Promise<void> => {
+      if (loadingMachineRef.current.state.conceptGeneration === 'loading') return;
+      
+      loadingMachineRef.current.actions.startConceptGeneration();
+      
+      try {
+        const conceptId = `concept-${Date.now()}`;
+        const concept: GeneratedConcept = {
+          id: conceptId,
+          title: 'Generated Concept',
+          imageUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmY2OTQyIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5Db25jZXB0PC90ZXh0Pjwvc3ZnPg==',
+          analysisId: selectedImages?.[0] || '',
+          description: `Generated concept based on: ${prompt}`,
+          improvements: [],
+          createdAt: new Date()
+        };
+
+        dispatch({ type: 'SET_CONCEPTS', payload: [concept] });
+        
+        loadingMachineRef.current.actions.conceptGenerationSuccess();
+        
+        toastRef.current({
+          title: "Concept Generated",
+          description: "New concept has been generated successfully",
+          category: "success"
+        });
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Concept generation failed';
+        console.error('Concept generation failed:', error);
+        
+        loadingMachineRef.current.actions.conceptGenerationError(errorMessage);
+        
+        toastRef.current({
+          title: "Generation Failed",
+          description: "Failed to generate concept. Please try again.",
+          variant: "destructive",
+          category: "error"
+        });
+      }
     },
-    createGroup: (name: string, description: string, color: string, imageIds: string[], position: { x: number; y: number }) => {
-      console.log('Mock createGroup called:', name);
-    },
-    generateConcept: async (prompt: string, selectedImages?: string[]) => {
-      console.log('Mock generateConcept called:', prompt);
-    },
+
     clearCanvas: () => {
       dispatch({ type: 'RESET_STATE' });
     }
-  }), [loadData, dispatch]);
-  
-  // Create mock loadingMachine for backward compatibility
-  const loadingMachine = useMemo(() => ({
-    state: { appData: 'idle', sync: 'idle', imageUpload: 'idle', conceptGeneration: 'idle' },
-    actions: {
-      startAppLoad: () => {},
-      appLoadSuccess: () => {},
-      appLoadError: () => {},
-      startSync: () => {},
-      syncSuccess: () => {},
-      syncError: () => {},
-      startUpload: () => {},
-      uploadSuccess: () => {},
-      uploadError: () => {},
-      startConceptGeneration: () => {},
-      conceptGenerationSuccess: () => {},
-      conceptGenerationError: () => {},
-      resetAll: () => {}
-    }
-  }), []);
-  
-  // Load data when user changes - single effect, no dependencies on loadData
+  }), []); // PHASE 1.2 CRITICAL FIX: EMPTY dependencies - truly stable
+
+  // Track loading state with ref
+  const hasLoadedRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (user && !hasLoadedRef.current && !isLoadingRef.current) {
-      // Use setTimeout to avoid immediate execution in render
-      const timeoutId = setTimeout(() => {
-        loadData();
-      }, 0);
-      
-      return () => clearTimeout(timeoutId);
-    } else if (!user && hasLoadedRef.current) {
-      // User logged out - reset state
+    if (user && user.id !== lastUserIdRef.current) {
+      console.log('[SimplifiedAppContext] User authenticated, loading data...');
+      lastUserIdRef.current = user.id;
+      hasLoadedRef.current = false;
+      stableHelpers.loadData();
+    } else if (!user && lastUserIdRef.current) {
+      console.log('[SimplifiedAppContext] User logged out, clearing state...');
+      lastUserIdRef.current = null;
       hasLoadedRef.current = false;
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user?.id]); // Only depend on user ID
-  
-  // Memoized context value - only recreate when state changes
+  }, [user?.id, stableHelpers]); // Stable dependencies
+
+  // Listen for project changes
+  useEffect(() => {
+    const handleProjectChange = async (event: CustomEvent) => {
+      const { projectId } = event.detail;
+      
+      // Skip if same project
+      if (currentProjectRef.current === projectId) {
+        console.log('[AppContext] Same project, skipping reload');
+        return;
+      }
+      
+      console.log('[AppContext] Project changed, reloading data for:', projectId);
+      currentProjectRef.current = projectId;
+      
+      // Clear current state
+      dispatch({ type: 'RESET_STATE' });
+      
+      // Load new project data
+      await stableHelpers.loadData();
+    };
+    
+    window.addEventListener('projectChanged', handleProjectChange as any);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange as any);
+    };
+  }, [stableHelpers.loadData]);
+
+  // PHASE 3.2: Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      console.log('[SimplifiedAppContext] Cleaning up context...');
+      loadingMachine.actions.resetAll();
+      isInitializedRef.current = false;
+    };
+  }, [loadingMachine.actions]);
+
+  // PHASE 3.1: Create context value with stable references including loading machine
   const contextValue = useMemo(() => ({
     state,
     dispatch,
-    loadData,
-    isLoading: isLoadingRef.current,
     stableHelpers,
     loadingMachine
-  }), [state, loadData, stableHelpers, loadingMachine]);
-  
+  }), [state, stableHelpers, loadingMachine]);
+
   return (
     <SimplifiedAppContext.Provider value={contextValue}>
-      {children}
+      <DataLoadingErrorBoundary>
+        {children}
+      </DataLoadingErrorBoundary>
     </SimplifiedAppContext.Provider>
   );
 };
 
-// Export for backward compatibility
+// Export for backward compatibility during migration
 export { SimplifiedAppContext as AppContext, useSimplifiedAppContext as useAppContext };
