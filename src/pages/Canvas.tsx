@@ -153,103 +153,47 @@ const Canvas = () => {
     setSelectedGroupId(null);
   };
 
-  // Load project by slug if provided, otherwise check for existing data
+  // Load project by slug if provided - let AppContext handle general data loading
   const { user } = useAuth();
   useEffect(() => {
-    // Prevent multiple load attempts
-    if (loadAttempted) return;
+    // Only handle specific project slug loading - AppContext handles general data loading
+    if (!projectSlug || loadAttempted) return;
     
     const loadProjectBySlug = async () => {
-      if (projectSlug) {
-        try {
-          setLoadAttempted(true);
-          console.log('Loading project by slug:', projectSlug);
-          const project = await SlugService.getProjectBySlug(projectSlug);
-          
-          if (!project) {
-            console.error('Project not found for slug:', projectSlug);
-            toast.toast({
-              category: 'error',
-              title: "Project not found",
-              description: "The project you're looking for doesn't exist or you don't have access to it.",
-              variant: "destructive",
-            });
-            navigate('/projects');
-            return;
-          }
-
-          // Switch to the project
-          await ProjectService.switchToProject(project.id);
-          
-          // Load project data and merge with AppContext state
-          const result = await DataMigrationService.loadAllFromDatabase();
-          if (result.success && result.data) {
-            console.log('Project data loaded successfully, merging with context state...', {
-              uploadedImages: result.data.uploadedImages?.length || 0,
-              analyses: result.data.analyses?.length || 0,
-              imageGroups: result.data.imageGroups?.length || 0
-            });
-            // Use smart state update that respects pending sync operations
-            updateAppStateFromDatabase(result.data);
-          } else {
-            console.error('Failed to load project data:', result.error);
-            // Still allow the canvas to load even if data loading fails
-            toast.toast({
-              category: 'error',
-              title: "Failed to load project data",
-              description: "The project loaded but some data couldn't be retrieved. You can still use the canvas.",
-              variant: "destructive",
-            });
-          }
-        } catch (error) {
-          console.error('Error loading project by slug:', error);
+      try {
+        setLoadAttempted(true);
+        console.log('Loading project by slug:', projectSlug);
+        const project = await SlugService.getProjectBySlug(projectSlug);
+        
+        if (!project) {
+          console.error('Project not found for slug:', projectSlug);
           toast.toast({
             category: 'error',
-            title: "Error loading project",
-            description: "Failed to load the project. Please try again.",
+            title: "Project not found",
+            description: "The project you're looking for doesn't exist or you don't have access to it.",
             variant: "destructive",
           });
           navigate('/projects');
+          return;
         }
-      } else {
-        // Check for existing data in current project - only if not attempted yet
-        const checkExistingData = async () => {
-          if (user && hasExistingData === null && !loadAttempted) {
-            try {
-              setLoadAttempted(true);
-              const hasData = await DataMigrationService.hasExistingData();
-              setHasExistingData(hasData);
-                if (hasData) {
-                  console.log('Loading existing project data...');
-                  const result = await DataMigrationService.loadAllFromDatabase();
-                  if (result.success && result.data) {
-                    console.log('Existing data loaded, merging with context state...', {
-                      uploadedImages: result.data.uploadedImages?.length || 0,
-                      analyses: result.data.analyses?.length || 0,
-                      imageGroups: result.data.imageGroups?.length || 0
-                    });
-                    // Use smart state update that respects pending sync operations
-                    updateAppStateFromDatabase(result.data);
-                  } else {
-                    console.error('Failed to load existing data:', result.error);
-                    setHasExistingData(false);
-                  }
-                }
-            } catch (error) {
-              console.error('Failed to check existing data:', error);
-              setHasExistingData(false);
-            }
-          } else if (!user) {
-            setHasExistingData(false);
-          }
-        };
 
-        checkExistingData();
+        // Switch to the project and let AppContext load the data
+        await ProjectService.switchToProject(project.id);
+        console.log('Project switched, AppContext will handle data loading...');
+      } catch (error) {
+        console.error('Error loading project by slug:', error);
+        toast.toast({
+          category: 'error',
+          title: "Error loading project",
+          description: "Failed to load the project. Please try again.",
+          variant: "destructive",
+        });
+        navigate('/projects');
       }
     };
 
     loadProjectBySlug();
-  }, [projectSlug, navigate, toast, user]); // Removed hasExistingData dependency
+  }, [projectSlug, navigate, toast]); // Removed user dependency to prevent conflicts
 
   // Set up keyboard shortcuts
   useKeyboardShortcuts({
