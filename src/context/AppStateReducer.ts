@@ -190,7 +190,21 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     }
     
     case 'MERGE_FROM_DATABASE': {
-      const mergedState = { ...state, ...action.payload };
+      const preserveUploading = action.meta?.preserveUploading || false;
+      
+      // If preserveUploading is true, filter out uploading images from the payload
+      let filteredPayload = { ...action.payload };
+      
+      if (preserveUploading && action.payload.uploadedImages) {
+        // Keep images that are currently uploading (have 'uploading' status)
+        const uploadingImages = state.uploadedImages.filter(img => img.status === 'uploading');
+        const newImages = action.payload.uploadedImages.filter(img => img.status !== 'uploading');
+        
+        // Merge existing uploading images with new completed images
+        filteredPayload.uploadedImages = [...uploadingImages, ...newImages];
+      }
+      
+      const mergedState = { ...state, ...filteredPayload };
       // Ensure sets are properly handled
       if (action.payload.pendingBackgroundSync instanceof Set) {
         mergedState.pendingBackgroundSync = action.payload.pendingBackgroundSync;

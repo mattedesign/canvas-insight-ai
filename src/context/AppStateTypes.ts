@@ -76,7 +76,7 @@ export type AppAction =
   | { type: 'SET_LAST_SYNC_TIMESTAMP'; payload: Date }
   | { type: 'INCREMENT_VERSION' }
   | { type: 'BATCH_UPLOAD'; payload: { images: UploadedImage[]; analyses: LegacyUXAnalysis[] } }
-  | { type: 'MERGE_FROM_DATABASE'; payload: Partial<AppState>; meta?: { forceReplace?: boolean } }
+  | { type: 'MERGE_FROM_DATABASE'; payload: Partial<AppState>; meta?: { forceReplace?: boolean; preserveUploading?: boolean } }
   | { type: 'CLEAR_ALL_DATA' }
   | { type: 'RESET_STATE' }
   | { type: 'RESTORE_STATE'; payload: AppState };

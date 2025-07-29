@@ -91,6 +91,12 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     const loadDataFunction = async (): Promise<void> => {
       if (!userRef.current || loadingMachineRef.current.state.appData === 'loading') return;
       
+      // 🚨 FIX: Don't overwrite state if currently uploading
+      if (loadingMachineRef.current.state.imageUpload === 'loading') {
+        console.log('[SimplifiedAppContext] Skipping data load during upload to prevent race condition');
+        return;
+      }
+      
       loadingMachineRef.current.actions.startAppLoad();
       
       try {
@@ -103,10 +109,14 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
             groups: migrationResult.data.imageGroups?.length || 0
           });
           
+          // 🚨 FIX: Merge with existing state instead of replacing
           dispatch({ 
             type: 'MERGE_FROM_DATABASE', 
             payload: migrationResult.data, 
-            meta: { forceReplace: false } 
+            meta: { 
+              forceReplace: false,
+              preserveUploading: true // Preserve images currently uploading
+            } 
           });
           
           loadingMachineRef.current.actions.appLoadSuccess();
