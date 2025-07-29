@@ -238,70 +238,73 @@ const Canvas = () => {
     };
   }, []);
   
-  // Load project by slug - with proper deduplication
+  // STEP 2.1: Create stable project loading function
   const { user } = useAuth();
-  useEffect(() => {
+  const loadProjectBySlug = useCallback(async (slug: string | undefined) => {
+    if (!user) return;
+
     // Skip if we've recently loaded this slug
     const now = Date.now();
-    if (loadedProjectRef.current.slug === projectSlug && 
+    if (loadedProjectRef.current.slug === slug && 
         now - loadedProjectRef.current.timestamp < 2000) {
-      console.log('[Canvas] Skipping duplicate load for slug:', projectSlug);
+      console.log('[Canvas] Skipping duplicate load for slug:', slug);
       return;
     }
-    
-    const loadProjectBySlug = async () => {
-      try {
-        // Update tracking
-        loadedProjectRef.current = {
-          slug: projectSlug,
-          projectId: null,
-          timestamp: now
-        };
+
+    try {
+      // Update tracking
+      loadedProjectRef.current = {
+        slug: slug || null,
+        projectId: null,
+        timestamp: now
+      };
+      
+      if (slug) {
+        console.log('[Canvas] Loading project by slug:', slug);
+        const project = await SlugService.getProjectBySlug(slug);
         
-        if (projectSlug) {
-          console.log('[Canvas] Loading project by slug:', projectSlug);
-          const project = await SlugService.getProjectBySlug(projectSlug);
-          
-          if (!project) {
-            console.error('[Canvas] Project not found for slug:', projectSlug);
-            toast.toast({
-              category: 'error',
-              title: "Project not found",
-              description: "The project you're looking for doesn't exist.",
-              variant: "destructive",
-            });
-            navigate('/projects');
-            return;
-          }
-          
-          // Only switch if different from current
-          const currentProject = await ProjectService.getCurrentProject();
-          if (currentProject !== project.id) {
-            await ProjectService.switchToProject(project.id);
-          }
-          
-          setCurrentProjectId(project.id);
-          loadedProjectRef.current.projectId = project.id;
-        } else {
-          // No slug - use current project
-          const currentProject = await ProjectService.getCurrentProject();
-          setCurrentProjectId(currentProject);
-          loadedProjectRef.current.projectId = currentProject;
+        if (!project) {
+          console.error('[Canvas] Project not found for slug:', slug);
+          toast.toast({
+            category: 'error',
+            title: "Project not found",
+            description: "The project you're looking for doesn't exist.",
+            variant: "destructive",
+          });
+          navigate('/projects');
+          return;
         }
-      } catch (error) {
-        console.error('[Canvas] Error loading project:', error);
-        toast.toast({
-          category: 'error',
-          title: "Error loading project",
-          description: "Failed to load the project.",
-          variant: "destructive",
-        });
-        navigate('/projects');
+        
+        // Only switch if different from current
+        const currentProject = await ProjectService.getCurrentProject();
+        if (currentProject !== project.id) {
+          await ProjectService.switchToProject(project.id);
+        }
+        
+        setCurrentProjectId(project.id);
+        loadedProjectRef.current.projectId = project.id;
+      } else {
+        // No slug - use current project
+        const currentProject = await ProjectService.getCurrentProject();
+        setCurrentProjectId(currentProject);
+        loadedProjectRef.current.projectId = currentProject;
       }
-    };
-    
-    loadProjectBySlug();
-  }, [projectSlug]); // Only depend on slug
+    } catch (error) {
+      console.error('[Canvas] Error loading project:', error);
+      toast.toast({
+        category: 'error',
+        title: "Error loading project",
+        description: "Failed to load the project.",
+        variant: "destructive",
+      });
+      navigate('/projects');
+    }
+  }, [user, toast, navigate]); // ✅ All dependencies included
+
+  // STEP 2.2: Use the stable function in useEffect
+  useEffect(() => {
+    loadProjectBySlug(projectSlug);
+  }, [projectSlug, loadProjectBySlug]); // ✅ Both dependencies included
 
   // Simplified keyboard shortcuts
   useKeyboardShortcuts({
