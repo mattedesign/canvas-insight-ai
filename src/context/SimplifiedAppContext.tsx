@@ -358,19 +358,21 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }), []); // PHASE 1.2 CRITICAL FIX: EMPTY dependencies - truly stable
 
-  // PHASE 3.2: Load initial data when user logs in - ONE TIME EFFECT
+  // Track if we've loaded for this user
+  const loadedForUserRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (user && !isInitializedRef.current) {
+    // Only load if user changed
+    if (user && user.id !== loadedForUserRef.current) {
       console.log('[SimplifiedAppContext] User authenticated, loading data...');
-      isInitializedRef.current = true;
+      loadedForUserRef.current = user.id;
       stableHelpers.loadData();
-    } else if (!user) {
+    } else if (!user && loadedForUserRef.current) {
       console.log('[SimplifiedAppContext] User logged out, clearing state...');
-      isInitializedRef.current = false;
-      loadingMachine.actions.resetAll();
+      loadedForUserRef.current = null;
       dispatch({ type: 'RESET_STATE' });
     }
-  }, [user, stableHelpers.loadData, loadingMachine.actions]); // PHASE 3.2: Proper dependencies
+  }, [user?.id]); // Only depend on user ID
 
   // PHASE 3.2: Cleanup on unmount to prevent memory leaks
   useEffect(() => {
