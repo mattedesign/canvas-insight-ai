@@ -16,6 +16,7 @@ import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { loadImageDimensions } from '@/utils/imageUtils';
+import { DataLoadingErrorBoundary } from '@/components/DataLoadingErrorBoundary';
 import type { 
   AppState, 
   AppAction,
@@ -110,25 +111,27 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
       dispatch({ type: 'SET_SYNCING', payload: true });
       
       try {
-        // Get current state at time of sync
-        const currentState = state;
-        const migrationResult = await DataMigrationService.migrateAllToDatabase({
-          uploadedImages: currentState.uploadedImages,
-          analyses: currentState.analyses,
-          imageGroups: currentState.imageGroups,
-          groupAnalysesWithPrompts: currentState.groupAnalysesWithPrompts,
-        });
+        // Phase 3.2: Event-driven approach - trigger a reload from database
+        // instead of trying to access potentially stale state
+        console.log('[SimplifiedAppContext] Triggering data reload for sync...');
         
-        if (migrationResult.success) {
-          console.log('[SimplifiedAppContext] Data synced successfully');
+        // Reload data from database (this is event-driven sync)
+        const migrationResult = await DataMigrationService.loadAllFromDatabase();
+        
+        if (migrationResult.success && migrationResult.data) {
+          dispatch({ 
+            type: 'MERGE_FROM_DATABASE', 
+            payload: migrationResult.data, 
+            meta: { forceReplace: false } 
+          });
+          
           toast({
             title: "Sync complete",
-            description: "Your data has been saved to the cloud.",
+            description: "Your data has been synchronized with the cloud.",
             category: "success"
           });
-        } else {
-          throw new Error(migrationResult.error || 'Sync failed');
         }
+        
       } catch (error) {
         console.error('[SimplifiedAppContext] Sync failed:', error);
         toast({
@@ -137,6 +140,9 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
           variant: "destructive",
           category: "error"
         });
+        
+        // Phase 3.2: Proper error boundary support
+        dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Sync failed' });
       } finally {
         isSyncingRef.current = false;
         dispatch({ type: 'SET_SYNCING', payload: false });
@@ -325,7 +331,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
     clearCanvas: () => {
       dispatch({ type: 'RESET_STATE' });
     }
-  }), [user, toast, state]); // Note: Only depends on stable references
+  }), [user, toast]); // Removed state dependency - helpers now truly stable
 
   // Load initial data when user logs in - ONE TIME EFFECT
   useEffect(() => {
@@ -346,9 +352,11 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
   }), [state, stableHelpers]);
 
   return (
-    <SimplifiedAppContext.Provider value={contextValue}>
-      {children}
-    </SimplifiedAppContext.Provider>
+    <DataLoadingErrorBoundary>
+      <SimplifiedAppContext.Provider value={contextValue}>
+        {children}
+      </SimplifiedAppContext.Provider>
+    </DataLoadingErrorBoundary>
   );
 };
 
