@@ -1,4 +1,5 @@
 import React from "react";
+import { useEffect, useRef } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,7 +23,46 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+// Emergency render count monitor - stops infinite loops
+const useEmergencyLoopStopper = (componentName: string) => {
+  const renderCount = useRef(0);
+  const lastRenderTime = useRef(Date.now());
+  
+  useEffect(() => {
+    renderCount.current++;
+    const currentTime = Date.now();
+    const timeSinceLastRender = currentTime - lastRenderTime.current;
+    
+    // If more than 50 renders in 1 second, throw error to stop the app
+    if (renderCount.current > 50 && timeSinceLastRender < 1000) {
+      console.error(`🚨 INFINITE LOOP DETECTED in ${componentName}!`);
+      console.error(`Render count: ${renderCount.current} in ${timeSinceLastRender}ms`);
+      
+      // Nuclear option - reload the page after 2 seconds
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+      throw new Error(`STOPPED: Infinite loop in ${componentName} - ${renderCount.current} renders`);
+    }
+    
+    // Reset counter every second
+    if (timeSinceLastRender > 1000) {
+      renderCount.current = 0;
+      lastRenderTime.current = currentTime;
+    }
+  });
+  
+  // Log excessive renders as warning
+  if (renderCount.current > 10) {
+    console.warn(`⚠️ High render count in ${componentName}: ${renderCount.current}`);
+  }
+};
+
+const App = () => {
+  useEmergencyLoopStopper('App');
+  
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -93,6 +133,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
