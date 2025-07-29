@@ -483,3 +483,7 @@ export const SimplifiedAppProvider: React.FC<{ children: React.ReactNode }> = ({
 
 // Export for backward compatibility during migration
 export { SimplifiedAppContext as AppContext, useSimplifiedAppContext as useAppContext };
+
+// Compatibility aliases for existing code using useStableApp
+export const useStableApp = useSimplifiedAppContext;
+export const StableAppProvider = SimplifiedAppProvider;
