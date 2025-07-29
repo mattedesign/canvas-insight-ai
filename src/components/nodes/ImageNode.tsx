@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { ZoomIn, Info, AlertTriangle, CheckCircle, AlertCircle, Brain } from 'lucide-react';
+import { ZoomIn, Info, AlertTriangle, CheckCircle, AlertCircle, Brain, ImageOff } from 'lucide-react';
 import { UXAnalysis, UploadedImage, AnnotationPoint } from '@/types/ux-analysis';
 import { ImageAnalysisDialog } from '@/components/ImageAnalysisDialog';
 
@@ -70,10 +70,48 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  
+  // Calculate responsive node size based on image dimensions
+  const calculateNodeSize = () => {
+    const { width, height } = image.dimensions;
+    
+    // Handle zero or invalid dimensions
+    if (!width || !height || width <= 0 || height <= 0) {
+      return { width: 320, height: 240 };
+    }
+    
+    // Calculate aspect ratio and scale to reasonable sizes
+    const aspectRatio = width / height;
+    const maxWidth = 400;
+    const maxHeight = 300;
+    const minWidth = 200;
+    const minHeight = 150;
+    
+    let nodeWidth, nodeHeight;
+    
+    if (aspectRatio > 1) {
+      // Landscape
+      nodeWidth = Math.min(Math.max(width * 0.3, minWidth), maxWidth);
+      nodeHeight = nodeWidth / aspectRatio;
+    } else {
+      // Portrait or square
+      nodeHeight = Math.min(Math.max(height * 0.3, minHeight), maxHeight);
+      nodeWidth = nodeHeight * aspectRatio;
+    }
+    
+    return {
+      width: Math.round(nodeWidth),
+      height: Math.round(nodeHeight)
+    };
+  };
+  
+  const nodeSize = calculateNodeSize();
 
   return (
     <div 
-      className="bg-card border border-border rounded-lg shadow-card overflow-hidden min-w-[320px]"
+      className="bg-card border border-border rounded-lg shadow-card overflow-hidden"
+      style={{ width: nodeSize.width }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -105,16 +143,32 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
             </div>
           </div>
         </div>
+        {/* Dimensions info */}
+        <div className="text-xs text-muted-foreground mt-1">
+          {image.dimensions.width} × {image.dimensions.height}px
+        </div>
       </div>
 
       {/* Image Container */}
-      <div className="relative">
-        <img
-          src={image.url}
-          alt={image.name}
-          className="w-full h-48 object-cover"
-          draggable={false}
-        />
+      <div 
+        className="relative bg-muted"
+        style={{ height: nodeSize.height }}
+      >
+        {!imageLoadError ? (
+          <img
+            src={image.url}
+            alt={image.name}
+            className="w-full h-full object-cover"
+            draggable={false}
+            onLoad={() => setImageLoadError(false)}
+            onError={() => setImageLoadError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+            <ImageOff className="w-8 h-8 mb-2" />
+            <span className="text-sm">Failed to load image</span>
+          </div>
+        )}
 
         {/* Annotations Overlay */}
         {showAnnotations && (

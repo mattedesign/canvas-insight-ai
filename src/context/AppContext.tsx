@@ -13,6 +13,7 @@ import { appStateReducer } from './AppStateReducer';
 import { initialAppState, type AppState, type AppAction } from './AppStateTypes';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
+import { loadImageDimensions } from '@/utils/imageUtils';
 import type { UploadedImage, UXAnalysis, ImageGroup, GroupAnalysisWithPrompt, GeneratedConcept } from '@/types/ux-analysis';
 
 interface AppContextType {
@@ -222,7 +223,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [user, state, toast]);
 
-  // Simplified image upload - direct state update
+  // Simplified image upload - direct state update with proper dimensions
   const handleImageUpload = useCallback(async (files: File[]) => {
     dispatch({ type: 'SET_UPLOADING', payload: true });
     
@@ -230,28 +231,39 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const newImages: UploadedImage[] = [];
       const newAnalyses: UXAnalysis[] = [];
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      // Load dimensions for all files in parallel
+      const dimensionsPromises = files.map(async (file, i) => {
         const imageId = `img-${Date.now()}-${i}`;
         const imageUrl = URL.createObjectURL(file);
+        
+        // Load actual dimensions
+        const dimensions = await loadImageDimensions(file);
         
         const uploadedImage: UploadedImage = {
           id: imageId,
           name: file.name,
           url: imageUrl,
           file,
-          dimensions: { width: 0, height: 0 },
+          dimensions,
           status: 'completed'
         };
         
-        newImages.push(uploadedImage);
-        
-        // Generate immediate mock analysis
-        const mockAnalysis = generateMockAnalysis(imageId, file.name, imageUrl);
-        newAnalyses.push(mockAnalysis);
-      }
+        return {
+          image: uploadedImage,
+          analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+        };
+      });
       
-      console.log('[AppContext] Uploading', newImages.length, 'images');
+      // Wait for all dimensions to load
+      const results = await Promise.all(dimensionsPromises);
+      
+      // Extract images and analyses
+      results.forEach(result => {
+        newImages.push(result.image);
+        newAnalyses.push(result.analysis);
+      });
+      
+      console.log('[AppContext] Uploading', newImages.length, 'images with dimensions');
       
       // Single atomic update
       dispatch({ 
@@ -261,7 +273,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       toast({
         title: "Upload complete",
-        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
+        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
         category: "success",
       });
       
@@ -278,7 +290,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [toast]);
 
-  // Immediate upload for demo purposes
+  // Immediate upload for demo purposes with proper dimension loading
   const handleImageUploadImmediate = useCallback(async (files: File[]) => {
     dispatch({ type: 'SET_UPLOADING', payload: true });
 
@@ -286,23 +298,37 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const newImages: UploadedImage[] = [];
       const newAnalyses: UXAnalysis[] = [];
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      // Load dimensions for all files in parallel
+      const dimensionsPromises = files.map(async (file, i) => {
         const imageId = `temp-${Date.now()}-${i}`;
         const imageUrl = URL.createObjectURL(file);
+        
+        // Load actual dimensions
+        const dimensions = await loadImageDimensions(file);
         
         const uploadedImage: UploadedImage = {
           id: imageId,
           name: file.name,
           url: imageUrl,
           file,
-          dimensions: { width: 0, height: 0 },
+          dimensions,
           status: 'completed'
         };
         
-        newImages.push(uploadedImage);
-        newAnalyses.push(generateMockAnalysis(imageId, file.name, imageUrl));
-      }
+        return {
+          image: uploadedImage,
+          analysis: generateMockAnalysis(imageId, file.name, imageUrl)
+        };
+      });
+      
+      // Wait for all dimensions to load
+      const results = await Promise.all(dimensionsPromises);
+      
+      // Extract images and analyses
+      results.forEach(result => {
+        newImages.push(result.image);
+        newAnalyses.push(result.analysis);
+      });
       
       // Single atomic update
       dispatch({ 
@@ -312,8 +338,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       toast({
         title: "Upload complete",
-        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''}.`,
+        description: `Successfully uploaded ${newImages.length} image${newImages.length > 1 ? 's' : ''} with dimensions loaded.`,
         category: "success",
+      });
+    } catch (error) {
+      console.error('Error in image upload:', error);
+      toast({
+        title: "Upload error",
+        description: "Some images failed to load properly. Please try again.",
+        category: "error",
       });
     } finally {
       dispatch({ type: 'SET_UPLOADING', payload: false });
