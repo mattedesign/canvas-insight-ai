@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFilteredToast } from './use-filtered-toast';
+import { SafeJson } from '@/utils/safeJson';
 import type { UploadedImage, UXAnalysis, ImageGroup } from '@/types/ux-analysis';
 
 interface CacheEntry {
@@ -56,9 +57,9 @@ export const useOfflineCache = (config: Partial<CacheConfig> = {}) => {
   const missCount = useRef(0);
   const syncQueue = useRef<Set<string>>(new Set());
 
-  // Compress large data using simple string compression
+  // Compress large data using safe JSON to prevent recursion
   const compress = useCallback((data: any): string => {
-    const jsonString = JSON.stringify(data);
+    const jsonString = SafeJson.stringify(data);
     if (jsonString.length < finalConfig.compressionThreshold) {
       return jsonString;
     }
@@ -82,11 +83,11 @@ export const useOfflineCache = (config: Partial<CacheConfig> = {}) => {
     return compressed;
   }, [finalConfig.compressionThreshold]);
 
-  // Decompress data
+  // Decompress data using safe JSON
   const decompress = useCallback((compressed: string): any => {
     if (!compressed.includes(/\d/.source)) {
       // Not compressed, parse directly
-      return JSON.parse(compressed);
+      return SafeJson.parse(compressed);
     }
     
     // Simple run-length decoding
@@ -109,12 +110,12 @@ export const useOfflineCache = (config: Partial<CacheConfig> = {}) => {
       }
     }
     
-    return JSON.parse(decompressed);
+    return SafeJson.parse(decompressed);
   }, []);
 
-  // Calculate size of data
+  // Calculate size of data using safe JSON
   const calculateSize = useCallback((data: any): number => {
-    return new Blob([JSON.stringify(data)]).size;
+    return new Blob([SafeJson.stringify(data)]).size;
   }, []);
 
   // Evict old or low-priority items

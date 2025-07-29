@@ -190,7 +190,10 @@ export const useClientStateManager = (
       console.error('[ClientStateManager] Auto-save failed:', error);
       
       // Add current state as pending operation for later sync
-      if (JSON.stringify(lastStateRef.current) !== JSON.stringify(state)) {
+      // Use shallow comparison instead of deep JSON.stringify to avoid recursion
+      if (lastStateRef.current?.version !== state.version || 
+          lastStateRef.current?.uploadedImages.length !== state.uploadedImages.length ||
+          lastStateRef.current?.analyses.length !== state.analyses.length) {
         addPendingOperation({
           type: 'update',
           entity: 'image', // Generic update operation
@@ -249,7 +252,9 @@ export const useClientStateManager = (
   // Create debounced auto-save function
   const debouncedAutoSave = useCallback(() => {
     debounce(() => {
-      if (JSON.stringify(lastStateRef.current) !== JSON.stringify(state)) {
+      // Use shallow comparison instead of deep JSON.stringify
+      if (lastStateRef.current?.version !== state.version ||
+          lastStateRef.current?.uploadedImages.length !== state.uploadedImages.length) {
         performAutoSave();
         lastStateRef.current = state;
       }
@@ -263,7 +268,9 @@ export const useClientStateManager = (
     }
 
     autoSaveTimerRef.current = setInterval(() => {
-      if (JSON.stringify(lastStateRef.current) !== JSON.stringify(state)) {
+      // Use shallow comparison instead of deep JSON.stringify
+      if (lastStateRef.current?.version !== state.version ||
+          lastStateRef.current?.uploadedImages.length !== state.uploadedImages.length) {
         performAutoSave();
         lastStateRef.current = state;
       }

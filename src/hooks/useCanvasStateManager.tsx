@@ -381,10 +381,16 @@ export function useCanvasStateManager({
     const newEdges = generateEdgesFromAppState(appState);
     
     // Only update if there are actual changes to prevent infinite loops
+    // Use shallow comparison instead of deep JSON.stringify to avoid recursion issues
     const hasNodeChanges = newNodes.length !== canvasState.nodes.length || 
       newNodes.some(newNode => {
         const existingNode = canvasState.nodes.find(n => n.id === newNode.id);
-        return !existingNode || JSON.stringify(existingNode.data) !== JSON.stringify(newNode.data);
+        return !existingNode || 
+               existingNode.type !== newNode.type ||
+               existingNode.position.x !== newNode.position.x ||
+               existingNode.position.y !== newNode.position.y ||
+               // Compare specific data fields instead of deep stringify
+               (existingNode.data?.id !== newNode.data?.id);
       });
     
     const hasEdgeChanges = newEdges.length !== canvasState.edges.length ||
