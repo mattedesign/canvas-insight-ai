@@ -586,13 +586,33 @@ export class DataMigrationService {
     try {
       const projectId = await ProjectService.getCurrentProject();
       
-      // Delete all data in reverse dependency order
-      await Promise.all([
-        supabase.from('group_analyses').delete().eq('image_groups.project_id', projectId),
-        supabase.from('group_images').delete().eq('image_groups.project_id', projectId),
-        supabase.from('ux_analyses').delete().eq('images.project_id', projectId),
-      ]);
+      // Get image IDs for this project first
+      const { data: projectImages } = await supabase
+        .from('images')
+        .select('id')
+        .eq('project_id', projectId);
       
+      const imageIds = projectImages?.map(img => img.id) || [];
+      
+      // Get group IDs for this project
+      const { data: projectGroups } = await supabase
+        .from('image_groups')
+        .select('id')
+        .eq('project_id', projectId);
+      
+      const groupIds = projectGroups?.map(group => group.id) || [];
+      
+      // Delete all data in reverse dependency order using proper queries
+      if (groupIds.length > 0) {
+        await supabase.from('group_analyses').delete().in('group_id', groupIds);
+        await supabase.from('group_images').delete().in('group_id', groupIds);
+      }
+      
+      if (imageIds.length > 0) {
+        await supabase.from('ux_analyses').delete().in('image_id', imageIds);
+      }
+      
+      // Now delete the main entities
       await Promise.all([
         supabase.from('image_groups').delete().eq('project_id', projectId),
         supabase.from('images').delete().eq('project_id', projectId),

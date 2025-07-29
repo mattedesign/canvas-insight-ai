@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import { generateMockGroupAnalysis } from '@/data/mockGroupAnalysis';
@@ -176,9 +176,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     onAnalysisStatusChange: handleAnalysisStatusChange
   });
 
+  // Add ref to track loading state and prevent race conditions
+  const loadingRef = useRef(false);
+
   // Load data from database when user authenticates
   useEffect(() => {
-    if (user && !isLoading) {
+    if (user && !isLoading && !loadingRef.current) {
       // Only load if we don't have recent uploads in progress
       const hasRecentUploads = uploadedImages.some(img => 
         img.status === 'uploading' || img.status === 'syncing'
@@ -198,11 +201,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setGeneratedConcepts([]);
       setGroupAnalyses([]);
       setGroupPromptSessions([]);
+      loadingRef.current = false; // Reset loading flag
     }
-  }, [user, isUploading]);
+  }, [user]); // Remove isUploading dependency to prevent unnecessary re-runs
 
   const loadDataFromDatabase = async () => {
+    // Prevent concurrent loading operations
+    if (loadingRef.current) {
+      console.log('Data loading already in progress, skipping...');
+      return;
+    }
+    
+    loadingRef.current = true;
     setIsLoading(true);
+    
     try {
       console.log('Loading data from database...');
       const result = await DataMigrationService.loadAllFromDatabase();
