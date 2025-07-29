@@ -39,17 +39,23 @@ export class DashboardService {
    */
   static async getDashboardMetrics(projectId: string): Promise<DashboardMetrics | null> {
     try {
-      // Get all analyses for the project through images
+      // First get image IDs for this project
+      const { data: projectImages } = await supabase
+        .from('images')
+        .select('id')
+        .eq('project_id', projectId);
+        
+      const imageIds = projectImages?.map(img => img.id) || [];
+      
+      if (imageIds.length === 0) {
+        return this.getEmptyMetrics();
+      }
+      
+      // Get all analyses for these images
       const { data: analyses, error: analysesError } = await supabase
         .from('ux_analyses')
-        .select(`
-          *,
-          images!inner(
-            id,
-            project_id
-          )
-        `)
-        .eq('images.project_id', projectId);
+        .select('*')
+        .in('image_id', imageIds);
 
       if (analysesError) {
         console.error('Error fetching analyses:', analysesError);
@@ -168,13 +174,22 @@ export class DashboardService {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+      // First get image IDs for this project
+      const { data: projectImages } = await supabase
+        .from('images')
+        .select('id')
+        .eq('project_id', projectId);
+        
+      const imageIds = projectImages?.map(img => img.id) || [];
+      
+      if (imageIds.length === 0) {
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('ux_analyses')
-        .select(`
-          created_at,
-          images!inner(project_id)
-        `)
-        .eq('images.project_id', projectId)
+        .select('created_at')
+        .in('image_id', imageIds)
         .gte('created_at', sevenDaysAgo.toISOString());
 
       if (error || !data) {

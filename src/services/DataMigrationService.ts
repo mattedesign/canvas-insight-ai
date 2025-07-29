@@ -480,13 +480,20 @@ export class GroupAnalysisMigrationService {
   static async loadGroupAnalysesFromDatabase(): Promise<GroupAnalysisWithPrompt[]> {
     const projectId = await ProjectService.getCurrentProject();
     
+    // First get group IDs for this project
+    const { data: projectGroups } = await supabase
+      .from('image_groups')
+      .select('id')
+      .eq('project_id', projectId);
+      
+    const groupIds = projectGroups?.map(g => g.id) || [];
+    
+    if (groupIds.length === 0) return [];
+    
     const { data: analyses, error } = await supabase
       .from('group_analyses')
-      .select(`
-        *,
-        image_groups!inner(project_id)
-      `)
-      .eq('image_groups.project_id', projectId)
+      .select('*')
+      .in('group_id', groupIds)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
