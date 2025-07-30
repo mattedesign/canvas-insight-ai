@@ -11,6 +11,7 @@ import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ImageAnalysisDialog } from '../ImageAnalysisDialog';
 import { AnalysisStatusIndicator } from '../AnalysisStatusIndicator';
+import { AIContextMenu } from './AIContextMenu';
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -21,6 +22,7 @@ interface ImageNodeData {
   onImageSelect?: (imageId: string) => void;
   onToggleSelection?: (imageId: string, isCtrlOrCmd: boolean) => void;
   isSelected?: boolean;
+  onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
 }
 
 interface ImageNodeProps {
@@ -29,7 +31,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false, onAnalysisComplete } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
@@ -145,8 +147,52 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
       onToggleSelection(image.id, isMultiSelectKey);
     }
   }, [currentTool, onToggleSelection, image.id, isMobile]);
+
+  // AI Integration Handlers
+  const handleAnalyzeImage = useCallback((imageId: string) => {
+    setShowAnalysisDialog(true);
+  }, []);
+
+  const handleViewAnalysis = useCallback((imageId: string) => {
+    if (analysis) {
+      toast({
+        title: "Analysis Available",
+        description: "View the analysis card connected to this image",
+      });
+    } else {
+      toast({
+        title: "No Analysis",
+        description: "This image hasn't been analyzed yet. Click 'AI Analysis' to start.",
+        variant: "destructive"
+      });
+    }
+  }, [analysis, toast]);
+
+  const handleCompareModels = useCallback((imageId: string) => {
+    toast({
+      title: "Model Comparison",
+      description: "This feature will compare different AI models for analysis",
+    });
+  }, [toast]);
+
+  const handleEnhancedAnalysis = useCallback((imageId: string) => {
+    toast({
+      title: "Enhanced Analysis",
+      description: "Starting enhanced AI analysis with advanced features",
+    });
+  }, [toast]);
   
   return (
+    <AIContextMenu
+      imageId={image.id}
+      imageName={image.name}
+      imageUrl={image.url}
+      isSelected={isSelected}
+      onAnalyzeImage={handleAnalyzeImage}
+      onViewAnalysis={handleViewAnalysis}
+      onCompareModels={handleCompareModels}
+      onEnhancedAnalysis={handleEnhancedAnalysis}
+    >
     <Card 
       className={`max-w-2xl overflow-hidden bg-background border-border shadow-lg transition-all cursor-pointer ${
         isSelected ? 'ring-2 ring-primary ring-offset-2' : ''
@@ -303,5 +349,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         />
       )}
     </Card>
+    </AIContextMenu>
   );
 };

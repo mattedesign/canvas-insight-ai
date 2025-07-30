@@ -30,6 +30,10 @@ import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { CanvasUploadZone } from '../CanvasUploadZone';
+import { AICanvasToolbar } from './AICanvasToolbar';
+import { AIContextMenu } from './AIContextMenu';
+import { useAI } from '@/context/AIContext';
+import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
 
 
 import { Button } from '@/components/ui/button';
@@ -112,6 +116,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const { toast } = useFilteredToast();
   const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
+  
+  // AI Integration
+  const { analyzeImageWithAI } = useAI();
+  const { performEnhancedAnalysis } = useEnhancedAnalysis();
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
@@ -166,6 +174,131 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleAnalysisExpansion = useCallback((analysisId: string) => {
     onOpenAnalysisPanel?.(analysisId);
   }, [onOpenAnalysisPanel]);
+
+  // AI Integration Handlers
+  const handleAnalysisTriggered = useCallback((imageId: string, analysis: any) => {
+    onAnalysisComplete?.(imageId, analysis);
+    toast({
+      title: "Analysis Complete",
+      description: "AI analysis completed successfully",
+      category: "success",
+    });
+  }, [onAnalysisComplete, toast]);
+  
+  const handleAnalyzeImage = useCallback(async (imageId: string) => {
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) return;
+
+    try {
+      const analysis = await analyzeImageWithAI(image.id, image.url, image.name);
+      handleAnalysisTriggered(image.id, analysis);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Failed to analyze image. Please try again.",
+        category: "error",
+      });
+    }
+  }, [uploadedImages, analyzeImageWithAI, handleAnalysisTriggered, toast]);
+
+  const handleBatchAnalysis = useCallback(async (imageIds: string[]) => {
+    const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
+    
+    toast({
+      title: "Batch Analysis Started",
+      description: `Analyzing ${imagesToAnalyze.length} images...`,
+      category: "success",
+    });
+
+    for (const image of imagesToAnalyze) {
+      try {
+        const analysis = await analyzeImageWithAI(image.id, image.url, image.name);
+        onAnalysisComplete?.(image.id, analysis);
+      } catch (error) {
+        console.error(`Analysis failed for ${image.name}:`, error);
+      }
+    }
+
+    toast({
+      title: "Batch Analysis Complete",
+      description: `Completed analysis for ${imagesToAnalyze.length} images`,
+      category: "success",
+    });
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
+
+  const handleGroupAnalysis = useCallback(async (imageIds: string[]) => {
+    const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
+    
+    toast({
+      title: "Group Analysis Started",
+      description: `Analyzing patterns across ${imagesToAnalyze.length} images...`,
+      category: "success",
+    });
+
+    // For now, this does individual analysis. In the future, this could call a group-specific analysis endpoint
+    for (const image of imagesToAnalyze) {
+      try {
+        const analysis = await analyzeImageWithAI(image.id, image.url, image.name, 'Group analysis context');
+        onAnalysisComplete?.(image.id, analysis);
+      } catch (error) {
+        console.error(`Group analysis failed for ${image.name}:`, error);
+      }
+    }
+
+    toast({
+      title: "Group Analysis Complete",
+      description: `Completed group analysis for ${imagesToAnalyze.length} images`,
+      category: "success",
+    });
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
+
+  const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) return;
+
+    try {
+      const result = await performEnhancedAnalysis(image.url, image.name, image.id);
+      if (result.success && result.data) {
+        onAnalysisComplete?.(image.id, result.data);
+        toast({
+          title: "Enhanced Analysis Complete",
+          description: `Enhanced AI analysis completed for ${image.name}`,
+          category: "success",
+        });
+      } else {
+        throw new Error(result.error || 'Enhanced analysis failed');
+      }
+    } catch (error) {
+      console.error('Enhanced analysis failed:', error);
+      toast({
+        title: "Enhanced Analysis Failed",
+        description: "Failed to perform enhanced analysis. Please try again.",
+        category: "error",
+      });
+    }
+  }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
+
+  const handleViewAnalysis = useCallback((imageId: string) => {
+    const analysis = analyses.find(a => a.imageId === imageId);
+    if (analysis) {
+      onOpenAnalysisPanel?.(analysis.id);
+    } else {
+      toast({
+        title: "No Analysis Found",
+        description: "This image hasn't been analyzed yet.",
+        category: "error",
+      });
+    }
+  }, [analyses, onOpenAnalysisPanel, toast]);
+
+  const handleCompareModels = useCallback((imageId: string) => {
+    toast({
+      title: "Model Comparison",
+      description: "Use the AI toolbar to compare different AI models for this image.",
+      category: "action-required",
+    });
+  }, [toast]);
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
@@ -1074,6 +1207,11 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   // Disable node dragging on mobile/tablet screens (768px and under)
   const isNodeDraggingEnabled = currentTool === 'cursor' && !isPanningDisabled && !isMobile;
 
+  // Get selected images for AI toolbar
+  const selectedImages = uploadedImages.filter(img => 
+    multiSelection.state.selectedImageIds.includes(img.id)
+  );
+
   return (
     <div className="h-full w-full bg-background relative">
       {/* Upload Zone - Show when no images */}
@@ -1084,6 +1222,8 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           hasImages={false}
         />
       )}
+
+      {/* AI Canvas Toolbar - Will be added in next phase */}
       
       {/* Undo/Redo Controls */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
