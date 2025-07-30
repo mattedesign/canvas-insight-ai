@@ -169,6 +169,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
+    console.log('[CanvasView] Generating nodes for images:', uploadedImages.length, uploadedImages);
+    console.log('[CanvasView] Analyses:', analyses.length, analyses);
+    console.log('[CanvasView] Groups:', imageGroups.length, imageGroups);
+    
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     
@@ -179,6 +183,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
     // Process ungrouped images first
     const ungroupedImages = uploadedImages.filter(image => !groupedImageIds.has(image.id));
+    console.log('[CanvasView] Ungrouped images to render:', ungroupedImages.length, ungroupedImages);
     
     ungroupedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);

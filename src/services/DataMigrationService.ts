@@ -375,8 +375,9 @@ export class ImageMigrationService {
           url: urlData.publicUrl,
           file: emptyFile, // Canvas components use URL, not File content
           dimensions: img.dimensions as { width: number; height: number },
-          status: 'completed' as const
-        };
+          status: 'completed' as const,
+          projectId: img.project_id // ✅ FIX 17: Add projectId for validation
+        } as UploadedImage;
       });
     } catch (error) {
       console.error('[ImageMigrationService] loadImagesFromDatabase failed:', error);

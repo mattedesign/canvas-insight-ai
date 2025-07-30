@@ -189,6 +189,14 @@ const Canvas = () => {
   const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations } = state;
   const isLoading = status.isLoading;
 
+  console.log('[Canvas] Current state:', {
+    uploadedImages: uploadedImages?.length || 0,
+    analyses: analyses?.length || 0,
+    imageGroups: imageGroups?.length || 0,
+    isLoading,
+    error
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-background">

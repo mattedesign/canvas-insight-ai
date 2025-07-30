@@ -36,7 +36,10 @@ export const useAppStateManager = (): StateManager => {
         // ✅ FIX 5: Project-aware data loading with validation
         const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
         if (result.success && result.data) {
+          console.log('[useAppStateManager] Data loaded successfully:', result.data);
           dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
+        } else {
+          console.error('[useAppStateManager] Data loading failed:', result.error);
         }
       } catch (error) {
         dispatch({ type: 'SET_ERROR', payload: error.message });

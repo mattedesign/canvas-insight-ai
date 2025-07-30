@@ -190,12 +190,13 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     }
     
     case 'MERGE_FROM_DATABASE': {
+      console.log('[AppStateReducer] MERGE_FROM_DATABASE called with:', action.payload);
       const { preserveUploading } = action.meta || {};
       const currentlyUploading = preserveUploading
         ? state.uploadedImages.filter(img => img.id.startsWith('temp-') || img.status === 'uploading')
         : [];
 
-      return {
+      const newState = {
         ...state,
         // 🚨 FIX: Preserve uploading images and merge with database data
         uploadedImages: [
@@ -216,6 +217,14 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
         isLoading: false,
         version: state.version + 1,
       };
+      
+      console.log('[AppStateReducer] New state after merge:', {
+        uploadedImages: newState.uploadedImages.length,
+        analyses: newState.analyses.length,
+        imageGroups: newState.imageGroups.length
+      });
+      
+      return newState;
     }
     
     case 'CLEAR_ALL_DATA':
