@@ -57,24 +57,26 @@ export const useStableAppState = (): StableAppStateReturn => {
   
   // Stable action references
   const uploadImages = useCallback((files: File[]) => {
-    return stableHelpers.uploadImages(files);
-  }, [stableHelpers]);
+    return actions.uploadImages(files);
+  }, [actions]);
   
   const selectImage = useCallback((imageId: string | null) => {
-    dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId });
-  }, [dispatch]);
+    // TODO: Implement selectImage action
+    console.log('Select image:', imageId);
+  }, []);
   
   const toggleAnnotations = useCallback(() => {
-    dispatch({ type: 'TOGGLE_ANNOTATIONS' });
-  }, [dispatch]);
+    // TODO: Implement toggleAnnotations action  
+    console.log('Toggle annotations');
+  }, []);
   
   const syncData = useCallback(() => {
-    return stableHelpers.syncData();
-  }, [stableHelpers]);
+    return actions.loadData();
+  }, [actions]);
   
   const loadData = useCallback(() => {
-    return stableHelpers.loadData();
-  }, [stableHelpers]);
+    return actions.loadData();
+  }, [actions]);
   
   // Return stable object (memoized)
   return useMemo(() => ({

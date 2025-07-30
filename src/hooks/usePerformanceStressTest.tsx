@@ -69,7 +69,7 @@ export const usePerformanceStressTest = () => {
       for (let i = 0; i < mockImages.length; i += batchSize) {
         const batch = mockImages.slice(i, i + batchSize);
         try {
-          await stableHelpers.uploadImages(batch);
+          await actions.uploadImages(batch);
           renderCount++;
           
           // Small delay to prevent blocking the UI
@@ -142,12 +142,12 @@ export const usePerformanceStressTest = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [generateMockImages, stableHelpers, state.uploadedImages, state.analyses]);
+  }, [generateMockImages, actions, state.uploadedImages, state.analyses]);
 
   const clearTestData = useCallback(() => {
-    stableHelpers.clearCanvas();
+    actions.resetAll();
     setResults(null);
-  }, [stableHelpers]);
+  }, [actions]);
 
   return {
     runStressTest,
