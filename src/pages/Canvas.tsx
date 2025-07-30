@@ -76,7 +76,7 @@ const Canvas = () => {
     timestamp: 0
   });
 
-  // Load project data ONCE with stable reference - FIXED: removed problematic dependency
+  // ✅ FIX 1: CRITICAL - Project switch BEFORE data loading
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
@@ -85,15 +85,31 @@ const Canvas = () => {
       let projectId: string;
       
       try {
+        // Determine the target project first
+        let targetProjectId: string;
+        
         if (projectSlug) {
-          // Load specific project by slug
-          projectId = await ProjectService.getProjectBySlug(projectSlug);
-          console.log('[Canvas] Loading project by slug:', projectSlug, '->', projectId);
+          // Load specific project by slug - MUST complete BEFORE any data loading
+          targetProjectId = await ProjectService.getProjectBySlug(projectSlug);
+          console.log('[Canvas] Loading project by slug:', projectSlug, '->', targetProjectId);
+          
+          // ✅ FIX 2: Clear state when switching projects to prevent contamination
+          if (loadedProjectRef.current.projectId && 
+              loadedProjectRef.current.projectId !== targetProjectId) {
+            console.log('[Canvas] Clearing state for project switch');
+            actions.resetAll();
+          }
+          
+          // ✅ FIX 3: CRITICAL - Switch project BEFORE loading data
+          await ProjectService.switchToProject(targetProjectId);
+          console.log('[Canvas] Project switched to:', targetProjectId);
         } else {
           // Load default project
-          projectId = await ProjectService.getCurrentProject();
-          console.log('[Canvas] Loading default project:', projectId);
+          targetProjectId = await ProjectService.getCurrentProject();
+          console.log('[Canvas] Loading default project:', targetProjectId);
         }
+        
+        projectId = targetProjectId;
         
         // Prevent duplicate loads
         if (loadedProjectRef.current.projectId === projectId && 
@@ -102,14 +118,10 @@ const Canvas = () => {
           return;
         }
         
-        // Switch to the target project if different from current
-        if (projectSlug && loadedProjectRef.current.projectId !== projectId) {
-          await ProjectService.switchToProject(projectId);
-        }
-        
+        // ✅ FIX 4: Now load data with correct project context
         console.log('[Canvas] Loading data for project:', projectId);
         loadedProjectRef.current = { projectId, timestamp: now };
-        await actions.loadData();
+        await actions.loadData(projectId); // Pass projectId for validation
         
       } catch (error) {
         console.error('[Canvas] Failed to load project:', error);
@@ -225,7 +237,7 @@ const Canvas = () => {
         <div className="flex-1 flex items-center justify-center">
           <ErrorDisplay 
             error={error} 
-            onRetry={() => actions.loadData()} 
+            onRetry={() => actions.loadData(loadedProjectRef.current.projectId || undefined)} 
           />
         </div>
       </div>

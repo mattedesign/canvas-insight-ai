@@ -15,7 +15,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { state, actions, status } = useAppStateManager();
   const hasLoadedRef = useRef(false);
 
-  // ✅ SIMPLE, CLEAN DATA LOADING - No circular dependencies
+  // ✅ FIX 12: SIMPLE, CLEAN DATA LOADING - No circular dependencies
   useEffect(() => {
     if (user && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -27,6 +27,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actions.resetAll();
     }
   }, [user?.id]); // ✅ ONLY user.id - actions are stable
+
+  // ✅ FIX 13: Listen for project changes and clear state
+  useEffect(() => {
+    const handleProjectChange = (event: CustomEvent) => {
+      console.log('[SimplifiedAppContext] Project changed, clearing state:', event.detail);
+      hasLoadedRef.current = false;
+      actions.resetAll();
+    };
+
+    window.addEventListener('projectChanged', handleProjectChange as EventListener);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange as EventListener);
+    };
+  }, [actions]);
 
   const value = { state, actions, status };
 

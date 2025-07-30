@@ -7,7 +7,7 @@ import { initialAppState } from '@/context/AppStateTypes';
 interface StateManager {
   state: AppState;
   actions: {
-    loadData: () => Promise<void>;
+    loadData: (expectedProjectId?: string) => Promise<void>;
     uploadImages: (files: File[]) => Promise<void>;
     createGroup: (data: any) => void;
     deleteImage: (id: string) => void;
@@ -26,14 +26,15 @@ export const useAppStateManager = (): StateManager => {
 
   // ✅ STABLE ACTIONS - These NEVER change (empty dependency arrays)
   const actions = {
-    loadData: useCallback(async () => {
+    loadData: useCallback(async (expectedProjectId?: string) => {
       if (isLoadingRef.current) return;
       
       isLoadingRef.current = true;
       dispatch({ type: 'SET_LOADING', payload: true });
       
       try {
-        const result = await DataMigrationService.loadAllFromDatabase();
+        // ✅ FIX 5: Project-aware data loading with validation
+        const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
         if (result.success && result.data) {
           dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
         }

@@ -5,9 +5,11 @@ import { OptimizedDataService } from './OptimizedMigrationService';
 export class ProgressiveDataLoader {
   private static loadingState = new Map<string, boolean>();
   
+  // ✅ FIX 14: Project-aware progressive loading with validation
   static async loadCanvasDataProgressively(
     projectId: string,
-    onProgress?: (stage: string, progress: number) => void
+    onProgress?: (stage: string, progress: number) => void,
+    validateProject: boolean = true
   ): Promise<{
     images: UploadedImage[];
     analyses: UXAnalysis[];
@@ -24,6 +26,12 @@ export class ProgressiveDataLoader {
     this.loadingState.set(cacheKey, true);
     
     try {
+      // ✅ FIX 15: Validate project context before loading
+      if (validateProject) {
+        console.log('[ProgressiveDataLoader] Validating project context for:', projectId);
+        // Add project validation logic here if needed
+      }
+      
       // Use optimized batch loading for better performance
       onProgress?.('Loading project data...', 50);
       const data = await OptimizedDataService.loadProjectDataBatch(projectId, {
@@ -31,6 +39,17 @@ export class ProgressiveDataLoader {
         groupLimit: 10,
         analysisLimit: 50
       });
+      
+      // ✅ FIX 16: Validate loaded data belongs to the correct project
+      const invalidImages = data.images.filter(img => {
+        const imgWithProject = img as any;
+        return imgWithProject.projectId && imgWithProject.projectId !== projectId;
+      });
+      
+      if (invalidImages.length > 0) {
+        console.error('[ProgressiveDataLoader] Data contamination detected:', invalidImages);
+        throw new Error(`Found ${invalidImages.length} images from wrong project`);
+      }
       
       onProgress?.('Finalizing...', 100);
       

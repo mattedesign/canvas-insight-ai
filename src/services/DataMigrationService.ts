@@ -148,6 +148,31 @@ export class ProjectService {
     return newProject;
   }
 
+  // ✅ FIX 10: Add missing getProjectBySlug method
+  static async getProjectBySlug(slug: string): Promise<string> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: project, error } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('slug', slug)
+        .single();
+
+      if (error) {
+        console.error('[ProjectService] Project not found for slug:', slug, error);
+        throw new Error(`Project not found: ${slug}`);
+      }
+
+      return project.id;
+    } catch (error) {
+      console.error('[ProjectService] getProjectBySlug failed:', error);
+      throw error;
+    }
+  }
+
   static async switchToProject(projectId: string): Promise<void> {
     if (this.isSwitching) {
       console.log('[ProjectService] Already switching projects, waiting…');
@@ -158,7 +183,7 @@ export class ProjectService {
       this.isSwitching = true;
       console.log('[ProjectService] Switching to project:', projectId);
 
-      // 🚨 FIX: Clear ALL cached data when switching projects
+      // ✅ FIX 11: Clear ALL cached data when switching projects
       const oldProjectId = this.currentProjectId;
       this.currentProjectId = projectId;
 
@@ -232,28 +257,6 @@ export class ProjectService {
     this.currentProjectId = null;
   }
 
-  static async getProjectBySlug(slug: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    const { data: project, error } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('slug', slug)
-      .single();
-
-    if (error) {
-      console.error('[ProjectService] Error finding project by slug:', error);
-      throw error;
-    }
-
-    if (!project) {
-      throw new Error(`Project with slug "${slug}" not found`);
-    }
-
-    return project.id;
-  }
 }
 
 // Image data migration service
@@ -675,10 +678,21 @@ export class DataMigrationService {
     }
   }
 
-  // Load all data from database back to in-memory format
-  static async loadAllFromDatabase() {
+  // ✅ FIX 6: Project-aware data loading with validation
+  static async loadAllFromDatabase(expectedProjectId?: string) {
     try {
       console.log('[DataMigrationService] Starting data load from database...');
+      
+      // ✅ FIX 7: Get current project to validate data loading
+      const currentProject = await ProjectService.getCurrentProject();
+      
+      // ✅ FIX 8: Validate expected project matches current project
+      if (expectedProjectId && expectedProjectId !== currentProject) {
+        console.warn('[DataMigrationService] Project mismatch! Expected:', expectedProjectId, 'Current:', currentProject);
+        throw new Error(`Project context mismatch: Expected ${expectedProjectId}, but current project is ${currentProject}`);
+      }
+      
+      console.log('[DataMigrationService] Loading data for validated project:', currentProject);
       
       const [images, analyses, groups, groupAnalyses] = await Promise.all([
         ImageMigrationService.loadImagesFromDatabase(),
@@ -691,8 +705,21 @@ export class DataMigrationService {
         images: images.length,
         analyses: analyses.length,
         groups: groups.length,
-        groupAnalyses: groupAnalyses.length
+        groupAnalyses: groupAnalyses.length,
+        projectId: currentProject
       });
+
+      // ✅ FIX 9: Validate loaded data belongs to current project
+      const invalidImages = images.filter(img => {
+        // Check if image has projectId property and validate it
+        const imgWithProject = img as any;
+        return imgWithProject.projectId && imgWithProject.projectId !== currentProject;
+      });
+      
+      if (invalidImages.length > 0) {
+        console.error('[DataMigrationService] Found images from wrong project:', invalidImages);
+        throw new Error(`Data contamination detected: Found ${invalidImages.length} images from different projects`);
+      }
 
       return {
         success: true,
