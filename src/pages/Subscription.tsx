@@ -15,11 +15,11 @@ const Subscription = () => {
       selectedImageId,
       showAnnotations
     },
-    actions
+    stableHelpers
   } = useAppContext();
 
   // Create missing handler functions
-  const handleClearCanvas = () => actions.resetAll();
+  const handleClearCanvas = () => stableHelpers.resetAll();
   const handleImageSelect = (imageId: string) => {
     // This would normally dispatch an action, but for subscription page it's not needed
     console.log('Image selected:', imageId);

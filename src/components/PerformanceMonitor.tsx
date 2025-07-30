@@ -4,7 +4,7 @@
  */
 
 import { useRef, useEffect } from 'react';
-import { useStableAppState } from '@/hooks/useStableAppState';
+import { useAppState } from '@/context/SimplifiedAppContext';
 
 interface RenderInfo {
   component: string;
@@ -23,7 +23,7 @@ export const PerformanceMonitor: React.FC<{ componentName?: string }> = ({
 }) => {
   const renderCountRef = useRef(0);
   const lastRenderRef = useRef(Date.now());
-  const { state } = useStableAppState();
+  const state = useAppState();
   
   // Track renders
   renderCountRef.current += 1;

@@ -116,13 +116,13 @@ export const useStateMetrics = () => {
 
 // Action dispatchers (stable references)
 export const useAppActions = () => {
-  const { actions } = useAppContext();
+  const { stableHelpers } = useAppContext();
   
-  return actions;
+  return stableHelpers;
 };
 
-// Helper functions (stable references)
-export const useAppHelpers = () => {
-  const { actions } = useAppContext();
-  return actions;
+// Helper functions (stable references)  
+export const useAppHelpersLegacy = () => {
+  const { stableHelpers } = useAppContext();
+  return stableHelpers;
 };

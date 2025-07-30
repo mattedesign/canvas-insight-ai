@@ -21,7 +21,7 @@ interface StressTestResults {
 }
 
 export const usePerformanceStressTest = () => {
-  const { actions, state } = useAppContext();
+  const { stableHelpers, state } = useAppContext();
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<StressTestResults | null>(null);
 
@@ -72,7 +72,7 @@ export const usePerformanceStressTest = () => {
       for (let i = 0; i < mockImages.length; i += batchSize) {
         const batch = mockImages.slice(i, i + batchSize);
         try {
-          await actions.uploadImages(batch);
+          await stableHelpers.uploadImages(batch);
           renderCount++;
           
           // Small delay to prevent blocking the UI
@@ -145,12 +145,12 @@ export const usePerformanceStressTest = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [generateMockImages, actions, state.uploadedImages, state.analyses]);
+  }, [generateMockImages, stableHelpers, state.uploadedImages, state.analyses]);
 
   const clearTestData = useCallback(() => {
-    actions.resetAll();
+    stableHelpers.resetAll();
     setResults(null);
-  }, [actions]);
+  }, [stableHelpers]);
 
   return {
     runStressTest,

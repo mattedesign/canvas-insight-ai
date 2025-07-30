@@ -68,7 +68,7 @@ class ErrorBoundary extends React.Component<{
 const Canvas = () => {
   const navigate = useNavigate();
   const { projectSlug } = useParams<{ projectSlug?: string }>();
-  const { state, actions, status } = useAppContext();
+  const { state, stableHelpers } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
   
@@ -98,7 +98,7 @@ const Canvas = () => {
           if (loadedProjectRef.current.projectId && 
               loadedProjectRef.current.projectId !== targetProjectId) {
             console.log('[Canvas] Clearing state for project switch');
-            actions.resetAll();
+            stableHelpers.resetAll();
           }
           
           // ✅ FIX 3: CRITICAL - Switch project BEFORE loading data
@@ -122,7 +122,7 @@ const Canvas = () => {
         // ✅ FIX 4: Now load data with correct project context
         console.log('[Canvas] Loading data for project:', projectId);
         loadedProjectRef.current = { projectId, timestamp: now };
-        await actions.loadData(projectId); // Pass projectId for validation
+        await stableHelpers.loadData(projectId); // Pass projectId for validation
         
       } catch (error) {
         console.error('[Canvas] Failed to load project:', error);
@@ -150,14 +150,14 @@ const Canvas = () => {
   }, []);
 
   const handleCreateGroup = useCallback((imageIds: string[]) => {
-    actions.createGroup({
+    stableHelpers.createGroup({
       name: 'New Group',
       description: 'Group created from canvas',
       color: '#3b82f6',
       imageIds,
       position: { x: 100, y: 100 }
     });
-  }, [actions]);
+  }, [stableHelpers]);
 
   const handleUngroup = useCallback((groupId: string) => {
     console.log('Ungroup:', groupId);
@@ -187,8 +187,7 @@ const Canvas = () => {
     console.log('Analysis complete:', imageId, analysis);
   }, []);
 
-  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations } = state;
-  const isLoading = status.isLoading;
+  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations, isLoading } = state;
 
   console.log('[Canvas] Current state:', {
     uploadedImages: uploadedImages?.length || 0,
@@ -246,7 +245,7 @@ const Canvas = () => {
         <div className="flex-1 flex items-center justify-center">
           <ErrorDisplay 
             error={error} 
-            onRetry={() => actions.loadData(loadedProjectRef.current.projectId || undefined)} 
+            onRetry={() => stableHelpers.loadData(loadedProjectRef.current.projectId || undefined)} 
           />
         </div>
       </div>
@@ -263,7 +262,7 @@ const Canvas = () => {
         }}
         uploadedImages={uploadedImages || []}
         analyses={analyses || []}
-        onClearCanvas={() => actions.resetAll()}
+        onClearCanvas={() => stableHelpers.resetAll()}
         onAddImages={() => {
           // Trigger file input or upload dialog
           const input = document.createElement('input');
@@ -273,7 +272,7 @@ const Canvas = () => {
           input.onchange = (e) => {
             const files = Array.from((e.target as HTMLInputElement).files || []);
             if (files.length > 0) {
-              actions.uploadImages(files);
+              stableHelpers.uploadImages(files);
             }
           };
           input.click();
@@ -326,7 +325,7 @@ const Canvas = () => {
             onSubmitGroupPrompt={handleSubmitGroupPrompt}
             onOpenAnalysisPanel={handleOpenAnalysisPanel}
             onAnalysisComplete={handleAnalysisComplete}
-            onImageUpload={actions.uploadImages}
+            onImageUpload={stableHelpers.uploadImages}
             isGeneratingConcept={state.isGeneratingConcept}
           />
         </ErrorBoundary>
