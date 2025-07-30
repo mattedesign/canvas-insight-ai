@@ -77,11 +77,26 @@ export const useAppStateManager = (): StateManager => {
         });
         
         const results = await Promise.all(uploadPromises);
+        console.log('[Upload] Upload completed, adding images to state:', results);
         
         dispatch({ 
           type: 'ADD_IMAGES',
           payload: results
         });
+
+        // After successful upload, reload data from database to ensure consistency
+        console.log('[Upload] Reloading data from database to verify images are saved...');
+        setTimeout(async () => {
+          try {
+            const result = await DataMigrationService.loadAllFromDatabase();
+            if (result.success && result.data) {
+              console.log('[Upload] Database reload completed:', result.data);
+              dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
+            }
+          } catch (error) {
+            console.error('[Upload] Failed to reload from database:', error);
+          }
+        }, 1000); // Small delay to ensure database operations complete
         
       } catch (error) {
         console.error('Upload failed:', error);

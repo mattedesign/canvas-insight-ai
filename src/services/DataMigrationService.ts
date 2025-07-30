@@ -325,7 +325,7 @@ export class ImageMigrationService {
         return [];
       }
 
-      console.log('[ImageMigrationService] Found', images.length, 'images');
+      console.log('[ImageMigrationService] Found', images.length, 'images:', images.map(img => ({ id: img.id, name: img.original_name, storage_path: img.storage_path })));
 
       return images.map(img => {
         // Get public URL for the image
