@@ -85,9 +85,9 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
 
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
-  const handleViewFullAnalysis = () => {
+  const handleViewFullAnalysis = useCallback(() => {
     onExpandedChange?.(safeAnalysis.id, true);
-  };
+  }, [onExpandedChange, safeAnalysis.id]);
   
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -101,7 +101,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     return 'destructive';
   };
 
-  const handleGenerateConcept = async () => {
+  const handleGenerateConcept = useCallback(async () => {
     if (!onGenerateConcept || isGeneratingConcept) return;
     
     try {
@@ -109,7 +109,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     } catch (error) {
       console.error('Failed to generate concept:', error);
     }
-  };
+  }, [onGenerateConcept, isGeneratingConcept, safeAnalysis.id]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
