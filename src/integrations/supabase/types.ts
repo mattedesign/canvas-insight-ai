@@ -428,20 +428,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_group_images_group_id"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "image_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_group_images_image_id"
-            columns: ["image_id"]
-            isOneToOne: false
-            referencedRelation: "images"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "group_images_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
