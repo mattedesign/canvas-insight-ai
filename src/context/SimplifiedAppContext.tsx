@@ -164,6 +164,5 @@ export const useAppDispatch = () => useAppContext().dispatch;
 export const useAppState = () => useAppContext().state;
 export const useAppHelpers = () => useAppContext().stableHelpers;
 
-// Backward compatibility aliases
-export const useSimplifiedAppContext = useAppContext;
-export const SimplifiedAppProvider = AppProvider;
+// ✅ PHASE 2.2: REMOVED - No backward compatibility aliases
+// All components should use the new hook names directly
