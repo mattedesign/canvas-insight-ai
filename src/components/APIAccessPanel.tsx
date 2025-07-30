@@ -44,7 +44,7 @@ interface APILog {
   timestamp: string;
 }
 
-export function APIAccessPanel() {
+export const APIAccessPanel = React.memo(() => {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
   const [apiLogs, setApiLogs] = useState<APILog[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -497,4 +497,6 @@ export function APIAccessPanel() {
       </Card>
     </div>
   );
-}
+});
+
+APIAccessPanel.displayName = 'APIAccessPanel';

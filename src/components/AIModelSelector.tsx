@@ -75,7 +75,7 @@ const aiModels: AIModel[] = [
   }
 ];
 
-export function AIModelSelector({ selectedModel, onModelChange, onAnalyze, isAnalyzing = false }: AIModelSelectorProps) {
+export const AIModelSelector = React.memo<AIModelSelectorProps>(({ selectedModel, onModelChange, onAnalyze, isAnalyzing = false }) => {
   const [showDetails, setShowDetails] = useState(false);
 
   const getStatusIcon = (status: AIModel['status']) => {
@@ -228,4 +228,6 @@ export function AIModelSelector({ selectedModel, onModelChange, onAnalyze, isAna
       </CardContent>
     </Card>
   );
-}
+});
+
+AIModelSelector.displayName = 'AIModelSelector';

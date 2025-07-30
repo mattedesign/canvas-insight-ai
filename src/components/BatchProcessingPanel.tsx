@@ -29,7 +29,7 @@ interface BatchProcessingPanelProps {
   projectId?: string;
 }
 
-export function BatchProcessingPanel({ projectId }: BatchProcessingPanelProps) {
+export const BatchProcessingPanel = React.memo<BatchProcessingPanelProps>(({ projectId }) => {
   const [jobs, setJobs] = useState<BatchJob[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -443,4 +443,6 @@ export function BatchProcessingPanel({ projectId }: BatchProcessingPanelProps) {
       </Card>
     </div>
   );
-}
+});
+
+BatchProcessingPanel.displayName = 'BatchProcessingPanel';
