@@ -9,7 +9,7 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useOptimisticUpdates } from '@/hooks/useOptimisticUpdates';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { CanvasStateService } from '@/services/CanvasStateService';
-import { atomicStateManager } from '@/services/AtomicStateManager';
+// Removed AtomicStateManager - using direct dispatch
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import type { AppState } from '@/context/AppStateTypes';
 import type { UploadedImage, UXAnalysis, ImageGroup } from '@/types/ux-analysis';
@@ -169,64 +169,60 @@ export function useCanvasStateManager({
 
     const operationId = `canvas-autosave-${now}`;
     
-    await atomicStateManager.executeOperation(
-      operationId,
-      'SYNC',
-      async () => {
-        const saveData = {
-          nodes: canvasState.nodes,
-          edges: canvasState.edges,
-          viewport: canvasState.viewport,
-          ui_state: {
-            showAnnotations: canvasState.canvasSettings.showAnnotations,
-            galleryTool: canvasState.canvasSettings.currentTool,
-            groupDisplayModes: {},
-            selectedNodes: canvasState.selectedNodes
-          }
-        };
-        
-        const result = await CanvasStateService.saveCanvasState(saveData);
-        offlineCache.set(`canvas-${projectId}`, canvasState, 'high', 'synced');
-        lastSaveTime.current = now;
-        return (result as any).success;
-      }
-    );
+    // Direct dispatch - implement in next step
+    try {
+      const saveData = {
+        nodes: canvasState.nodes,
+        edges: canvasState.edges,
+        viewport: canvasState.viewport,
+        ui_state: {
+          showAnnotations: canvasState.canvasSettings.showAnnotations,
+          galleryTool: canvasState.canvasSettings.currentTool,
+          groupDisplayModes: {},
+          selectedNodes: canvasState.selectedNodes
+        }
+      };
+      
+      const result = await CanvasStateService.saveCanvasState(saveData);
+      offlineCache.set(`canvas-${projectId}`, canvasState, 'high', 'synced');
+      lastSaveTime.current = now;
+      return (result as any).success;
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      return false;
+    }
   }, [canvasState, projectId, offlineCache]);
 
   // Update canvas state with race condition prevention
   const updateCanvasState = useCallback(async (updates: Partial<CanvasState>) => {
     const operationId = `canvas-update-${Date.now()}`;
     
-    const result = await atomicStateManager.executeOperation(
-      operationId,
-      'SYNC',
-      async () => {
-        setCanvasState(prevState => {
-          const newState = { ...prevState, ...updates };
-          
-          // Save to undo/redo history if nodes or edges changed
-          if (updates.nodes || updates.edges) {
-            undoRedoManager.saveState(newState.nodes, newState.edges);
-          }
-          
-          pendingChanges.current = true;
-          onStateChange?.(newState);
-          
-          return newState;
-        });
+    // Direct dispatch - implement in next step
+    try {
+      setCanvasState(prevState => {
+        const newState = { ...prevState, ...updates };
         
-        return true;
-      }
-    );
-
-    if (!result.success) {
-      console.error('Failed to update canvas state:', result.error);
+        // Save to undo/redo history if nodes or edges changed
+        if (updates.nodes || updates.edges) {
+          undoRedoManager.saveState(newState.nodes, newState.edges);
+        }
+        
+        pendingChanges.current = true;
+        onStateChange?.(newState);
+        
+        return newState;
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to update canvas state:', error);
       toast({
         title: "Canvas Update Failed",
         description: "Failed to update canvas state. Changes may be lost.",
         category: "error",
         variant: "destructive"
       });
+      return false;
     }
   }, [undoRedoManager, onStateChange, toast]);
 
@@ -337,55 +333,55 @@ export function useCanvasStateManager({
   const performUndo = useCallback(async () => {
     const operationId = `undo-${Date.now()}`;
     
-    await atomicStateManager.executeOperation(
-      operationId,
-      'LOAD',
-      async () => {
-        const previousState = undoRedoManager.undo();
-        if (previousState) {
-          undoRedoManager.setIsUpdating(true);
-          await updateCanvasState({
-            nodes: previousState.nodes,
-            edges: previousState.edges
-          });
-          undoRedoManager.setIsUpdating(false);
-          
-          toast({
-            title: "Undo",
-            description: "Reverted to previous state",
-            category: "action-required"
-          });
-        }
-        return true;
+    // Direct dispatch - implement in next step
+    try {
+      const previousState = undoRedoManager.undo();
+      if (previousState) {
+        undoRedoManager.setIsUpdating(true);
+        await updateCanvasState({
+          nodes: previousState.nodes,
+          edges: previousState.edges
+        });
+        undoRedoManager.setIsUpdating(false);
+        
+        toast({
+          title: "Undo",
+          description: "Reverted to previous state",
+          category: "action-required"
+        });
       }
-    );
+      return true;
+    } catch (error) {
+      console.error('Undo failed:', error);
+      return false;
+    }
   }, [undoRedoManager, updateCanvasState, toast]);
 
   const performRedo = useCallback(async () => {
     const operationId = `redo-${Date.now()}`;
     
-    await atomicStateManager.executeOperation(
-      operationId,
-      'LOAD',
-      async () => {
-        const nextState = undoRedoManager.redo();
-        if (nextState) {
-          undoRedoManager.setIsUpdating(true);
-          await updateCanvasState({
-            nodes: nextState.nodes,
-            edges: nextState.edges
-          });
-          undoRedoManager.setIsUpdating(false);
-          
-          toast({
-            title: "Redo",
-            description: "Applied next state",
-            category: "action-required"
-          });
-        }
-        return true;
+    // Direct dispatch - implement in next step
+    try {
+      const nextState = undoRedoManager.redo();
+      if (nextState) {
+        undoRedoManager.setIsUpdating(true);
+        await updateCanvasState({
+          nodes: nextState.nodes,
+          edges: nextState.edges
+        });
+        undoRedoManager.setIsUpdating(false);
+        
+        toast({
+          title: "Redo",
+          description: "Applied next state",
+          category: "action-required"
+        });
       }
-    );
+      return true;
+    } catch (error) {
+      console.error('Redo failed:', error);
+      return false;
+    }
   }, [undoRedoManager, updateCanvasState, toast]);
 
   // Update the sync effect

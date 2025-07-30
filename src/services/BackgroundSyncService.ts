@@ -6,7 +6,7 @@
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { DataMigrationService } from './DataMigrationService';
 import { AnalysisPerformanceService } from './AnalysisPerformanceService';
-import { atomicStateManager } from './AtomicStateManager';
+// Removed AtomicStateManager - using direct dispatch
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SyncOperation {
@@ -272,32 +272,29 @@ class BackgroundSyncService {
       let result: any;
 
       // Use atomic state manager for coordination
-      const atomicResult = await atomicStateManager.executeOperation(
-        operation.id,
-        'SYNC',
-        async () => {
-          switch (operation.type) {
-            case 'IMAGE_UPLOAD':
-              return await this.processImageUpload(operation);
-            
-            case 'ANALYSIS_GENERATION':
-              return await this.processAnalysisGeneration(operation);
-            
-            case 'METADATA_EXTRACTION':
-              return await this.processMetadataExtraction(operation);
-            
-            case 'FULL_SYNC':
-              return await this.processFullSync(operation);
-            
-            default:
-              throw new Error(`Unknown operation type: ${operation.type}`);
-          }
-        },
-        7 // High priority for sync operations
-      );
+      // Direct dispatch - implement in next step
+      switch (operation.type) {
+        case 'IMAGE_UPLOAD':
+          result = await this.processImageUpload(operation);
+          break;
+        
+        case 'ANALYSIS_GENERATION':
+          result = await this.processAnalysisGeneration(operation);
+          break;
+        
+        case 'METADATA_EXTRACTION':
+          result = await this.processMetadataExtraction(operation);
+          break;
+        
+        case 'FULL_SYNC':
+          result = await this.processFullSync(operation);
+          break;
+        
+        default:
+          throw new Error(`Unknown operation type: ${operation.type}`);
+      }
 
-      if (atomicResult.success) {
-        result = atomicResult.data;
+      if (result) {
         operation.status = 'completed';
         operation.updatedAt = Date.now();
         
@@ -317,7 +314,7 @@ class BackgroundSyncService {
         }, 30000); // 30 seconds
 
       } else {
-        throw new Error(atomicResult.error || 'Operation failed');
+        throw new Error('Operation failed');
       }
 
     } catch (error) {

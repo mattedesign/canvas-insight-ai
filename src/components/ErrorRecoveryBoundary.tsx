@@ -7,7 +7,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Bug, Download, Upload } from 'lucide-react';
-import { atomicStateManager } from '@/services/AtomicStateManager';
+// Removed AtomicStateManager - using direct dispatch
 
 interface Props {
   children: ReactNode;
@@ -135,16 +135,13 @@ export class ErrorRecoveryBoundary extends Component<Props, State> {
     try {
       // Try to rollback to previous state if enabled
       if (this.props.enableStateRollback) {
-        const lastSnapshot = atomicStateManager.getLastSnapshot();
-        if (lastSnapshot) {
-          console.log('📸 Found state snapshot, attempting rollback...');
-          // The parent component should handle the actual state restoration
-          this.props.onRecovery?.();
-        }
+        // Direct dispatch - implement in next step
+        console.log('📸 State rollback would be implemented here');
+        this.props.onRecovery?.();
       }
 
       // Clear any pending operations that might be causing issues
-      atomicStateManager.clearQueue();
+      // Direct dispatch - implement in next step
 
       // Small delay to let things settle
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -173,7 +170,7 @@ export class ErrorRecoveryBoundary extends Component<Props, State> {
 
     try {
       // Clear any problematic state
-      atomicStateManager.clearQueue();
+      // Direct dispatch - implement in next step
       
       // Notify parent component
       this.props.onRecovery?.();
@@ -202,20 +199,16 @@ export class ErrorRecoveryBoundary extends Component<Props, State> {
     this.setState({ isRecovering: true });
 
     try {
-      const lastSnapshot = atomicStateManager.getLastSnapshot();
-      if (lastSnapshot) {
-        console.log('📸 Rolling back to snapshot:', lastSnapshot.operationId);
-        this.props.onRecovery?.();
-        
-        this.setState({
-          hasError: false,
-          error: undefined,
-          errorInfo: undefined,
-          isRecovering: false
-        });
-      } else {
-        throw new Error('No state snapshot available');
-      }
+      // Direct dispatch - implement in next step
+      console.log('📸 State rollback would be implemented here');
+      this.props.onRecovery?.();
+      
+      this.setState({
+        hasError: false,
+        error: undefined,
+        errorInfo: undefined,
+        isRecovering: false
+      });
     } catch (rollbackError) {
       console.error('❌ State rollback failed:', rollbackError);
       this.setState({ isRecovering: false });

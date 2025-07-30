@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { SimplifiedAppProvider } from "./context/SimplifiedAppContext";
+import { AppProvider } from "./context/SimplifiedAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
@@ -74,7 +74,7 @@ const App = () => {
       <BrowserRouter>
       <AuthProvider>
         <AIProvider>
-          <SimplifiedAppProvider>
+          <AppProvider>
             <RenderDiagnostic />
             <Suspense fallback={
               <div className="min-h-screen flex items-center justify-center bg-background">
@@ -137,7 +137,7 @@ const App = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-          </SimplifiedAppProvider>
+          </AppProvider>
         </AIProvider>
       </AuthProvider>
       </BrowserRouter>
