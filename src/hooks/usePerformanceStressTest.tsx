@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAppContext } from '@/context/SimplifiedAppContext';
+// Note: This imports mock data for performance testing demo purposes only
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import type { UploadedImage } from '@/context/AppStateTypes';
 
@@ -25,9 +26,11 @@ export const usePerformanceStressTest = () => {
   const [results, setResults] = useState<StressTestResults | null>(null);
 
   const generateMockImages = useCallback((count: number): File[] => {
+    // WARNING: This generates demo data for stress testing only
+    // Real application uses actual user uploads
     const mockImages: File[] = [];
     for (let i = 0; i < count; i++) {
-      // Create mock file
+      // Create mock file for testing
       const canvas = document.createElement('canvas');
       canvas.width = 800;
       canvas.height = 600;
@@ -60,7 +63,7 @@ export const usePerformanceStressTest = () => {
     try {
       console.log(`[StressTest] Starting with ${imageCount} images...`);
 
-      // Phase 1: Mass image upload
+      // Phase 1: Mass image upload (DEMO DATA ONLY)
       const mockImages = generateMockImages(imageCount);
       const uploadStart = performance.now();
       

@@ -160,17 +160,27 @@ export class MonitoringService {
       
       const responseTime = performance.now() - startTime;
       
-      // For now, return mock data since types aren't regenerated yet
-      // TODO: Update to use real monitoring tables once types are available
-      const errorRate = Math.floor(Math.random() * 5); // Mock: 0-5 errors
-      const uniqueActiveUsers = Math.floor(Math.random() * 20) + 1; // Mock: 1-20 users
+      // Get real error rate from last hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const { count: errorCount } = await supabase
+        .from('error_logs')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', oneHourAgo.toISOString());
+      
+      // Get unique active users from last hour
+      const { data: userEvents } = await supabase
+        .from('user_events')
+        .select('user_id')
+        .gte('created_at', oneHourAgo.toISOString());
+      
+      const uniqueUsers = new Set(userEvents?.map(e => e.user_id).filter(Boolean)).size;
 
       return {
         status: error ? 'error' : responseTime > 1000 ? 'degraded' : 'healthy',
         uptime: performance.now(),
         responseTime,
-        errorRate,
-        activeUsers: uniqueActiveUsers,
+        errorRate: errorCount || 0,
+        activeUsers: uniqueUsers,
         lastUpdated: new Date()
       };
     } catch (error) {
@@ -190,58 +200,59 @@ export class MonitoringService {
    * Get analytics data for dashboard
    */
   static async getAnalytics(timeRange: '1h' | '24h' | '7d' | '30d' = '24h') {
-    // For now, return mock data since types aren't regenerated yet
-    // TODO: Update to use real monitoring tables once types are available
-    
-    // Generate mock data for demonstration
-    const generateMockEvents = (count: number) => {
-      return Array.from({ length: count }, (_, i) => ({
-        id: `event_${i}`,
-        created_at: new Date(Date.now() - (i * 60 * 60 * 1000)).toISOString(),
-        event_type: ['page_view', 'click', 'upload', 'analysis'][Math.floor(Math.random() * 4)],
-        event_name: `mock_event_${i}`,
-        properties: { mock: true },
-        user_id: `user_${Math.floor(Math.random() * 5)}`,
-        session_id: `session_${Math.floor(Math.random() * 10)}`,
-        url: window.location.href
-      }));
-    };
+    try {
+      // Calculate time window
+      const timeWindowMs = {
+        '1h': 60 * 60 * 1000,
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000
+      }[timeRange];
+      
+      const startTime = new Date(Date.now() - timeWindowMs);
 
-    const generateMockMetrics = (count: number) => {
-      return Array.from({ length: count }, (_, i) => ({
-        id: `metric_${i}`,
-        created_at: new Date(Date.now() - (i * 60 * 60 * 1000)).toISOString(),
-        metric_type: 'api_response',
-        metric_name: 'api_response_time',
-        value: Math.floor(Math.random() * 1000) + 100,
-        metadata: {},
-        user_id: `user_${Math.floor(Math.random() * 5)}`,
-        session_id: `session_${Math.floor(Math.random() * 10)}`
-      }));
-    };
+      // Get real events data
+      const { data: events } = await supabase
+        .from('user_events')
+        .select('*')
+        .gte('created_at', startTime.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    const generateMockErrors = (count: number) => {
-      return Array.from({ length: count }, (_, i) => ({
-        id: `error_${i}`,
-        created_at: new Date(Date.now() - (i * 4 * 60 * 60 * 1000)).toISOString(),
-        error_type: ['javascript', 'api', 'network'][Math.floor(Math.random() * 3)],
-        error_message: `Mock error ${i}`,
-        stack_trace: null,
-        user_id: `user_${Math.floor(Math.random() * 5)}`,
-        session_id: `session_${Math.floor(Math.random() * 10)}`,
-        url: window.location.href,
-        user_agent: navigator.userAgent,
-        metadata: {}
-      }));
-    };
+      // Get real performance metrics
+      const { data: metrics } = await supabase
+        .from('performance_metrics')
+        .select('*')
+        .gte('created_at', startTime.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    return {
-      events: generateMockEvents(20),
-      metrics: generateMockMetrics(15),
-      errors: generateMockErrors(3),
-      timeRange,
-      generatedAt: new Date()
-    };
+      // Get real error logs
+      const { data: errors } = await supabase
+        .from('error_logs')
+        .select('*')
+        .gte('created_at', startTime.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      return {
+        events: events || [],
+        metrics: metrics || [],
+        errors: errors || [],
+        timeRange,
+        generatedAt: new Date()
+      };
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      // Return empty data on error
+      return {
+        events: [],
+        metrics: [],
+        errors: [],
+        timeRange,
+        generatedAt: new Date()
+      };
+    }
   }
 
   /**

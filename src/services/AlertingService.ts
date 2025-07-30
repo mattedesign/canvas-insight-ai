@@ -152,20 +152,36 @@ export class AlertingService {
    * Check error rate
    */
   private static async checkErrorRate(threshold: number, since: Date): Promise<boolean> {
-    // For now, return mock data since types aren't regenerated yet
-    // TODO: Update to use real monitoring tables once types are available
-    const mockErrorCount = Math.floor(Math.random() * 3); // 0-2 errors
-    return mockErrorCount > threshold;
+    try {
+      const { count } = await supabase
+        .from('error_logs')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', since.toISOString());
+      
+      return (count || 0) > threshold;
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Check response time
    */
   private static async checkResponseTime(threshold: number, since: Date): Promise<boolean> {
-    // For now, return mock data since types aren't regenerated yet
-    // TODO: Update to use real monitoring tables once types are available
-    const mockAvgResponseTime = Math.floor(Math.random() * 1500) + 200; // 200-1700ms
-    return mockAvgResponseTime > threshold;
+    try {
+      const { data } = await supabase
+        .from('performance_metrics')
+        .select('value')
+        .eq('metric_name', 'api_response_time')
+        .gte('created_at', since.toISOString());
+      
+      if (!data || data.length === 0) return false;
+      
+      const avgResponseTime = data.reduce((sum, metric) => sum + Number(metric.value), 0) / data.length;
+      return avgResponseTime > threshold;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -250,15 +266,25 @@ export class AlertingService {
    * Save alert to database
    */
   private static async saveAlert(alert: Alert) {
-    // For now, just log alerts since types aren't regenerated yet
-    // TODO: Update to use real alerts table once types are available
-    console.log('Alert saved:', alert.title, alert.severity);
-    
     try {
-      // This will be enabled once types are regenerated
-      // const { error } = await supabase
-      //   .from('alerts')
-      //   .insert({...});
+      const { error } = await supabase
+        .from('alerts')
+        .insert({
+          type: alert.type,
+          severity: alert.severity,
+          title: alert.title,
+          message: alert.message,
+          metadata: alert.metadata,
+          user_id: alert.user_id,
+          acknowledged: alert.acknowledged,
+          resolved: alert.resolved
+        });
+
+      if (error) {
+        console.error('Error saving alert to database:', error);
+      } else {
+        console.log('Alert saved to database:', alert.title, alert.severity);
+      }
     } catch (error) {
       console.error('Error saving alert:', error);
     }
@@ -288,26 +314,33 @@ export class AlertingService {
    * Load active alerts from database
    */
   private static async loadActiveAlerts() {
-    // For now, generate some mock alerts for demonstration
-    // TODO: Update to use real alerts table once types are available
-    
-    const mockAlerts: Alert[] = [
-      {
-        id: 'alert-1',
-        type: 'performance',
-        severity: 'medium',
-        title: 'Slow Response Time Detected',
-        message: 'Average response time exceeded 2000ms in the last 10 minutes.',
-        timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-        acknowledged: false,
-        resolved: false,
-        metadata: { ruleId: 'slow_response_time' }
-      }
-    ];
+    try {
+      const { data: alerts } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('resolved', false)
+        .order('created_at', { ascending: false });
 
-    mockAlerts.forEach(alert => {
-      this.activeAlerts.set(alert.id, alert);
-    });
+      if (alerts) {
+        alerts.forEach(alertData => {
+          const alert: Alert = {
+            id: alertData.id,
+            type: alertData.type as Alert['type'],
+            severity: alertData.severity as Alert['severity'],
+            title: alertData.title,
+            message: alertData.message,
+            timestamp: new Date(alertData.created_at),
+            acknowledged: alertData.acknowledged,
+            resolved: alertData.resolved,
+            metadata: (alertData.metadata as Record<string, any>) || {},
+            user_id: alertData.user_id || undefined
+          };
+          this.activeAlerts.set(alert.id, alert);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading active alerts:', error);
+    }
   }
 
   /**
@@ -345,13 +378,25 @@ export class AlertingService {
     const alert = this.activeAlerts.get(alertId);
     if (!alert) return false;
 
-    alert.acknowledged = true;
-    alert.user_id = userId;
+    try {
+      const { error } = await supabase
+        .from('alerts')
+        .update({
+          acknowledged: true,
+          acknowledged_by: userId,
+          acknowledged_at: new Date().toISOString()
+        })
+        .eq('id', alertId);
 
-    // For now, just update in memory
-    // TODO: Update to use real alerts table once types are available
-    console.log('Alert acknowledged:', alertId, userId);
-    return true;
+      if (!error) {
+        alert.acknowledged = true;
+        alert.user_id = userId;
+        return true;
+      }
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+    }
+    return false;
   }
 
   /**
@@ -361,14 +406,26 @@ export class AlertingService {
     const alert = this.activeAlerts.get(alertId);
     if (!alert) return false;
 
-    alert.resolved = true;
-    alert.user_id = userId;
-    this.activeAlerts.delete(alertId);
+    try {
+      const { error } = await supabase
+        .from('alerts')
+        .update({
+          resolved: true,
+          resolved_by: userId,
+          resolved_at: new Date().toISOString()
+        })
+        .eq('id', alertId);
 
-    // For now, just update in memory
-    // TODO: Update to use real alerts table once types are available
-    console.log('Alert resolved:', alertId, userId);
-    return true;
+      if (!error) {
+        alert.resolved = true;
+        alert.user_id = userId;
+        this.activeAlerts.delete(alertId);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error resolving alert:', error);
+    }
+    return false;
   }
 
   /**
