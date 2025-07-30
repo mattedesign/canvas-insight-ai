@@ -3,7 +3,7 @@ import { useAuth } from './AuthContext';
 import { appStateReducer } from '@/context/AppStateReducer';
 import { initialAppState } from '@/context/AppStateTypes';
 import type { AppState, AppAction } from '@/context/AppStateTypes';
-import { DataMigrationService } from '@/services/DataMigrationService';
+import { useStableHelpers } from '@/hooks/useStableHelpers';
 
 interface AppContextType {
   state: AppState;
@@ -23,99 +23,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { user } = useAuth();
   const [state, dispatch] = useReducer(appStateReducer, initialAppState);
   const hasLoadedRef = useRef(false);
-  const isLoadingRef = useRef(false);
 
-  // ✅ PHASE 2.1: STABLE HELPERS - Never change (empty dependencies)
-  const stableHelpers = useRef({
-    loadData: async (expectedProjectId?: string) => {
-      if (isLoadingRef.current) return;
-      
-      isLoadingRef.current = true;
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      try {
-        console.log('[Pure Reducer] Starting data load for project:', expectedProjectId);
-        const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
-        if (result.success && result.data) {
-          console.log('[Pure Reducer] Data loaded successfully:', result.data);
-          dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
-        } else {
-          console.error('[Pure Reducer] Data loading failed:', result.error);
-          dispatch({ type: 'SET_ERROR', payload: result.error || 'Unknown error' });
-        }
-      } catch (error: any) {
-        console.error('[Pure Reducer] Data loading exception:', error);
-        dispatch({ type: 'SET_ERROR', payload: error.message || 'Unknown error' });
-      } finally {
-        isLoadingRef.current = false;
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    },
+  // ✅ PHASE 2.3: USE STABLE HELPERS HOOK
+  const stableHelpers = useStableHelpers(dispatch);
 
-    uploadImages: async (files: File[]) => {
-      dispatch({ type: 'SET_UPLOADING', payload: true });
-      
-      try {
-        const { loadImageDimensions } = await import('@/utils/imageUtils');
-        const { ImageMigrationService } = await import('@/services/DataMigrationService');
-        
-        const uploadPromises = files.map(async (file) => {
-          const dimensions = await loadImageDimensions(file);
-          
-          const uploadedImage = {
-            id: crypto.randomUUID(),
-            name: file.name,
-            url: URL.createObjectURL(file),
-            file: file,
-            dimensions,
-            status: 'uploading' as const
-          };
-          
-          await ImageMigrationService.migrateImageToDatabase(uploadedImage);
-          
-          return {
-            ...uploadedImage,
-            status: 'completed' as const
-          };
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        dispatch({ type: 'ADD_IMAGES', payload: results });
-
-        // Reload data to ensure consistency
-        setTimeout(async () => {
-          try {
-            const result = await DataMigrationService.loadAllFromDatabase();
-            if (result.success && result.data) {
-              dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
-            }
-          } catch (error) {
-            console.error('[Upload] Failed to reload from database:', error);
-          }
-        }, 1000);
-        
-      } catch (error: any) {
-        console.error('Upload failed:', error);
-        dispatch({ type: 'SET_ERROR', payload: `Upload failed: ${error.message}` });
-      } finally {
-        dispatch({ type: 'SET_UPLOADING', payload: false });
-      }
-    },
-
-    createGroup: (data: any) => {
-      dispatch({ type: 'ADD_GROUP', payload: data });
-    },
-
-    deleteImage: (id: string) => {
-      dispatch({ type: 'REMOVE_IMAGE', payload: id });
-    },
-
-    resetAll: () => {
-      dispatch({ type: 'RESET_STATE' });
-    }
-  }).current;
-
-  // ✅ PHASE 2.1: SIMPLE DATA LOADING - No circular dependencies
+  // ✅ PHASE 2.3: SIMPLE DATA LOADING - No circular dependencies
   useEffect(() => {
     if (user && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -128,7 +40,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user?.id]); // ✅ ONLY user.id - stableHelpers never change
 
-  // ✅ PHASE 2.1: Listen for project changes and clear state
+  // ✅ PHASE 2.3: Listen for project changes and clear state
   useEffect(() => {
     const handleProjectChange = (event: CustomEvent) => {
       console.log('[Pure Reducer] Project changed, clearing state:', event.detail);
@@ -140,7 +52,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as EventListener);
     };
-  }, []); // ✅ PHASE 2.1: Empty dependencies - stableHelpers never change
+  }, []); // ✅ PHASE 2.3: Empty dependencies - stableHelpers never change
 
   const value = { state, dispatch, stableHelpers };
 
@@ -159,10 +71,10 @@ export const useAppContext = () => {
   return context;
 };
 
-// ✅ PHASE 2.1: PURE REDUCER HOOKS
+// ✅ PHASE 2.3: PURE REDUCER HOOKS
 export const useAppDispatch = () => useAppContext().dispatch;
 export const useAppState = () => useAppContext().state;
 export const useAppHelpers = () => useAppContext().stableHelpers;
 
-// ✅ PHASE 2.2: REMOVED - No backward compatibility aliases
+// ✅ PHASE 2.3: REMOVED - No backward compatibility aliases
 // All components should use the new hook names directly
