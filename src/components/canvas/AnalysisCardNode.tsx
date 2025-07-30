@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useRenderMonitor } from '@/hooks/useRenderMonitor';
 import { Handle, Position } from '@xyflow/react';
 import { UXAnalysis } from '@/types/ux-analysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,14 +34,10 @@ interface AnalysisCardNodeProps {
 }
 
 export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
-  // Debug logging to understand the data structure
-  console.log('AnalysisCardNode received data:', {
-    hasData: !!data,
-    hasAnalysis: !!(data?.analysis),
-    hasSummary: !!(data?.analysis?.summary),
-    categoryScores: data?.analysis?.summary?.categoryScores,
-    categoryScoresType: typeof data?.analysis?.summary?.categoryScores
-  });
+  // ✅ MONITOR: Track renders to ensure no infinite loops
+  useRenderMonitor('AnalysisCardNode');
+  
+  // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
   // Add null/undefined checks to prevent React state errors
   if (!data || !data.analysis) {
@@ -84,11 +81,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
   };
 
-  // Additional debug logging after safe construction
-  console.log('AnalysisCardNode safeAnalysis:', {
-    categoryScores: safeAnalysis.summary.categoryScores,
-    categoryScoresEntries: Object.entries(safeAnalysis.summary.categoryScores)
-  });
+  // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
   const handleViewFullAnalysis = () => {
     onExpandedChange?.(safeAnalysis.id, true);
