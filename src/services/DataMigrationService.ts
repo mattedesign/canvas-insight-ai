@@ -266,11 +266,18 @@ export class ImageMigrationService {
       if (!user) throw new Error('User not authenticated');
 
       // Check if image already exists in database
-      const { data: existingImage } = await supabase
+      const { data: existingImage, error: checkError } = await supabase
         .from('images')
         .select('id')
         .eq('id', uploadedImage.id)
-        .single();
+        .eq('project_id', projectId) // Add project check to match RLS policy
+        .maybeSingle(); // Use maybeSingle to handle non-existent records gracefully
+
+      // If there's an error other than "not found", throw it
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking for existing image:', checkError);
+        throw checkError;
+      }
 
       if (existingImage) {
         console.log('Image already exists in database:', uploadedImage.id);
