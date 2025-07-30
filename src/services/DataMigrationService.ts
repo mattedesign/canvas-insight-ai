@@ -278,12 +278,13 @@ export class ImageMigrationService {
         .upsert({
           id: uploadedImage.id,
           project_id: projectId,
-          user_id: user.id,
           filename: uploadedImage.name,
           original_name: uploadedImage.name,
           storage_path: fileName,
           dimensions: uploadedImage.dimensions,
-          status: 'completed'
+          file_size: uploadedImage.file.size,
+          file_type: uploadedImage.file.type,
+          security_scan_status: 'pending'
         }, {
           onConflict: 'id'
         })
