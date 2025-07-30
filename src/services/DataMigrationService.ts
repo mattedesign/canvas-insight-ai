@@ -255,7 +255,11 @@ export class ImageMigrationService {
       }
 
       // Upload file to storage with conflict handling
-      const fileName = `${user.id}/${uploadedImage.id}/${uploadedImage.name}`;
+      // Sanitize filename for storage (remove spaces, special characters)
+      const sanitizedName = uploadedImage.name
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/_+/g, '_');
+      const fileName = `${user.id}/${uploadedImage.id}/${sanitizedName}`;
       
       // Check if file already exists in storage
       const { data: existingFile } = await supabase.storage
