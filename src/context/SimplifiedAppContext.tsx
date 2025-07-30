@@ -40,7 +40,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       window.removeEventListener('projectChanged', handleProjectChange as EventListener);
     };
-  }, [actions]);
+  }, []); // ✅ PHASE 1.2: Empty dependencies - actions are stable
 
   const value = { state, actions, status };
 
