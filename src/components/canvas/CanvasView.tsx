@@ -29,6 +29,7 @@ import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
+import { CanvasUploadZone } from '../CanvasUploadZone';
 
 
 import { Button } from '@/components/ui/button';
@@ -1070,6 +1071,15 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
 
   return (
     <div className="h-full w-full bg-background relative">
+      {/* Upload Zone - Show when no images */}
+      {uploadedImages.length === 0 && onImageUpload && (
+        <CanvasUploadZone 
+          onImageUpload={onImageUpload}
+          isUploading={false}
+          hasImages={false}
+        />
+      )}
+      
       {/* Undo/Redo Controls */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <Button
