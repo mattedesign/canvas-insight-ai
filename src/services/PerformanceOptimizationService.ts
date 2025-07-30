@@ -21,11 +21,17 @@ export interface OptimizationRecommendation {
 export class PerformanceOptimizationService {
   private static metricsCache = new Map<string, any>();
   private static performanceObserver: PerformanceObserver | null = null;
+  private static isInitialized = false;
 
   /**
    * Initialize performance monitoring
    */
   static initialize(): void {
+    if (this.isInitialized) {
+      return; // Prevent duplicate initialization
+    }
+    
+    this.isInitialized = true;
     this.setupPerformanceObserver();
     this.setupMemoryMonitoring();
     this.setupNetworkMonitoring();
@@ -228,19 +234,20 @@ export class PerformanceOptimizationService {
       clearInterval(this.memoryMonitorInterval);
     }
 
+    // Only check memory usage once, don't set up continuous monitoring
     if ('memory' in performance) {
       const memoryInfo = (performance as any).memory;
       const usagePercent = (memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100;
       
-      if (usagePercent > 80) {
+      if (usagePercent > 90) { // Increased threshold to 90%
         this.triggerMemoryCleanup();
       }
     }
 
-    // Monitor for memory leaks with proper cleanup
+    // Reduced frequency and only run if needed
     this.memoryMonitorInterval = window.setInterval(() => {
       this.detectMemoryLeaks();
-    }, 60000); // Check every minute
+    }, 300000); // Check every 5 minutes instead of 1 minute
   }
 
   /**
@@ -521,7 +528,10 @@ export class PerformanceOptimizationService {
   static cleanup(): void {
     if (this.performanceObserver) {
       this.performanceObserver.disconnect();
+      this.performanceObserver = null;
     }
+    this.stopMemoryMonitoring();
     this.metricsCache.clear();
+    this.isInitialized = false;
   }
 }

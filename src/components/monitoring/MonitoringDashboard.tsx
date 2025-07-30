@@ -11,11 +11,8 @@ import { AlertingService } from '@/services/AlertingService';
 export const MonitoringDashboard: React.FC = () => {
   
   useEffect(() => {
-    // Initialize monitoring services
-    MonitoringService.initialize();
-    AlertingService.initialize();
-
-    // Track dashboard visit
+    // Services are already initialized in main.tsx
+    // Just track dashboard visit
     MonitoringService.trackEvent('page_view', 'monitoring_dashboard', {
       timestamp: new Date().toISOString()
     });

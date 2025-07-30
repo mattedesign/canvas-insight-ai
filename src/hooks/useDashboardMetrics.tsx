@@ -43,7 +43,7 @@ export const useDashboardMetrics = () => {
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [user]);
+  }, [user?.id]); // Only depend on user ID, not the whole user object
 
   const refreshMetrics = useCallback(() => {
     loadedForUserRef.current = null; // Reset to force reload
@@ -52,7 +52,7 @@ export const useDashboardMetrics = () => {
 
   useEffect(() => {
     loadMetrics();
-  }, [user?.id]); // Only depend on user ID, not the function
+  }, [loadMetrics]); // Depend on the stable loadMetrics function
 
   return {
     metrics,

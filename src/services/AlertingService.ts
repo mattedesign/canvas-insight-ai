@@ -76,11 +76,18 @@ export class AlertingService {
   ];
 
   private static activeAlerts: Map<string, Alert> = new Map();
+  private static monitoringInterval: number | null = null;
+  private static isInitialized = false;
 
   /**
    * Initialize alerting system
    */
   static initialize() {
+    if (this.isInitialized) {
+      return; // Prevent duplicate initialization
+    }
+    
+    this.isInitialized = true;
     // Start monitoring for alerts
     this.startAlertMonitoring();
     
@@ -307,15 +314,20 @@ export class AlertingService {
    * Start alert monitoring
    */
   private static startAlertMonitoring() {
-    // Check for alerts every minute
-    setInterval(() => {
+    // Clear existing interval to prevent duplicates
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+    
+    // Check for alerts every 5 minutes instead of every minute
+    this.monitoringInterval = window.setInterval(() => {
       this.checkAlertRules();
-    }, 60000);
+    }, 300000); // 5 minutes
 
-    // Initial check
+    // Initial check after 10 seconds
     setTimeout(() => {
       this.checkAlertRules();
-    }, 5000);
+    }, 10000);
   }
 
   /**

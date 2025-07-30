@@ -9,6 +9,12 @@ import { PerformanceOptimizationService } from './services/PerformanceOptimizati
 MonitoringService.initialize()
 PerformanceOptimizationService.initialize()
 
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  PerformanceOptimizationService.cleanup()
+  MonitoringService.cleanup()
+})
+
 // Simple error boundary for the root level
 class RootErrorBoundary extends React.Component<
   { children: React.ReactNode },
