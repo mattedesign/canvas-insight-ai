@@ -161,18 +161,38 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           className="w-full h-auto object-contain"
           style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
           onError={(e) => {
-            console.error(`Image failed to load: ${image.url}`);
+            // ✅ PHASE 2 FIX: Enhanced error handling with detailed logging
+            console.error(`[ImageNode] Image failed to load:`, {
+              imageName: image.name,
+              imageId: image.id,
+              url: image.url,
+              hasFile: !!image.file,
+              isBlob: image.url.startsWith('blob:'),
+              isSupabase: image.url.includes('supabase')
+            });
+            
             // Try to regenerate blob URL if we have the file
-            if (image.file && image.url.startsWith('http')) {
-              console.log('Fallback to blob URL for:', image.name);
-              const fallbackUrl = URL.createObjectURL(image.file);
-              e.currentTarget.src = fallbackUrl;
+            if (image.file && !image.url.startsWith('blob:')) {
+              console.log('[ImageNode] Attempting fallback to blob URL for:', image.name);
+              try {
+                const fallbackUrl = URL.createObjectURL(image.file);
+                e.currentTarget.src = fallbackUrl;
+              } catch (blobError) {
+                console.error('[ImageNode] Failed to create blob URL:', blobError);
+              }
             } else {
-              console.error('No fallback available for:', image.name);
+              console.error('[ImageNode] No fallback available for:', image.name);
+              // Set a placeholder or error image
+              e.currentTarget.style.display = 'none';
             }
           }}
           onLoad={() => {
-            console.log(`Image loaded successfully: ${image.name}`);
+            console.log(`[ImageNode] Image loaded successfully:`, {
+              imageName: image.name,
+              imageId: image.id,
+              dimensions: image.dimensions,
+              url: image.url.substring(0, 100) + '...'
+            });
           }}
         />
 

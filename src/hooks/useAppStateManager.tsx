@@ -3,6 +3,7 @@ import { DataMigrationService } from '@/services/DataMigrationService';
 import { appStateReducer } from '@/context/AppStateReducer';
 import type { AppState, AppAction } from '@/context/AppStateTypes';
 import { initialAppState } from '@/context/AppStateTypes';
+import { useOptimizedDataLoader } from './useOptimizedDataLoader';
 
 interface StateManager {
   state: AppState;
@@ -23,31 +24,44 @@ interface StateManager {
 export const useAppStateManager = (): StateManager => {
   const [state, dispatch] = useReducer(appStateReducer, initialAppState);
   const isLoadingRef = useRef(false);
+  const { loadWithDeduplication } = useOptimizedDataLoader();
 
   // ✅ STABLE ACTIONS - These NEVER change (empty dependency arrays)
   const actions = {
     loadData: useCallback(async (expectedProjectId?: string) => {
-      if (isLoadingRef.current) return;
+      const loadKey = `data-${expectedProjectId || 'current'}`;
       
-      isLoadingRef.current = true;
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      try {
-        // ✅ FIX 5: Project-aware data loading with validation
-        const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
-        if (result.success && result.data) {
-          console.log('[useAppStateManager] Data loaded successfully:', result.data);
-          dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
-        } else {
-          console.error('[useAppStateManager] Data loading failed:', result.error);
+      return loadWithDeduplication(loadKey, async () => {
+        if (isLoadingRef.current) return;
+        
+        isLoadingRef.current = true;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        
+        try {
+          console.log('[useAppStateManager] Starting optimized data load for project:', expectedProjectId);
+          
+          // ✅ PHASE 1 & 3: Optimized data loading with validation
+          const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
+          if (result.success && result.data) {
+            console.log('[useAppStateManager] Data loaded successfully:', {
+              images: result.data.uploadedImages?.length || 0,
+              analyses: result.data.analyses?.length || 0,
+              groups: result.data.imageGroups?.length || 0
+            });
+            dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
+          } else {
+            console.error('[useAppStateManager] Data loading failed:', result.error);
+            dispatch({ type: 'SET_ERROR', payload: result.error || 'Unknown error' });
+          }
+        } catch (error) {
+          console.error('[useAppStateManager] Data loading exception:', error);
+          dispatch({ type: 'SET_ERROR', payload: error.message || 'Unknown error' });
+        } finally {
+          isLoadingRef.current = false;
+          dispatch({ type: 'SET_LOADING', payload: false });
         }
-      } catch (error) {
-        dispatch({ type: 'SET_ERROR', payload: error.message });
-      } finally {
-        isLoadingRef.current = false;
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    }, []), // ✅ EMPTY - Never changes
+      }, 500); // ✅ PHASE 1: 500ms debounce for data loading
+    }, [loadWithDeduplication]), // ✅ Stable dependency
 
     uploadImages: useCallback(async (files: File[]) => {
       dispatch({ type: 'SET_UPLOADING', payload: true });

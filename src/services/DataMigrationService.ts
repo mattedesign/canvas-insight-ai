@@ -358,10 +358,10 @@ export class ImageMigrationService {
         return [];
       }
 
-      console.log('[ImageMigrationService] Found', images.length, 'images:', images.map(img => ({ id: img.id, name: img.original_name, storage_path: img.storage_path })));
+      console.log('[ImageMigrationService] Found', images.length, 'images for processing');
 
-      return images.map(img => {
-        // Get public URL for the image
+      const result = images.map(img => {
+        // ✅ PHASE 2 FIX: Enhanced URL generation with validation
         const { data: urlData } = supabase.storage
           .from('images')
           .getPublicUrl(img.storage_path);
@@ -369,7 +369,7 @@ export class ImageMigrationService {
         // Create a minimal File object for backward compatibility
         const emptyFile = new File([], img.original_name, { type: 'image/*' });
 
-        return {
+        const uploadedImage = {
           id: img.id,
           name: img.original_name,
           url: urlData.publicUrl,
@@ -378,6 +378,25 @@ export class ImageMigrationService {
           status: 'completed' as const,
           projectId: img.project_id // ✅ FIX 17: Add projectId for validation
         } as UploadedImage;
+
+        // ✅ PHASE 2 FIX: Validate URL generation
+        if (!uploadedImage.url || uploadedImage.url.includes('undefined')) {
+          console.error('[ImageMigrationService] Invalid URL generated for image:', {
+            imageId: img.id,
+            originalName: img.original_name,
+            storagePath: img.storage_path,
+            generatedUrl: uploadedImage.url
+          });
+        } else {
+          console.log('[ImageMigrationService] Successfully processed image:', {
+            name: uploadedImage.name,
+            id: uploadedImage.id,
+            dimensions: uploadedImage.dimensions,
+            urlValid: uploadedImage.url.startsWith('http')
+          });
+        }
+
+        return uploadedImage;
       });
     } catch (error) {
       console.error('[ImageMigrationService] loadImagesFromDatabase failed:', error);
@@ -451,6 +470,8 @@ export class AnalysisMigrationService {
         .eq('project_id', projectId);
         
       if (imagesError) throw imagesError;
+      
+      // ✅ PHASE 1 FIX: Early return prevents empty array query
       if (!projectImages || projectImages.length === 0) {
         console.log('[AnalysisMigrationService] No images found, skipping analysis loading');
         return [];
@@ -459,39 +480,52 @@ export class AnalysisMigrationService {
       const imageIds = projectImages.map(img => img.id);
       console.log('[AnalysisMigrationService] Loading analyses for', imageIds.length, 'images');
     
-    // Then get analyses for those images
-    const { data: analyses, error } = await supabase
-      .from('ux_analyses')
-      .select('*')
-      .in('image_id', imageIds)
-      .order('created_at', { ascending: false });
+      // ✅ PHASE 1 FIX: Only query if we have valid image IDs
+      const { data: analyses, error } = await supabase
+        .from('ux_analyses')
+        .select('*')
+        .in('image_id', imageIds)
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    if (!analyses) return [];
+      if (error) throw error;
+      if (!analyses) return [];
 
-    return analyses.map(analysis => {
-      // Find the corresponding image data
-      const imageData = projectImages.find(img => img.id === analysis.image_id);
-      
-      // Get public URL for the image
-      const { data: urlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(imageData?.storage_path || '');
+      console.log('[AnalysisMigrationService] Found', analyses.length, 'analyses');
 
-      return {
-        id: analysis.id,
-        imageId: analysis.image_id,
-        imageName: imageData?.original_name || 'Unknown',
-        imageUrl: urlData.publicUrl,
-        userContext: analysis.user_context || '',
-        visualAnnotations: (analysis.visual_annotations as any) || [],
-        suggestions: (analysis.suggestions as any) || [],
-        summary: (analysis.summary as any) || {},
-        metadata: (analysis.metadata as any) || {},
-        status: 'completed' as const,
-        createdAt: new Date(analysis.created_at)
-      };
-    });
+      return analyses.map(analysis => {
+        // Find the corresponding image data
+        const imageData = projectImages.find(img => img.id === analysis.image_id);
+        
+        // ✅ PHASE 2 FIX: Better URL generation with fallback
+        let imageUrl = '';
+        if (imageData?.storage_path) {
+          const { data: urlData } = supabase.storage
+            .from('images')
+            .getPublicUrl(imageData.storage_path);
+          imageUrl = urlData.publicUrl;
+        }
+
+        const result = {
+          id: analysis.id,
+          imageId: analysis.image_id,
+          imageName: imageData?.original_name || 'Unknown',
+          imageUrl,
+          userContext: analysis.user_context || '',
+          visualAnnotations: (analysis.visual_annotations as any) || [],
+          suggestions: (analysis.suggestions as any) || [],
+          summary: (analysis.summary as any) || {},
+          metadata: (analysis.metadata as any) || {},
+          status: 'completed' as const,
+          createdAt: new Date(analysis.created_at)
+        };
+
+        // ✅ PHASE 2 FIX: Debug logging for URL validation
+        if (!result.imageUrl) {
+          console.warn('[AnalysisMigrationService] No image URL for analysis:', result.id, 'imageName:', result.imageName);
+        }
+
+        return result;
+      });
     } catch (error) {
       console.error('[AnalysisMigrationService] loadAnalysesFromDatabase failed:', error);
       return [];

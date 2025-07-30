@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
+import { ImageLoadingDiagnostic } from '@/components/ImageLoadingDiagnostic';
 
 interface ErrorDisplayProps {
   error: string;
@@ -285,6 +286,13 @@ const Canvas = () => {
       />
       
       <div className="flex-1 overflow-hidden relative w-full h-full">
+        {/* ✅ PHASE 2: Debug diagnostic component */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute top-4 left-4 z-50 max-w-sm">
+            <ImageLoadingDiagnostic />
+          </div>
+        )}
+        
         <ErrorBoundary
           fallback={
             <div className="h-full flex items-center justify-center">
