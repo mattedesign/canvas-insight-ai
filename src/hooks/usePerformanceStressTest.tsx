@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
+import { useAppContext } from '@/context/SimplifiedAppContext';
 import { generateMockAnalysis } from '@/data/mockAnalysis';
 import type { UploadedImage } from '@/context/AppStateTypes';
 
@@ -20,7 +20,7 @@ interface StressTestResults {
 }
 
 export const usePerformanceStressTest = () => {
-  const { stableHelpers, state } = useSimplifiedAppContext();
+  const { actions, state } = useAppContext();
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<StressTestResults | null>(null);
 

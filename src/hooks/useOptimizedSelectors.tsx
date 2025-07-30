@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
+import { useAppContext } from '@/context/SimplifiedAppContext';
 import type { 
   AppState, 
   UploadedImage, 
@@ -18,7 +18,7 @@ type StateSelector<T> = (state: AppState) => T;
 
 // Core selector hook with memoization
 export const useAppSelector = <T,>(selector: StateSelector<T>): T => {
-  const { state } = useSimplifiedAppContext();
+  const { state } = useAppContext();
   return useMemo(() => selector(state), [selector, state]);
 };
 
@@ -116,47 +116,13 @@ export const useStateMetrics = () => {
 
 // Action dispatchers (stable references)
 export const useAppActions = () => {
-  const { dispatch } = useSimplifiedAppContext();
+  const { actions } = useAppContext();
   
-  return useMemo(() => ({
-    // Image actions
-    selectImage: (imageId: string | null) => 
-      dispatch({ type: 'SET_SELECTED_IMAGE', payload: imageId }),
-    
-    removeImage: (imageId: string) => 
-      dispatch({ type: 'REMOVE_IMAGE', payload: imageId }),
-    
-    updateImage: (id: string, updates: Partial<UploadedImage>) => 
-      dispatch({ type: 'UPDATE_IMAGE', payload: { id, updates } }),
-    
-    // Analysis actions
-    addAnalysis: (analysis: UXAnalysis) => 
-      dispatch({ type: 'ADD_ANALYSIS', payload: analysis }),
-    
-    updateAnalysis: (imageId: string, analysis: UXAnalysis) => 
-      dispatch({ type: 'UPDATE_ANALYSIS', payload: { imageId, analysis } }),
-    
-    // Group actions
-    updateGroup: (id: string, updates: Partial<ImageGroup>) => 
-      dispatch({ type: 'UPDATE_GROUP', payload: { id, updates } }),
-    
-    deleteGroup: (groupId: string) => 
-      dispatch({ type: 'DELETE_GROUP', payload: groupId }),
-    
-    // UI actions
-    toggleAnnotations: () => 
-      dispatch({ type: 'TOGGLE_ANNOTATIONS' }),
-    
-    setGalleryTool: (tool: 'cursor' | 'draw') => 
-      dispatch({ type: 'SET_GALLERY_TOOL', payload: tool }),
-    
-    setGroupDisplayMode: (groupId: string, mode: 'standard' | 'stacked') => 
-      dispatch({ type: 'SET_GROUP_DISPLAY_MODE', payload: { groupId, mode } }),
-  }), [dispatch]);
+  return actions;
 };
 
 // Helper functions (stable references)
 export const useAppHelpers = () => {
-  const { stableHelpers } = useSimplifiedAppContext();
-  return stableHelpers;
+  const { actions } = useAppContext();
+  return actions;
 };

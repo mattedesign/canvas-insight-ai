@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
+import { useAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
@@ -63,7 +63,7 @@ class ErrorBoundary extends React.Component<{
 }
 
 const Canvas = () => {
-  const { state, stableHelpers, loadingMachine } = useSimplifiedAppContext();
+  const { state, actions, status } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
   
@@ -89,7 +89,7 @@ const Canvas = () => {
       
       console.log('[Canvas] Loading data for project:', projectId);
       loadedProjectRef.current = { projectId, timestamp: now };
-      await stableHelpers.loadData();
+      await actions.loadData();
     };
     
     loadData();
@@ -109,14 +109,14 @@ const Canvas = () => {
   }, []);
 
   const handleCreateGroup = useCallback((imageIds: string[]) => {
-    stableHelpers.createGroup(
-      'New Group',
-      'Group created from canvas',
-      '#3b82f6',
+    actions.createGroup({
+      name: 'New Group',
+      description: 'Group created from canvas',
+      color: '#3b82f6',
       imageIds,
-      { x: 100, y: 100 }
-    );
-  }, [stableHelpers]);
+      position: { x: 100, y: 100 }
+    });
+  }, [actions]);
 
   const handleUngroup = useCallback((groupId: string) => {
     console.log('Ungroup:', groupId);
@@ -147,7 +147,7 @@ const Canvas = () => {
   }, []);
 
   const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations } = state;
-  const isLoading = loadingMachine.state.appData === 'loading';
+  const isLoading = status.isLoading;
 
   if (isLoading) {
     return <LoadingSpinner message="Loading project data..." />;
@@ -157,7 +157,7 @@ const Canvas = () => {
     return (
       <ErrorDisplay 
         error={error} 
-        onRetry={() => stableHelpers.loadData()} 
+        onRetry={() => actions.loadData()} 
       />
     );
   }
@@ -194,7 +194,7 @@ const Canvas = () => {
         onSubmitGroupPrompt={handleSubmitGroupPrompt}
         onOpenAnalysisPanel={handleOpenAnalysisPanel}
         onAnalysisComplete={handleAnalysisComplete}
-        onImageUpload={stableHelpers.uploadImages}
+        onImageUpload={actions.uploadImages}
         isGeneratingConcept={state.isGeneratingConcept}
       />
     </ErrorBoundary>

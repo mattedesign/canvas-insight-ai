@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { SubscriptionManagement } from '@/components/SubscriptionManagement';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
+import { useAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
@@ -15,11 +15,11 @@ const Subscription = () => {
       selectedImageId,
       showAnnotations
     },
-    stableHelpers: { clearCanvas }
-  } = useSimplifiedAppContext();
+    actions
+  } = useAppContext();
 
   // Create missing handler functions
-  const handleClearCanvas = () => clearCanvas();
+  const handleClearCanvas = () => actions.resetAll();
   const handleImageSelect = (imageId: string) => {
     // This would normally dispatch an action, but for subscription page it's not needed
     console.log('Image selected:', imageId);

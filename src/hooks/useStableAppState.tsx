@@ -4,7 +4,7 @@
  */
 
 import { useContext, useMemo, useCallback } from 'react';
-import { useSimplifiedAppContext } from '@/context/SimplifiedAppContext';
+import { useAppContext } from '@/context/SimplifiedAppContext';
 import type { AppState, UploadedImage, LegacyUXAnalysis as UXAnalysis } from '@/context/AppStateTypes';
 
 interface StableAppStateReturn {
@@ -32,7 +32,7 @@ interface StableAppStateReturn {
 }
 
 export const useStableAppState = (): StableAppStateReturn => {
-  const { state, stableHelpers, dispatch } = useSimplifiedAppContext();
+  const { state, actions } = useAppContext();
   
   // Memoized selectors to prevent object recreation
   const getImageById = useCallback((id: string) => {
