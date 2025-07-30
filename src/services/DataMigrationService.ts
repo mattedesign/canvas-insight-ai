@@ -480,6 +480,12 @@ export class AnalysisMigrationService {
       const imageIds = projectImages.map(img => img.id);
       console.log('[AnalysisMigrationService] Loading analyses for', imageIds.length, 'images');
     
+      // 🚨 ADDITIONAL GUARD: Ensure imageIds is not empty before querying
+      if (imageIds.length === 0) {
+        console.log('[AnalysisMigrationService] No image IDs available, returning empty analyses');
+        return [];
+      }
+
       // ✅ PHASE 1 FIX: Only query if we have valid image IDs
       const { data: analyses, error } = await supabase
         .from('ux_analyses')
@@ -737,12 +743,26 @@ export class DataMigrationService {
       
       console.log('[DataMigrationService] Loading data for validated project:', currentProject);
       
-      const [images, analyses, groups, groupAnalyses] = await Promise.all([
-        ImageMigrationService.loadImagesFromDatabase(),
-        AnalysisMigrationService.loadAnalysesFromDatabase(),
-        GroupMigrationService.loadGroupsFromDatabase(),
-        GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase()
-      ]);
+      // 🚨 SAFE LOADING: Handle each service individually to prevent cascade failures
+      const images = await ImageMigrationService.loadImagesFromDatabase().catch(err => {
+        console.error('[DataMigrationService] Failed to load images:', err);
+        return [];
+      });
+      
+      const analyses = await AnalysisMigrationService.loadAnalysesFromDatabase().catch(err => {
+        console.error('[DataMigrationService] Failed to load analyses:', err);
+        return [];
+      });
+      
+      const groups = await GroupMigrationService.loadGroupsFromDatabase().catch(err => {
+        console.error('[DataMigrationService] Failed to load groups:', err);
+        return [];
+      });
+      
+      const groupAnalyses = await GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase().catch(err => {
+        console.error('[DataMigrationService] Failed to load group analyses:', err);
+        return [];
+      });
 
       console.log('[DataMigrationService] Data load completed:', {
         images: images.length,
