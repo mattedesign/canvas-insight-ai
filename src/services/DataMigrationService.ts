@@ -858,7 +858,21 @@ export class DataMigrationService {
         console.error('[DataMigrationService] Group analyses returned undefined/null, using empty array');
       }
 
-      console.log('[DataMigrationService] Data load completed:', {
+      // Debug logging to track the data loss
+      if (!Array.isArray(images)) {
+        console.error('[DataMigrationService] CRITICAL: Images not array!', typeof images, images);
+      }
+      if (!Array.isArray(analyses)) {
+        console.error('[DataMigrationService] CRITICAL: Analyses not array!', typeof analyses, analyses);
+      }
+      if (!Array.isArray(groups)) {
+        console.error('[DataMigrationService] CRITICAL: Groups not array!', typeof groups, groups);
+      }
+      if (!Array.isArray(groupAnalyses)) {
+        console.error('[DataMigrationService] CRITICAL: GroupAnalyses not array!', typeof groupAnalyses, groupAnalyses);
+      }
+
+      console.log('[DataMigrationService] Safe data prepared:', {
         images: safeImages.length,
         analyses: safeAnalyses.length,
         groups: safeGroups.length,
