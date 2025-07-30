@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
+import { Sidebar } from '@/components/Sidebar';
 
 interface ErrorDisplayProps {
   error: string;
@@ -63,6 +65,7 @@ class ErrorBoundary extends React.Component<{
 }
 
 const Canvas = () => {
+  const navigate = useNavigate();
   const { state, actions, status } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
@@ -150,54 +153,132 @@ const Canvas = () => {
   const isLoading = status.isLoading;
 
   if (isLoading) {
-    return <LoadingSpinner message="Loading project data..." />;
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar 
+          selectedView="canvas"
+          onViewChange={(view) => {
+            if (view === 'summary') navigate('/dashboard');
+            else if (view === 'gallery') navigate('/projects');
+          }}
+          uploadedImages={[]}
+          analyses={[]}
+          onClearCanvas={() => {}}
+          onAddImages={() => {}}
+          onImageSelect={() => {}}
+          onToggleAnnotations={() => {}}
+          onNavigateToPreviousAnalyses={() => navigate('/projects')}
+          selectedImageId={null}
+          showAnnotations={false}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner message="Loading project data..." />
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <ErrorDisplay 
-        error={error} 
-        onRetry={() => actions.loadData()} 
-      />
+      <div className="flex h-screen bg-background">
+        <Sidebar 
+          selectedView="canvas"
+          onViewChange={(view) => {
+            if (view === 'summary') navigate('/dashboard');
+            else if (view === 'gallery') navigate('/projects');
+          }}
+          uploadedImages={[]}
+          analyses={[]}
+          onClearCanvas={() => {}}
+          onAddImages={() => {}}
+          onImageSelect={() => {}}
+          onToggleAnnotations={() => {}}
+          onNavigateToPreviousAnalyses={() => navigate('/projects')}
+          selectedImageId={null}
+          showAnnotations={false}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <ErrorDisplay 
+            error={error} 
+            onRetry={() => actions.loadData()} 
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <ErrorBoundary
-      fallback={
-        <ErrorDisplay 
-          error="Canvas component failed to render" 
-          onRetry={() => window.location.reload()} 
-        />
-      }
-      onError={(error, errorInfo) => {
-        console.error('Canvas ErrorBoundary:', error, errorInfo);
-        setCanvasError(error.message);
-      }}
-    >
-      <PerformantCanvasView
+    <div className="flex h-screen bg-background">
+      <Sidebar 
+        selectedView="canvas"
+        onViewChange={(view) => {
+          if (view === 'summary') navigate('/dashboard');
+          else if (view === 'gallery') navigate('/projects');
+        }}
         uploadedImages={uploadedImages || []}
         analyses={analyses || []}
-        generatedConcepts={generatedConcepts || []}
-        imageGroups={imageGroups || []}
-        groupAnalysesWithPrompts={groupAnalysesWithPrompts || []}
-        groupDisplayModes={groupDisplayModes || {}}
-        showAnnotations={showAnnotations}
-        onToggleAnnotations={handleToggleAnnotations}
+        onClearCanvas={() => actions.resetAll()}
+        onAddImages={() => {
+          // Trigger file input or upload dialog
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.multiple = true;
+          input.accept = 'image/*';
+          input.onchange = (e) => {
+            const files = Array.from((e.target as HTMLInputElement).files || []);
+            if (files.length > 0) {
+              actions.uploadImages(files);
+            }
+          };
+          input.click();
+        }}
         onImageSelect={handleImageSelect}
-        onGenerateConcept={handleGenerateConcept}
-        onCreateGroup={handleCreateGroup}
-        onUngroup={handleUngroup}
-        onDeleteGroup={handleDeleteGroup}
-        onEditGroup={handleEditGroup}
-        onGroupDisplayModeChange={handleGroupDisplayModeChange}
-        onSubmitGroupPrompt={handleSubmitGroupPrompt}
-        onOpenAnalysisPanel={handleOpenAnalysisPanel}
-        onAnalysisComplete={handleAnalysisComplete}
-        onImageUpload={actions.uploadImages}
-        isGeneratingConcept={state.isGeneratingConcept}
+        onToggleAnnotations={handleToggleAnnotations}
+        onNavigateToPreviousAnalyses={() => navigate('/projects')}
+        selectedImageId={null}
+        showAnnotations={showAnnotations}
       />
-    </ErrorBoundary>
+      
+      <div className="flex-1 overflow-hidden">
+        <ErrorBoundary
+          fallback={
+            <div className="h-full flex items-center justify-center">
+              <ErrorDisplay 
+                error="Canvas component failed to render" 
+                onRetry={() => window.location.reload()} 
+              />
+            </div>
+          }
+          onError={(error, errorInfo) => {
+            console.error('Canvas ErrorBoundary:', error, errorInfo);
+            setCanvasError(error.message);
+          }}
+        >
+          <PerformantCanvasView
+            uploadedImages={uploadedImages || []}
+            analyses={analyses || []}
+            generatedConcepts={generatedConcepts || []}
+            imageGroups={imageGroups || []}
+            groupAnalysesWithPrompts={groupAnalysesWithPrompts || []}
+            groupDisplayModes={groupDisplayModes || {}}
+            showAnnotations={showAnnotations}
+            onToggleAnnotations={handleToggleAnnotations}
+            onImageSelect={handleImageSelect}
+            onGenerateConcept={handleGenerateConcept}
+            onCreateGroup={handleCreateGroup}
+            onUngroup={handleUngroup}
+            onDeleteGroup={handleDeleteGroup}
+            onEditGroup={handleEditGroup}
+            onGroupDisplayModeChange={handleGroupDisplayModeChange}
+            onSubmitGroupPrompt={handleSubmitGroupPrompt}
+            onOpenAnalysisPanel={handleOpenAnalysisPanel}
+            onAnalysisComplete={handleAnalysisComplete}
+            onImageUpload={actions.uploadImages}
+            isGeneratingConcept={state.isGeneratingConcept}
+          />
+        </ErrorBoundary>
+      </div>
+    </div>
   );
 };
 
