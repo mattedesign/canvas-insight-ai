@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react';
 import type { AppAction } from '@/context/AppStateTypes';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { useLoadingStateMachine } from './useLoadingStateMachine';
+import { eventDrivenSyncService } from '@/services/EventDrivenSyncService';
 
 interface StableHelpers {
   loadData: (expectedProjectId?: string) => Promise<void>;
@@ -12,10 +13,10 @@ interface StableHelpers {
 }
 
 /**
- * ✅ PHASE 3.1: STABLE HELPER FUNCTIONS WITH LOADING STATE MACHINE
+ * ✅ PHASE 3.2: STABLE HELPER FUNCTIONS WITH EVENT-DRIVEN SYNC
  * Creates stable helper functions that only depend on dispatch
  * Uses useCallback with empty dependencies to prevent re-creation
- * Implements explicit loading state transitions
+ * Implements explicit loading state transitions and event-driven updates
  */
 export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHelpers => {
   const isLoadingRef = useRef(false);
@@ -92,20 +93,17 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
       const results = await Promise.all(uploadPromises);
       dispatch({ type: 'ADD_IMAGES', payload: results });
       
+      // ✅ PHASE 3.2: Fire event-driven sync for each uploaded image
+      results.forEach(image => {
+        eventDrivenSyncService.emitSyncEvent({
+          type: 'image_added',
+          payload: image,
+          source: 'local'
+        });
+      });
+      
       // ✅ PHASE 3.1: Complete uploading state
       loadingMachine.completeUploading();
-
-      // Reload data to ensure consistency
-      setTimeout(async () => {
-        try {
-          const result = await DataMigrationService.loadAllFromDatabase();
-          if (result.success && result.data) {
-            dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
-          }
-        } catch (error) {
-          console.error('[Upload] Failed to reload from database:', error);
-        }
-      }, 1000);
       
     } catch (error: any) {
       const errorMsg = `Upload failed: ${error.message}`;
@@ -117,14 +115,35 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
 
   const createGroup = useCallback((data: any) => {
     dispatch({ type: 'ADD_GROUP', payload: data });
+    
+    // ✅ PHASE 3.2: Fire event-driven sync for group creation
+    eventDrivenSyncService.emitSyncEvent({
+      type: 'group_created',
+      payload: data,
+      source: 'local'
+    });
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
   const deleteImage = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_IMAGE', payload: id });
+    
+    // ✅ PHASE 3.2: Fire event-driven sync for image deletion
+    eventDrivenSyncService.emitSyncEvent({
+      type: 'image_deleted',
+      payload: id,
+      source: 'local'
+    });
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
   const resetAll = useCallback(() => {
     dispatch({ type: 'RESET_STATE' });
+    
+    // ✅ PHASE 3.2: Fire event-driven sync for data invalidation
+    eventDrivenSyncService.emitSyncEvent({
+      type: 'data_invalidated',
+      payload: { reason: 'state_reset' },
+      source: 'local'
+    });
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
   return {
