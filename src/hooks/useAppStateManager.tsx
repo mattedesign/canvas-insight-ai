@@ -49,24 +49,31 @@ export const useAppStateManager = (): StateManager => {
       dispatch({ type: 'SET_UPLOADING', payload: true });
       
       try {
-        // ✅ COPY YOUR EXISTING UPLOAD LOGIC HERE
-        // Replace this with your actual upload implementation
+        const { loadImageDimensions } = await import('@/utils/imageUtils');
+        const { ImageMigrationService } = await import('@/services/DataMigrationService');
+        
         const uploadPromises = files.map(async (file) => {
-          // Your upload logic from the old stableHelpers.uploadImages
+          // Load image dimensions first
+          const dimensions = await loadImageDimensions(file);
+          
+          // Create uploaded image object
           const uploadedImage = {
             id: crypto.randomUUID(),
             name: file.name,
-            url: URL.createObjectURL(file), // Create temporary URL for preview
+            url: URL.createObjectURL(file), // Temporary URL for immediate preview
             file: file,
-            dimensions: { width: 0, height: 0 }, // Will be updated after loading
+            dimensions,
             status: 'uploading' as const
           };
           
-          // Use existing ImageMigrationService
-          const { ImageMigrationService } = await import('@/services/DataMigrationService');
+          // Upload to Supabase storage and create database record
           await ImageMigrationService.migrateImageToDatabase(uploadedImage);
           
-          return uploadedImage;
+          // Return completed image
+          return {
+            ...uploadedImage,
+            status: 'completed' as const
+          };
         });
         
         const results = await Promise.all(uploadPromises);
@@ -76,10 +83,10 @@ export const useAppStateManager = (): StateManager => {
           payload: results
         });
         
-        dispatch({ type: 'SET_UPLOADING', payload: false });
-        
       } catch (error) {
-        dispatch({ type: 'SET_ERROR', payload: error.message });
+        console.error('Upload failed:', error);
+        dispatch({ type: 'SET_ERROR', payload: `Upload failed: ${error.message}` });
+      } finally {
         dispatch({ type: 'SET_UPLOADING', payload: false });
       }
     }, []), // ✅ EMPTY - Never changes
