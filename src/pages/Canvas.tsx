@@ -284,7 +284,7 @@ const Canvas = () => {
         showAnnotations={showAnnotations}
       />
       
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative w-full h-full">
         <ErrorBoundary
           fallback={
             <div className="h-full flex items-center justify-center">

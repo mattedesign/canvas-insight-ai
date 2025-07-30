@@ -1140,6 +1140,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        style={{ width: '100%', height: '100%' }}
         panOnDrag={!isPanningDisabled} // Disable panning when annotation is active
         panOnScroll={!isPanningDisabled} // Also disable pan on scroll
         zoomOnScroll
@@ -1149,7 +1150,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         nodesDraggable={isNodeDraggingEnabled}
         nodesConnectable={currentTool === 'cursor'}
         elementsSelectable={currentTool === 'cursor'}
-        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''}`}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''} w-full h-full`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
       >

@@ -440,18 +440,24 @@ export class AnalysisMigrationService {
   }
 
   static async loadAnalysesFromDatabase(): Promise<UXAnalysis[]> {
-    const projectId = await ProjectService.getCurrentProject();
-    
-    // First get all images for this project to get their IDs
-    const { data: projectImages, error: imagesError } = await supabase
-      .from('images')
-      .select('id, original_name, storage_path')
-      .eq('project_id', projectId);
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      console.log('[AnalysisMigrationService] Loading analyses for project:', projectId);
       
-    if (imagesError) throw imagesError;
-    if (!projectImages || projectImages.length === 0) return [];
-    
-    const imageIds = projectImages.map(img => img.id);
+      // First get all images for this project to get their IDs
+      const { data: projectImages, error: imagesError } = await supabase
+        .from('images')
+        .select('id, original_name, storage_path')
+        .eq('project_id', projectId);
+        
+      if (imagesError) throw imagesError;
+      if (!projectImages || projectImages.length === 0) {
+        console.log('[AnalysisMigrationService] No images found, skipping analysis loading');
+        return [];
+      }
+      
+      const imageIds = projectImages.map(img => img.id);
+      console.log('[AnalysisMigrationService] Loading analyses for', imageIds.length, 'images');
     
     // Then get analyses for those images
     const { data: analyses, error } = await supabase
@@ -486,10 +492,12 @@ export class AnalysisMigrationService {
         createdAt: new Date(analysis.created_at)
       };
     });
+    } catch (error) {
+      console.error('[AnalysisMigrationService] loadAnalysesFromDatabase failed:', error);
+      return [];
+    }
   }
 }
-
-// Group data migration service
 export class GroupMigrationService {
   static async migrateGroupToDatabase(group: ImageGroup): Promise<string> {
     const projectId = await ProjectService.getCurrentProject();
