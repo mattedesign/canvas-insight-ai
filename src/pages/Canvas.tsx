@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
@@ -66,6 +66,7 @@ class ErrorBoundary extends React.Component<{
 
 const Canvas = () => {
   const navigate = useNavigate();
+  const { projectSlug } = useParams<{ projectSlug?: string }>();
   const { state, actions, status } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
@@ -81,22 +82,46 @@ const Canvas = () => {
       if (!user) return;
       
       const now = Date.now();
-      const projectId = await ProjectService.getCurrentProject();
+      let projectId: string;
       
-      // Prevent duplicate loads
-      if (loadedProjectRef.current.projectId === projectId && 
-          now - loadedProjectRef.current.timestamp < 5000) {
-        console.log('[Canvas] Skipping duplicate load for project:', projectId);
-        return;
+      try {
+        if (projectSlug) {
+          // Load specific project by slug
+          projectId = await ProjectService.getProjectBySlug(projectSlug);
+          console.log('[Canvas] Loading project by slug:', projectSlug, '->', projectId);
+        } else {
+          // Load default project
+          projectId = await ProjectService.getCurrentProject();
+          console.log('[Canvas] Loading default project:', projectId);
+        }
+        
+        // Prevent duplicate loads
+        if (loadedProjectRef.current.projectId === projectId && 
+            now - loadedProjectRef.current.timestamp < 5000) {
+          console.log('[Canvas] Skipping duplicate load for project:', projectId);
+          return;
+        }
+        
+        // Switch to the target project if different from current
+        if (projectSlug && loadedProjectRef.current.projectId !== projectId) {
+          await ProjectService.switchToProject(projectId);
+        }
+        
+        console.log('[Canvas] Loading data for project:', projectId);
+        loadedProjectRef.current = { projectId, timestamp: now };
+        await actions.loadData();
+        
+      } catch (error) {
+        console.error('[Canvas] Failed to load project:', error);
+        if (projectSlug) {
+          // If specific project not found, redirect to default canvas
+          navigate('/canvas');
+        }
       }
-      
-      console.log('[Canvas] Loading data for project:', projectId);
-      loadedProjectRef.current = { projectId, timestamp: now };
-      await actions.loadData();
     };
     
     loadData();
-  }, [user?.id]); // 🚨 CRITICAL FIX: Only depend on user.id, NOT stableHelpers.loadData
+  }, [user?.id, projectSlug]); // Include projectSlug as dependency
 
   // ✅ CRITICAL FIX: Create stable callback references to prevent infinite re-renders
   const handleToggleAnnotations = useCallback(() => {

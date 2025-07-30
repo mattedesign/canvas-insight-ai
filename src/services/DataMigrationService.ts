@@ -231,6 +231,29 @@ export class ProjectService {
   static resetProject() {
     this.currentProjectId = null;
   }
+
+  static async getProjectBySlug(slug: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('slug', slug)
+      .single();
+
+    if (error) {
+      console.error('[ProjectService] Error finding project by slug:', error);
+      throw error;
+    }
+
+    if (!project) {
+      throw new Error(`Project with slug "${slug}" not found`);
+    }
+
+    return project.id;
+  }
 }
 
 // Image data migration service
