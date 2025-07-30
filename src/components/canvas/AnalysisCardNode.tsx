@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { useRenderMonitor } from '@/hooks/useRenderMonitor';
 import { Handle, Position } from '@xyflow/react';
 import { UXAnalysis } from '@/types/ux-analysis';
@@ -54,32 +54,34 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   const { analysis, onGenerateConcept, isGeneratingConcept = false, onExpandedChange } = data;
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Ensure analysis has all required properties with fallbacks
-  // First ensure we have the basic structure with proper typing
-  const baseSummary = analysis.summary || {} as any;
-  const baseCategoryScores = (baseSummary.categoryScores || {}) as Record<string, number>;
-  
-  // Create a safe categoryScores object with all required properties
-  const safeCategoryScores = {
-    usability: typeof baseCategoryScores.usability === 'number' ? baseCategoryScores.usability : 0,
-    accessibility: typeof baseCategoryScores.accessibility === 'number' ? baseCategoryScores.accessibility : 0,
-    visual: typeof baseCategoryScores.visual === 'number' ? baseCategoryScores.visual : 0,
-    content: typeof baseCategoryScores.content === 'number' ? baseCategoryScores.content : 0,
-    ...baseCategoryScores // Include any additional category scores
-  };
+  // ✅ REAL FIX: Memoize these objects to prevent infinite re-renders
+  const safeAnalysis = useMemo(() => {
+    // Ensure analysis has all required properties with fallbacks
+    const baseSummary = analysis.summary || {} as any;
+    const baseCategoryScores = (baseSummary.categoryScores || {}) as Record<string, number>;
+    
+    // Create a safe categoryScores object with all required properties
+    const safeCategoryScores = {
+      usability: typeof baseCategoryScores.usability === 'number' ? baseCategoryScores.usability : 0,
+      accessibility: typeof baseCategoryScores.accessibility === 'number' ? baseCategoryScores.accessibility : 0,
+      visual: typeof baseCategoryScores.visual === 'number' ? baseCategoryScores.visual : 0,
+      content: typeof baseCategoryScores.content === 'number' ? baseCategoryScores.content : 0,
+      ...baseCategoryScores // Include any additional category scores
+    };
 
-  const safeAnalysis = {
-    ...analysis, // Spread first to get all original properties
-    id: analysis.id || '',
-    summary: {
-      ...baseSummary, // Safely spread summary
-      overallScore: typeof baseSummary.overallScore === 'number' ? baseSummary.overallScore : 0,
-      categoryScores: safeCategoryScores,
-      keyIssues: Array.isArray(baseSummary.keyIssues) ? baseSummary.keyIssues : [],
-      strengths: Array.isArray(baseSummary.strengths) ? baseSummary.strengths : []
-    },
-    suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
-  };
+    return {
+      ...analysis, // Spread first to get all original properties
+      id: analysis.id || '',
+      summary: {
+        ...baseSummary, // Safely spread summary
+        overallScore: typeof baseSummary.overallScore === 'number' ? baseSummary.overallScore : 0,
+        categoryScores: safeCategoryScores,
+        keyIssues: Array.isArray(baseSummary.keyIssues) ? baseSummary.keyIssues : [],
+        strengths: Array.isArray(baseSummary.strengths) ? baseSummary.strengths : []
+      },
+      suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
+    };
+  }, [analysis]); // ✅ Only recreate when analysis actually changes
 
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
