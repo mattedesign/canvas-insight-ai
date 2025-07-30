@@ -47,10 +47,37 @@ export const useAppStateManager = (): StateManager => {
 
     uploadImages: useCallback(async (files: File[]) => {
       dispatch({ type: 'SET_UPLOADING', payload: true });
+      
       try {
-        // Upload logic here - implement based on your current upload flow
-        console.log('Upload started for', files.length, 'files');
+        // ✅ COPY YOUR EXISTING UPLOAD LOGIC HERE
+        // Replace this with your actual upload implementation
+        const uploadPromises = files.map(async (file) => {
+          // Your upload logic from the old stableHelpers.uploadImages
+          const uploadedImage = {
+            id: crypto.randomUUID(),
+            name: file.name,
+            url: URL.createObjectURL(file), // Create temporary URL for preview
+            file: file,
+            dimensions: { width: 0, height: 0 }, // Will be updated after loading
+            status: 'uploading' as const
+          };
+          
+          // Use existing ImageMigrationService
+          const { ImageMigrationService } = await import('@/services/DataMigrationService');
+          await ImageMigrationService.migrateImageToDatabase(uploadedImage);
+          
+          return uploadedImage;
+        });
+        
+        const results = await Promise.all(uploadPromises);
+        
+        dispatch({ 
+          type: 'ADD_IMAGES',
+          payload: results
+        });
+        
         dispatch({ type: 'SET_UPLOADING', payload: false });
+        
       } catch (error) {
         dispatch({ type: 'SET_ERROR', payload: error.message });
         dispatch({ type: 'SET_UPLOADING', payload: false });
