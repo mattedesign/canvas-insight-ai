@@ -22,6 +22,7 @@ import { GroupContainerNode } from './GroupContainerNode';
 import { GroupAnalysisCardNode } from './GroupAnalysisCardNode';
 import { GroupPromptCollectionNode } from './GroupPromptCollectionNode';
 import { GroupAnalysisResultsNode } from './GroupAnalysisResultsNode';
+import { EnhancedGroupAnalysisNode } from './EnhancedGroupAnalysisNode';
 import { ImageLoadingNode } from './ImageLoadingNode';
 import { AnalysisLoadingNode } from './AnalysisLoadingNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
@@ -48,6 +49,7 @@ const nodeTypes = {
   groupAnalysisCard: GroupAnalysisCardNode,
   groupPromptCollection: GroupPromptCollectionNode,
   groupAnalysisResults: GroupAnalysisResultsNode,
+  enhancedGroupAnalysis: EnhancedGroupAnalysisNode,
   imageLoading: ImageLoadingNode,
   analysisLoading: AnalysisLoadingNode,
 };
@@ -935,14 +937,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           )[0];
           
           const analysisResultsNode: Node = {
-            id: `group-results-${latestAnalysis.id}`,
-            type: 'groupAnalysisResults',
+            id: `group-enhanced-${latestAnalysis.id}`,
+            type: 'enhancedGroupAnalysis',
             position: { x: rightmostXPosition + 840, y: yOffset },
             data: {
               analysis: latestAnalysis,
               groupName: group.name,
-                onEditPrompt: onEditGroupPrompt,
-                onCreateFork: handleCreateForkClick,
+              imageCount: group.imageIds.length,
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: handleCreateForkClick,
               onViewDetails: (analysisId: string) => {
                 // Remove informational group analysis view toast
               },
@@ -955,7 +958,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             id: `edge-group-${group.id}-results`,
             source: `group-container-${group.id}`,
             sourceHandle: 'analysis',
-            target: `group-results-${latestAnalysis.id}`,
+            target: `group-enhanced-${latestAnalysis.id}`,
             type: 'smoothstep',
             animated: true,
             style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
@@ -984,7 +987,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             // Create edge for branch
             const branchEdge: Edge = {
               id: `edge-group-${group.id}-branch-${analysis.id}`,
-              source: `group-results-${latestAnalysis.id}`,
+              source: `group-enhanced-${latestAnalysis.id}`,
               target: `group-branch-${analysis.id}`,
               type: 'smoothstep',
               animated: false,

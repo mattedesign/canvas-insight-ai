@@ -270,15 +270,46 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         })}
 
         
+        {/* AI Analysis Results Overlay */}
         {analysis && (
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-2 right-2 z-10 space-y-2">
             <Badge 
               variant={analysis.summary.overallScore >= 80 ? 'default' : 
                      analysis.summary.overallScore >= 60 ? 'secondary' : 'destructive'}
-              className="bg-background/90"
+              className="bg-background/90 backdrop-blur-sm"
             >
               Score: {analysis.summary.overallScore}
             </Badge>
+            
+            {/* AI Model Used Indicator */}
+            {analysis.modelUsed && (
+              <Badge 
+                variant="outline" 
+                className="bg-background/90 backdrop-blur-sm text-xs"
+              >
+                {analysis.modelUsed}
+              </Badge>
+            )}
+            
+            {/* Quick Insights Count */}
+            <div className="flex gap-1">
+              {analysis.summary.keyIssues.length > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="bg-background/90 backdrop-blur-sm text-xs px-1"
+                >
+                  {analysis.summary.keyIssues.length} issues
+                </Badge>
+              )}
+              {analysis.suggestions.length > 0 && (
+                <Badge 
+                  variant="secondary" 
+                  className="bg-background/90 backdrop-blur-sm text-xs px-1"
+                >
+                  {analysis.suggestions.length} tips
+                </Badge>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -298,6 +329,28 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
                 compact 
               />
             </div>
+            
+            {/* Enhanced Analysis Preview */}
+            {analysis && (
+              <div className="mb-3 p-2 bg-muted/50 rounded-md text-xs space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">AI Analysis</span>
+                  <span className="text-muted-foreground">
+                    {analysis.createdAt ? new Date(analysis.createdAt).toLocaleDateString() : 'Recent'}
+                  </span>
+                </div>
+                {analysis.summary.keyIssues.length > 0 && (
+                  <div className="text-destructive">
+                    Top Issue: {analysis.summary.keyIssues[0].substring(0, 40)}...
+                  </div>
+                )}
+                {analysis.suggestions.length > 0 && (
+                  <div className="text-primary">
+                    Main Suggestion: {analysis.suggestions[0].title.substring(0, 40)}...
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="flex gap-2 ml-3 flex-shrink-0">

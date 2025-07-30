@@ -145,9 +145,29 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
           <CardTitle className="text-lg font-semibold text-foreground">
             UX Analysis
           </CardTitle>
-          <Badge variant={getScoreVariant(safeAnalysis.summary.overallScore)}>
-            {safeAnalysis.summary.overallScore}/100
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={getScoreVariant(safeAnalysis.summary.overallScore)}>
+              {safeAnalysis.summary.overallScore}/100
+            </Badge>
+            {safeAnalysis.modelUsed && (
+              <Badge variant="outline" className="text-xs">
+                {safeAnalysis.modelUsed}
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {/* Analysis Metadata */}
+        <div className="text-xs text-muted-foreground flex justify-between items-center pt-2">
+          <span>
+            {safeAnalysis.createdAt ? 
+              `Analyzed ${new Date(safeAnalysis.createdAt).toLocaleDateString()}` : 
+              'Recent Analysis'
+            }
+          </span>
+          <span>
+            {safeAnalysis.visualAnnotations?.length || 0} annotations
+          </span>
         </div>
       </CardHeader>
       
@@ -205,15 +225,33 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
           </div>
         )}
 
-        {/* Suggestions Count */}
-        <div className="flex items-center justify-between pt-2 border-t border-border">
-          <div className="flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">Suggestions</span>
+        {/* Suggestions Preview */}
+        <div className="pt-2 border-t border-border space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">Top Suggestions</span>
+            </div>
+            <Badge variant="outline">
+              {safeAnalysis.suggestions.length}
+            </Badge>
           </div>
-          <Badge variant="outline">
-            {safeAnalysis.suggestions.length}
-          </Badge>
+          
+          {safeAnalysis.suggestions.slice(0, 2).map((suggestion, index) => (
+            <div key={index} className="text-xs text-muted-foreground p-2 bg-muted/30 rounded border-l-2 border-primary/50">
+              <div className="flex items-center gap-1 mb-1">
+                {getSuggestionIcon(suggestion.category)}
+                <span className="font-medium capitalize">{suggestion.category}</span>
+              </div>
+              <div>{suggestion.title}</div>
+            </div>
+          ))}
+          
+          {safeAnalysis.suggestions.length > 2 && (
+            <div className="text-xs text-muted-foreground text-center">
+              +{safeAnalysis.suggestions.length - 2} more suggestions
+            </div>
+          )}
         </div>
         
         {/* Action Buttons */}

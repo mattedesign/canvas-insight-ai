@@ -93,6 +93,16 @@ export interface GroupAnalysisWithPrompt {
     designInconsistencies: string[];
     userJourneyGaps: string[];
   };
+  // New enhanced analysis structure - optional for backward compatibility
+  analysis?: {
+    overallScore: number;
+    consistencyScore: number;
+    thematicCoherence: number;
+    userFlowContinuity: number;
+    keyInsights: string[];
+    recommendations: string[];
+    commonPatterns: string[];
+  };
   createdAt: Date;
 }
 
@@ -126,6 +136,7 @@ export interface UXAnalysis {
   summary: AnalysisSummary;
   metadata: VisionMetadata;
   createdAt: Date;
+  modelUsed?: string; // AI model used for analysis
   status?: 'processing' | 'analyzing' | 'completed' | 'error';
 }
 
