@@ -1,21 +1,31 @@
 import { useCallback, useRef, useEffect } from 'react';
 import type { AppAction } from '@/context/AppStateTypes';
 import { useLoadingStateMachine } from './useLoadingStateMachine';
+import type { 
+  StrictInitializationConfig,
+  StrictInitializationStatus,
+  StrictInitializationManager,
+  StrictDispatchFunction,
+  StrictAsyncFunction,
+  StrictCallbackFunction
+} from '@/types/strict-types';
 
-interface InitializationConfig {
-  userId?: string;
-  projectId?: string;
-  retryAttempts?: number;
-  retryDelay?: number;
+// ✅ PHASE 4.1: STRICT INITIALIZATION CONFIG WITH EXPLICIT TYPES
+interface InitializationConfig extends StrictInitializationConfig {
+  readonly userId?: string;
+  readonly projectId?: string;
+  readonly retryAttempts?: number;
+  readonly retryDelay?: number;
 }
 
 /**
- * ✅ PHASE 3.2: INITIALIZATION MANAGER
+ * ✅ PHASE 4.1: STRICT INITIALIZATION MANAGER WITH TYPE SAFETY
  * Separates initialization from re-renders using one-time effects
  * Implements proper error boundaries and retry logic
  * Uses event-driven updates for subsequent data changes
+ * ALL FUNCTIONS HAVE EXPLICIT RETURN TYPES FOR STRICT TYPESCRIPT
  */
-export const useInitializationManager = (dispatch: React.Dispatch<AppAction>) => {
+export const useInitializationManager = (dispatch: StrictDispatchFunction): StrictInitializationManager => {
   const initializationStatusRef = useRef<{
     isInitialized: boolean;
     isInitializing: boolean;
@@ -30,8 +40,8 @@ export const useInitializationManager = (dispatch: React.Dispatch<AppAction>) =>
 
   const loadingMachine = useLoadingStateMachine(dispatch);
 
-  // ✅ PHASE 3.2: One-time initialization with error handling
-  const initializeApp = useCallback(async (config: InitializationConfig): Promise<void> => {
+  // ✅ PHASE 4.1: One-time initialization with explicit return type and strict typing
+  const initializeApp = useCallback<StrictAsyncFunction<InitializationConfig, void>>(async (config: InitializationConfig): Promise<void> => {
     const status = initializationStatusRef.current;
     
     // Prevent multiple initializations
@@ -118,8 +128,8 @@ export const useInitializationManager = (dispatch: React.Dispatch<AppAction>) =>
     }
   }, []); // ✅ PHASE 3.2: Empty dependencies - only depends on dispatch
 
-  // ✅ PHASE 3.2: Reset initialization state
-  const resetInitialization = useCallback(() => {
+  // ✅ PHASE 4.1: Reset initialization state with explicit return type
+  const resetInitialization = useCallback<StrictCallbackFunction<void, void>>((): void => {
     const status = initializationStatusRef.current;
     status.isInitialized = false;
     status.isInitializing = false;
@@ -132,8 +142,8 @@ export const useInitializationManager = (dispatch: React.Dispatch<AppAction>) =>
     window.dispatchEvent(new CustomEvent('appInitializationReset'));
   }, []); // ✅ PHASE 3.2: Empty dependencies
 
-  // ✅ PHASE 3.2: Check initialization status
-  const getInitializationStatus = useCallback(() => ({
+  // ✅ PHASE 4.1: Check initialization status with explicit return type
+  const getInitializationStatus = useCallback<StrictCallbackFunction<void, StrictInitializationStatus>>((): StrictInitializationStatus => ({
     isInitialized: initializationStatusRef.current.isInitialized,
     isInitializing: initializationStatusRef.current.isInitializing,
     lastConfig: initializationStatusRef.current.lastConfig,

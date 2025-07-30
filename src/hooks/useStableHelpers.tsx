@@ -3,29 +3,38 @@ import type { AppAction } from '@/context/AppStateTypes';
 import { DataMigrationService } from '@/services/DataMigrationService';
 import { useLoadingStateMachine } from './useLoadingStateMachine';
 import { eventDrivenSyncService } from '@/services/EventDrivenSyncService';
+import type { 
+  StrictStableHelpers, 
+  StrictDispatchFunction,
+  StrictCallbackFunction,
+  StrictAsyncFunction 
+} from '@/types/strict-types';
+import type { ImageGroup } from '@/types/ux-analysis';
 
-interface StableHelpers {
-  loadData: (expectedProjectId?: string) => Promise<void>;
-  uploadImages: (files: File[]) => Promise<void>;
-  createGroup: (data: any) => void;
-  deleteImage: (id: string) => void;
-  resetAll: () => void;
+// ✅ PHASE 4.1: STRICT INTERFACE WITH EXPLICIT RETURN TYPES
+interface StableHelpers extends StrictStableHelpers {
+  readonly loadData: StrictAsyncFunction<string | undefined, void>;
+  readonly uploadImages: StrictAsyncFunction<readonly File[], void>;
+  readonly createGroup: StrictCallbackFunction<ImageGroup, void>;
+  readonly deleteImage: StrictCallbackFunction<string, void>;
+  readonly resetAll: StrictCallbackFunction<void, void>;
 }
 
 /**
- * ✅ PHASE 3.2: STABLE HELPER FUNCTIONS WITH EVENT-DRIVEN SYNC
+ * ✅ PHASE 4.1: STABLE HELPER FUNCTIONS WITH STRICT TYPING
  * Creates stable helper functions that only depend on dispatch
  * Uses useCallback with empty dependencies to prevent re-creation
  * Implements explicit loading state transitions and event-driven updates
+ * ALL FUNCTIONS HAVE EXPLICIT RETURN TYPES FOR STRICT TYPESCRIPT
  */
-export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHelpers => {
+export const useStableHelpers = (dispatch: StrictDispatchFunction): StableHelpers => {
   const isLoadingRef = useRef(false);
   
   // ✅ PHASE 3.1: Use loading state machine
   const loadingMachine = useLoadingStateMachine(dispatch);
 
-  // ✅ PHASE 3.1: Data loading with explicit state machine transitions
-  const loadData = useCallback(async (expectedProjectId?: string) => {
+  // ✅ PHASE 4.1: Data loading with explicit return type and strict typing
+  const loadData = useCallback(async (expectedProjectId?: string): Promise<void> => {
     if (isLoadingRef.current) return;
     
     isLoadingRef.current = true;
@@ -57,8 +66,8 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
     }
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
-  // ✅ PHASE 3.1: Upload with explicit state machine transitions
-  const uploadImages = useCallback(async (files: File[]) => {
+  // ✅ PHASE 4.1: Upload with explicit return type and strict typing
+  const uploadImages = useCallback(async (files: readonly File[]): Promise<void> => {
     // ✅ PHASE 3.1: Start uploading state
     loadingMachine.startUploading(`Uploading ${files.length} files`);
     
@@ -113,7 +122,8 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
     }
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
-  const createGroup = useCallback((data: any) => {
+  // ✅ PHASE 4.1: Create group with explicit return type and strict typing
+  const createGroup = useCallback((data: ImageGroup): void => {
     dispatch({ type: 'ADD_GROUP', payload: data });
     
     // ✅ PHASE 3.2: Fire event-driven sync for group creation
@@ -124,7 +134,8 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
     });
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
-  const deleteImage = useCallback((id: string) => {
+  // ✅ PHASE 4.1: Delete image with explicit return type and strict typing
+  const deleteImage = useCallback((id: string): void => {
     dispatch({ type: 'REMOVE_IMAGE', payload: id });
     
     // ✅ PHASE 3.2: Fire event-driven sync for image deletion
@@ -135,7 +146,8 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
     });
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
-  const resetAll = useCallback(() => {
+  // ✅ PHASE 4.1: Reset all with explicit return type and strict typing
+  const resetAll = useCallback((): void => {
     dispatch({ type: 'RESET_STATE' });
     
     // ✅ PHASE 3.2: Fire event-driven sync for data invalidation

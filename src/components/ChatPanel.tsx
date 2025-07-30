@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,8 @@ const suggestedPrompts = [
   }
 ];
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
+// ✅ PHASE 4.2: MEMOIZED COMPONENT FOR PERFORMANCE
+export const ChatPanel: React.FC<ChatPanelProps> = memo(({ isOpen, onClose }) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -138,4 +139,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
       </Card>
     </div>
   );
-};
+}); // ✅ PHASE 4.2: MEMOIZED COMPONENT CLOSING
+
+// ✅ PHASE 4.2: SET DISPLAY NAME FOR DEBUGGING
+ChatPanel.displayName = 'ChatPanel';
