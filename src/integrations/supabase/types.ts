@@ -751,6 +751,7 @@ export type Database = {
           id: string
           image_id: string | null
           metadata: Json
+          project_id: string | null
           status: string | null
           suggestions: Json
           summary: Json
@@ -764,6 +765,7 @@ export type Database = {
           id?: string
           image_id?: string | null
           metadata?: Json
+          project_id?: string | null
           status?: string | null
           suggestions?: Json
           summary?: Json
@@ -777,6 +779,7 @@ export type Database = {
           id?: string
           image_id?: string | null
           metadata?: Json
+          project_id?: string | null
           status?: string | null
           suggestions?: Json
           summary?: Json
@@ -796,6 +799,13 @@ export type Database = {
             columns: ["image_id"]
             isOneToOne: false
             referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ux_analyses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
