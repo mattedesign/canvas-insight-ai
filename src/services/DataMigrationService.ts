@@ -579,52 +579,79 @@ export class GroupMigrationService {
   }
 
   static async loadGroupsFromDatabase(): Promise<ImageGroup[]> {
-    const projectId = await ProjectService.getCurrentProject();
-    
-    // First, get all groups for the project
-    const { data: groups, error: groupsError } = await supabase
-      .from('image_groups')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      if (!projectId) {
+        console.log('[GroupMigrationService] No current project, returning empty groups');
+        return [];
+      }
+      
+      // First, get all groups for the project
+      const { data: groups, error: groupsError } = await supabase
+        .from('image_groups')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
 
-    if (groupsError) throw groupsError;
-    if (!groups) return [];
+      if (groupsError) {
+        console.error('[GroupMigrationService] Failed to fetch groups:', groupsError);
+        return [];
+      }
+      if (!groups || groups.length === 0) {
+        console.log('[GroupMigrationService] No groups found for project');
+        return [];
+      }
 
-    // Then, for each group, get its images separately to avoid ambiguous relationships
-    const groupsWithImages = await Promise.all(
-      groups.map(async (group) => {
-        const { data: groupImages, error: imagesError } = await supabase
-          .from('group_images')
-          .select('image_id')
-          .eq('group_id', group.id);
+      console.log('[GroupMigrationService] Loading images for', groups.length, 'groups');
 
-        if (imagesError) {
-          console.error(`Failed to load images for group ${group.id}:`, imagesError);
-          return {
-            id: group.id,
-            name: group.name,
-            description: group.description || '',
-            imageIds: [],
-            position: (group.position as any) || { x: 100, y: 100 },
-            color: group.color,
-            createdAt: new Date(group.created_at)
-          };
-        }
+      // 🚨 CRITICAL FIX: Handle Promise.all failures gracefully
+      const groupsWithImages = await Promise.allSettled(
+        groups.map(async (group) => {
+          try {
+            const { data: groupImages, error: imagesError } = await supabase
+              .from('group_images')
+              .select('image_id')
+              .eq('group_id', group.id);
 
-        return {
-          id: group.id,
-          name: group.name,
-          description: group.description || '',
-          imageIds: groupImages?.map((gi: any) => gi.image_id) || [],
-          position: (group.position as any) || { x: 100, y: 100 },
-          color: group.color,
-          createdAt: new Date(group.created_at)
-        };
-      })
-    );
+            if (imagesError) {
+              console.error(`Failed to load images for group ${group.id}:`, imagesError);
+            }
 
-    return groupsWithImages;
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description || '',
+              imageIds: groupImages?.map((gi: any) => gi.image_id) || [],
+              position: (group.position as any) || { x: 100, y: 100 },
+              color: group.color,
+              createdAt: new Date(group.created_at)
+            };
+          } catch (error) {
+            console.error(`Failed to process group ${group.id}:`, error);
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description || '',
+              imageIds: [],
+              position: { x: 100, y: 100 },
+              color: group.color,
+              createdAt: new Date(group.created_at)
+            };
+          }
+        })
+      );
+
+      // Extract successful results only
+      const validGroups = groupsWithImages
+        .filter((result): result is PromiseFulfilledResult<ImageGroup> => result.status === 'fulfilled')
+        .map(result => result.value);
+
+      console.log('[GroupMigrationService] Successfully loaded', validGroups.length, 'groups');
+      return validGroups;
+    } catch (error) {
+      console.error('[GroupMigrationService] Critical error in loadGroupsFromDatabase:', error);
+      return [];
+    }
   }
 }
 
