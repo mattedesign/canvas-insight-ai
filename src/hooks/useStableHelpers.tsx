@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { AppAction } from '@/context/AppStateTypes';
 import { DataMigrationService } from '@/services/DataMigrationService';
+import { useLoadingStateMachine } from './useLoadingStateMachine';
 
 interface StableHelpers {
   loadData: (expectedProjectId?: string) => Promise<void>;
@@ -11,19 +12,25 @@ interface StableHelpers {
 }
 
 /**
- * ✅ PHASE 2.3: STABLE HELPER FUNCTIONS
+ * ✅ PHASE 3.1: STABLE HELPER FUNCTIONS WITH LOADING STATE MACHINE
  * Creates stable helper functions that only depend on dispatch
  * Uses useCallback with empty dependencies to prevent re-creation
+ * Implements explicit loading state transitions
  */
 export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHelpers => {
   const isLoadingRef = useRef(false);
+  
+  // ✅ PHASE 3.1: Use loading state machine
+  const loadingMachine = useLoadingStateMachine(dispatch);
 
-  // ✅ PHASE 2.3: All helpers use useCallback with empty dependencies
+  // ✅ PHASE 3.1: Data loading with explicit state machine transitions
   const loadData = useCallback(async (expectedProjectId?: string) => {
     if (isLoadingRef.current) return;
     
     isLoadingRef.current = true;
-    dispatch({ type: 'SET_LOADING', payload: true });
+    
+    // ✅ PHASE 3.1: Start loading state
+    loadingMachine.startDataLoading('Loading project data');
     
     try {
       console.log('[Stable Helpers] Starting data load for project:', expectedProjectId);
@@ -31,27 +38,38 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
       if (result.success && result.data) {
         console.log('[Stable Helpers] Data loaded successfully:', result.data);
         dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
+        // ✅ PHASE 3.1: Complete loading state
+        loadingMachine.completeDataLoading();
       } else {
-        console.error('[Stable Helpers] Data loading failed:', result.error);
-        dispatch({ type: 'SET_ERROR', payload: result.error || 'Unknown error' });
+        const errorMsg = result.error || 'Unknown error';
+        console.error('[Stable Helpers] Data loading failed:', errorMsg);
+        // ✅ PHASE 3.1: Fail loading state with specific error
+        loadingMachine.failDataLoading(errorMsg);
       }
     } catch (error: any) {
+      const errorMsg = error.message || 'Unknown error';
       console.error('[Stable Helpers] Data loading exception:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Unknown error' });
+      // ✅ PHASE 3.1: Fail loading state with exception error
+      loadingMachine.failDataLoading(errorMsg);
     } finally {
       isLoadingRef.current = false;
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
+  // ✅ PHASE 3.1: Upload with explicit state machine transitions
   const uploadImages = useCallback(async (files: File[]) => {
-    dispatch({ type: 'SET_UPLOADING', payload: true });
+    // ✅ PHASE 3.1: Start uploading state
+    loadingMachine.startUploading(`Uploading ${files.length} files`);
     
     try {
       const { loadImageDimensions } = await import('@/utils/imageUtils');
       const { ImageMigrationService } = await import('@/services/DataMigrationService');
       
-      const uploadPromises = files.map(async (file) => {
+      const uploadPromises = files.map(async (file, index) => {
+        // ✅ PHASE 3.1: Update progress during upload
+        const progress = ((index + 1) / files.length) * 100;
+        loadingMachine.updateUploadProgress(progress);
+        
         const dimensions = await loadImageDimensions(file);
         
         const uploadedImage = {
@@ -73,6 +91,9 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
       
       const results = await Promise.all(uploadPromises);
       dispatch({ type: 'ADD_IMAGES', payload: results });
+      
+      // ✅ PHASE 3.1: Complete uploading state
+      loadingMachine.completeUploading();
 
       // Reload data to ensure consistency
       setTimeout(async () => {
@@ -87,10 +108,10 @@ export const useStableHelpers = (dispatch: React.Dispatch<AppAction>): StableHel
       }, 1000);
       
     } catch (error: any) {
-      console.error('Upload failed:', error);
-      dispatch({ type: 'SET_ERROR', payload: `Upload failed: ${error.message}` });
-    } finally {
-      dispatch({ type: 'SET_UPLOADING', payload: false });
+      const errorMsg = `Upload failed: ${error.message}`;
+      console.error(errorMsg, error);
+      // ✅ PHASE 3.1: Fail uploading state with specific error
+      loadingMachine.failUploading(errorMsg);
     }
   }, []); // ✅ Empty dependencies - only depends on dispatch
 

@@ -16,6 +16,16 @@ export type ImageGroup = LegacyImageGroup;
 export type GeneratedConcept = LegacyGeneratedConcept;
 export type GroupAnalysis = GroupAnalysisWithPrompt;
 
+// ✅ PHASE 3.1: LOADING STATE MACHINE TYPES
+export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+export interface LoadingStateInfo {
+  state: LoadingState;
+  operation?: string;
+  progress?: number;
+  error?: string;
+}
+
 // App State interface - using existing types for compatibility
 export interface AppState {
   // Data state
@@ -33,7 +43,12 @@ export interface AppState {
   galleryTool: 'cursor' | 'draw'; // Match existing values
   groupDisplayModes: Record<string, 'standard' | 'stacked'>; // Match existing values
   
-  // Operation state
+  // ✅ PHASE 3.1: LOADING STATE MACHINE
+  loadingState: LoadingStateInfo;
+  uploadingState: LoadingStateInfo;
+  syncingState: LoadingStateInfo;
+  
+  // Legacy operation state (for backward compatibility)
   isLoading: boolean;
   isSyncing: boolean;
   isUploading: boolean;
@@ -48,6 +63,11 @@ export interface AppState {
 
 // Action types - enhanced with missing actions
 export type AppAction =
+  // ✅ PHASE 3.1: LOADING STATE MACHINE ACTIONS
+  | { type: 'SET_LOADING_STATE'; payload: LoadingStateInfo }
+  | { type: 'SET_UPLOADING_STATE'; payload: LoadingStateInfo }
+  | { type: 'SET_SYNCING_STATE'; payload: LoadingStateInfo }
+  // Legacy loading actions (for backward compatibility)
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_SYNCING'; payload: boolean }
   | { type: 'SET_UPLOADING'; payload: boolean }
@@ -84,6 +104,14 @@ export type AppAction =
 // State selector type
 export type StateSelector<T> = (state: AppState) => T;
 
+// ✅ PHASE 3.1: DEFAULT LOADING STATE
+const createIdleLoadingState = (): LoadingStateInfo => ({
+  state: 'idle',
+  operation: undefined,
+  progress: undefined,
+  error: undefined,
+});
+
 // Initial state
 export const initialAppState: AppState = {
   uploadedImages: [],
@@ -97,6 +125,13 @@ export const initialAppState: AppState = {
   showAnnotations: true,
   galleryTool: 'cursor',
   groupDisplayModes: {},
+  
+  // ✅ PHASE 3.1: LOADING STATE MACHINE INITIAL VALUES
+  loadingState: createIdleLoadingState(),
+  uploadingState: createIdleLoadingState(),
+  syncingState: createIdleLoadingState(),
+  
+  // Legacy operation state (for backward compatibility)
   isLoading: false,
   isSyncing: false,
   isUploading: false,
@@ -127,9 +162,48 @@ export const selectors = {
   getGroupAnalyses: (state: AppState, groupId: string): GroupAnalysisWithPrompt[] =>
     state.groupAnalysesWithPrompts.filter(ga => ga.groupId === groupId),
   
+  // ✅ PHASE 3.1: LOADING STATE MACHINE SELECTORS
   hasOperationsInProgress: (state: AppState): boolean =>
-    state.isLoading || state.isSyncing || state.isUploading || state.isGeneratingConcept,
+    state.loadingState.state === 'loading' || 
+    state.syncingState.state === 'loading' || 
+    state.uploadingState.state === 'loading' || 
+    state.isGeneratingConcept,
   
+  isDataLoading: (state: AppState): boolean =>
+    state.loadingState.state === 'loading',
+  
+  isUploading: (state: AppState): boolean =>
+    state.uploadingState.state === 'loading',
+  
+  isSyncing: (state: AppState): boolean =>
+    state.syncingState.state === 'loading',
+  
+  getLoadingProgress: (state: AppState): number | undefined =>
+    state.uploadingState.progress,
+  
+  getLoadingOperation: (state: AppState): string | undefined =>
+    state.loadingState.operation || state.uploadingState.operation || state.syncingState.operation,
+  
+  hasLoadingErrors: (state: AppState): boolean =>
+    state.loadingState.state === 'error' ||
+    state.uploadingState.state === 'error' ||
+    state.syncingState.state === 'error',
+  
+  getLoadingErrors: (state: AppState): string[] => {
+    const errors: string[] = [];
+    if (state.loadingState.state === 'error' && state.loadingState.error) {
+      errors.push(state.loadingState.error);
+    }
+    if (state.uploadingState.state === 'error' && state.uploadingState.error) {
+      errors.push(state.uploadingState.error);
+    }
+    if (state.syncingState.state === 'error' && state.syncingState.error) {
+      errors.push(state.syncingState.error);
+    }
+    return errors;
+  },
+  
+  // Legacy selectors (backward compatibility)
   getPendingSyncCount: (state: AppState): number =>
     state.pendingBackgroundSync.size,
   

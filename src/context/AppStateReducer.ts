@@ -7,14 +7,62 @@ import type { AppState, AppAction } from './AppStateTypes';
 
 export function appStateReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    // ✅ PHASE 3.1: LOADING STATE MACHINE ACTIONS
+    case 'SET_LOADING_STATE':
+      return {
+        ...state,
+        loadingState: action.payload,
+        // ✅ PHASE 3.1: Update legacy boolean for backward compatibility
+        isLoading: action.payload.state === 'loading',
+        error: action.payload.state === 'error' ? action.payload.error || 'Unknown error' : state.error,
+      };
+    
+    case 'SET_UPLOADING_STATE':
+      return {
+        ...state,
+        uploadingState: action.payload,
+        // ✅ PHASE 3.1: Update legacy boolean for backward compatibility
+        isUploading: action.payload.state === 'loading',
+      };
+    
+    case 'SET_SYNCING_STATE':
+      return {
+        ...state,
+        syncingState: action.payload,
+        // ✅ PHASE 3.1: Update legacy boolean for backward compatibility
+        isSyncing: action.payload.state === 'loading',
+      };
+    
+    // ✅ PHASE 3.1: Legacy loading actions (for backward compatibility)
     case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
+      return {
+        ...state,
+        isLoading: action.payload,
+        loadingState: {
+          state: action.payload ? 'loading' : 'idle',
+          operation: action.payload ? 'data-loading' : undefined,
+        },
+      };
     
     case 'SET_SYNCING':
-      return { ...state, isSyncing: action.payload };
+      return {
+        ...state,
+        isSyncing: action.payload,
+        syncingState: {
+          state: action.payload ? 'loading' : 'idle',
+          operation: action.payload ? 'syncing' : undefined,
+        },
+      };
     
     case 'SET_UPLOADING':
-      return { ...state, isUploading: action.payload };
+      return {
+        ...state,
+        isUploading: action.payload,
+        uploadingState: {
+          state: action.payload ? 'loading' : 'idle',
+          operation: action.payload ? 'uploading' : undefined,
+        },
+      };
     
     case 'SET_GENERATING_CONCEPT':
       return { ...state, isGeneratingConcept: action.payload };
