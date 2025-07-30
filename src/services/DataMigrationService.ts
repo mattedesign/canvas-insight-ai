@@ -682,38 +682,85 @@ export class GroupAnalysisMigrationService {
   }
 
   static async loadGroupAnalysesFromDatabase(): Promise<GroupAnalysisWithPrompt[]> {
-    const projectId = await ProjectService.getCurrentProject();
-    
-    // First get group IDs for this project
-    const { data: projectGroups } = await supabase
-      .from('image_groups')
-      .select('id')
-      .eq('project_id', projectId);
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      if (!projectId) {
+        console.log('[GroupAnalysisMigrationService] No current project, returning empty group analyses');
+        return [];
+      }
       
-    const groupIds = projectGroups?.map(g => g.id) || [];
-    
-    if (groupIds.length === 0) return [];
-    
-    const { data: analyses, error } = await supabase
-      .from('group_analyses')
-      .select('*')
-      .in('group_id', groupIds)
-      .order('created_at', { ascending: false });
+      // First get group IDs for this project
+      const { data: projectGroups, error: groupsError } = await supabase
+        .from('image_groups')
+        .select('id')
+        .eq('project_id', projectId);
+      
+      if (groupsError) {
+        console.error('[GroupAnalysisMigrationService] Failed to fetch project groups:', groupsError);
+        return [];
+      }
+        
+      const groupIds = projectGroups?.map(g => g.id) || [];
+      
+      if (groupIds.length === 0) {
+        console.log('[GroupAnalysisMigrationService] No groups found for project');
+        return [];
+      }
+      
+      console.log('[GroupAnalysisMigrationService] Loading analyses for', groupIds.length, 'groups');
+      
+      const { data: analyses, error } = await supabase
+        .from('group_analyses')
+        .select('*')
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    if (!analyses) return [];
+      if (error) {
+        console.error('[GroupAnalysisMigrationService] Failed to fetch group analyses:', error);
+        return [];
+      }
+      
+      if (!analyses || analyses.length === 0) {
+        console.log('[GroupAnalysisMigrationService] No group analyses found');
+        return [];
+      }
 
-    return analyses.map(analysis => ({
-      id: analysis.id,
-      sessionId: `session-${analysis.id}`, // Generate session ID for compatibility
-      groupId: analysis.group_id,
-      prompt: analysis.prompt,
-      summary: (analysis.summary as any) || {},
-      insights: (analysis.insights as any) || [],
-      recommendations: (analysis.recommendations as any) || [],
-      patterns: (analysis.patterns as any) || {},
-      createdAt: new Date(analysis.created_at)
-    }));
+      const processedAnalyses = analyses.map(analysis => {
+        try {
+          return {
+            id: analysis.id,
+            sessionId: `session-${analysis.id}`, // Generate session ID for compatibility
+            groupId: analysis.group_id,
+            prompt: analysis.prompt || 'default',
+            summary: (analysis.summary as any) || {},
+            insights: (analysis.insights as any) || [],
+            recommendations: (analysis.recommendations as any) || [],
+            patterns: (analysis.patterns as any) || {},
+            createdAt: new Date(analysis.created_at)
+          };
+        } catch (processError) {
+          console.error('[GroupAnalysisMigrationService] Failed to process analysis:', analysis.id, processError);
+          // Return a minimal valid object for corrupted data
+          return {
+            id: analysis.id || `fallback-${Date.now()}`,
+            sessionId: `session-${analysis.id || Date.now()}`,
+            groupId: analysis.group_id || '',
+            prompt: 'default',
+            summary: {},
+            insights: [],
+            recommendations: [],
+            patterns: {},
+            createdAt: new Date()
+          };
+        }
+      });
+
+      console.log('[GroupAnalysisMigrationService] Successfully loaded', processedAnalyses.length, 'group analyses');
+      return processedAnalyses;
+    } catch (error) {
+      console.error('[GroupAnalysisMigrationService] Critical error in loadGroupAnalysesFromDatabase:', error);
+      return [];
+    }
   }
 }
 
@@ -791,16 +838,36 @@ export class DataMigrationService {
         return [];
       });
 
+      // 🚨 CRITICAL SAFETY GUARDS: Ensure all results are valid arrays
+      const safeImages = Array.isArray(images) ? images : [];
+      const safeAnalyses = Array.isArray(analyses) ? analyses : [];
+      const safeGroups = Array.isArray(groups) ? groups : [];
+      const safeGroupAnalyses = Array.isArray(groupAnalyses) ? groupAnalyses : [];
+
+      // Additional validation: Check for undefined or null values
+      if (images === undefined || images === null) {
+        console.error('[DataMigrationService] Images returned undefined/null, using empty array');
+      }
+      if (analyses === undefined || analyses === null) {
+        console.error('[DataMigrationService] Analyses returned undefined/null, using empty array');
+      }
+      if (groups === undefined || groups === null) {
+        console.error('[DataMigrationService] Groups returned undefined/null, using empty array');
+      }
+      if (groupAnalyses === undefined || groupAnalyses === null) {
+        console.error('[DataMigrationService] Group analyses returned undefined/null, using empty array');
+      }
+
       console.log('[DataMigrationService] Data load completed:', {
-        images: images.length,
-        analyses: analyses.length,
-        groups: groups.length,
-        groupAnalyses: groupAnalyses.length,
+        images: safeImages.length,
+        analyses: safeAnalyses.length,
+        groups: safeGroups.length,
+        groupAnalyses: safeGroupAnalyses.length,
         projectId: currentProject
       });
 
-      // ✅ FIX 9: Validate loaded data belongs to current project
-      const invalidImages = images.filter(img => {
+      // ✅ FIX 9: Validate loaded data belongs to current project using safe arrays
+      const invalidImages = safeImages.filter(img => {
         // Check if image has projectId property and validate it
         const imgWithProject = img as any;
         return imgWithProject.projectId && imgWithProject.projectId !== currentProject;
@@ -814,10 +881,10 @@ export class DataMigrationService {
       return {
         success: true,
         data: {
-          uploadedImages: images,
-          analyses,
-          imageGroups: groups,
-          groupAnalysesWithPrompts: groupAnalyses,
+          uploadedImages: safeImages,
+          analyses: safeAnalyses,
+          imageGroups: safeGroups,
+          groupAnalysesWithPrompts: safeGroupAnalyses,
           // Initialize empty arrays for other state
           generatedConcepts: [],
           groupAnalyses: [],
