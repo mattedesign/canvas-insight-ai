@@ -35,13 +35,14 @@ export function ImageAnalysisDialog({
     try {
       toast.info('Starting AI analysis...');
 
-      const { data, error } = await supabase.functions.invoke('ai-analysis', {
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
-          imageId,
-          imageUrl,
-          imageName,
-          userContext,
-          aiModel: selectedAIModel
+          type: 'ANALYZE_IMAGE',
+          payload: {
+            imageUrl,
+            userContext: userContext || '',
+            aiModel: selectedAIModel
+          }
         }
       });
 
