@@ -304,9 +304,27 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
-    console.log('[CanvasView] Generating nodes for images:', uploadedImages.length, uploadedImages);
-    console.log('[CanvasView] Analyses:', analyses.length, analyses);
-    console.log('[CanvasView] Groups:', imageGroups.length, imageGroups);
+    console.log('[CanvasView] === CANVAS RENDERING START ===');
+    console.log('[CanvasView] Input data summary:', {
+      uploadedImages: uploadedImages.length,
+      analyses: analyses.length,
+      imageGroups: imageGroups.length,
+      showAnalysis,
+      currentTool
+    });
+    
+    if (uploadedImages.length === 0) {
+      console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
+      return { nodes: [], edges: [] };
+    }
+    
+    console.log('[CanvasView] Image details:', uploadedImages.map(img => ({
+      id: img.id,
+      name: img.name,
+      url: img.url ? `${img.url.substring(0, 50)}...` : 'NO_URL',
+      dimensions: img.dimensions,
+      status: img.status
+    })));
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -318,7 +336,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
     // Process ungrouped images first
     const ungroupedImages = uploadedImages.filter(image => !groupedImageIds.has(image.id));
-    console.log('[CanvasView] Ungrouped images to render:', ungroupedImages.length, ungroupedImages);
+    console.log('[CanvasView] Processing ungrouped images:', ungroupedImages.length);
     
     ungroupedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);

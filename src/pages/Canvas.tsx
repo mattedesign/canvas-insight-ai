@@ -5,7 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
-import { ImageLoadingDiagnostic } from '@/components/ImageLoadingDiagnostic';
+import { ImageLoadingDiagnostic } from '@/components/canvas/ImageLoadingDiagnostic';
+import { CanvasDataDiagnostic } from '@/components/canvas/CanvasDataDiagnostic';
 
 interface ErrorDisplayProps {
   error: string;
@@ -285,11 +286,14 @@ const Canvas = () => {
       />
       
       <div className="flex-1 overflow-hidden relative w-full h-full">
-        {/* ✅ PHASE 2: Debug diagnostic component */}
+        {/* Development Mode Diagnostics */}
         {process.env.NODE_ENV === 'development' && (
-          <div className="absolute top-4 left-4 z-50 max-w-sm">
-            <ImageLoadingDiagnostic />
-          </div>
+          <>
+            <div className="absolute top-4 left-4 z-50 max-w-sm">
+              <ImageLoadingDiagnostic />
+            </div>
+            <CanvasDataDiagnostic />
+          </>
         )}
         
         <ErrorBoundary

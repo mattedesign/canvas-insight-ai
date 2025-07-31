@@ -349,7 +349,7 @@ export class ImageMigrationService {
         .order('uploaded_at', { ascending: false });
 
       if (error) {
-        console.error('[ImageMigrationService] Error loading images:', error);
+        console.error('[ImageMigrationService] Database query error:', error);
         throw error;
       }
 
@@ -358,57 +358,61 @@ export class ImageMigrationService {
         return [];
       }
 
-      console.log('[ImageMigrationService] Found', images.length, 'images for processing');
+      console.log('[ImageMigrationService] Database returned', images.length, 'image records:', images.map(img => ({
+        id: img.id,
+        original_name: img.original_name,
+        storage_path: img.storage_path,
+        dimensions: img.dimensions
+      })));
 
-      const result = images.map(img => {
-        // ✅ PHASE 2 FIX: Enhanced URL generation with validation
+      // Transform database records to UploadedImage format
+      const transformedImages = images.map(img => {
+        // Generate public URL from storage path
         const { data: urlData } = supabase.storage
           .from('images')
           .getPublicUrl(img.storage_path);
 
-        // Validate storage path
-        if (!img.storage_path) {
-          console.error('[ImageMigrationService] Missing storage path for image:', img.id);
-        }
+        // Create minimal File object for compatibility
+        const emptyFile = new File([], img.original_name || img.filename, { 
+          type: img.file_type || 'image/*' 
+        });
 
-        // Create a minimal File object for backward compatibility
-        const emptyFile = new File([], img.original_name, { type: 'image/*' });
-
-        const uploadedImage = {
+        const uploadedImage: UploadedImage = {
           id: img.id,
-          name: img.original_name,
+          name: img.original_name || img.filename, // Handle both field names
           url: urlData.publicUrl,
-          file: emptyFile, // Canvas components use URL, not File content
+          file: emptyFile,
           dimensions: img.dimensions as { width: number; height: number },
-          status: 'completed' as const,
-          projectId: img.project_id // ✅ FIX 17: Add projectId for validation
-        } as UploadedImage;
+          status: 'completed' as const
+        };
 
-        // ✅ PHASE 2 FIX: Validate URL generation
+        // Validation and logging
+        if (!img.storage_path) {
+          console.error('[ImageMigrationService] Missing storage_path for image:', img.id);
+        }
         if (!uploadedImage.url || uploadedImage.url.includes('undefined')) {
-          console.error('[ImageMigrationService] Invalid URL generated for image:', {
+          console.error('[ImageMigrationService] Invalid URL generated:', {
             imageId: img.id,
-            originalName: img.original_name,
             storagePath: img.storage_path,
-            generatedUrl: uploadedImage.url
+            url: uploadedImage.url
           });
         } else {
-          console.log('[ImageMigrationService] Successfully processed image:', {
-            name: uploadedImage.name,
+          console.log('[ImageMigrationService] Successfully transformed image:', {
             id: uploadedImage.id,
-            dimensions: uploadedImage.dimensions,
-            urlValid: uploadedImage.url.startsWith('http')
+            name: uploadedImage.name,
+            urlPrefix: uploadedImage.url.substring(0, 50) + '...',
+            dimensions: uploadedImage.dimensions
           });
         }
 
         return uploadedImage;
       });
 
-      console.log('[ImageMigrationService] Successfully loaded', result.length, 'images');
-      return result; // ✅ CRITICAL FIX: Return the processed images!
+      console.log('[ImageMigrationService] Successfully transformed', transformedImages.length, 'images');
+      return transformedImages;
     } catch (error) {
       console.error('[ImageMigrationService] loadImagesFromDatabase failed:', error);
-      return [];
+      throw error; // Re-throw to trigger proper error handling
     }
   }
 }
@@ -825,26 +829,34 @@ export class DataMigrationService {
       
       console.log('[DataMigrationService] Loading data for validated project:', currentProject);
       
-      // 🚨 SAFE LOADING: Handle each service individually to prevent cascade failures
-      const images = await ImageMigrationService.loadImagesFromDatabase().catch(err => {
-        console.error('[DataMigrationService] Failed to load images:', err);
-        return [];
-      });
+      // Load images first with detailed logging
+      console.log('[DataMigrationService] Loading images...');
+      const images = await ImageMigrationService.loadImagesFromDatabase();
+      console.log('[DataMigrationService] Images loaded:', images.length, images.map(i => ({ id: i.id, name: i.name, url: i.url.substring(0, 50) + '...' })));
       
+      // Load analyses with error handling
+      console.log('[DataMigrationService] Loading analyses...');
       const analyses = await AnalysisMigrationService.loadAnalysesFromDatabase().catch(err => {
         console.error('[DataMigrationService] Failed to load analyses:', err);
         return [];
       });
+      console.log('[DataMigrationService] Analyses loaded:', analyses.length);
       
+      // Load groups with error handling
+      console.log('[DataMigrationService] Loading groups...');
       const groups = await GroupMigrationService.loadGroupsFromDatabase().catch(err => {
         console.error('[DataMigrationService] Failed to load groups:', err);
         return [];
       });
+      console.log('[DataMigrationService] Groups loaded:', groups.length);
       
+      // Load group analyses with error handling
+      console.log('[DataMigrationService] Loading group analyses...');
       const groupAnalyses = await GroupAnalysisMigrationService.loadGroupAnalysesFromDatabase().catch(err => {
         console.error('[DataMigrationService] Failed to load group analyses:', err);
         return [];
       });
+      console.log('[DataMigrationService] Group analyses loaded:', groupAnalyses.length);
 
       // 🚨 CRITICAL SAFETY GUARDS: Ensure all results are valid arrays
       const safeImages = Array.isArray(images) ? images : [];

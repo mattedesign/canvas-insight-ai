@@ -207,30 +207,22 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           className="w-full h-auto object-contain"
           style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
           onError={(e) => {
-            // ✅ PHASE 2 FIX: Enhanced error handling with detailed logging
-            console.error(`[ImageNode] Image failed to load:`, {
+            console.error(`[ImageNode] Image load failed:`, {
               imageName: image.name,
               imageId: image.id,
               url: image.url,
               hasFile: !!image.file,
               isBlob: image.url.startsWith('blob:'),
-              isSupabase: image.url.includes('supabase')
+              isSupabase: image.url.includes('supabase'),
+              statusCode: e.currentTarget.complete ? 'complete but error' : 'loading failed'
             });
             
-            // Try to regenerate blob URL if we have the file
-            if (image.file && !image.url.startsWith('blob:')) {
-              console.log('[ImageNode] Attempting fallback to blob URL for:', image.name);
-              try {
-                const fallbackUrl = URL.createObjectURL(image.file);
-                e.currentTarget.src = fallbackUrl;
-              } catch (blobError) {
-                console.error('[ImageNode] Failed to create blob URL:', blobError);
-              }
-            } else {
-              console.error('[ImageNode] No fallback available for:', image.name);
-              // Set a placeholder or error image
-              e.currentTarget.style.display = 'none';
-            }
+            // Show error state instead of hiding
+            e.currentTarget.style.display = 'block';
+            e.currentTarget.style.backgroundColor = 'hsl(var(--muted))';
+            e.currentTarget.style.border = '2px dashed hsl(var(--border))';
+            e.currentTarget.style.minHeight = '200px';
+            e.currentTarget.alt = `Failed to load: ${image.name}`;
           }}
           onLoad={() => {
             console.log(`[ImageNode] Image loaded successfully:`, {
