@@ -64,13 +64,13 @@ export const AnalysisRequestNode: React.FC<AnalysisRequestNodeProps> = ({ data }
                 <SelectItem value="claude">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-3 h-3" />
-                    Claude Vision
+                    Claude Opus 4 - Most Advanced
                   </div>
                 </SelectItem>
                 <SelectItem value="openai">
                   <div className="flex items-center gap-2">
                     <Brain className="w-3 h-3" />
-                    GPT-4 Vision
+                    GPT-4.1 - Fast & Reliable
                   </div>
                 </SelectItem>
               </SelectContent>
