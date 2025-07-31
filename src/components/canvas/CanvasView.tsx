@@ -1212,7 +1212,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
 
   // Get selected images for AI toolbar
   const selectedImages = uploadedImages.filter(img => 
-    multiSelection.state.selectedImageIds.includes(img.id)
+    multiSelection.state.selectedIds.includes(img.id)
   );
 
   return (
