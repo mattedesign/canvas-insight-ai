@@ -1472,12 +1472,12 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
 
   return (
     <div className="h-full w-full bg-background relative" style={{ height: '100vh', width: '100%' }}>
-      {/* Upload Zone - Show when no images or in corner when images exist */}
-      {onImageUpload && (
+      {/* Upload Zone - Show only when no images exist */}
+      {onImageUpload && uploadedImages.length === 0 && (
         <CanvasUploadZone 
           onImageUpload={onImageUpload}
           isUploading={false}
-          hasImages={uploadedImages.length > 0}
+          hasImages={false}
         />
       )}
 
