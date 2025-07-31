@@ -153,9 +153,6 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
   const handleAnalyzeImage = useCallback((imageId: string) => {
     if (onCreateAnalysisRequest) {
       onCreateAnalysisRequest(imageId);
-    } else {
-      // Fallback to modal dialog if callback not provided
-      setShowAnalysisDialog(true);
     }
   }, [onCreateAnalysisRequest]);
 
