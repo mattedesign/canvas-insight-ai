@@ -35,6 +35,7 @@ import { CanvasUploadZone } from '../CanvasUploadZone';
 import { AICanvasToolbar } from './AICanvasToolbar';
 import { AIContextMenu } from './AIContextMenu';
 import { useAI } from '@/context/AIContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
 
 
@@ -190,48 +191,49 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name, imageUrl: image.url })));
   }, [uploadedImages]);
 
-  const handleStartAnalysis = useCallback(async (imageId: string, context?: string, aiModel?: string) => {
-    const image = uploadedImages.find(img => img.id === imageId);
-    if (!image) return;
-
-    // Remove from requests and add to in-progress
+  const handleStartAnalysis = useCallback(async (imageId: string, context: string, aiModel: string) => {
+    // Remove from requests, add to in-progress
     setAnalysisRequests(prev => {
       const newMap = new Map(prev);
       newMap.delete(imageId);
       return newMap;
     });
     
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) return;
     setAnalysisInProgress(prev => new Map(prev.set(imageId, {
-      imageId,
+      imageId: image.id,
       imageName: image.name,
-      stage: 'Starting analysis...',
-      progress: 0
+      stage: 'Initializing...',
+      progress: 10
     })));
-
+    
     try {
-      const result = await performEnhancedAnalysis(image.url, image.name, image.id, context, aiModel);
+      // Simulate progress updates
+      setTimeout(() => {
+        setAnalysisInProgress(prev => new Map(prev.set(imageId, {
+          imageId: image.id,
+          imageName: image.name,
+          stage: 'Analyzing visual elements...',
+          progress: 40
+        })));
+      }, 1000);
       
-      if (result.success && result.data) {
-        // Remove from in-progress
-        setAnalysisInProgress(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(imageId);
-          return newMap;
-        });
-        
-        // Trigger completion callback
-        onAnalysisComplete?.(imageId, result.data);
-        
-        toast({
-          title: "Analysis Complete",
-          description: "AI analysis completed successfully",
-          category: "success",
-        });
-      } else {
-        throw new Error(result.error || 'Analysis failed');
-      }
-    } catch (error) {
-      console.error('Analysis failed:', error);
+      // Call your actual analysis function
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        body: {
+          type: 'ANALYZE_IMAGE',
+          payload: {
+            imageId,
+            imageUrl: image.url,
+            imageName: image.name,
+            userContext: context || ''
+          },
+          aiModel
+        }
+      });
+      
+      if (error) throw error;
       
       // Remove from in-progress
       setAnalysisInProgress(prev => {
@@ -240,10 +242,39 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         return newMap;
       });
       
+      // Handle successful analysis
+      onAnalysisComplete?.(imageId, data.data);
+      
+      toast({
+        title: "Analysis Complete",
+        description: "AI analysis has been generated for this image",
+        category: "success"
+      });
+      
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      
+      // Show error state briefly
+      setAnalysisInProgress(prev => new Map(prev.set(imageId, {
+        imageId: image.id,
+        imageName: image.name,
+        stage: 'error',
+        progress: 0
+      })));
+      
+      // Remove after 3 seconds
+      setTimeout(() => {
+        setAnalysisInProgress(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(imageId);
+          return newMap;
+        });
+      }, 3000);
+      
       toast({
         title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "An error occurred during analysis",
-        category: "error",
+        description: "Failed to analyze image. Please try again.",
+        category: "error"
       });
     }
   }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
