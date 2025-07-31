@@ -796,10 +796,79 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               onAnnotationClick: () => {},
               onAnalysisComplete: (newAnalysis: UXAnalysis) => {
                 onAnalysisComplete?.(image.id, newAnalysis);
-              }
+              },
+              onCreateAnalysisRequest: handleCreateAnalysisRequest
             },
           };
           nodes.push(imageNode);
+
+          let rightmostXPosition = padding + displayWidth + 50; // Start after image with some spacing
+          
+          // Check for analysis request node for grouped images
+          const analysisRequest = analysisRequests.get(image.id);
+          if (analysisRequest && !isImageLoading) {
+            const requestNode: Node = {
+              id: `group-analysis-request-${image.id}`,
+              type: 'analysisRequest',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
+                onCancel: () => handleCancelAnalysisRequest(image.id)
+              }
+            };
+            nodes.push(requestNode);
+
+            // Create edge connecting image to analysis request
+            const requestEdge: Edge = {
+              id: `edge-group-${image.id}-request`,
+              source: `image-${image.id}`,
+              target: `group-analysis-request-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+            };
+            edges.push(requestEdge);
+
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
+
+          // Check for analysis progress node for grouped images
+          const analysisProgress = analysisInProgress.get(image.id);
+          if (analysisProgress && !isImageLoading) {
+            const progressNode: Node = {
+              id: `group-analysis-progress-${image.id}`,
+              type: 'analysisLoading',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                status: 'analyzing',
+                progress: analysisProgress.progress,
+                stage: analysisProgress.stage,
+                onCancel: () => handleCancelAnalysis(image.id)
+              }
+            };
+            nodes.push(progressNode);
+
+            // Create edge from image to loading node
+            const loadingEdge: Edge = {
+              id: `edge-group-${image.id}-loading`,
+              source: `image-${image.id}`,
+              target: `group-analysis-progress-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--secondary))', strokeDasharray: '5,5' },
+            };
+            edges.push(loadingEdge);
+
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
           
           // Individual analysis card for this image - with generous spacing
           if (analysis && showAnalysis && !isImageLoading) {
@@ -935,10 +1004,79 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               onAnnotationClick: () => {},
               onAnalysisComplete: (newAnalysis: UXAnalysis) => {
                 onAnalysisComplete?.(image.id, newAnalysis);
-              }
+              },
+              onCreateAnalysisRequest: handleCreateAnalysisRequest
             },
           };
           nodes.push(imageNode);
+
+          let rightmostXPosition = padding + displayWidth + 50; // Start after image with some spacing
+          
+          // Check for analysis request node for grouped images (stacked mode)
+          const analysisRequest = analysisRequests.get(image.id);
+          if (analysisRequest) {
+            const requestNode: Node = {
+              id: `group-analysis-request-${image.id}`,
+              type: 'analysisRequest',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
+                onCancel: () => handleCancelAnalysisRequest(image.id)
+              }
+            };
+            nodes.push(requestNode);
+
+            // Create edge connecting image to analysis request
+            const requestEdge: Edge = {
+              id: `edge-group-${image.id}-request`,
+              source: `image-${image.id}`,
+              target: `group-analysis-request-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+            };
+            edges.push(requestEdge);
+
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
+
+          // Check for analysis progress node for grouped images (stacked mode)
+          const analysisProgress = analysisInProgress.get(image.id);
+          if (analysisProgress) {
+            const progressNode: Node = {
+              id: `group-analysis-progress-${image.id}`,
+              type: 'analysisLoading',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                status: 'analyzing',
+                progress: analysisProgress.progress,
+                stage: analysisProgress.stage,
+                onCancel: () => handleCancelAnalysis(image.id)
+              }
+            };
+            nodes.push(progressNode);
+
+            // Create edge from image to loading node
+            const loadingEdge: Edge = {
+              id: `edge-group-${image.id}-loading`,
+              source: `image-${image.id}`,
+              target: `group-analysis-progress-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--secondary))', strokeDasharray: '5,5' },
+            };
+            edges.push(loadingEdge);
+
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
           
           // Individual analysis card for this image - with generous spacing for stacked mode
           if (analysis && showAnalysis) {
