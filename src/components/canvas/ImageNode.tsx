@@ -88,8 +88,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         markerRect.top - imageContainer.getBoundingClientRect().top
       );
 
-      const relatedSuggestions = analysis?.suggestions.filter(s => 
-        s.relatedAnnotations.includes(annotation.id)
+      const relatedSuggestions = analysis?.suggestions?.filter(s => 
+        s.relatedAnnotations?.includes(annotation.id)
       ) || [];
 
       showAnnotation({
@@ -244,7 +244,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         />
         
         {/* Annotation Markers */}
-        {analysis && showAnnotations && analysis.visualAnnotations.map((annotation) => {
+        {analysis && showAnnotations && analysis.visualAnnotations?.map((annotation) => {
           const isActive = activeAnnotation?.annotation.id === annotation.id;
           return (
             <div
@@ -285,7 +285,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
             
             {/* Quick Insights Count */}
             <div className="flex gap-1">
-              {analysis.summary.keyIssues.length > 0 && (
+              {(analysis.summary?.keyIssues?.length || 0) > 0 && (
                 <Badge 
                   variant="destructive" 
                   className="bg-background/90 backdrop-blur-sm text-xs px-1"
@@ -293,7 +293,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
                   {analysis.summary.keyIssues.length} issues
                 </Badge>
               )}
-              {analysis.suggestions.length > 0 && (
+              {(analysis.suggestions?.length || 0) > 0 && (
                 <Badge 
                   variant="secondary" 
                   className="bg-background/90 backdrop-blur-sm text-xs px-1"
@@ -331,12 +331,12 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
                     {analysis.createdAt ? new Date(analysis.createdAt).toLocaleDateString() : 'Recent'}
                   </span>
                 </div>
-                {analysis.summary.keyIssues.length > 0 && (
+                {(analysis.summary?.keyIssues?.length || 0) > 0 && (
                   <div className="text-destructive">
                     Top Issue: {analysis.summary.keyIssues[0].substring(0, 40)}...
                   </div>
                 )}
-                {analysis.suggestions.length > 0 && (
+                {(analysis.suggestions?.length || 0) > 0 && (
                   <div className="text-primary">
                     Main Suggestion: {analysis.suggestions[0].title.substring(0, 40)}...
                   </div>
