@@ -1391,17 +1391,17 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       edges.push(requestEdge);
     });
 
-    // Add analysis progress nodes
+    // Add analysis in progress nodes
     analysisInProgress.forEach(({ imageId, imageName, stage, progress }) => {
       const imageNode = nodes.find(n => n.id === `image-${imageId}`);
-      const imagePosition = imageNode?.position || { x: 50, y: yOffset };
+      if (!imageNode) return;
       
       const analysisLoadingNode: Node = {
         id: `analysis-loading-${imageId}`,
         type: 'analysisLoading',
         position: { 
-          x: imagePosition.x + 450, // Position to the right of the image
-          y: imagePosition.y
+          x: imageNode.position.x + 450,
+          y: imageNode.position.y 
         },
         data: {
           imageId,
@@ -1414,13 +1414,17 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       };
       nodes.push(analysisLoadingNode);
       
-      // Create edge from image to loading node
+      // Create dashed edge from image to loading node
       const loadingEdge: Edge = {
         id: `edge-image-${imageId}-to-loading`,
         source: `image-${imageId}`,
         target: `analysis-loading-${imageId}`,
         type: 'smoothstep',
-        animated: true
+        animated: true,
+        style: { 
+          stroke: 'hsl(var(--primary))',
+          strokeDasharray: '5 5'
+        }
       };
       edges.push(loadingEdge);
     });
