@@ -117,7 +117,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   
   // Analysis workflow state
-  const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string }>>(new Map());
+  const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
   const [analysisInProgress, setAnalysisInProgress] = useState<Map<string, { imageId: string; imageName: string; stage: string; progress: number }>>(new Map());
   
   const { toast } = useFilteredToast();
@@ -187,7 +187,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const image = uploadedImages.find(img => img.id === imageId);
     if (!image) return;
     
-    setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name })));
+    setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name, imageUrl: image.url })));
   }, [uploadedImages]);
 
   const handleStartAnalysis = useCallback(async (imageId: string, context?: string, aiModel?: string) => {
