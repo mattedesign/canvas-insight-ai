@@ -366,6 +366,11 @@ export class ImageMigrationService {
           .from('images')
           .getPublicUrl(img.storage_path);
 
+        // Validate storage path
+        if (!img.storage_path) {
+          console.error('[ImageMigrationService] Missing storage path for image:', img.id);
+        }
+
         // Create a minimal File object for backward compatibility
         const emptyFile = new File([], img.original_name, { type: 'image/*' });
 
@@ -398,6 +403,9 @@ export class ImageMigrationService {
 
         return uploadedImage;
       });
+
+      console.log('[ImageMigrationService] Successfully loaded', result.length, 'images');
+      return result; // ✅ CRITICAL FIX: Return the processed images!
     } catch (error) {
       console.error('[ImageMigrationService] loadImagesFromDatabase failed:', error);
       return [];

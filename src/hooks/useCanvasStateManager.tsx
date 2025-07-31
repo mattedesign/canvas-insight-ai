@@ -403,6 +403,14 @@ export function useCanvasStateManager({
     const newNodes = generateNodesFromAppState(appState, existingPositions);
     const newEdges = generateEdgesFromAppState(appState);
     
+    console.log('[CanvasStateManager] Sync data check:', {
+      uploadedImages: appState.uploadedImages.length,
+      analyses: appState.analyses.length,
+      imageGroups: appState.imageGroups.length,
+      newNodes: newNodes.length,
+      newEdges: newEdges.length
+    });
+    
     // Only update if there are actual changes to prevent infinite loops
     const hasNodeChanges = newNodes.length !== canvasState.nodes.length || 
       newNodes.some(newNode => {
@@ -461,6 +469,12 @@ function generateNodesFromAppState(
   appState: AppState, 
   nodePositions: Record<string, { x: number; y: number }> = {}
 ): Node[] {
+  console.log('[CanvasStateManager] Generating nodes from app state:', {
+    images: appState.uploadedImages.length,
+    analyses: appState.analyses.length,
+    preservedPositions: Object.keys(nodePositions).length
+  });
+  
   const nodes: Node[] = [];
   let yOffset = 0;
   const spacing = 200;
@@ -469,6 +483,11 @@ function generateNodesFromAppState(
   appState.uploadedImages.forEach((image, index) => {
     const nodeId = `image-${image.id}`;
     const position = nodePositions[nodeId] || { x: 50, y: yOffset };
+    
+    // ✅ PHASE 4: Validate image data before creating node
+    if (!image.url) {
+      console.error('[CanvasStateManager] Image missing URL:', image.id, image.name);
+    }
     
     nodes.push({
       id: nodeId,

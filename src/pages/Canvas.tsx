@@ -329,6 +329,8 @@ const Canvas = () => {
             isGeneratingConcept={state.isGeneratingConcept}
           />
         </ErrorBoundary>
+        
+        {/* ✅ PHASE 4: Additional diagnostic logging - component already exists above */}
       </div>
     </div>
   );

@@ -51,12 +51,13 @@ export const OptimizedImageNode: React.FC<OptimizedImageNodeProps> = memo(({ dat
       url: image.url,
       hasFile: !!image.file,
       isBlob: image.url?.startsWith('blob:'),
-      isSupabase: image.url?.includes('supabase')
+      isSupabase: image.url?.includes('supabase'),
+      errorEvent: e.currentTarget.src
     });
     
     setImageError(true);
     
-    // Try to regenerate blob URL if we have the file
+    // Enhanced error recovery: Try to regenerate blob URL if we have the file
     if (image.file && !image.url?.startsWith('blob:')) {
       console.log('[OptimizedImageNode] Attempting fallback to blob URL for:', image.name);
       try {

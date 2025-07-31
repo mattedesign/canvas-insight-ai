@@ -46,7 +46,24 @@ export const useStableHelpers = (dispatch: StrictDispatchFunction): StableHelper
       console.log('[Stable Helpers] Starting data load for project:', expectedProjectId);
       const result = await DataMigrationService.loadAllFromDatabase(expectedProjectId);
       if (result.success && result.data) {
-        console.log('[Stable Helpers] Data loaded successfully:', result.data);
+        console.log('[Stable Helpers] Data loaded successfully:', {
+          images: result.data.uploadedImages.length,
+          analyses: result.data.analyses.length,
+          groups: result.data.imageGroups.length,
+          groupAnalyses: result.data.groupAnalysesWithPrompts.length
+        });
+        
+        // ✅ PHASE 4: Validate loaded image URLs before dispatching
+        const validImages = result.data.uploadedImages.filter(img => 
+          img.url && (img.url.startsWith('http') || img.url.startsWith('blob:'))
+        );
+        
+        console.log('[Stable Helpers] Image URL validation:', {
+          total: result.data.uploadedImages.length,
+          validUrls: validImages.length,
+          invalidUrls: result.data.uploadedImages.length - validImages.length
+        });
+        
         dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
         // ✅ PHASE 3.1: Complete loading state
         loadingMachine.completeDataLoading();
