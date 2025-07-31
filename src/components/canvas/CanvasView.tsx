@@ -1235,12 +1235,12 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
 
   return (
     <div className="h-full w-full bg-background relative">
-      {/* Upload Zone - Show when no images */}
-      {uploadedImages.length === 0 && onImageUpload && (
+      {/* Upload Zone - Show when no images or in corner when images exist */}
+      {onImageUpload && (
         <CanvasUploadZone 
           onImageUpload={onImageUpload}
           isUploading={false}
-          hasImages={false}
+          hasImages={uploadedImages.length > 0}
         />
       )}
 
@@ -1300,10 +1300,16 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        fitView
+        fitView={uploadedImages.length === 0} // Only fit view when no images to prevent zoom conflicts
+        fitViewOptions={{
+          padding: 0.1,
+          includeHiddenNodes: false,
+          minZoom: 0.5,
+          maxZoom: 2
+        }}
         style={{ width: '100%', height: '100%' }}
-        panOnDrag={!isPanningDisabled} // Disable panning when annotation is active
-        panOnScroll={!isPanningDisabled} // Also disable pan on scroll
+        panOnDrag={!isPanningDisabled}
+        panOnScroll={!isPanningDisabled}
         zoomOnScroll
         zoomOnPinch
         zoomOnDoubleClick={currentTool !== 'draw'}
@@ -1314,6 +1320,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''} w-full h-full`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
+        minZoom={0.1}
+        maxZoom={4}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         
         <Background color="hsl(var(--muted))" />

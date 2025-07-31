@@ -37,7 +37,7 @@ export const CanvasUploadZone: React.FC<CanvasUploadZoneProps> = ({
       <Card 
         {...getRootProps()}
         className={`
-          fixed bottom-6 right-6 z-50 p-4 border-2 border-dashed 
+          fixed bottom-6 right-6 z-[100] p-4 border-2 border-dashed 
           transition-all duration-300 cursor-pointer bg-card/95 backdrop-blur-sm
           ${isDragActive 
             ? 'border-primary bg-primary/10 scale-105' 

@@ -285,7 +285,7 @@ const Canvas = () => {
         showAnnotations={showAnnotations}
       />
       
-      <div className="flex-1 overflow-hidden relative w-full h-full">
+      <div className="flex-1 relative w-full h-full">
         {/* Development Mode Diagnostics */}
         {process.env.NODE_ENV === 'development' && (
           <>
