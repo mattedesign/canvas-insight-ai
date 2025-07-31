@@ -343,3 +343,15 @@ All colors MUST be HSL.
   width: 100% !important;
   height: 100% !important;
 }
+
+/* Dashed edge style for analysis connections */
+.react-flow__edge-path {
+  stroke-dasharray: 5 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
