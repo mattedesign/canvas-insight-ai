@@ -326,3 +326,20 @@ All colors MUST be HSL.
 .keyboard-hint {
   @apply text-xs text-muted-foreground;
 }
+
+/* Canvas and ReactFlow specific styles */
+.react-flow__renderer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.react-flow__container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure infinite canvas scrolling */
+.react-flow {
+  width: 100% !important;
+  height: 100% !important;
+}

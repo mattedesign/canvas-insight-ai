@@ -1234,7 +1234,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   );
 
   return (
-    <div className="h-full w-full bg-background relative">
+    <div className="h-full w-full bg-background relative" style={{ height: '100vh', width: '100%' }}>
       {/* Upload Zone - Show when no images or in corner when images exist */}
       {onImageUpload && (
         <CanvasUploadZone 
@@ -1317,7 +1317,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         nodesDraggable={isNodeDraggingEnabled}
         nodesConnectable={currentTool === 'cursor'}
         elementsSelectable={currentTool === 'cursor'}
-        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''} w-full h-full`}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''}`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
         minZoom={0.1}
