@@ -9,7 +9,7 @@ import { AppProvider } from "./context/SimplifiedAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
-import { RenderDiagnostic } from "./components/RenderDiagnostic";
+
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -75,7 +75,7 @@ const App = () => {
       <AuthProvider>
         <AIProvider>
           <AppProvider>
-            <RenderDiagnostic />
+            
             <Suspense fallback={
               <div className="min-h-screen flex items-center justify-center bg-background">
                 <LoadingSpinner />
