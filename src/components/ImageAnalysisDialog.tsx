@@ -39,10 +39,12 @@ export function ImageAnalysisDialog({
         body: {
           type: 'ANALYZE_IMAGE',
           payload: {
+            imageId,
             imageUrl,
-            userContext: userContext || '',
-            aiModel: selectedAIModel
-          }
+            imageName,
+            userContext: userContext || ''
+          },
+          aiModel: selectedAIModel
         }
       });
 

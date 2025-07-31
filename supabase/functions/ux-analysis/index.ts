@@ -2343,7 +2343,18 @@ Deno.serve(async (req) => {
     try {
       switch (type) {
         case 'ANALYZE_IMAGE':
+          console.log('ANALYZE_IMAGE payload validation:', {
+            hasImageId: !!payload.imageId,
+            hasImageUrl: !!payload.imageUrl,
+            hasImageName: !!payload.imageName,
+            payloadKeys: Object.keys(payload)
+          });
           if (!payload.imageId || !payload.imageUrl) {
+            console.error('Missing required ANALYZE_IMAGE parameters:', {
+              imageId: payload.imageId,
+              imageUrl: payload.imageUrl ? `${payload.imageUrl.substring(0, 50)}...` : 'missing',
+              receivedKeys: Object.keys(payload)
+            });
             throw new Error('ANALYZE_IMAGE requires imageId and imageUrl in payload')
           }
           result = await analyzeImage(payload, aiModel)
