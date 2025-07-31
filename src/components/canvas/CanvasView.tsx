@@ -1190,6 +1190,72 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       yOffset += containerHeight + 100; // Space between groups
     });
 
+    // Add analysis workflow nodes (requests and progress)
+    analysisRequests.forEach(({ imageId, imageName }) => {
+      const imageNode = nodes.find(n => n.id === `image-${imageId}`);
+      const imagePosition = imageNode?.position || { x: 50, y: yOffset };
+      
+      const analysisRequestNode: Node = {
+        id: `analysis-request-${imageId}`,
+        type: 'analysisRequest',
+        position: { 
+          x: imagePosition.x + 450, // Position to the right of the image
+          y: imagePosition.y
+        },
+        data: {
+          imageId,
+          imageName,
+          onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(imageId, context, aiModel),
+          onCancel: () => handleCancelAnalysisRequest(imageId)
+        }
+      };
+      nodes.push(analysisRequestNode);
+      
+      // Create edge from image to request node
+      const requestEdge: Edge = {
+        id: `edge-image-${imageId}-to-request`,
+        source: `image-${imageId}`,
+        target: `analysis-request-${imageId}`,
+        type: 'smoothstep',
+        animated: true
+      };
+      edges.push(requestEdge);
+    });
+
+    // Add analysis progress nodes
+    analysisInProgress.forEach(({ imageId, imageName, stage, progress }) => {
+      const imageNode = nodes.find(n => n.id === `image-${imageId}`);
+      const imagePosition = imageNode?.position || { x: 50, y: yOffset };
+      
+      const analysisLoadingNode: Node = {
+        id: `analysis-loading-${imageId}`,
+        type: 'analysisLoading',
+        position: { 
+          x: imagePosition.x + 450, // Position to the right of the image
+          y: imagePosition.y
+        },
+        data: {
+          imageId,
+          imageName,
+          status: 'analyzing',
+          stage,
+          progress,
+          onCancel: () => handleCancelAnalysis(imageId)
+        }
+      };
+      nodes.push(analysisLoadingNode);
+      
+      // Create edge from image to loading node
+      const loadingEdge: Edge = {
+        id: `edge-image-${imageId}-to-loading`,
+        source: `image-${imageId}`,
+        target: `analysis-loading-${imageId}`,
+        type: 'smoothstep',
+        animated: true
+      };
+      edges.push(loadingEdge);
+    });
+
     return { nodes, edges };
   }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept]);
 

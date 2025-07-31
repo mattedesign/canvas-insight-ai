@@ -2313,6 +2313,10 @@ Deno.serve(async (req) => {
   try {
     const requestData = await req.json()
     
+    // Debug logging
+    console.log('Raw request data:', JSON.stringify(requestData, null, 2))
+    console.log('Request data keys:', Object.keys(requestData))
+    
     // Validate request data structure
     if (!requestData || typeof requestData !== 'object') {
       throw new Error('Invalid request data: must be a JSON object')

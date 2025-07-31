@@ -356,20 +356,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowAnalysisDialog(true);
+                handleAnalyzeImage(image.id);
               }}
               title="Analyze with AI"
             >
               AI Analysis
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleViewSingle}
-              title="View in single image mode"
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              View
             </Button>
           </div>
         </div>
