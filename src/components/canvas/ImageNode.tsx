@@ -23,6 +23,7 @@ interface ImageNodeData {
   onToggleSelection?: (imageId: string, isCtrlOrCmd: boolean) => void;
   isSelected?: boolean;
   onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
+  onCreateAnalysisRequest?: (imageId: string) => void;
 }
 
 interface ImageNodeProps {
@@ -31,7 +32,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false, onAnalysisComplete } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false, onAnalysisComplete, onCreateAnalysisRequest } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
@@ -150,8 +151,12 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   // AI Integration Handlers
   const handleAnalyzeImage = useCallback((imageId: string) => {
-    setShowAnalysisDialog(true);
-  }, []);
+    if (onCreateAnalysisRequest) {
+      onCreateAnalysisRequest(imageId);
+    } else {
+      setShowAnalysisDialog(true);
+    }
+  }, [onCreateAnalysisRequest]);
 
   const handleViewAnalysis = useCallback((imageId: string) => {
     if (analysis) {

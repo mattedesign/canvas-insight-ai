@@ -25,6 +25,7 @@ import { GroupAnalysisResultsNode } from './GroupAnalysisResultsNode';
 import { EnhancedGroupAnalysisNode } from './EnhancedGroupAnalysisNode';
 import { ImageLoadingNode } from './ImageLoadingNode';
 import { AnalysisLoadingNode } from './AnalysisLoadingNode';
+import { AnalysisRequestNode } from './AnalysisRequestNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
@@ -52,6 +53,7 @@ const nodeTypes = {
   enhancedGroupAnalysis: EnhancedGroupAnalysisNode,
   imageLoading: ImageLoadingNode,
   analysisLoading: AnalysisLoadingNode,
+  analysisRequest: AnalysisRequestNode,
 };
 
 export interface CanvasViewProps {
@@ -114,6 +116,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   const [groups, setGroups] = useState<ImageGroup[]>([]);
   
+  // Analysis workflow state
+  const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string }>>(new Map());
+  const [analysisInProgress, setAnalysisInProgress] = useState<Map<string, { imageId: string; imageName: string; stage: string; progress: number }>>(new Map());
   
   const { toast } = useFilteredToast();
   const multiSelection = useMultiSelection();
@@ -121,7 +126,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   // AI Integration
   const { analyzeImageWithAI } = useAI();
-  const { performEnhancedAnalysis } = useEnhancedAnalysis();
+  const { performEnhancedAnalysis, isAnalyzing, progress, stage, error } = useEnhancedAnalysis();
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
@@ -176,6 +181,109 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleAnalysisExpansion = useCallback((analysisId: string) => {
     onOpenAnalysisPanel?.(analysisId);
   }, [onOpenAnalysisPanel]);
+
+  // Analysis workflow handlers
+  const handleCreateAnalysisRequest = useCallback((imageId: string) => {
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) return;
+    
+    setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name })));
+  }, [uploadedImages]);
+
+  const handleStartAnalysis = useCallback(async (imageId: string, context?: string, aiModel?: string) => {
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) return;
+
+    // Remove from requests and add to in-progress
+    setAnalysisRequests(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(imageId);
+      return newMap;
+    });
+    
+    setAnalysisInProgress(prev => new Map(prev.set(imageId, {
+      imageId,
+      imageName: image.name,
+      stage: 'Starting analysis...',
+      progress: 0
+    })));
+
+    try {
+      const result = await performEnhancedAnalysis(image.url, image.name, image.id, context, aiModel);
+      
+      if (result.success && result.data) {
+        // Remove from in-progress
+        setAnalysisInProgress(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(imageId);
+          return newMap;
+        });
+        
+        // Trigger completion callback
+        onAnalysisComplete?.(imageId, result.data);
+        
+        toast({
+          title: "Analysis Complete",
+          description: "AI analysis completed successfully",
+          category: "success",
+        });
+      } else {
+        throw new Error(result.error || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      
+      // Remove from in-progress
+      setAnalysisInProgress(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(imageId);
+        return newMap;
+      });
+      
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "An error occurred during analysis",
+        category: "error",
+      });
+    }
+  }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
+
+  // Sync analysis progress from hook
+  useEffect(() => {
+    if (isAnalyzing) {
+      // Find the image being analyzed (we need to track which image is being analyzed)
+      const analysisImage = Array.from(analysisInProgress.keys())[0];
+      if (analysisImage) {
+        setAnalysisInProgress(prev => {
+          const current = prev.get(analysisImage);
+          if (current) {
+            return new Map(prev.set(analysisImage, {
+              ...current,
+              stage: stage,
+              progress: progress
+            }));
+          }
+          return prev;
+        });
+      }
+    }
+  }, [isAnalyzing, progress, stage, analysisInProgress]);
+
+  const handleCancelAnalysisRequest = useCallback((imageId: string) => {
+    setAnalysisRequests(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(imageId);
+      return newMap;
+    });
+  }, []);
+
+  const handleCancelAnalysis = useCallback((imageId: string) => {
+    setAnalysisInProgress(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(imageId);
+      return newMap;
+    });
+  }, []);
 
   // AI Integration Handlers
   const handleAnalysisTriggered = useCallback((imageId: string, analysis: any) => {
@@ -372,12 +480,75 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onAnnotationClick: () => {},
           onAnalysisComplete: (newAnalysis: UXAnalysis) => {
             onAnalysisComplete?.(image.id, newAnalysis);
-          }
+          },
+          onCreateAnalysisRequest: handleCreateAnalysisRequest
         },
       };
       nodes.push(imageNode);
 
       let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
+
+      // Check for analysis request node
+      const analysisRequest = analysisRequests.get(image.id);
+      if (analysisRequest && !isImageLoading) {
+        const requestNode: Node = {
+          id: `analysis-request-${image.id}`,
+          type: 'analysisRequest',
+          position: { x: rightmostXPosition, y: yOffset },
+          data: {
+            imageId: image.id,
+            imageName: image.name,
+            onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
+            onCancel: () => handleCancelAnalysisRequest(image.id)
+          }
+        };
+        nodes.push(requestNode);
+
+        // Create edge connecting image to analysis request
+        const requestEdge: Edge = {
+          id: `edge-${image.id}-request`,
+          source: `image-${image.id}`,
+          target: `analysis-request-${image.id}`,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+        };
+        edges.push(requestEdge);
+
+        rightmostXPosition += 400 + horizontalSpacing; // Update position for next node
+      }
+
+      // Check for analysis in progress
+      const analysisProgress = analysisInProgress.get(image.id);
+      if (analysisProgress && !isImageLoading) {
+        const progressNode: Node = {
+          id: `analysis-progress-${image.id}`,
+          type: 'analysisLoading',
+          position: { x: rightmostXPosition, y: yOffset },
+          data: {
+            imageId: image.id,
+            imageName: image.name,
+            status: 'analyzing' as const,
+            progress: analysisProgress.progress,
+            stage: analysisProgress.stage,
+            onCancel: () => handleCancelAnalysis(image.id)
+          }
+        };
+        nodes.push(progressNode);
+
+        // Create edge connecting image to analysis progress
+        const progressEdge: Edge = {
+          id: `edge-${image.id}-progress`,
+          source: `image-${image.id}`,
+          target: `analysis-progress-${image.id}`,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(var(--primary))' },
+        };
+        edges.push(progressEdge);
+
+        rightmostXPosition += 340 + horizontalSpacing; // Update position for next node
+      }
 
         // Create analysis card node if analysis exists and showAnalysis is true
         if (analysis && showAnalysis && !isImageLoading) {
