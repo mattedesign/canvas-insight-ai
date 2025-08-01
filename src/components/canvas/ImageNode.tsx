@@ -151,10 +151,19 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   // AI Integration Handlers
   const handleAnalyzeImage = useCallback((imageId: string) => {
+    console.log('[ImageNode] AI Analysis button clicked for image:', imageId);
     if (onCreateAnalysisRequest) {
+      console.log('[ImageNode] Calling onCreateAnalysisRequest...');
       onCreateAnalysisRequest(imageId);
+    } else {
+      console.error('[ImageNode] onCreateAnalysisRequest handler is missing!');
+      toast({
+        title: "Analysis Not Available",
+        description: "Analysis functionality is not properly connected",
+        variant: "destructive"
+      });
     }
-  }, [onCreateAnalysisRequest]);
+  }, [onCreateAnalysisRequest, toast]);
 
   const handleViewAnalysis = useCallback((imageId: string) => {
     if (analysis) {
@@ -350,15 +359,16 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           
           <div className="flex gap-2 ml-3 flex-shrink-0">
             <Button
-              variant="outline"
+              variant={analysis ? "outline" : "default"}
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 handleAnalyzeImage(image.id);
               }}
-              title="Analyze with AI"
+              title={analysis ? "Analyze again with AI" : "Analyze with AI"}
+              className={!analysis ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
             >
-              AI Analysis
+              {analysis ? "Re-analyze" : "AI Analysis"}
             </Button>
           </div>
         </div>

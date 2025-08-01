@@ -125,6 +125,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
   
+  // Show helpful hint on first load for images without analysis
+  useEffect(() => {
+    const imagesWithoutAnalysis = uploadedImages.filter(img => 
+      !analyses.some(analysis => analysis.imageId === img.id)
+    );
+    
+    if (imagesWithoutAnalysis.length > 0 && uploadedImages.length > 0) {
+      const timer = setTimeout(() => {
+        toast({
+          title: "AI Analysis Available",
+          description: `Click the "AI Analysis" button on any image to get instant UX insights. ${imagesWithoutAnalysis.length} image(s) ready for analysis.`,
+          category: "action-required"
+        });
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [uploadedImages.length, analyses.length, toast]);
+  
   // AI Integration
   const { analyzeImageWithAI } = useAI();
   const { performEnhancedAnalysis, isAnalyzing, progress, stage, error } = useEnhancedAnalysis();
@@ -186,12 +205,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   // Analysis workflow handlers
   const handleCreateAnalysisRequest = useCallback((imageId: string) => {
     const image = uploadedImages.find(img => img.id === imageId);
-    if (!image) return;
+    if (!image) {
+      console.error('[CanvasView] Image not found for analysis request:', imageId);
+      return;
+    }
     
+    console.log('[CanvasView] Creating analysis request for image:', image.name);
     setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name, imageUrl: image.url })));
-  }, [uploadedImages]);
+    
+    toast({
+      title: "Analysis Request Created",
+      description: `Created analysis request for ${image.name}`,
+      category: "success"
+    });
+  }, [uploadedImages, toast]);
 
-  const handleStartAnalysis = useCallback(async (imageId: string, context: string, aiModel: string) => {
+  const handleStartAnalysis = useCallback(async (imageId: string, context: string = '', aiModel: string = 'claude') => {
+    console.log('[CanvasView] Starting analysis for image:', imageId, 'with context:', context, 'model:', aiModel);
+    
     // Remove from requests, add to in-progress
     setAnalysisRequests(prev => {
       const newMap = new Map(prev);
@@ -200,7 +231,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
     
     const image = uploadedImages.find(img => img.id === imageId);
-    if (!image) return;
+    if (!image) {
+      console.error('[CanvasView] Image not found for analysis:', imageId);
+      return;
+    }
+    
     setAnalysisInProgress(prev => new Map(prev.set(imageId, {
       imageId: image.id,
       imageName: image.name,
@@ -209,17 +244,37 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     })));
     
     try {
-      // Simulate progress updates
+      // Update progress
       setTimeout(() => {
-        setAnalysisInProgress(prev => new Map(prev.set(imageId, {
-          imageId: image.id,
-          imageName: image.name,
-          stage: 'Analyzing visual elements...',
-          progress: 40
-        })));
+        setAnalysisInProgress(prev => {
+          const current = prev.get(imageId);
+          if (current) {
+            return new Map(prev.set(imageId, {
+              ...current,
+              stage: 'Analyzing visual elements...',
+              progress: 40
+            }));
+          }
+          return prev;
+        });
       }, 1000);
       
-      // Call your actual analysis function
+      setTimeout(() => {
+        setAnalysisInProgress(prev => {
+          const current = prev.get(imageId);
+          if (current) {
+            return new Map(prev.set(imageId, {
+              ...current,
+              stage: 'Processing UX patterns...',
+              progress: 70
+            }));
+          }
+          return prev;
+        });
+      }, 2000);
+      
+      // Call the analysis function
+      console.log('[CanvasView] Calling ux-analysis function...');
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
           type: 'ANALYZE_IMAGE',
@@ -233,7 +288,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('[CanvasView] Analysis function error:', error);
+        throw error;
+      }
+      
+      console.log('[CanvasView] Analysis function response:', data);
       
       // Remove from in-progress
       setAnalysisInProgress(prev => {
@@ -243,16 +303,19 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       });
       
       // Handle successful analysis
-      onAnalysisComplete?.(imageId, data.data);
-      
-      toast({
-        title: "Analysis Complete",
-        description: "AI analysis has been generated for this image",
-        category: "success"
-      });
+      if (data?.data) {
+        onAnalysisComplete?.(imageId, data.data);
+        toast({
+          title: "Analysis Complete",
+          description: `AI analysis has been generated for ${image.name}`,
+          category: "success"
+        });
+      } else {
+        throw new Error('No analysis data returned');
+      }
       
     } catch (error) {
-      console.error('Analysis failed:', error);
+      console.error('[CanvasView] Analysis failed:', error);
       
       // Show error state briefly
       setAnalysisInProgress(prev => new Map(prev.set(imageId, {
@@ -273,21 +336,21 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       
       toast({
         title: "Analysis Failed",
-        description: "Failed to analyze image. Please try again.",
+        description: `Failed to analyze ${image.name}. Please try again.`,
         category: "error"
       });
     }
-  }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
+  }, [uploadedImages, onAnalysisComplete, toast]);
 
-  // Sync analysis progress from hook
+  // Sync analysis progress from hook - optimized to prevent infinite updates
   useEffect(() => {
-    if (isAnalyzing) {
+    if (isAnalyzing && analysisInProgress.size > 0) {
       // Find the image being analyzed (we need to track which image is being analyzed)
       const analysisImage = Array.from(analysisInProgress.keys())[0];
       if (analysisImage) {
         setAnalysisInProgress(prev => {
           const current = prev.get(analysisImage);
-          if (current) {
+          if (current && (current.stage !== stage || current.progress !== progress)) {
             return new Map(prev.set(analysisImage, {
               ...current,
               stage: stage,
@@ -298,7 +361,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         });
       }
     }
-  }, [isAnalyzing, progress, stage, analysisInProgress]);
+  }, [isAnalyzing, progress, stage]);
 
   const handleCancelAnalysisRequest = useCallback((imageId: string) => {
     setAnalysisRequests(prev => {
@@ -443,14 +506,16 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Generate initial nodes and edges
   const initialElements = useMemo(() => {
-    console.log('[CanvasView] === CANVAS RENDERING START ===');
-    console.log('[CanvasView] Input data summary:', {
-      uploadedImages: uploadedImages.length,
-      analyses: analyses.length,
-      imageGroups: imageGroups.length,
-      showAnalysis,
-      currentTool
-    });
+  console.log('[CanvasView] === CANVAS RENDERING START ===');
+  console.log('[CanvasView] Input data summary:', {
+    uploadedImages: uploadedImages.length,
+    analyses: analyses.length,
+    imageGroups: imageGroups.length,
+    showAnalysis,
+    currentTool,
+    analysisRequestsCount: analysisRequests.size,
+    analysisInProgressCount: analysisInProgress.size
+  });
     
     if (uploadedImages.length === 0) {
       console.warn('[CanvasView] No uploaded images provided - canvas will be empty');

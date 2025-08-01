@@ -11,7 +11,7 @@ import { Brain, Sparkles, X } from 'lucide-react';
 interface AnalysisRequestNodeData {
   imageId: string;
   imageName: string;
-  onStartAnalysis: (context?: string, aiModel?: string) => void;
+  onStartAnalysis: (context: string, aiModel: string) => void;
   onCancel: () => void;
 }
 
@@ -24,7 +24,7 @@ export const AnalysisRequestNode: React.FC<AnalysisRequestNodeProps> = ({ data }
   const [selectedAIModel, setSelectedAIModel] = React.useState<string>('claude');
 
   const handleStartAnalysis = () => {
-    data.onStartAnalysis(userContext || undefined, selectedAIModel);
+    data.onStartAnalysis(userContext || '', selectedAIModel);
   };
 
   return (
