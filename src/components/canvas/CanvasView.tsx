@@ -10,6 +10,7 @@ import {
   Node,
   Background,
 } from '@xyflow/react';
+import { BoundaryPushingPipeline } from '@/services/BoundaryPushingPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { AnalysisRequestNodeData } from './AnalysisRequestNode';
@@ -227,110 +228,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
   }, [uploadedImages, toast]);
 
-  const onStartAnalysis = useCallback(async (imageId: string, imageName: string, context?: string) => {
-    console.log('[CanvasView] Starting analysis for image:', imageId, 'with context:', context);
-    
-    // Create analysis request node
-    const analysisNodeId = `analysis-${imageId}-${Date.now()}`;
-    
-    setNodes(currentNodes => {
-      const imageNode = currentNodes.find(n => n.id === imageId && n.type === 'image');
-      
-      if (!imageNode) {
-        console.error('[CanvasView] Image node not found:', imageId);
-        return currentNodes;
-      }
-
-      // Position the analysis node to the right of the image
-      const analysisNode: Node = {
-        id: analysisNodeId,
-        type: 'analysisRequest',
-        position: {
-          x: imageNode.position.x + 350,
-          y: imageNode.position.y
-        },
-        data: {
-          imageId,
-          imageName,
-          status: 'loading' as const,
-          progress: 0,
-          stage: 'Initializing...'
-        }
-      };
-
-      return [...currentNodes, analysisNode];
-    });
-
-    // Create edge connecting image to analysis
-    const edge: Edge = {
-      id: `edge-${imageId}-${analysisNodeId}`,
-      source: imageId,
-      target: analysisNodeId,
-      type: 'smoothstep'
-    };
-
-    setEdges(edges => [...edges, edge]);
-
-    // Get the image data
-    const image = uploadedImages.find(img => img.id === imageId);
-    if (!image) {
-      console.error('[CanvasView] Image not found:', imageId);
-      updateAnalysisNode(analysisNodeId, { status: 'error', error: 'Image not found' });
-      return;
-    }
-
-    try {
-      // Use the new BoundaryPushingPipeline
-      console.log('[CanvasView] Starting BoundaryPushingPipeline analysis...');
-      
-      const result = await pipeline.executeAnalysis(image.url, context || '');
-      
-      console.log('[CanvasView] Pipeline result:', result);
-      
-      if (result?.requiresClarification) {
-        // Update node to show clarification state
-        updateAnalysisNode(analysisNodeId, {
-          status: 'clarification',
-          clarificationQuestions: result.questions || ['Please provide more context about what you want to analyze.']
-        });
-        
-        // Store the partial context for later (if available in future pipeline versions)
-        storePartialContext(analysisNodeId, null, null);
-        
-      } else if (result?.success && result?.data) {
-        // Analysis complete - call the handler
-        onAnalysisComplete?.(imageId, result.data);
-        
-        // Remove the request node
-        setNodes(nodes => nodes.filter(n => n.id !== analysisNodeId));
-        setEdges(edges => edges.filter(e => e.target !== analysisNodeId));
-        
-      } else {
-        // Error state
-        const errorMessage = 'Analysis failed';
-        updateAnalysisNode(analysisNodeId, {
-          status: 'error',
-          error: errorMessage
-        });
-      }
-      
-    } catch (error) {
-      console.error('[CanvasView] Analysis failed:', error);
-      updateAnalysisNode(analysisNodeId, {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Analysis failed'
-      });
-    }
-  }, [uploadedImages, pipeline, onAnalysisComplete]);
-
-  // Helper function to update analysis node
-  const updateAnalysisNode = useCallback((nodeId: string, updates: Partial<AnalysisRequestNodeData>) => {
-    setNodes(nodes => nodes.map(node => 
-      node.id === nodeId 
-        ? { ...node, data: { ...node.data, ...updates } }
-        : node
-    ));
-  }, []);
 
   // Helper to store partial context for clarification
   const storePartialContext = useCallback((nodeId: string, context: any, token: any) => {
@@ -342,13 +239,19 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     console.log('[CanvasView] Node clicked:', node.type, node.id);
     
+    // Handle clarification node clicks
     if (node.type === 'analysisRequest' && node.data.status === 'clarification') {
-      // Open clarification dialog
-      handleClarificationClick(node);
+      console.log('[CanvasView] Clarification needed for:', node.id);
+      // TODO: Implement clarification dialog
+      toast({
+        title: "Context Clarification",
+        description: "Click functionality coming soon. The AI needs more context to provide optimal analysis.",
+        category: "action-required"
+      });
     }
     
-    // ... existing click handlers
-  }, []);
+    // ... rest of existing click handlers
+  }, [toast]);
 
   const handleClarificationClick = useCallback((node: Node) => {
     // This would open a dialog to answer clarification questions
@@ -361,9 +264,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     // 2. Collect answers
     // 3. Resume analysis with pipeline.resumeWithClarification()
   }, []);
-
-  const handleStartAnalysis = onStartAnalysis;
-
 
   const handleCancelAnalysisRequest = useCallback((imageId: string) => {
     setAnalysisRequests(prev => {
@@ -1373,6 +1273,122 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // Helper function to update analysis node
+  const updateAnalysisNode = useCallback((nodeId: string, updates: Partial<any>) => {
+    setNodes(nodes => nodes.map(node => 
+      node.id === nodeId 
+        ? { ...node, data: { ...node.data, ...updates } }
+        : node
+    ));
+  }, []);
+
+  const onStartAnalysis = useCallback(async (imageId: string, imageName: string, context?: string) => {
+    console.log('[CanvasView] Starting analysis for image:', imageId, 'with context:', context);
+    
+    // Find the image node
+    const imageNode = nodes.find(n => n.id === `image-${imageId}` && n.type === 'image');
+    if (!imageNode) {
+      console.error('[CanvasView] Image node not found:', imageId);
+      return;
+    }
+
+    // Create analysis request node ID
+    const analysisNodeId = `analysis-request-${imageId}`;
+    
+    // Check if analysis node already exists
+    const existingNode = nodes.find(n => n.id === analysisNodeId);
+    if (existingNode) {
+      console.log('[CanvasView] Analysis already in progress for:', imageId);
+      return;
+    }
+
+    // Create the analysis node
+    const analysisNode: Node = {
+      id: analysisNodeId,
+      type: 'analysisRequest',
+      position: {
+        x: imageNode.position.x + 350,
+        y: imageNode.position.y
+      },
+      data: {
+        imageId,
+        imageName,
+        status: 'loading',
+        progress: 0,
+        stage: 'Initializing...'
+      }
+    };
+
+    // Create edge
+    const edge: Edge = {
+      id: `edge-${imageId}-${analysisNodeId}`,
+      source: `image-${imageId}`,
+      target: analysisNodeId,
+      type: 'smoothstep'
+    };
+
+    // Add to canvas
+    setNodes(currentNodes => [...currentNodes, analysisNode]);
+    setEdges(currentEdges => [...currentEdges, edge]);
+
+    // Get image data
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) {
+      console.error('[CanvasView] Image not found in uploadedImages:', imageId);
+      updateAnalysisNode(analysisNodeId, { status: 'error', error: 'Image not found' });
+      return;
+    }
+
+    try {
+      console.log('[CanvasView] Executing pipeline for image:', image.url);
+      
+      // Create a new pipeline instance
+      const pipeline = new BoundaryPushingPipeline();
+      
+      // Execute with progress callback
+      const result = await pipeline.execute(
+        image.url,
+        context || 'General UX analysis',
+        (progress, stage) => {
+          console.log('[CanvasView] Pipeline progress:', progress, stage);
+          updateAnalysisNode(analysisNodeId, {
+            progress,
+            stage,
+            status: 'loading'
+          });
+        }
+      );
+      
+      console.log('[CanvasView] Pipeline result:', result);
+      
+      // Handle results
+      if (result?.requiresClarification) {
+        updateAnalysisNode(analysisNodeId, {
+          status: 'clarification',
+          clarificationQuestions: result.questions || ['Please provide more context for analysis']
+        });
+      } else if (result?.data) {
+        // Success - create analysis card
+        onAnalysisComplete?.(imageId, result.data);
+        
+        // Remove request node
+        setNodes(currentNodes => currentNodes.filter(n => n.id !== analysisNodeId));
+        setEdges(currentEdges => currentEdges.filter(e => e.target !== analysisNodeId));
+      } else {
+        throw new Error('No data returned from pipeline');
+      }
+      
+    } catch (error) {
+      console.error('[CanvasView] Pipeline execution failed:', error);
+      updateAnalysisNode(analysisNodeId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Analysis failed'
+      });
+    }
+  }, [nodes, uploadedImages, onAnalysisComplete, updateAnalysisNode]);
+
+  const handleStartAnalysis = onStartAnalysis;
   
   const {
     saveState,
