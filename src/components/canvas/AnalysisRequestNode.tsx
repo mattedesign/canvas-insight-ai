@@ -1,115 +1,74 @@
-import React from 'react';
-import { Handle, Position } from '@xyflow/react';
+import React, { memo } from 'react';
+import { NodeProps, Handle, Position } from '@xyflow/react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Brain, Sparkles, X } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
-interface AnalysisRequestNodeData {
+export interface AnalysisRequestNodeData {
   imageId: string;
   imageName: string;
-  onStartAnalysis: (context: string, aiModel: string) => void;
-  onCancel: () => void;
+  status: 'loading' | 'clarification' | 'error' | 'complete';
+  progress?: number;
+  stage?: string;
+  clarificationQuestions?: string[];
+  error?: string;
 }
 
 interface AnalysisRequestNodeProps {
   data: AnalysisRequestNodeData;
 }
 
-export const AnalysisRequestNode: React.FC<AnalysisRequestNodeProps> = ({ data }) => {
-  const [userContext, setUserContext] = React.useState('');
-  const [selectedAIModel, setSelectedAIModel] = React.useState<string>('claude');
-
-  const handleStartAnalysis = () => {
-    data.onStartAnalysis(userContext || '', selectedAIModel);
-  };
+export const AnalysisRequestNode = memo(({ data }: AnalysisRequestNodeProps) => {
+  const { imageName, status, progress = 0, stage, clarificationQuestions, error } = data;
 
   return (
-    <Card className="w-[380px] p-4 bg-card border border-border shadow-lg">
-      <Handle type="target" position={Position.Left} className="w-3 h-3" />
+    <>
+      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">AI Analysis Request</h3>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={data.onCancel}
-            className="h-8 w-8 p-0"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-        
-        <div className="text-xs text-muted-foreground">
-          Image: <span className="font-medium">{data.imageName}</span>
-        </div>
-        
+      <Card className="w-80 p-4 bg-background/95 backdrop-blur">
         <div className="space-y-3">
-          <div className="space-y-2">
-            <Label htmlFor="ai-model" className="text-xs font-medium">
-              AI Model
-            </Label>
-            <Select value={selectedAIModel} onValueChange={setSelectedAIModel}>
-              <SelectTrigger id="ai-model" className="h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="claude">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-3 h-3" />
-                    Claude Opus 4 - Most Advanced
-                  </div>
-                </SelectItem>
-                <SelectItem value="openai">
-                  <div className="flex items-center gap-2">
-                    <Brain className="w-3 h-3" />
-                    GPT-4.1 - Fast & Reliable
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <h3 className="font-medium text-sm">Analyzing {imageName}</h3>
           
-          <div className="space-y-2">
-            <Label htmlFor="context" className="text-xs font-medium">
-              Additional Context (Optional)
-            </Label>
-            <Textarea
-              id="context"
-              placeholder="Describe what you'd like the AI to focus on..."
-              value={userContext}
-              onChange={(e) => setUserContext(e.target.value)}
-              className="text-xs resize-none"
-              rows={3}
-            />
-          </div>
+          {status === 'loading' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{stage || 'Initializing analysis...'}</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
+          
+          {status === 'clarification' && clarificationQuestions && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                I need some clarification to provide the best analysis:
+              </p>
+              <div className="space-y-2">
+                {clarificationQuestions.map((question, index) => (
+                  <div key={index} className="p-2 bg-muted/50 rounded text-sm">
+                    {question}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Click to answer questions →
+              </p>
+            </div>
+          )}
+          
+          {status === 'error' && (
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5" />
+              <span>{error || 'Analysis failed'}</span>
+            </div>
+          )}
         </div>
-        
-        <div className="flex items-center gap-2 pt-2">
-          <Button 
-            onClick={handleStartAnalysis}
-            size="sm"
-            className="flex-1"
-          >
-            <Brain className="w-3 h-3 mr-1" />
-            Start Analysis
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={data.onCancel}
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </Card>
+      </Card>
+      
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+    </>
   );
-};
+});
+
+AnalysisRequestNode.displayName = 'AnalysisRequestNode';
