@@ -12,7 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Available model configurations
 const MODEL_CONFIGS = {
-  'gpt-4o': {
+  'gpt-4.1-2025-04-14': {
     api: 'openai',
     endpoint: 'https://api.openai.com/v1/chat/completions',
     requiresKey: 'OPENAI_API_KEY'
@@ -20,10 +20,10 @@ const MODEL_CONFIGS = {
   'openai-vision': {
     api: 'openai',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4-vision-preview',
+    model: 'gpt-4.1-2025-04-14',
     requiresKey: 'OPENAI_API_KEY'
   },
-  'claude-3-5-sonnet-20241022': {
+  'claude-opus-4-20250514': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
     requiresKey: 'ANTHROPIC_API_KEY'
@@ -31,7 +31,7 @@ const MODEL_CONFIGS = {
   'anthropic-vision': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    model: 'claude-3-opus-20240229',
+    model: 'claude-opus-4-20250514',
     requiresKey: 'ANTHROPIC_API_KEY'
   }
 }

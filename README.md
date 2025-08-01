@@ -163,7 +163,7 @@ src/
 - [x] Replace main edge function completely
 - [x] Create context-detection edge function
 - [x] DO NOT add fallback logic
-- [ ] Use ONLY specified model configurations
+- [x] Use ONLY specified model configurations
 
 **Phase 6: Update Frontend Integration**
 - [ ] Replace the pipeline hook implementation
