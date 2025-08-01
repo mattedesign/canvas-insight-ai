@@ -121,7 +121,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   // Analysis workflow state
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
-  const [analysisInProgress, setAnalysisInProgress] = useState<Map<string, { imageId: string; imageName: string; stage: string; progress: number }>>(new Map());
   
   const { toast } = useFilteredToast();
   const multiSelection = useMultiSelection();
@@ -365,37 +364,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const handleStartAnalysis = onStartAnalysis;
 
-  // Sync analysis progress from hook - optimized to prevent infinite updates
-  useEffect(() => {
-    if (isAnalyzing && analysisInProgress.size > 0) {
-      // Find the image being analyzed (we need to track which image is being analyzed)
-      const analysisImage = Array.from(analysisInProgress.keys())[0];
-      if (analysisImage) {
-        setAnalysisInProgress(prev => {
-          const current = prev.get(analysisImage);
-          if (current && (current.stage !== stage || current.progress !== progress)) {
-            return new Map(prev.set(analysisImage, {
-              ...current,
-              stage: stage,
-              progress: progress
-            }));
-          }
-          return prev;
-        });
-      }
-    }
-  }, [isAnalyzing, progress, stage]);
 
   const handleCancelAnalysisRequest = useCallback((imageId: string) => {
     setAnalysisRequests(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(imageId);
-      return newMap;
-    });
-  }, []);
-
-  const handleCancelAnalysis = useCallback((imageId: string) => {
-    setAnalysisInProgress(prev => {
       const newMap = new Map(prev);
       newMap.delete(imageId);
       return newMap;
@@ -536,8 +507,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     imageGroups: imageGroups.length,
     showAnalysis,
     currentTool,
-    analysisRequestsCount: analysisRequests.size,
-    analysisInProgressCount: analysisInProgress.size
+    analysisRequestsCount: analysisRequests.size
   });
     
     if (uploadedImages.length === 0) {
@@ -637,37 +607,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         rightmostXPosition += 400 + horizontalSpacing; // Update position for next node
       }
 
-      // Check for analysis in progress
-      const analysisProgress = analysisInProgress.get(image.id);
-      if (analysisProgress && !isImageLoading) {
-        const progressNode: Node = {
-          id: `analysis-progress-${image.id}`,
-          type: 'analysisLoading',
-          position: { x: rightmostXPosition, y: yOffset },
-          data: {
-            imageId: image.id,
-            imageName: image.name,
-            status: 'analyzing' as const,
-            progress: analysisProgress.progress,
-            stage: analysisProgress.stage,
-            onCancel: () => handleCancelAnalysis(image.id)
-          }
-        };
-        nodes.push(progressNode);
-
-        // Create edge connecting image to analysis progress
-        const progressEdge: Edge = {
-          id: `edge-${image.id}-progress`,
-          source: `image-${image.id}`,
-          target: `analysis-progress-${image.id}`,
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: 'hsl(var(--primary))' },
-        };
-        edges.push(progressEdge);
-
-        rightmostXPosition += 340 + horizontalSpacing; // Update position for next node
-      }
 
         // Create analysis card node if analysis exists and showAnalysis is true
         if (analysis && showAnalysis && !isImageLoading) {
@@ -956,39 +895,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             rightmostXPosition += 400 + 50; // Update position for next node
           }
 
-          // Check for analysis progress node for grouped images
-          const analysisProgress = analysisInProgress.get(image.id);
-          if (analysisProgress && !isImageLoading) {
-            const progressNode: Node = {
-              id: `group-analysis-progress-${image.id}`,
-              type: 'analysisLoading',
-              position: { x: rightmostXPosition, y: currentY },
-              parentId: `group-container-${group.id}`,
-              extent: 'parent',
-              data: {
-                imageId: image.id,
-                imageName: image.name,
-                status: 'analyzing',
-                progress: analysisProgress.progress,
-                stage: analysisProgress.stage,
-                onCancel: () => handleCancelAnalysis(image.id)
-              }
-            };
-            nodes.push(progressNode);
-
-            // Create edge from image to loading node
-            const loadingEdge: Edge = {
-              id: `edge-group-${image.id}-loading`,
-              source: `image-${image.id}`,
-              target: `group-analysis-progress-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--secondary))', strokeDasharray: '5,5' },
-            };
-            edges.push(loadingEdge);
-
-            rightmostXPosition += 400 + 50; // Update position for next node
-          }
           
           // Individual analysis card for this image - with generous spacing
           if (analysis && showAnalysis && !isImageLoading) {
@@ -1165,39 +1071,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             rightmostXPosition += 400 + 50; // Update position for next node
           }
 
-          // Check for analysis progress node for grouped images (stacked mode)
-          const analysisProgress = analysisInProgress.get(image.id);
-          if (analysisProgress) {
-            const progressNode: Node = {
-              id: `group-analysis-progress-${image.id}`,
-              type: 'analysisLoading',
-              position: { x: rightmostXPosition, y: currentY },
-              parentId: `group-container-${group.id}`,
-              extent: 'parent',
-              data: {
-                imageId: image.id,
-                imageName: image.name,
-                status: 'analyzing',
-                progress: analysisProgress.progress,
-                stage: analysisProgress.stage,
-                onCancel: () => handleCancelAnalysis(image.id)
-              }
-            };
-            nodes.push(progressNode);
-
-            // Create edge from image to loading node
-            const loadingEdge: Edge = {
-              id: `edge-group-${image.id}-loading`,
-              source: `image-${image.id}`,
-              target: `group-analysis-progress-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--secondary))', strokeDasharray: '5,5' },
-            };
-            edges.push(loadingEdge);
-
-            rightmostXPosition += 400 + 50; // Update position for next node
-          }
           
           // Individual analysis card for this image - with generous spacing for stacked mode
           if (analysis && showAnalysis) {
@@ -1482,43 +1355,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       edges.push(requestEdge);
     });
 
-    // Add analysis in progress nodes
-    analysisInProgress.forEach(({ imageId, imageName, stage, progress }) => {
-      const imageNode = nodes.find(n => n.id === `image-${imageId}`);
-      if (!imageNode) return;
-      
-      const analysisLoadingNode: Node = {
-        id: `analysis-loading-${imageId}`,
-        type: 'analysisLoading',
-        position: { 
-          x: imageNode.position.x + 450,
-          y: imageNode.position.y 
-        },
-        data: {
-          imageId,
-          imageName,
-          status: 'analyzing',
-          stage,
-          progress,
-          onCancel: () => handleCancelAnalysis(imageId)
-        }
-      };
-      nodes.push(analysisLoadingNode);
-      
-      // Create dashed edge from image to loading node
-      const loadingEdge: Edge = {
-        id: `edge-image-${imageId}-to-loading`,
-        source: `image-${imageId}`,
-        target: `analysis-loading-${imageId}`,
-        type: 'smoothstep',
-        animated: true,
-        style: { 
-          stroke: 'hsl(var(--primary))',
-          strokeDasharray: '5 5'
-        }
-      };
-      edges.push(loadingEdge);
-    });
 
     return { nodes, edges };
   }, [
@@ -1532,8 +1368,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     showAnalysis, 
     currentTool, 
     isGeneratingConcept,
-    analysisRequests,
-    analysisInProgress
+    analysisRequests
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
