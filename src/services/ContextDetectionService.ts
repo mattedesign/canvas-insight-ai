@@ -166,44 +166,39 @@ export class ContextDetectionService {
     return context;
   }
 
-  /**
-   * Generate clarifying questions when context confidence is low
-   */
   generateClarificationQuestions(
     imageContext: ImageContext,
     userContext: UserContext
   ): string[] {
     const questions: string[] = [];
 
+    // Always ensure we have questions when confidence is low
+    
     // Clarify interface type if uncertain
     if (imageContext.primaryType === 'unknown') {
       questions.push(
-        "I'm analyzing your interface. Is this primarily a dashboard, landing page, mobile app, or something else?",
-        "What is the main purpose of this interface?"
+        "What type of interface is this? (e.g., dashboard, landing page, mobile app, form, etc.)"
       );
     }
 
     // Clarify user role if not detected
     if (!userContext.inferredRole) {
       questions.push(
-        "What's your role in this project? (Designer, Developer, Product Manager, Business Stakeholder, etc.)",
-        "What perspective would be most helpful for your analysis?"
+        "What's your role? (designer, developer, product manager, business owner, etc.)"
       );
     }
 
-    // Clarify goals if vague
+    // Clarify goals if not clear
     if (!userContext.goals || userContext.goals.length === 0) {
       questions.push(
-        "What are you hoping to improve or validate with this analysis?",
-        "Are there specific metrics or outcomes you're targeting?"
+        "What would you like me to focus on? (conversion, usability, accessibility, performance, etc.)"
       );
     }
 
-    // Domain-specific clarifications
-    if (imageContext.domain === 'general' || !imageContext.domain) {
+    // Always have at least one question if confidence is low
+    if (questions.length === 0) {
       questions.push(
-        "What industry or domain is this interface for?",
-        "Are there specific compliance requirements we should consider?"
+        "Could you tell me more about this interface and what kind of analysis would be most helpful?"
       );
     }
 
