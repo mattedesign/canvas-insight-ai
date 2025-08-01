@@ -34,10 +34,11 @@ interface VisionMetadata {
   web?: any;
 }
 
-async function analyzeImage(payload: { imageId: string; imageUrl: string; imageName: string; userContext?: string }, aiModel = 'auto') {
-  console.log('Starting multi-stage AI analysis pipeline');
+async function analyzeImage(payload: { imageId: string; imageUrl: string; imageName: string; userContext?: string; domainInstructions?: string }, aiModel = 'auto') {
+  console.log('Starting enhanced multi-stage AI analysis pipeline');
   console.log('Analyzing image:', payload);
   console.log('Using AI model preference:', aiModel);
+  console.log('Domain instructions provided:', !!payload.domainInstructions);
   
   try {
     const stages: AnalysisStageResult[] = [];
@@ -407,8 +408,8 @@ async function performClaudeVisionAnalysisWithMetadata(payload: any, metadata: V
     throw new Error(`Image not accessible: ${imageError.message}`);
   }
 
-  // Separate text and image content to avoid compound data issues
-  const textPrompt = `Analyze this UI design interface. 
+  // Enhanced domain-aware prompt
+  const textPrompt = `Analyze this UI design interface with domain-specific expertise.
 
 Metadata context:
 - UI Elements: ${optimizedMetadata.elements}
@@ -416,15 +417,18 @@ Metadata context:
 - Color Palette: ${optimizedMetadata.colors}
 - Labels: ${optimizedMetadata.labels}
 
-${payload.userContext ? `User Context: ${payload.userContext.slice(0, 300)}` : ''}
+${payload.userContext ? `User Context: ${payload.userContext.slice(0, 500)}` : ''}
 
-Focus on initial visual assessment and return structured JSON:
+${payload.domainInstructions ? `Domain-Specific Focus:\n${payload.domainInstructions}` : ''}
+
+Provide initial visual assessment with domain expertise and return structured JSON:
 {
-  "visualElements": ["component1", "component2"],
-  "layoutAnalysis": "brief assessment",
-  "initialConcerns": ["concern1", "concern2"],
-  "designPatterns": ["pattern1", "pattern2"],
-  "accessibility": "accessibility notes"
+  "visualElements": ["specific UI components identified"],
+  "layoutAnalysis": "domain-aware layout assessment",
+  "initialConcerns": ["domain-specific issues"],
+  "designPatterns": ["identified patterns for this domain"],
+  "accessibility": "accessibility assessment with domain context",
+  "domainCompliance": "adherence to domain best practices"
 }`;
 
   const requestPayload = {
@@ -733,7 +737,8 @@ Return JSON format:
 
 
 async function performClaudeOpus4ComprehensiveAnalysis(payload: any, metadata: VisionMetadata, visionAnalysis: any) {
-  console.log('Performing comprehensive analysis with Claude Opus 4');
+  console.log('Performing domain-aware comprehensive analysis with Claude Opus 4');
+  console.log('Domain instructions available:', !!payload.domainInstructions);
   
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!anthropicApiKey) {
@@ -772,6 +777,8 @@ ANALYSIS CONTEXT:
 - Key Elements: ${optimizedContext.elements}
 - Layout: ${optimizedContext.layoutInfo}
 - Initial Concerns: ${optimizedContext.concerns}
+
+${payload.domainInstructions ? `DOMAIN-SPECIFIC FOCUS:\n${payload.domainInstructions}` : ''}
 
 FOCUS AREAS:
 1. ${optimizedContext.priorities[0]}
