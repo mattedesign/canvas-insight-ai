@@ -147,7 +147,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [uploadedImages.length, analyses.length, toast]);
+  }, [uploadedImages.length, analyses.length]);
   
   // AI Integration
   const { analyzeImageWithAI } = useAI();

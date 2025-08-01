@@ -1,10 +1,11 @@
 import { useToast as useOriginalToast } from '@/hooks/use-toast';
+import { useCallback } from 'react';
 import { shouldShowToast, getToastVariant, FilteredToastOptions } from '@/utils/toastFilters';
 
 export const useFilteredToast = () => {
   const { toast: originalToast, ...rest } = useOriginalToast();
 
-  const toast = (options: FilteredToastOptions) => {
+  const toast = useCallback((options: FilteredToastOptions) => {
     // Only show toast if category is enabled
     if (!shouldShowToast(options.category)) {
       return { id: '', dismiss: () => {}, update: () => {} };
@@ -16,7 +17,7 @@ export const useFilteredToast = () => {
       variant: options.variant || getToastVariant(options.category),
       action: options.action,
     });
-  };
+  }, [originalToast]);
 
   return {
     ...rest,
