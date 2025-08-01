@@ -154,7 +154,7 @@ src/
 - [x] DO NOT optimize the code
 
 **Phase 4: UI Components**
-- [ ] Build ONLY listed components
+- [x] Build ONLY listed components
 - [ ] Use ONLY the props specified
 - [ ] DO NOT add animations
 - [ ] DO NOT add extra styling

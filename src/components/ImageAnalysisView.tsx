@@ -1,0 +1,62 @@
+import { AnalysisContextDisplay } from './AnalysisContextDisplay';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Info, Code, Palette, Briefcase, TrendingUp } from 'lucide-react';
+
+interface ImageAnalysisViewProps {
+  analysis: any;
+}
+
+export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
+  return (
+    <div className="space-y-6">
+      {/* Context Information - PRIORITY DISPLAY */}
+      {analysis.analysisContext && (
+        <AnalysisContextDisplay context={analysis.analysisContext} />
+      )}
+
+      {/* Enhanced Model Information */}
+      {analysis.metadata?.modelsUsed && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Badge variant="outline" className="gap-1">
+            <Info className="h-3 w-3" />
+            {analysis.metadata.modelsUsed.length} AI Models Used
+          </Badge>
+          
+          {analysis.metadata.modelsUsed.map((model: string) => (
+            <Badge key={model} variant="secondary" className="text-xs">
+              {model}
+            </Badge>
+          ))}
+          
+          {analysis.summary?.confidence && (
+            <Badge variant="outline" className="gap-1">
+              Confidence: {Math.round(analysis.summary.confidence * 100)}%
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Enhanced Pipeline Stages Display */}
+      {analysis.metadata?.stagesCompleted && (
+        <div className="mb-4">
+          <div className="text-sm font-medium mb-2">Analysis Pipeline</div>
+          <div className="flex gap-2">
+            {['context', 'vision', 'analysis', 'synthesis'].map((stage) => {
+              const completed = analysis.metadata.stagesCompleted.includes(stage);
+              return (
+                <Badge 
+                  key={stage} 
+                  variant={completed ? 'default' : 'outline'}
+                  className="capitalize"
+                >
+                  {stage}
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
