@@ -12,6 +12,8 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOptimizedPipeline } from '@/hooks/useOptimizedPipeline';
+import { ContextClarification } from '@/components/ContextClarification';
+import { AnalysisContextDisplay } from '@/components/AnalysisContextDisplay';
 import { Loader2, CheckCircle, AlertCircle, Zap, TrendingUp, Database } from 'lucide-react';
 
 interface OptimizedAnalysisDialogProps {
@@ -41,7 +43,11 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
     tokenUsage,
     error,
     stages,
+    analysisContext,
+    requiresClarification,
+    clarificationQuestions,
     executeOptimizedAnalysis,
+    resumeWithClarification,
     cancelAnalysis,
     resetPipeline
   } = useOptimizedPipeline();
@@ -62,6 +68,22 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
     } catch (err) {
       console.error('Analysis failed:', err);
     }
+  };
+
+  const handleClarificationSubmit = async (responses: Record<string, string>) => {
+    try {
+      const result = await resumeWithClarification(responses, '', imageUrl, userContext);
+      if (result.success && result.data) {
+        onAnalysisComplete(result.data);
+        handleClose();
+      }
+    } catch (err) {
+      console.error('Clarification analysis failed:', err);
+    }
+  };
+
+  const handleClarificationCancel = () => {
+    resetPipeline();
   };
 
   const handleClose = () => {
@@ -115,22 +137,39 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
             </div>
           </div>
 
-          {/* User Context Input */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Context & Focus Areas (Optional)
-            </label>
-            <Textarea
-              value={userContext}
-              onChange={(e) => setUserContext(e.target.value)}
-              placeholder="Describe what you want to focus on in this analysis... (e.g., accessibility, mobile usability, conversion optimization)"
-              className="min-h-[80px]"
-              disabled={isAnalyzing}
+          {/* Clarification Flow */}
+          {requiresClarification && clarificationQuestions.length > 0 ? (
+            <ContextClarification
+              questions={clarificationQuestions}
+              partialContext={analysisContext}
+              onSubmit={handleClarificationSubmit}
+              onCancel={handleClarificationCancel}
             />
-            <p className="text-xs text-muted-foreground">
-              The optimized pipeline will automatically compress context if needed to prevent API limits
-            </p>
-          </div>
+          ) : (
+            <>
+              {/* User Context Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Context & Focus Areas (Optional)
+                </label>
+                <Textarea
+                  value={userContext}
+                  onChange={(e) => setUserContext(e.target.value)}
+                  placeholder="Describe what you want to focus on in this analysis... (e.g., accessibility, mobile usability, conversion optimization)"
+                  className="min-h-[80px]"
+                  disabled={isAnalyzing}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The optimized pipeline will automatically compress context if needed to prevent API limits
+                </p>
+              </div>
+
+              {/* Analysis Context Display */}
+              {analysisContext && (
+                <AnalysisContextDisplay context={analysisContext} />
+              )}
+            </>
+          )}
 
           {/* Progress Indicator */}
           {isAnalyzing && (
@@ -236,32 +275,34 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleClose}
-              disabled={isAnalyzing}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing}
-              className="min-w-[120px]"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Start Optimized Analysis
-                </>
-              )}
-            </Button>
-          </div>
+          {!requiresClarification && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isAnalyzing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                className="min-w-[120px]"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Start Optimized Analysis
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
