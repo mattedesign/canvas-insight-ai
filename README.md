@@ -173,7 +173,7 @@ src/
 
 **Phase 7: Environment Configuration**
 - [x] Update local environment variables
-- [ ] Configure Supabase Edge Function environment
+- [x] Configure Supabase Edge Function environment
 - [ ] Add ALL required API keys
 - [ ] DO NOT add optional keys unless specified
 
