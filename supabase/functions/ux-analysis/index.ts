@@ -42,10 +42,14 @@ serve(async (req) => {
   }
 
   try {
-    const { action, ...payload } = await req.json()
+    const requestBody = await req.json()
+    console.log('UX Analysis Edge Function - Raw Request Body:', JSON.stringify(requestBody, null, 2))
     
-    console.log('UX Analysis Edge Function - Raw Request Body:', JSON.stringify(payload, null, 2))
+    // Handle both old Canvas format (with action) and new pipeline format (with stage)
+    const { action, stage, ...payload } = requestBody
+    
     console.log('UX Analysis Edge Function - Action:', action)
+    console.log('UX Analysis Edge Function - Stage:', stage) 
     console.log('UX Analysis Edge Function - Payload Fields:', Object.keys(payload))
     
     // Check available API keys
@@ -73,8 +77,14 @@ serve(async (req) => {
         )
       
       default:
-        // Execute model based on stage - no action means direct execution
-        return await executeModel(payload)
+        // Handle both formats: Canvas (with action) and Pipeline (with stage) 
+        if (action) {
+          // Old Canvas format - convert to new format
+          return await handleCanvasRequest(action, payload)
+        } else {
+          // New pipeline format - direct execution
+          return await executeModel({ stage, ...payload })
+        }
     }
 
   } catch (error) {
@@ -257,6 +267,29 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
   const arrayBuffer = await blob.arrayBuffer()
   const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
   return base64
+}
+
+async function handleCanvasRequest(action: string, payload: any) {
+  console.log('Handling Canvas request - Action:', action, 'Payload:', payload)
+  
+  // Convert old Canvas format to new pipeline format
+  switch (action) {
+    case 'ANALYZE_IMAGE':
+      // Map Canvas format to pipeline format
+      const convertedPayload = {
+        model: 'gpt-4.1-2025-04-14', // Default model for Canvas requests
+        stage: 'vision', // Start with vision stage
+        imageUrl: payload.payload?.imageUrl,
+        prompt: `Analyze this ${payload.payload?.imageName || 'image'} for UX/UI insights. Context: ${payload.payload?.userContext || 'General analysis'}`,
+        systemPrompt: 'You are an expert UX/UI analyst providing detailed insights.'
+      }
+      
+      console.log('Converted Canvas payload:', convertedPayload)
+      return await executeModel(convertedPayload)
+      
+    default:
+      throw new Error(`Unknown Canvas action: ${action}`)
+  }
 }
 
 async function storeAnalysisResults(pipelineResults: any) {

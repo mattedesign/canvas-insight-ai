@@ -37,6 +37,7 @@ import { AIContextMenu } from './AIContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
+import { useOptimizedPipeline } from '@/hooks/useOptimizedPipeline';
 
 
 import { Button } from '@/components/ui/button';
@@ -149,9 +150,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, [uploadedImages.length, analyses.length]);
   
-  // AI Integration
+  // AI Integration - Use the new pipeline
   const { analyzeImageWithAI } = useAI();
   const { performEnhancedAnalysis, isAnalyzing, progress, stage, error } = useEnhancedAnalysis();
+  const pipeline = useOptimizedPipeline();
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
@@ -278,27 +280,28 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         });
       }, 2000);
       
-      // Call the analysis function
-      console.log('[CanvasView] Calling ux-analysis function...');
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: {
-          type: 'ANALYZE_IMAGE',
-          payload: {
-            imageId,
-            imageUrl: image.url,
-            imageName: image.name,
-            userContext: context || ''
-          },
-          aiModel
-        }
-      });
+      // Use the new BoundaryPushingPipeline instead of direct edge function calls
+      console.log('[CanvasView] Starting BoundaryPushingPipeline analysis...');
       
-      if (error) {
-        console.error('[CanvasView] Analysis function error:', error);
-        throw error;
-      }
+      // Create progress handler for this analysis
+      const progressHandler = (progress: number, stage: string) => {
+        setAnalysisInProgress(prev => {
+          const current = prev.get(imageId);
+          if (current) {
+            return new Map(prev.set(imageId, {
+              ...current,
+              stage: stage,
+              progress: progress
+            }));
+          }
+          return prev;
+        });
+      };
       
-      console.log('[CanvasView] Analysis function response:', data);
+      // Use the new pipeline
+      const result = await pipeline.executeAnalysis(image.url, context || '');
+      
+      console.log('[CanvasView] Pipeline result:', result);
       
       // Remove from in-progress
       setAnalysisInProgress(prev => {
@@ -308,15 +311,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       });
       
       // Handle successful analysis
-      if (data?.data) {
-        onAnalysisComplete?.(imageId, data.data);
+      if (result?.success && result?.data) {
+        onAnalysisComplete?.(imageId, result.data);
         toast({
           title: "Analysis Complete",
           description: `AI analysis has been generated for ${image.name}`,
           category: "success"
         });
+      } else if (result?.requiresClarification) {
+        // Handle clarification flow if needed
+        console.log('[CanvasView] Clarification needed:', result.questions);
+        toast({
+          title: "Context Clarification Needed",
+          description: "Additional context required for optimal analysis",
+          category: "action-required"
+        });
       } else {
-        throw new Error('No analysis data returned');
+        const errorMessage = typeof result === 'object' && result && 'error' in result ? String(result.error) : 'No analysis data returned';
+        throw new Error(errorMessage || 'Analysis failed');
       }
       
     } catch (error) {

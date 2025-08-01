@@ -43,10 +43,20 @@ export class BoundaryPushingPipeline {
     this.abortController = new AbortController();
     const startTime = Date.now();
     
-    console.log('BoundaryPushingPipeline.execute() called with:', {
+    console.log('🚀 BoundaryPushingPipeline.execute() called with:', {
       imageUrl: imageUrl ? 'provided' : 'missing',
       userContext: userContext ? `"${userContext.substring(0, 50)}..."` : 'empty',
-      hasProgressCallback: !!onProgress
+      hasProgressCallback: !!onProgress,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('🔧 Pipeline configuration:', {
+      contextDetectionEnabled: pipelineConfig.contextDetection.enabled,
+      availableModels: {
+        vision: pipelineConfig.models.vision.primary,
+        analysis: pipelineConfig.models.analysis.primary
+      },
+      qualitySettings: pipelineConfig.quality
     });
     
     try {
@@ -63,7 +73,13 @@ export class BoundaryPushingPipeline {
         userContextParsed
       );
       
-      console.log('Analysis Context:', this.analysisContext);
+      console.log('📊 Analysis Context Created:', {
+        imageType: this.analysisContext.image.primaryType,
+        userRole: this.analysisContext.user.inferredRole,
+        confidence: this.analysisContext.confidence,
+        focusAreas: this.analysisContext.focusAreas,
+        industryStandards: this.analysisContext.industryStandards
+      });
 
       // Check if clarification is needed
       if (this.analysisContext.clarificationNeeded && this.analysisContext.clarificationQuestions) {
@@ -217,18 +233,34 @@ export class BoundaryPushingPipeline {
       systemPrompt: this.getSystemPromptForContext()
     };
     
-    console.log('Vision Stage - Sending payload:', payload);
+    console.log('👁️ Vision Stage - Sending payload:', {
+      model,
+      stage: 'vision',
+      hasImage: !!imageUrl,
+      promptLength: prompt.length,
+      timestamp: new Date().toISOString()
+    });
     
+    const startTime = Date.now();
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
       body: payload
     });
 
     if (error) {
-      console.error('Vision Stage - Error:', error);
+      console.error('❌ Vision Stage - Error:', {
+        model,
+        error: error.message,
+        executionTime: Date.now() - startTime
+      });
       throw error;
     }
     
-    console.log('Vision Stage - Response:', data);
+    console.log('✅ Vision Stage - Success:', {
+      model,
+      hasData: !!data,
+      executionTime: Date.now() - startTime,
+      dataKeys: data ? Object.keys(data) : []
+    });
     return data;
   }
 
@@ -340,18 +372,34 @@ export class BoundaryPushingPipeline {
       systemPrompt: this.getSystemPromptForContext()
     };
     
-    console.log('Analysis Stage - Sending payload:', payload);
+    console.log('🧠 Analysis Stage - Sending payload:', {
+      model,
+      stage: 'analysis',
+      hasVisionData: !!visionData,
+      promptLength: prompt.length,
+      timestamp: new Date().toISOString()
+    });
     
+    const startTime = Date.now();
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
       body: payload
     });
 
     if (error) {
-      console.error('Analysis Stage - Error:', error);
+      console.error('❌ Analysis Stage - Error:', {
+        model,
+        error: error.message,
+        executionTime: Date.now() - startTime
+      });
       throw error;
     }
     
-    console.log('Analysis Stage - Response:', data);
+    console.log('✅ Analysis Stage - Success:', {
+      model,
+      hasData: !!data,
+      executionTime: Date.now() - startTime,
+      dataKeys: data ? Object.keys(data) : []
+    });
     return data;
   }
 
@@ -450,18 +498,35 @@ export class BoundaryPushingPipeline {
       systemPrompt: this.getSystemPromptForContext()
     };
     
-    console.log('Synthesis Stage - Sending payload:', payload);
+    console.log('🔬 Synthesis Stage - Sending payload:', {
+      model,
+      stage: 'synthesis',
+      hasVisionData: !!visionData,
+      hasAnalysisData: !!analysisData,
+      promptLength: prompt.length,
+      timestamp: new Date().toISOString()
+    });
     
+    const startTime = Date.now();
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
       body: payload
     });
 
     if (error) {
-      console.error('Synthesis Stage - Error:', error);
+      console.error('❌ Synthesis Stage - Error:', {
+        model,
+        error: error.message,
+        executionTime: Date.now() - startTime
+      });
       throw error;
     }
     
-    console.log('Synthesis Stage - Response:', data);
+    console.log('✅ Synthesis Stage - Success:', {
+      model,
+      hasData: !!data,
+      executionTime: Date.now() - startTime,
+      dataKeys: data ? Object.keys(data) : []
+    });
     return data;
   }
 
