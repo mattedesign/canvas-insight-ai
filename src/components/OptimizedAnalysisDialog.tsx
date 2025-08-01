@@ -139,12 +139,29 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
 
           {/* Clarification Flow */}
           {requiresClarification && clarificationQuestions.length > 0 ? (
-            <ContextClarification
-              questions={clarificationQuestions}
-              partialContext={analysisContext}
-              onSubmit={handleClarificationSubmit}
-              onCancel={handleClarificationCancel}
-            />
+            <div className="space-y-4">
+              {/* Show detected context during clarification */}
+              {analysisContext && (
+                <Card className="bg-muted/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-primary" />
+                      Context Detected
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AnalysisContextDisplay context={analysisContext} />
+                  </CardContent>
+                </Card>
+              )}
+              
+              <ContextClarification
+                questions={clarificationQuestions}
+                partialContext={analysisContext}
+                onSubmit={handleClarificationSubmit}
+                onCancel={handleClarificationCancel}
+              />
+            </div>
           ) : (
             <>
               {/* User Context Input */}
@@ -183,7 +200,12 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>{message}</span>
+                    <span className="flex items-center gap-2">
+                      {stage === 'Analyzing image context...' && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {stage === 'Understanding user needs...' && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {stage === 'Context clarification needed...' && <AlertCircle className="h-3 w-3 text-amber-500" />}
+                      {message || stage}
+                    </span>
                     <span>{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />
@@ -270,6 +292,26 @@ const OptimizedAnalysisDialog: React.FC<OptimizedAnalysisDialogProps> = ({
                   <span className="text-sm font-medium">Analysis Failed</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">{error}</p>
+                
+                {/* Specific error guidance */}
+                {error.includes('API key') && (
+                  <div className="mt-3 p-3 bg-muted rounded-md">
+                    <p className="text-xs font-medium">Quick Fix:</p>
+                    <p className="text-xs text-muted-foreground">
+                      Configure your API keys in Supabase Edge Functions settings. 
+                      At least one of OpenAI, Anthropic, or Google Vision API key is required.
+                    </p>
+                  </div>
+                )}
+                
+                {error.includes('Network') && (
+                  <div className="mt-3 p-3 bg-muted rounded-md">
+                    <p className="text-xs font-medium">Quick Fix:</p>
+                    <p className="text-xs text-muted-foreground">
+                      Check your internet connection and try again. The analysis requires stable connectivity.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
