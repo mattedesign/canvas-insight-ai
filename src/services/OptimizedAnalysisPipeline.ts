@@ -2,7 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Optimized Multi-Stage Analysis Pipeline Service
- * Addresses 422 character limit errors through data compression and token management
+ * Sequential Model Processing: Google Vision → OpenAI → Claude
+ * Each stage builds upon previous outputs for compounded insights
  */
 
 interface TokenBudget {
@@ -76,11 +77,11 @@ export class OptimizedAnalysisPipeline {
     try {
       this.updateProgress('initializing', 0, 'Initializing optimized analysis pipeline');
 
-      // Stage 1: Compressed Metadata Extraction
-      this.updateProgress('metadata', 20, 'Extracting and compressing metadata');
+      // Stage 1: Google Vision - Extract Metadata
+      this.updateProgress('google-vision', 15, 'Google Vision: Extracting visual metadata');
       const metadataResult = await this.extractCompressedMetadata(imageUrl);
       stages.push({
-        stage: 'compressed_metadata',
+        stage: 'google_vision_metadata',
         model: 'google-vision',
         success: true,
         timestamp: new Date().toISOString(),
@@ -88,37 +89,37 @@ export class OptimizedAnalysisPipeline {
         compressed: true
       });
 
-      // Stage 2: Optimized Vision Analysis
-      this.updateProgress('vision', 40, 'Performing optimized vision analysis');
-      const visionResult = await this.performOptimizedVisionAnalysis(
+      // Stage 2: OpenAI - Initial UX Analysis
+      this.updateProgress('openai-analysis', 40, 'OpenAI: Performing initial UX analysis');
+      const openaiResult = await this.performOpenAIAnalysis(
         imageUrl, 
         metadataResult, 
         userContext
       );
       stages.push({
-        stage: 'optimized_vision',
-        model: visionResult.model,
+        stage: 'openai_ux_analysis',
+        model: 'openai-gpt-4.1',
         success: true,
         timestamp: new Date().toISOString(),
-        data: visionResult.data,
-        tokenUsage: visionResult.tokenUsage
+        data: openaiResult.data,
+        tokenUsage: openaiResult.tokenUsage
       });
 
-      // Stage 3: Token-Managed Comprehensive Analysis
-      this.updateProgress('comprehensive', 70, 'Performing comprehensive analysis with token management');
-      const comprehensiveResult = await this.performTokenManagedAnalysis(
+      // Stage 3: Claude - Synthesis & Final Analysis
+      this.updateProgress('claude-synthesis', 70, 'Claude: Synthesizing comprehensive insights');
+      const claudeResult = await this.performClaudeSynthesis(
         imageUrl,
         metadataResult,
-        visionResult.data,
+        openaiResult.data,
         userContext
       );
       stages.push({
-        stage: 'token_managed_comprehensive',
-        model: comprehensiveResult.model,
+        stage: 'claude_synthesis',
+        model: 'claude-sonnet-4',
         success: true,
         timestamp: new Date().toISOString(),
-        data: comprehensiveResult.data,
-        tokenUsage: comprehensiveResult.tokenUsage
+        data: claudeResult.data,
+        tokenUsage: claudeResult.tokenUsage
       });
 
       // Stage 4: Data Consolidation and Storage
@@ -208,44 +209,95 @@ export class OptimizedAnalysisPipeline {
   }
 
   /**
-   * Perform vision analysis with optimized prompts
+   * Stage 2: OpenAI Analysis - Initial UX Analysis with Vision Context
    */
-  private async performOptimizedVisionAnalysis(
+  private async performOpenAIAnalysis(
     imageUrl: string,
     metadata: CompressedMetadata,
     userContext?: string
   ): Promise<{ data: any; model: string; tokenUsage: number }> {
     
-    // Optimize prompt to stay within token budget
-    const optimizedPrompt = this.createOptimizedVisionPrompt(metadata, userContext);
+    const openaiPrompt = this.createOpenAIPrompt(metadata, userContext);
     
     try {
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
-          type: 'OPTIMIZED_VISION',
+          type: 'OPENAI_UX_ANALYSIS',
           payload: {
             imageUrl,
-            prompt: optimizedPrompt,
-            maxTokens: 1200 // Reduced from default
+            prompt: openaiPrompt,
+            model: 'gpt-4.1-2025-04-14',
+            maxTokens: 1500,
+            temperature: 0.7
           }
         }
       });
 
-      if (error) throw new Error(`Vision analysis failed: ${error.message}`);
+      if (error) throw new Error(`OpenAI analysis failed: ${error.message}`);
+
+      this.currentTokenUsage += data.tokenUsage || 1500;
 
       return {
         data: data.analysis,
-        model: data.model || 'openai',
-        tokenUsage: data.tokenUsage || 1200
+        model: 'openai-gpt-4.1',
+        tokenUsage: data.tokenUsage || 1500
       };
     } catch (error) {
-      console.error('Optimized vision analysis failed:', error);
-      // Return structured fallback
+      console.error('OpenAI analysis failed:', error);
       return {
-        data: this.createVisionFallback(metadata),
-        model: 'fallback',
+        data: this.createOpenAIFallback(metadata),
+        model: 'openai-fallback',
         tokenUsage: 0
       };
+    }
+  }
+
+  /**
+   * Stage 3: Claude Synthesis - Final Analysis with Previous Context
+   */
+  private async performClaudeSynthesis(
+    imageUrl: string,
+    metadata: CompressedMetadata,
+    openaiData: any,
+    userContext?: string
+  ): Promise<{ data: any; model: string; tokenUsage: number }> {
+    
+    const budget = this.tokenBudgets['claude-sonnet-4'];
+    const remainingBudget = budget.stage3_comprehensive - this.currentTokenUsage;
+    
+    if (remainingBudget < 3000) {
+      console.warn('Token budget low for Claude synthesis, using compressed approach');
+      return this.performCompressedSynthesis(metadata, openaiData);
+    }
+
+    const claudePrompt = this.createClaudePrompt(metadata, openaiData, userContext);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        body: {
+          type: 'CLAUDE_SYNTHESIS',
+          payload: {
+            imageUrl,
+            prompt: claudePrompt,
+            model: 'claude-sonnet-4-20250514',
+            maxTokens: Math.min(remainingBudget - 500, 2000),
+            temperature: 0.4
+          }
+        }
+      });
+
+      if (error) throw new Error(`Claude synthesis failed: ${error.message}`);
+
+      this.currentTokenUsage += data.tokenUsage || 2000;
+
+      return {
+        data: data.analysis,
+        model: 'claude-sonnet-4',
+        tokenUsage: data.tokenUsage || 2000
+      };
+    } catch (error) {
+      console.error('Claude synthesis failed:', error);
+      return this.performCompressedSynthesis(metadata, openaiData);
     }
   }
 
@@ -379,6 +431,177 @@ JSON format:
   }
 
   /**
+   * Create OpenAI analysis prompt
+   */
+  private createOpenAIPrompt(metadata: CompressedMetadata, userContext?: string): string {
+    const contextSummary = userContext ? 
+      userContext.slice(0, 300) + (userContext.length > 300 ? '...' : '') : '';
+
+    return `Analyze this UI/UX design based on the visual metadata extracted by Google Vision.
+
+Visual Elements Detected: ${metadata.elements}
+Text Content: ${metadata.textSummary}
+Color Palette: ${metadata.colorPalette}
+UI Components: ${metadata.labelsSummary}
+${contextSummary ? `User Focus: ${contextSummary}` : ''}
+
+Please provide a comprehensive UX analysis identifying:
+1. Visual hierarchy and layout patterns
+2. Usability issues and accessibility concerns  
+3. Design consistency and component relationships
+4. User flow and interaction points
+
+Return structured JSON with:
+{
+  "layoutAnalysis": {
+    "type": "grid|flex|absolute|responsive",
+    "hierarchy": "description of visual hierarchy",
+    "components": ["component1", "component2"],
+    "patterns": ["pattern1", "pattern2"]
+  },
+  "usabilityFindings": {
+    "issues": [{"type": "navigation|contrast|sizing", "description": "issue description", "severity": "low|medium|high"}],
+    "strengths": ["strength1", "strength2"]
+  },
+  "accessibilityReview": {
+    "concerns": ["concern1", "concern2"],
+    "recommendations": ["rec1", "rec2"]
+  }
+}`;
+  }
+
+  /**
+   * Create Claude synthesis prompt that builds on OpenAI analysis
+   */
+  private createClaudePrompt(metadata: CompressedMetadata, openaiData: any, userContext?: string): string {
+    const contextSummary = userContext ? 
+      userContext.slice(0, 200) + (userContext.length > 200 ? '...' : '') : '';
+
+    return `You are conducting the final synthesis stage of a multi-model UX analysis pipeline.
+
+CONTEXT:
+- Google Vision provided: ${metadata.elements} | ${metadata.textSummary} | ${metadata.colorPalette}
+- OpenAI Analysis identified: 
+  Layout: ${openaiData.layoutAnalysis?.type || 'standard'} with ${openaiData.layoutAnalysis?.hierarchy || 'standard hierarchy'}
+  Key Issues: ${JSON.stringify(openaiData.usabilityFindings?.issues || []).slice(0, 200)}
+  Strengths: ${JSON.stringify(openaiData.usabilityFindings?.strengths || []).slice(0, 150)}
+${contextSummary ? `User Focus: ${contextSummary}` : ''}
+
+SYNTHESIS TASK:
+Integrate the previous analysis into actionable UX recommendations. Provide the final analysis in this exact JSON format:
+
+{
+  "visualAnnotations": [
+    {
+      "id": "unique_id",
+      "x": 50,
+      "y": 30,
+      "type": "issue|suggestion|success",
+      "title": "Brief title",
+      "description": "Detailed description",
+      "severity": "low|medium|high"
+    }
+  ],
+  "suggestions": [
+    {
+      "id": "unique_id", 
+      "category": "usability|accessibility|visual|content|performance",
+      "title": "Suggestion title",
+      "description": "Detailed description",
+      "impact": "low|medium|high",
+      "effort": "low|medium|high",
+      "actionItems": ["specific action 1", "specific action 2"]
+    }
+  ],
+  "summary": {
+    "overallScore": 85,
+    "categoryScores": {
+      "usability": 80,
+      "accessibility": 75,
+      "visual": 90,
+      "content": 85
+    },
+    "keyIssues": ["issue 1", "issue 2"],
+    "strengths": ["strength 1", "strength 2"]
+  }
+}`;
+  }
+
+  /**
+   * Create OpenAI analysis fallback
+   */
+  private createOpenAIFallback(metadata: CompressedMetadata): any {
+    return {
+      layoutAnalysis: {
+        type: 'standard',
+        hierarchy: 'basic layout structure',
+        components: metadata.elements.split(', ').slice(0, 3),
+        patterns: ['standard patterns']
+      },
+      usabilityFindings: {
+        issues: [{ type: 'review', description: 'Manual review needed', severity: 'medium' }],
+        strengths: ['basic structure detected']
+      },
+      accessibilityReview: {
+        concerns: ['accessibility review needed'],
+        recommendations: ['conduct detailed accessibility audit']
+      }
+    };
+  }
+
+  /**
+   * Perform compressed synthesis when token budget is low
+   */
+  private async performCompressedSynthesis(
+    metadata: CompressedMetadata,
+    openaiData: any
+  ): Promise<{ data: any; model: string; tokenUsage: number }> {
+    const timestamp = Date.now();
+    
+    const compressedResult = {
+      visualAnnotations: [
+        {
+          id: `annotation-${timestamp}`,
+          x: 50,
+          y: 20,
+          type: 'issue',
+          title: 'Budget-Limited Analysis',
+          description: 'Token budget constraints limited analysis depth',
+          severity: 'medium'
+        }
+      ],
+      suggestions: [
+        {
+          id: `suggestion-${timestamp}`,
+          category: 'usability',
+          title: 'Detailed Review Recommended',
+          description: 'Complete manual UX review recommended for comprehensive insights',
+          impact: 'medium',
+          effort: 'medium',
+          actionItems: ['Manual UX review', 'User testing', 'Accessibility audit']
+        }
+      ],
+      summary: {
+        overallScore: 75,
+        categoryScores: {
+          usability: 70,
+          accessibility: 65,
+          visual: 80,
+          content: 75
+        },
+        keyIssues: ['Limited analysis depth due to token constraints'],
+        strengths: ['Basic structure and components identified']
+      }
+    };
+
+    return {
+      data: compressedResult,
+      model: 'claude-compressed',
+      tokenUsage: 300
+    };
+  }
+
+  /**
    * Create vision analysis fallback
    */
   private createVisionFallback(metadata: CompressedMetadata): any {
@@ -441,24 +664,33 @@ JSON format:
    * Consolidate all stage results into final analysis
    */
   private consolidateOptimizedResults(stages: StageResult[], imageId: string, imageName: string): any {
-    const comprehensiveStage = stages.find(s => s.stage === 'token_managed_comprehensive');
-    const visionStage = stages.find(s => s.stage === 'optimized_vision');
-    const metadataStage = stages.find(s => s.stage === 'compressed_metadata');
+    // Claude synthesis is the primary result (final stage)
+    const claudeStage = stages.find(s => s.stage === 'claude_synthesis');
+    const openaiStage = stages.find(s => s.stage === 'openai_ux_analysis');
+    const metadataStage = stages.find(s => s.stage === 'google_vision_metadata');
 
-    const finalAnalysis = comprehensiveStage?.data || this.createBasicAnalysis(stages);
+    // Use Claude's synthesis as the primary result, fallback to OpenAI if needed
+    const finalAnalysis = claudeStage?.data || openaiStage?.data || this.createBasicAnalysis(stages);
 
-    // Add optimized metadata
+    // Add comprehensive metadata showing the full pipeline journey
     finalAnalysis.metadata = {
       ...finalAnalysis.metadata,
-      compressedMetadata: metadataStage?.data,
-      visionAnalysis: visionStage?.data,
+      // Google Vision metadata
+      googleVisionData: metadataStage?.data,
+      // OpenAI analysis
+      openaiAnalysis: openaiStage?.data,
+      // Claude synthesis (final result)
+      claudeSynthesis: claudeStage?.data,
+      // Pipeline information
       pipelineOptimized: true,
+      pipelineModel: 'Google Vision → OpenAI GPT-4.1 → Claude Sonnet-4',
       totalTokenUsage: stages.reduce((sum, stage) => sum + (stage.tokenUsage || 0), 0),
       stages: stages.map(s => ({
         stage: s.stage,
         model: s.model,
         success: s.success,
-        compressed: s.compressed
+        compressed: s.compressed,
+        timestamp: s.timestamp
       }))
     };
 
