@@ -509,7 +509,7 @@ export class ResilientAnalysisPipeline {
           payload: {
             imageUrl,
             prompt: claudePrompt,
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-opus-4-20250514',
             maxTokens: Math.min(remainingBudget - 500, 2000),
             temperature: 0.4
           }

@@ -428,7 +428,7 @@ Focus on initial visual assessment and return structured JSON:
 }`;
 
   const requestPayload = {
-    model: 'claude-3-5-sonnet-20241022', // Using Claude 3.5 Sonnet
+    model: 'claude-opus-4-20250514', // Using Claude Opus 4
     max_tokens: 1500,
     messages: [{
       role: 'user',
@@ -817,7 +817,7 @@ Provide comprehensive UX analysis in strict JSON format:
 }`;
 
     const requestPayload = {
-      model: 'claude-3-5-sonnet-20241022', // Using Claude 3.5 Sonnet
+      model: 'claude-opus-4-20250514', // Using Claude Opus 4
       max_tokens: 2500,
       messages: [{
         role: 'user',
@@ -2262,7 +2262,7 @@ async function analyzeMarkedRegion(imageUrl: string, prompt: string, bounds?: { 
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-opus-4-20250514',
         max_tokens: 2000,
         messages: [
           {
@@ -2786,7 +2786,7 @@ async function performTokenManagedComprehensiveHandler(payload: any) {
 
   try {
     const requestPayload = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-20250514',
       max_tokens: maxSafeTokens,
       messages: [{
         role: 'user',
@@ -3030,7 +3030,7 @@ async function performClaudeSynthesisHandler(payload: any) {
         'anthropic-version': '2024-06-01'
       },
       body: JSON.stringify({
-        model: payload.model || 'claude-sonnet-4-20250514',
+        model: payload.model || 'claude-opus-4-20250514',
         max_tokens: payload.maxTokens || 2000,
         messages: [
           {
