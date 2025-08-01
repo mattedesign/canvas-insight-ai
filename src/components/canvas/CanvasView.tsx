@@ -127,6 +127,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   // Show helpful hint on first load for images without analysis
   useEffect(() => {
+    // Only show notifications when in Lovable app context
+    if (!window.location.hostname.includes('lovable') && !window.location.hostname.includes('localhost')) {
+      return;
+    }
+
     const imagesWithoutAnalysis = uploadedImages.filter(img => 
       !analyses.some(analysis => analysis.imageId === img.id)
     );
