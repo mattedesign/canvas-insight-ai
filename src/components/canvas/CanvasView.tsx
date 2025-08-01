@@ -504,7 +504,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
   }, [toast]);
 
-  // Generate initial nodes and edges
+  // Memoize the node generation to prevent unnecessary recalculations
   const initialElements = useMemo(() => {
   console.log('[CanvasView] === CANVAS RENDERING START ===');
   console.log('[CanvasView] Input data summary:', {
@@ -1495,7 +1495,20 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [uploadedImages, analyses, generatedConcepts, imageGroups, groupAnalysesWithPrompts, groupDisplayModes, showAnnotations, showAnalysis, currentTool, isGeneratingConcept]);
+  }, [
+    uploadedImages, 
+    analyses, 
+    generatedConcepts, 
+    imageGroups, 
+    groupAnalysesWithPrompts, 
+    groupDisplayModes, 
+    showAnnotations, 
+    showAnalysis, 
+    currentTool, 
+    isGeneratingConcept,
+    analysisRequests,
+    analysisInProgress
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
