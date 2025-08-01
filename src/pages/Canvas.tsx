@@ -5,6 +5,9 @@ import { useAuth } from '@/context/AuthContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
+import { AnalysisPanel } from '@/components/AnalysisPanel';
+import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 
 interface ErrorDisplayProps {
   error: string;
@@ -70,6 +73,10 @@ const Canvas = () => {
   const { state, stableHelpers } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
+  const { generateEnhancedConcept } = useEnhancedAnalysis();
+  const { toast } = useFilteredToast();
   
   const loadedProjectRef = useRef<{ projectId: string | null; timestamp: number }>({
     projectId: null,
@@ -144,9 +151,52 @@ const Canvas = () => {
     console.log('Image selected:', imageId);
   }, []);
 
+  // Get state data first before using in callbacks
+  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations, isLoading } = state;
+
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
-    console.log('Generate concept for analysis:', analysisId);
-  }, []);
+    try {
+      // Find the analysis and related image
+      const analysis = analyses?.find(a => a.id === analysisId);
+      const image = analysis ? uploadedImages?.find(img => img.id === analysis.imageId) : null;
+      
+      if (!analysis || !image) {
+        toast({
+          category: 'error',
+          title: 'Error',
+          description: 'Could not find analysis or image data.'
+        });
+        return;
+      }
+
+      // Generate the concept using the enhanced analysis hook
+      const result = await generateEnhancedConcept(analysis, image.url, image.name);
+      
+      if (result.success) {
+        toast({
+          category: 'success',
+          title: 'Concept Generated',
+          description: 'AI design concept has been generated successfully.'
+        });
+        
+        // Trigger data reload to show the new concept
+        await stableHelpers.loadData();
+      } else {
+        toast({
+          category: 'error',
+          title: 'Generation Failed',
+          description: result.error || 'Failed to generate concept.'
+        });
+      }
+    } catch (error) {
+      console.error('Error generating concept:', error);
+      toast({
+        category: 'error',
+        title: 'Generation Error',
+        description: 'An unexpected error occurred while generating the concept.'
+      });
+    }
+  }, [analyses, uploadedImages, generateEnhancedConcept, toast, stableHelpers]);
 
   const handleCreateGroup = useCallback((imageIds: string[]) => {
     stableHelpers.createGroup({
@@ -179,14 +229,18 @@ const Canvas = () => {
   }, []);
 
   const handleOpenAnalysisPanel = useCallback((analysisId: string) => {
-    console.log('Open analysis panel:', analysisId);
+    setSelectedAnalysisId(analysisId);
+    setIsAnalysisPanelOpen(true);
+  }, []);
+
+  const handleCloseAnalysisPanel = useCallback(() => {
+    setIsAnalysisPanelOpen(false);
+    setSelectedAnalysisId(null);
   }, []);
 
   const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
     console.log('Analysis complete:', imageId, analysis);
   }, []);
-
-  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations, isLoading } = state;
 
   console.log('[Canvas] Current state:', {
     uploadedImages: uploadedImages?.length || 0,
@@ -323,7 +377,18 @@ const Canvas = () => {
           />
         </ErrorBoundary>
         
-        {/* ✅ PHASE 4: Additional diagnostic logging - component already exists above */}
+        {/* Analysis Panel */}
+        <AnalysisPanel
+          analysis={selectedAnalysisId ? analyses?.find(a => a.id === selectedAnalysisId) || null : null}
+          image={selectedAnalysisId ? 
+            (() => {
+              const analysis = analyses?.find(a => a.id === selectedAnalysisId);
+              return analysis ? uploadedImages?.find(img => img.id === analysis.imageId) || null : null;
+            })() : null
+          }
+          isOpen={isAnalysisPanelOpen}
+          onClose={handleCloseAnalysisPanel}
+        />
       </div>
     </div>
   );

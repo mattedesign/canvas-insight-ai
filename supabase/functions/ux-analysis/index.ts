@@ -1983,10 +1983,54 @@ async function performStabilityAIConceptGeneration(payload: any) {
 
     console.log('Stability.ai concept generation completed successfully');
 
-    return {
-      success: true,
-      data: concept
-    };
+    // Save the generated concept to the database
+    try {
+      const { data: savedConcept, error: saveError } = await supabase
+        .from('generated_concepts')
+        .insert({
+          user_id: payload.userId || payload.analysisData.userId,
+          image_id: payload.imageId || payload.analysisData.imageId,
+          analysis_id: payload.analysisData.id,
+          title: concept.title,
+          description: concept.description,
+          image_url: concept.conceptImage,
+          improvements: concept.improvements,
+          metadata: concept.metadata
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error('Failed to save concept to database:', saveError);
+        return {
+          success: true,
+          data: concept,
+          warning: 'Concept generated but not saved to database'
+        };
+      }
+
+      console.log('Concept saved to database successfully:', savedConcept.id);
+      
+      return {
+        success: true,
+        data: {
+          ...concept,
+          id: savedConcept.id,
+          userId: savedConcept.user_id,
+          imageId: savedConcept.image_id,
+          analysisId: savedConcept.analysis_id,
+          createdAt: savedConcept.created_at,
+          updatedAt: savedConcept.updated_at
+        }
+      };
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      return {
+        success: true,
+        data: concept,
+        warning: 'Concept generated but database save failed'
+      };
+    }
 
   } catch (error) {
     console.error('Stability.ai concept generation failed:', error);
@@ -2165,29 +2209,85 @@ Technical specs: clean interface design, high contrast, modern typography, profe
       }
     }
     
-    return {
-      success: true,
-      data: {
-        title: aiConcept.title || `Enhanced ${domainContext.domain} Design`,
-        description: aiConcept.description || 'Comprehensive design improvements based on UX analysis',
-        imageUrl: generatedImageUrl,
-        improvements: aiConcept.improvements || ['Enhanced usability', 'Improved accessibility', 'Better visual hierarchy'],
-        designChanges: aiConcept.designChanges || {
-          layout: 'Improved information hierarchy',
-          navigation: 'Enhanced navigation clarity',
-          visual: 'Better visual contrast and spacing',
-          content: 'Clearer content organization'
-        },
-        preservedElements: aiConcept.preservedElements || ['Brand consistency', 'Core functionality'],
-        expectedOutcomes: aiConcept.expectedOutcomes || {
-          usabilityScore: 85,
-          accessibilityScore: 90,
-          domainSpecificScore: 80
-        },
-        implementationPriority: aiConcept.implementationPriority || ['High impact usability fixes', 'Accessibility improvements', 'Visual enhancements'],
-        domainContext: domainContext.domain
-      }
+    const conceptData = {
+      title: aiConcept.title || `Enhanced ${domainContext.domain} Design`,
+      description: aiConcept.description || 'Comprehensive design improvements based on UX analysis',
+      imageUrl: generatedImageUrl,
+      improvements: aiConcept.improvements || ['Enhanced usability', 'Improved accessibility', 'Better visual hierarchy'],
+      designChanges: aiConcept.designChanges || {
+        layout: 'Improved information hierarchy',
+        navigation: 'Enhanced navigation clarity',
+        visual: 'Better visual contrast and spacing',
+        content: 'Clearer content organization'
+      },
+      preservedElements: aiConcept.preservedElements || ['Brand consistency', 'Core functionality'],
+      expectedOutcomes: aiConcept.expectedOutcomes || {
+        usabilityScore: 85,
+        accessibilityScore: 90,
+        domainSpecificScore: 80
+      },
+      implementationPriority: aiConcept.implementationPriority || ['High impact usability fixes', 'Accessibility improvements', 'Visual enhancements'],
+      domainContext: domainContext.domain
     };
+
+    // Save the generated concept to the database
+    try {
+      const { data: savedConcept, error: saveError } = await supabase
+        .from('generated_concepts')
+        .insert({
+          user_id: payload.userId || payload.analysisData.userId,
+          image_id: payload.imageId || payload.analysisData.imageId,
+          analysis_id: payload.analysisData.id,
+          title: conceptData.title,
+          description: conceptData.description,
+          image_url: conceptData.imageUrl,
+          improvements: conceptData.improvements,
+          metadata: {
+            designChanges: conceptData.designChanges,
+            preservedElements: conceptData.preservedElements,
+            expectedOutcomes: conceptData.expectedOutcomes,
+            implementationPriority: conceptData.implementationPriority,
+            domainContext: conceptData.domainContext,
+            aiGenerated: true,
+            model: 'openai',
+            timestamp: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error('Failed to save concept to database:', saveError);
+        // Return the concept data even if saving failed
+        return {
+          success: true,
+          data: conceptData,
+          warning: 'Concept generated but not saved to database'
+        };
+      }
+
+      console.log('Concept saved to database successfully:', savedConcept.id);
+      
+      return {
+        success: true,
+        data: {
+          ...conceptData,
+          id: savedConcept.id,
+          userId: savedConcept.user_id,
+          imageId: savedConcept.image_id,
+          analysisId: savedConcept.analysis_id,
+          createdAt: savedConcept.created_at,
+          updatedAt: savedConcept.updated_at
+        }
+      };
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      return {
+        success: true,
+        data: conceptData,
+        warning: 'Concept generated but database save failed'
+      };
+    }
 
   } catch (error) {
     console.error('Enhanced AI concept generation failed:', error);

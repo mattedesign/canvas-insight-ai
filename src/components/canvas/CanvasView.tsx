@@ -671,6 +671,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             } : { 
               analysis,
               onGenerateConcept: stableCallbacks.onGenerateConcept,
+              onOpenAnalysisPanel: onOpenAnalysisPanel,
               isGeneratingConcept,
               onExpandedChange: handleAnalysisExpansion
             },
@@ -992,6 +993,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               } : { 
                 analysis,
                 onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: onOpenAnalysisPanel,
                 isGeneratingConcept,
                 onExpandedChange: handleAnalysisExpansion
               },
@@ -1191,6 +1193,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               data: { 
                 analysis,
                 onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: onOpenAnalysisPanel,
                 isGeneratingConcept,
                 onExpandedChange: handleAnalysisExpansion
               },

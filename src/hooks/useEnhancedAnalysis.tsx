@@ -182,13 +182,20 @@ export function useEnhancedAnalysis() {
     try {
       setState(prev => ({ ...prev, progress: 30, stage: 'analyzing design context' }));
       
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
           type: 'GENERATE_CONCEPT',
           payload: {
             analysisData,
             imageUrl,
-            imageName
+            imageName,
+            userId: userData.user.id,
+            imageId: analysisData.imageId
           }
         }
       });

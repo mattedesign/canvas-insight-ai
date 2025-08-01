@@ -47,12 +47,16 @@ export interface AnalysisSummary {
 
 export interface GeneratedConcept {
   id: string;
+  userId: string;
+  imageId: string;
   analysisId: string;
   imageUrl: string;
   title: string;
   description: string;
   improvements: string[];
+  metadata: Record<string, any>;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ImageGroup {

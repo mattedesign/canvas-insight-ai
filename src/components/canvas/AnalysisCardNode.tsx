@@ -27,6 +27,7 @@ interface AnalysisCardNodeData {
   onGenerateConcept?: (analysisId: string) => Promise<void>;
   isGeneratingConcept?: boolean;
   onExpandedChange?: (analysisId: string, isExpanded: boolean) => void;
+  onOpenAnalysisPanel?: (analysisId: string) => void;
 }
 
 interface AnalysisCardNodeProps {
@@ -86,8 +87,8 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
   const handleViewFullAnalysis = useCallback(() => {
-    onExpandedChange?.(safeAnalysis.id, true);
-  }, [onExpandedChange, safeAnalysis.id]);
+    data.onOpenAnalysisPanel?.(safeAnalysis.id);
+  }, [data.onOpenAnalysisPanel, safeAnalysis.id]);
   
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
