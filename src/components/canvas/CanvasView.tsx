@@ -340,6 +340,29 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     console.log('[CanvasView] Storing partial context for node:', nodeId);
   }, []);
 
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    console.log('[CanvasView] Node clicked:', node.type, node.id);
+    
+    if (node.type === 'analysisRequest' && node.data.status === 'clarification') {
+      // Open clarification dialog
+      handleClarificationClick(node);
+    }
+    
+    // ... existing click handlers
+  }, []);
+
+  const handleClarificationClick = useCallback((node: Node) => {
+    // This would open a dialog to answer clarification questions
+    // For now, log it
+    console.log('[CanvasView] Clarification needed for:', node.id);
+    
+    // TODO: Implement clarification dialog
+    // This should:
+    // 1. Show the questions in a dialog
+    // 2. Collect answers
+    // 3. Resume analysis with pipeline.resumeWithClarification()
+  }, []);
+
   const handleStartAnalysis = onStartAnalysis;
 
   // Sync analysis progress from hook - optimized to prevent infinite updates
@@ -1635,6 +1658,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         currentTool={currentTool}
         showAnnotations={showAnnotations}
         showAnalysis={showAnalysis}
@@ -1666,6 +1690,7 @@ interface CanvasContentProps {
   onNodesChange: any;
   onEdgesChange: any;
   onConnect: any;
+  onNodeClick: (event: React.MouseEvent, node: Node) => void;
   currentTool: ToolMode;
   showAnnotations: boolean;
   showAnalysis: boolean;
@@ -1693,6 +1718,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   onNodesChange,
   onEdgesChange,
   onConnect,
+  onNodeClick,
   currentTool,
   showAnnotations,
   showAnalysis,
@@ -1790,6 +1816,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView={uploadedImages.length === 0} // Only fit view when no images to prevent zoom conflicts
         fitViewOptions={{
