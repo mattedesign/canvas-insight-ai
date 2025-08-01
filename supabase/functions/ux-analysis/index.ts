@@ -73,8 +73,7 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       } else if (visionModel === 'openai') {
         visionAnalysisResult = await performOpenAIVisionAnalysisWithMetadata(payload, metadataResult);
       } else {
-        // Fallback to basic analysis using metadata only
-        visionAnalysisResult = createFallbackVisionAnalysis(metadataResult);
+        throw new Error('No vision analysis models available - configure OpenAI or Anthropic API keys');
       }
       
       stages.push({
@@ -93,12 +92,7 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         availableKeys: availableSecrets
       });
       
-      // 🚨 CRITICAL: Make fallback usage VISIBLE
-      console.warn(`⚠️ [${requestId}] USING FALLBACK DATA - Real AI analysis failed!`);
-      console.warn(`⚠️ [${requestId}] This means you're getting mock/generic data instead of real AI insights!`);
-      
-      visionAnalysisResult = createFallbackVisionAnalysis(metadataResult);
-      visionAnalysisResult._FALLBACK_WARNING = 'This is fallback data - real AI analysis failed';
+      throw error;
       
       stages.push({
         stage: 'vision_analysis',
@@ -132,12 +126,7 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         modelUsed: 'claude-3-5-sonnet'
       });
       
-      // 🚨 CRITICAL: Make fallback usage VISIBLE
-      console.warn(`⚠️ [${requestId}] USING FALLBACK DATA - Comprehensive AI analysis failed!`);
-      console.warn(`⚠️ [${requestId}] This means you're getting generic mock data instead of real Claude insights!`);
-      
-      finalAnalysisResult = createFallbackComprehensiveAnalysis(metadataResult, visionAnalysisResult);
-      finalAnalysisResult._FALLBACK_WARNING = 'This is fallback data - comprehensive AI analysis failed';
+      throw error;
       
       stages.push({
         stage: 'comprehensive_analysis',
@@ -278,79 +267,7 @@ async function selectBestVisionModel(): Promise<string> {
   return 'fallback';
 }
 
-// Fallback functions for when AI models fail
-function createFallbackVisionAnalysis(metadata: VisionMetadata) {
-  console.log('Creating fallback vision analysis based on metadata');
-  return {
-    visualElements: metadata.objects.map(o => o.name).slice(0, 5),
-    layoutAnalysis: 'Interface contains standard UI elements including navigation and content areas',
-    initialConcerns: ['Accessibility compliance needs verification', 'Visual hierarchy assessment required'],
-    designPatterns: ['Standard web interface patterns detected'],
-    accessibility: 'Comprehensive accessibility audit recommended',
-    layoutStructure: 'Standard layout with header, navigation, and content areas'
-  };
-}
 
-function createFallbackComprehensiveAnalysis(metadata: VisionMetadata, visionAnalysis: any) {
-  console.log('Creating fallback comprehensive analysis');
-  const timestamp = Date.now();
-  
-  return {
-    visualAnnotations: [
-      {
-        id: `fallback-annotation-${timestamp}-1`,
-        x: 50,
-        y: 20,
-        type: 'suggestion',
-        title: 'Accessibility Review Needed',
-        description: 'Complete accessibility audit recommended to ensure WCAG compliance',
-        severity: 'medium'
-      },
-      {
-        id: `fallback-annotation-${timestamp}-2`,
-        x: 25,
-        y: 60,
-        type: 'suggestion', 
-        title: 'Visual Hierarchy Assessment',
-        description: 'Review information hierarchy and visual flow for optimal user experience',
-        severity: 'low'
-      }
-    ],
-    suggestions: [
-      {
-        id: `fallback-suggestion-${timestamp}-1`,
-        category: 'accessibility',
-        title: 'Conduct Accessibility Audit',
-        description: 'Perform comprehensive accessibility testing to ensure compliance with WCAG guidelines',
-        impact: 'high',
-        effort: 'medium',
-        actionItems: ['Run automated accessibility testing', 'Conduct keyboard navigation testing', 'Verify color contrast ratios'],
-        relatedAnnotations: [`fallback-annotation-${timestamp}-1`]
-      },
-      {
-        id: `fallback-suggestion-${timestamp}-2`,
-        category: 'usability',
-        title: 'Optimize User Flow',
-        description: 'Review and optimize user interaction patterns for improved usability',
-        impact: 'medium',
-        effort: 'medium',
-        actionItems: ['Analyze user journey', 'Simplify navigation paths', 'Improve visual feedback'],
-        relatedAnnotations: [`fallback-annotation-${timestamp}-2`]
-      }
-    ],
-    summary: {
-      overallScore: 75,
-      categoryScores: {
-        usability: 75,
-        accessibility: 70,
-        visual: 80,
-        content: 75
-      },
-      keyIssues: ['Accessibility verification needed', 'User experience optimization'],
-      strengths: ['Basic interface structure', 'Standard design patterns']
-    }
-  };
-}
 
 async function performGoogleVisionMetadataExtraction(payload: any): Promise<VisionMetadata> {
   console.log('Extracting metadata with Google Vision API');
@@ -1140,8 +1057,7 @@ function combineAnalysisStages(stages: AnalysisStageResult[], payload: any, meta
   } else if (finalAnalysis) {
     combinedAnalysis = finalAnalysis;
   } else {
-    // Generate basic analysis from available data
-    combinedAnalysis = generateBasicAnalysisFromStages(stages, metadata);
+    throw new Error('No analysis data available from any pipeline stage');
   }
 
   // Ensure metadata includes pipeline information
@@ -1159,46 +1075,6 @@ function combineAnalysisStages(stages: AnalysisStageResult[], payload: any, meta
   return combinedAnalysis;
 }
 
-function generateBasicAnalysisFromStages(stages: AnalysisStageResult[], metadata: VisionMetadata) {
-  const timestamp = Date.now();
-  
-  return {
-    visualAnnotations: [
-      {
-        id: `annotation-${timestamp}-0`,
-        x: 1,
-        y: 1,
-        type: 'suggestion',
-        title: 'Interface Analysis Complete',
-        description: 'Basic interface analysis completed with available data',
-        severity: 'low'
-      }
-    ],
-    suggestions: [
-      {
-        id: `suggestion-${timestamp}-0`,
-        category: 'usability',
-        title: 'Review Interface Design',
-        description: 'Conduct detailed usability review based on detected elements',
-        impact: 'medium',
-        effort: 'medium',
-        actionItems: ['Usability testing', 'User feedback collection'],
-        relatedAnnotations: [`annotation-${timestamp}-0`]
-      }
-    ],
-    summary: {
-      overallScore: 75,
-      categoryScores: {
-        usability: 75,
-        accessibility: 70,
-        visual: 80,
-        content: 75
-      },
-      keyIssues: ['Requires detailed manual review'],
-      strengths: ['Interface structure identified', 'Basic elements detected']
-    }
-  };
-}
 
 
 async function selectBestModel(): Promise<string> {
@@ -2552,7 +2428,7 @@ async function generateWithStabilityAI(imageUrl: string, maskData: string | unde
 
   } catch (error) {
     console.error('Stability AI generation failed:', error);
-    return generateFallbackInpaintedImage(prompt, 'stability-ai', error.message);
+    throw error;
   }
 }
 
@@ -2617,46 +2493,10 @@ async function generateWithOpenAI(imageUrl: string, maskData: string | undefined
 
   } catch (error) {
     console.error('OpenAI generation failed:', error);
-    return generateFallbackInpaintedImage(prompt, 'openai-dalle2', error.message);
+    throw error;
   }
 }
 
-function generateFallbackInpaintedImage(prompt: string, model: string, error: string) {
-  console.log('Generating fallback inpainted image');
-  
-  // Create a simple colored rectangle as fallback
-  const canvas = new OffscreenCanvas(1024, 1024);
-  const ctx = canvas.getContext('2d');
-  
-  if (ctx) {
-    // Create a gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 1024, 1024);
-    gradient.addColorStop(0, '#f0f0f0');
-    gradient.addColorStop(1, '#e0e0e0');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1024, 1024);
-    
-    // Add some text
-    ctx.fillStyle = '#666';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Inpainting service temporarily unavailable', 512, 480);
-    ctx.fillText(`Prompt: ${prompt.substring(0, 50)}...`, 512, 520);
-    ctx.fillText('Please try again later', 512, 560);
-  }
-
-  return {
-    success: false,
-    data: {
-      type: 'inpainted_image',
-      imageUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 transparent pixel
-      prompt: prompt,
-      model: model,
-      error: error,
-      timestamp: new Date().toISOString()
-    }
-  };
-}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -3295,56 +3135,11 @@ async function performClaudeSynthesisHandler(payload: any) {
         tokenUsage: data.usage?.output_tokens || 2000
       };
     } catch (parseError) {
-      console.warn('Failed to parse Claude response, using fallback');
-      return {
-        success: true,
-        analysis: createClaudeSynthesisFallback(),
-        model: 'claude-fallback',
-        tokenUsage: data.usage?.output_tokens || 2000
-      };
+      console.error('Failed to parse Claude response:', parseError);
+      throw new Error(`Claude response parsing failed: ${parseError.message}`);
     }
   } catch (error) {
     console.error('Claude synthesis failed:', error);
     throw error;
   }
-}
-
-function createClaudeSynthesisFallback() {
-  const timestamp = Date.now();
-  
-  return {
-    visualAnnotations: [
-      {
-        id: `annotation-${timestamp}`,
-        x: 50,
-        y: 30,
-        type: 'suggestion',
-        title: 'Pipeline Synthesis',
-        description: 'Multi-model analysis completed with synthesis constraints',
-        severity: 'medium'
-      }
-    ],
-    suggestions: [
-      {
-        id: `suggestion-${timestamp}`,
-        category: 'usability',
-        title: 'Review Multi-Model Analysis',
-        description: 'Synthesized insights from Google Vision → OpenAI → Claude pipeline',
-        impact: 'medium',
-        effort: 'medium',
-        actionItems: ['Review pipeline results', 'Validate insights', 'Implement recommendations']
-      }
-    ],
-    summary: {
-      overallScore: 78,
-      categoryScores: {
-        usability: 75,
-        accessibility: 70,
-        visual: 85,
-        content: 80
-      },
-      keyIssues: ['Pipeline synthesis completed with constraints'],
-      strengths: ['Multi-model analysis', 'Comprehensive pipeline']
-    }
-  };
 }
