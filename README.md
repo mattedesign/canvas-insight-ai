@@ -161,7 +161,7 @@ src/
 
 **Phase 5: Create Edge Functions**
 - [x] Replace main edge function completely
-- [ ] Create context-detection edge function
+- [x] Create context-detection edge function
 - [ ] DO NOT add fallback logic
 - [ ] Use ONLY specified model configurations
 
