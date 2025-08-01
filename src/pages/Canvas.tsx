@@ -70,7 +70,7 @@ class ErrorBoundary extends React.Component<{
 const Canvas = () => {
   const navigate = useNavigate();
   const { projectSlug } = useParams<{ projectSlug?: string }>();
-  const { state, stableHelpers } = useAppContext();
+  const { state, stableHelpers, dispatch } = useAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
@@ -240,7 +240,40 @@ const Canvas = () => {
 
   const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
     console.log('Analysis complete:', imageId, analysis);
-  }, []);
+    
+    // Store the analysis in app state
+    if (analysis) {
+      // Ensure the analysis has an ID
+      const analysisWithId = {
+        ...analysis,
+        id: analysis.id || crypto.randomUUID(),
+        imageId,
+        createdAt: analysis.createdAt || new Date().toISOString()
+      };
+      
+      dispatch({ 
+        type: 'ADD_ANALYSIS', 
+        payload: analysisWithId
+      });
+      
+      // Automatically open the analysis panel to show the results
+      setSelectedAnalysisId(analysisWithId.id);
+      setIsAnalysisPanelOpen(true);
+      
+      toast({
+        category: "success",
+        title: "Analysis Stored",
+        description: "Analysis has been saved and opened for viewing",
+      });
+    } else {
+      console.error('No analysis data received');
+      toast({
+        category: "error",
+        title: "Analysis Error",
+        description: "No analysis data was received",
+      });
+    }
+  }, [dispatch, toast]);
 
   console.log('[Canvas] Current state:', {
     uploadedImages: uploadedImages?.length || 0,
