@@ -2,38 +2,63 @@ import { ImageContext, UserContext, AnalysisContext, ClarifiedContext } from '@/
 import { supabase } from '@/integrations/supabase/client';
 
 export class ContextDetectionService {
-  /**
-   * Use AI to intelligently detect image context - THIS IS PRIORITY
-   */
-  async detectImageContext(
-    imageUrl: string,
-    initialVisionData?: any
-  ): Promise<ImageContext> {
-    // First pass: Quick visual analysis for context
-    const contextPrompt = `Analyze this interface and determine:
-    1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
-    2. Sub-types or patterns present
-    3. Industry/domain (finance/health/education/retail/tech/other)
-    4. Complexity level (simple/moderate/complex)
-    5. Likely user intents when viewing this interface
-    6. Business model if apparent
-    7. Target audience characteristics
-    8. Development maturity (prototype/mvp/growth/mature)
-    9. Platform type (web/mobile/desktop/responsive)
-    10. Design system presence and consistency
+  async detectImageContext(imageUrl: string): Promise<ImageContext> {
+    try {
+      const contextPrompt = `Analyze this UI/UX interface image and determine:
+      1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
+      2. Sub-types or specific patterns
+      3. Domain/industry (finance/healthcare/education/retail/etc)
+      4. Complexity level (simple/moderate/complex)
+      5. Likely user intents based on UI elements
+      6. Business model indicators
+      7. Target audience indicators
+      8. Product maturity stage
+      9. Platform type (web/mobile/desktop/responsive)
+      10. Design system presence and consistency
 
-    Return as JSON with confidence scores for each determination.`;
+      Return as JSON with confidence scores for each determination.`;
 
-    const { data } = await supabase.functions.invoke('context-detection', {
-      body: {
-        imageUrl,
-        prompt: contextPrompt,
-        model: 'gpt-4o',
-        maxTokens: 1000
+      // Add timeout wrapper
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Context detection timeout')), 15000)
+      );
+
+      const detectionPromise = supabase.functions.invoke('context-detection', {
+        body: {
+          imageUrl,
+          prompt: contextPrompt,
+          model: 'gpt-4-vision-preview', // Use vision model
+          maxTokens: 1000
+        }
+      });
+
+      const { data, error } = await Promise.race([
+        detectionPromise,
+        timeoutPromise
+      ]) as any;
+
+      if (error) {
+        console.warn('Context detection failed, using defaults:', error);
+        return this.getDefaultContext();
       }
-    });
 
-    return this.parseImageContext(data);
+      return this.parseImageContext(data);
+    } catch (error) {
+      console.warn('Context detection error, using defaults:', error);
+      return this.getDefaultContext();
+    }
+  }
+
+  private getDefaultContext(): ImageContext {
+    return {
+      primaryType: 'unknown',
+      subTypes: [],
+      domain: 'general',
+      complexity: 'moderate',
+      userIntent: ['analyze', 'improve'],
+      maturityStage: 'mvp',
+      platform: 'web'
+    };
   }
 
   /**
