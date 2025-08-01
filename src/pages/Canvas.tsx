@@ -92,28 +92,37 @@ const Canvas = () => {
       let projectId: string;
       
       try {
+        console.log('[Canvas] Starting project loading for slug:', projectSlug, 'user:', user.id);
+        
         // Determine the target project first
         let targetProjectId: string;
         
         if (projectSlug) {
           // Load specific project by slug - MUST complete BEFORE any data loading
+          console.log('[Canvas] Looking up project by slug:', projectSlug);
           targetProjectId = await ProjectService.getProjectBySlug(projectSlug);
-          console.log('[Canvas] Loading project by slug:', projectSlug, '->', targetProjectId);
+          console.log('[Canvas] Found project ID for slug:', projectSlug, '->', targetProjectId);
           
           // ✅ FIX 2: Clear state when switching projects to prevent contamination
           if (loadedProjectRef.current.projectId && 
               loadedProjectRef.current.projectId !== targetProjectId) {
-            console.log('[Canvas] Clearing state for project switch');
+            console.log('[Canvas] Clearing state for project switch from', loadedProjectRef.current.projectId, 'to', targetProjectId);
             stableHelpers.resetAll();
           }
           
           // ✅ FIX 3: CRITICAL - Switch project BEFORE loading data
+          console.log('[Canvas] Switching to project:', targetProjectId);
           await ProjectService.switchToProject(targetProjectId);
-          console.log('[Canvas] Project switched to:', targetProjectId);
+          console.log('[Canvas] Project switch completed');
+          
+          // Add a small delay to ensure the project context is fully updated
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
         } else {
           // Load default project
+          console.log('[Canvas] Loading default project');
           targetProjectId = await ProjectService.getCurrentProject();
-          console.log('[Canvas] Loading default project:', targetProjectId);
+          console.log('[Canvas] Default project ID:', targetProjectId);
         }
         
         projectId = targetProjectId;
@@ -125,22 +134,35 @@ const Canvas = () => {
           return;
         }
         
-        // ✅ FIX 4: Now load data with correct project context
-        console.log('[Canvas] Loading data for project:', projectId);
+        // ✅ FIX 4: Verify project context before loading data
+        const currentProjectCheck = await ProjectService.getCurrentProject();
+        if (currentProjectCheck !== projectId) {
+          console.error('[Canvas] Project context mismatch! Expected:', projectId, 'Current:', currentProjectCheck);
+          throw new Error(`Project context mismatch after switch: expected ${projectId}, got ${currentProjectCheck}`);
+        }
+        
+        // ✅ FIX 5: Now load data with correct project context
+        console.log('[Canvas] Loading data for verified project:', projectId);
         loadedProjectRef.current = { projectId, timestamp: now };
         await stableHelpers.loadData(projectId); // Pass projectId for validation
+        
+        console.log('[Canvas] Data loading completed for project:', projectId);
         
       } catch (error) {
         console.error('[Canvas] Failed to load project:', error);
         if (projectSlug) {
           // If specific project not found, redirect to default canvas
+          console.log('[Canvas] Redirecting to default canvas due to error');
           navigate('/canvas');
+        } else {
+          // Show error to user
+          setCanvasError(error instanceof Error ? error.message : 'Failed to load project data');
         }
       }
     };
     
     loadData();
-  }, [user?.id, projectSlug]); // Include projectSlug as dependency
+  }, [user?.id, projectSlug, navigate, stableHelpers]); // Include all dependencies
 
   // ✅ CRITICAL FIX: Create stable callback references to prevent infinite re-renders
   const handleToggleAnnotations = useCallback(() => {
