@@ -175,7 +175,7 @@ src/
 - [x] Update local environment variables
 - [x] Configure Supabase Edge Function environment
 - [x] Add ALL required API keys
-- [ ] DO NOT add optional keys unless specified
+- [x] DO NOT add optional keys unless specified
 
 **Phase 8: Testing & Validation**
 - [ ] Test context detection scenarios
