@@ -89,7 +89,7 @@ Please provide a detailed UX analysis in this JSON format:
       'anthropic-version': '2024-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-20250514',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 4000,
       messages: [{
         role: 'user',
@@ -188,7 +188,7 @@ Please provide a detailed UX analysis in this exact JSON format:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',

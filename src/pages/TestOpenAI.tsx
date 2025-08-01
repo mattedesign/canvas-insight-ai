@@ -23,14 +23,13 @@ interface TestResult {
 }
 
 const OPENAI_MODELS = [
-  { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1 (Latest)' },
-  { value: 'o4-mini-2025-04-16', label: 'O4 Mini (Fast Reasoning)' },
-  { value: 'o3-2025-04-16', label: 'O3 (Powerful Reasoning)' },
-  { value: 'gpt-4o', label: 'GPT-4o (Vision)' }
+  { value: 'gpt-4o', label: 'GPT-4o (Vision)' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
+  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' }
 ];
 
 export default function TestOpenAI() {
-  const [selectedModel, setSelectedModel] = useState('gpt-4.1-2025-04-14');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [userContext, setUserContext] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<{ file: File; url: string; id: string } | null>(null);
@@ -203,10 +202,9 @@ export default function TestOpenAI() {
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm font-medium">{selectedModelInfo.label}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedModel === 'gpt-4.1-2025-04-14' && 'Latest flagship model with vision capabilities'}
-                      {selectedModel === 'o4-mini-2025-04-16' && 'Fast reasoning model optimized for efficiency'}
-                      {selectedModel === 'o3-2025-04-16' && 'Powerful reasoning model for complex analysis'}
-                      {selectedModel === 'gpt-4o' && 'Older vision model with proven capabilities'}
+                      {selectedModel === 'gpt-4o' && 'Flagship vision model with excellent capabilities'}
+                      {selectedModel === 'gpt-4o-mini' && 'Fast and efficient model for quick analysis'}
+                      {selectedModel === 'gpt-4-turbo' && 'High-performance model for complex analysis'}
                     </p>
                   </div>
                 )}

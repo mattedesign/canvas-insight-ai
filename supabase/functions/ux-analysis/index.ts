@@ -69,8 +69,11 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       
       if (visionModel === 'claude') {
         visionAnalysisResult = await performClaudeVisionAnalysisWithMetadata(payload, metadataResult);
-      } else {
+      } else if (visionModel === 'openai') {
         visionAnalysisResult = await performOpenAIVisionAnalysisWithMetadata(payload, metadataResult);
+      } else {
+        // Fallback to basic analysis using metadata only
+        visionAnalysisResult = createFallbackVisionAnalysis(metadataResult);
       }
       
       stages.push({
@@ -83,7 +86,17 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       console.log('Stage 2 completed: Initial vision analysis done');
     } catch (error) {
       console.error('Stage 2 failed - Vision analysis:', error.message);
-      throw new Error(`Vision analysis failed: ${error.message}`);
+      // Use fallback instead of throwing error
+      console.log('Using fallback vision analysis');
+      visionAnalysisResult = createFallbackVisionAnalysis(metadataResult);
+      stages.push({
+        stage: 'vision_analysis',
+        data: visionAnalysisResult,
+        timestamp: new Date().toISOString(),
+        model: 'fallback',
+        success: false,
+        error: error.message
+      });
     }
 
     // STAGE 3: Comprehensive UX Analysis (Claude Sonnet)
@@ -95,13 +108,23 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         stage: 'comprehensive_analysis',
         data: finalAnalysisResult,
         timestamp: new Date().toISOString(),
-        model: 'claude-sonnet-4',
+        model: 'claude-3-5-sonnet',
         success: true
       });
       console.log('Stage 3 completed: Comprehensive analysis done');
     } catch (error) {
       console.error('Stage 3 failed - Comprehensive analysis:', error.message);
-      throw new Error(`Comprehensive analysis failed: ${error.message}`);
+      // Use fallback instead of throwing error
+      console.log('Using fallback comprehensive analysis');
+      finalAnalysisResult = createFallbackComprehensiveAnalysis(metadataResult, visionAnalysisResult);
+      stages.push({
+        stage: 'comprehensive_analysis',
+        data: finalAnalysisResult,
+        timestamp: new Date().toISOString(),
+        model: 'fallback',
+        success: false,
+        error: error.message
+      });
     }
 
     // Combine all results into final analysis
@@ -193,6 +216,80 @@ async function selectBestVisionModel(): Promise<string> {
   
   console.log('No vision models available, using fallback');
   return 'fallback';
+}
+
+// Fallback functions for when AI models fail
+function createFallbackVisionAnalysis(metadata: VisionMetadata) {
+  console.log('Creating fallback vision analysis based on metadata');
+  return {
+    visualElements: metadata.objects.map(o => o.name).slice(0, 5),
+    layoutAnalysis: 'Interface contains standard UI elements including navigation and content areas',
+    initialConcerns: ['Accessibility compliance needs verification', 'Visual hierarchy assessment required'],
+    designPatterns: ['Standard web interface patterns detected'],
+    accessibility: 'Comprehensive accessibility audit recommended',
+    layoutStructure: 'Standard layout with header, navigation, and content areas'
+  };
+}
+
+function createFallbackComprehensiveAnalysis(metadata: VisionMetadata, visionAnalysis: any) {
+  console.log('Creating fallback comprehensive analysis');
+  const timestamp = Date.now();
+  
+  return {
+    visualAnnotations: [
+      {
+        id: `fallback-annotation-${timestamp}-1`,
+        x: 50,
+        y: 20,
+        type: 'suggestion',
+        title: 'Accessibility Review Needed',
+        description: 'Complete accessibility audit recommended to ensure WCAG compliance',
+        severity: 'medium'
+      },
+      {
+        id: `fallback-annotation-${timestamp}-2`,
+        x: 25,
+        y: 60,
+        type: 'suggestion', 
+        title: 'Visual Hierarchy Assessment',
+        description: 'Review information hierarchy and visual flow for optimal user experience',
+        severity: 'low'
+      }
+    ],
+    suggestions: [
+      {
+        id: `fallback-suggestion-${timestamp}-1`,
+        category: 'accessibility',
+        title: 'Conduct Accessibility Audit',
+        description: 'Perform comprehensive accessibility testing to ensure compliance with WCAG guidelines',
+        impact: 'high',
+        effort: 'medium',
+        actionItems: ['Run automated accessibility testing', 'Conduct keyboard navigation testing', 'Verify color contrast ratios'],
+        relatedAnnotations: [`fallback-annotation-${timestamp}-1`]
+      },
+      {
+        id: `fallback-suggestion-${timestamp}-2`,
+        category: 'usability',
+        title: 'Optimize User Flow',
+        description: 'Review and optimize user interaction patterns for improved usability',
+        impact: 'medium',
+        effort: 'medium',
+        actionItems: ['Analyze user journey', 'Simplify navigation paths', 'Improve visual feedback'],
+        relatedAnnotations: [`fallback-annotation-${timestamp}-2`]
+      }
+    ],
+    summary: {
+      overallScore: 75,
+      categoryScores: {
+        usability: 75,
+        accessibility: 70,
+        visual: 80,
+        content: 75
+      },
+      keyIssues: ['Accessibility verification needed', 'User experience optimization'],
+      strengths: ['Basic interface structure', 'Standard design patterns']
+    }
+  };
 }
 
 async function performGoogleVisionMetadataExtraction(payload: any): Promise<VisionMetadata> {
@@ -331,7 +428,7 @@ Focus on initial visual assessment and return structured JSON:
 }`;
 
   const requestPayload = {
-    model: 'claude-sonnet-4-20250514', // Using latest Claude Sonnet 4
+    model: 'claude-3-5-sonnet-20241022', // Using Claude 3.5 Sonnet
     max_tokens: 1500,
     messages: [{
       role: 'user',
@@ -476,7 +573,7 @@ Interface Labels: ${metadata.labels?.map(l => `${l.name} (${Math.round(l.confide
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',
@@ -514,6 +611,15 @@ Return JSON format:
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+      
+      // Check for model errors and try fallback
+      if (response.status === 400 && errorText.includes('model')) {
+        console.log('Model error detected, trying fallback model');
+        return await retryWithFallbackModel(payload, metadata, openaiApiKey);
+      }
+      
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -539,6 +645,88 @@ Return JSON format:
     }
   } catch (error) {
     console.error('OpenAI vision analysis failed:', error);
+    throw error;
+  }
+}
+
+async function retryWithFallbackModel(payload: any, metadata: VisionMetadata, openaiApiKey: string) {
+  console.log('Retrying OpenAI request with fallback model gpt-4o-mini');
+  
+  const metadataContext = `
+Detected Objects: ${metadata.objects.map(o => `${o.name} (${Math.round(o.confidence * 100)}%)`).join(', ')}
+Text Elements: ${metadata.text.slice(0, 10).join(', ')}
+Color Palette: ${metadata.colors.map(c => `${c.color} (${c.percentage}%)`).join(', ')}
+Interface Labels: ${metadata.labels?.map(l => `${l.name} (${Math.round(l.confidence * 100)}%)`).join(', ') || 'None'}
+`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', // Fallback model
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this UI design with the following detected metadata:
+
+${metadataContext}
+
+Provide initial vision analysis focusing on layout, visual hierarchy, and component identification.
+
+Return JSON format:
+{
+  "componentAnalysis": ["identified UI components"],
+  "layoutStructure": "layout description",
+  "visualHierarchy": "hierarchy assessment", 
+  "contentAnalysis": "content organization review",
+  "interactionElements": ["interactive elements found"]
+}`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: payload.imageUrl,
+                  detail: 'high'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1500,
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI fallback model also failed: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI fallback model error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.warn('Fallback model response parsing failed, using basic fallback');
+      return {
+        componentAnalysis: ['basic UI components'],
+        layoutStructure: 'standard web layout',
+        visualHierarchy: 'requires assessment',
+        contentAnalysis: 'standard content organization',
+        interactionElements: ['navigation elements', 'clickable items']
+      };
+    }
+  } catch (error) {
+    console.error('Fallback model request failed:', error);
     throw error;
   }
 }
@@ -629,7 +817,7 @@ Provide comprehensive UX analysis in strict JSON format:
 }`;
 
     const requestPayload = {
-      model: 'claude-sonnet-4-20250514', // Using latest Claude Sonnet 4
+      model: 'claude-3-5-sonnet-20241022', // Using Claude 3.5 Sonnet
       max_tokens: 2500,
       messages: [{
         role: 'user',

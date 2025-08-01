@@ -173,7 +173,7 @@ export default async function handler(req: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: model || 'gpt-4.1-2025-04-14',
+        model: model || 'gpt-4o',
         messages: [
           {
             role: 'user',
@@ -254,7 +254,7 @@ export default async function handler(req: Request) {
       metadata: {
         ...analysisData.metadata,
         aiGenerated: true,
-        model: model || 'gpt-4.1-2025-04-14',
+        model: model || 'gpt-4o',
         domain,
         analysisTime,
         tokensUsed: data.usage?.total_tokens
@@ -271,7 +271,7 @@ export default async function handler(req: Request) {
       analysis,
       promptUsed: prompt,
       executionTime: analysisTime,
-      model: model || 'gpt-4.1-2025-04-14'
+      model: model || 'gpt-4o'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

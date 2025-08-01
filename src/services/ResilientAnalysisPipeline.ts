@@ -454,7 +454,7 @@ export class ResilientAnalysisPipeline {
           payload: {
             imageUrl,
             prompt: openaiPrompt,
-            model: 'gpt-4.1-2025-04-14',
+            model: 'gpt-4o',
             maxTokens: 1500,
             temperature: 0.7
           }
@@ -509,7 +509,7 @@ export class ResilientAnalysisPipeline {
           payload: {
             imageUrl,
             prompt: claudePrompt,
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             maxTokens: Math.min(remainingBudget - 500, 2000),
             temperature: 0.4
           }
