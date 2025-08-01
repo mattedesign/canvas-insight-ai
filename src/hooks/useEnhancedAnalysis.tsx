@@ -109,6 +109,14 @@ export function useEnhancedAnalysis() {
       
       const analysisResult = await analysisWrapper.retryAnalysis(
         async () => {
+          console.log(`🔄 [Enhanced Analysis] Starting analysis request:`, {
+            imageId,
+            imageName,
+            userContextLength: userContext?.length || 0,
+            domainType: domainAnalysis.uiType,
+            modelPreference: aiModel || 'auto'
+          });
+          
           const { data, error } = await supabase.functions.invoke('ux-analysis', {
             body: {
               type: 'ANALYZE_IMAGE',
@@ -123,12 +131,31 @@ export function useEnhancedAnalysis() {
             }
           });
 
+          console.log(`📥 [Enhanced Analysis] Edge function response:`, {
+            hasData: !!data,
+            hasError: !!error,
+            dataKeys: data ? Object.keys(data) : [],
+            errorMessage: error?.message
+          });
+
           if (error) {
+            console.error(`❌ [Enhanced Analysis] Edge function error:`, error);
             throw new Error(error.message || 'Analysis failed');
           }
 
           if (!data?.success) {
+            console.error(`❌ [Enhanced Analysis] Analysis failed:`, data?.error);
             throw new Error(data?.error || 'Analysis failed');
+          }
+
+          // 🚨 CRITICAL: Check for fallback data usage
+          if (data.debugInfo?.fallbacksUsed > 0) {
+            console.warn(`⚠️ [Enhanced Analysis] FALLBACK DATA DETECTED!`, {
+              fallbacksUsed: data.debugInfo.fallbacksUsed,
+              pipelineSuccess: data.debugInfo.pipelineSuccess,
+              stages: data.debugInfo.stages,
+              availableAPIs: data.debugInfo.availableAPIs
+            });
           }
 
           return data;
@@ -155,6 +182,19 @@ export function useEnhancedAnalysis() {
       
       console.log('Enhanced Analysis Quality Metrics:', qualityMetrics);
       
+      // 🚨 CRITICAL: Check for fallback data and warn user
+      const fallbacksUsed = analysisResult.debugInfo?.fallbacksUsed || 0;
+      const pipelineSuccess = analysisResult.debugInfo?.pipelineSuccess;
+      
+      if (fallbacksUsed > 0 || !pipelineSuccess) {
+        console.warn('🚨 FALLBACK DATA DETECTED - User notification required');
+        toast({
+          title: "⚠️ Fallback Data Detected",
+          description: `${fallbacksUsed} AI stages failed. You're seeing generic data instead of real AI analysis. Check API keys: ${analysisResult.debugInfo?.availableAPIs?.join(', ') || 'None configured'}.`,
+          variant: "destructive"
+        });
+      }
+      
       // Quality feedback with retry suggestion
       if (qualityMetrics.overallQuality < 60) {
         setState(prev => ({ ...prev, canRetry: true }));
@@ -171,12 +211,18 @@ export function useEnhancedAnalysis() {
         stage: 'completed',
         qualityMetrics,
         domainAnalysis,
-        canRetry: qualityMetrics.overallQuality < 60
+        canRetry: qualityMetrics.overallQuality < 60 || fallbacksUsed > 0
       });
 
+      const toastTitle = fallbacksUsed > 0 ? "Analysis Complete (Fallback Data)" : "Analysis Complete";
+      const description = fallbacksUsed > 0 
+        ? `Using fallback data. Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}. Configure API keys for real AI analysis.`
+        : `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`;
+      
       toast({
-        title: "Analysis Complete",
-        description: `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`,
+        title: toastTitle,
+        description,
+        variant: fallbacksUsed > 0 ? "destructive" : "default"
       });
 
       return {

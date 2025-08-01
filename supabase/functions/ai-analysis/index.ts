@@ -230,6 +230,12 @@ serve(async (req) => {
   }
 
   try {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    
+    console.log(`🚀 [${requestId}] AI Analysis Request Started`);
+    console.log(`📊 [${requestId}] Timestamp: ${new Date().toISOString()}`);
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -238,14 +244,70 @@ serve(async (req) => {
 
     const { imageId, imageUrl, imageName, userContext = '', aiModel }: AIAnalysisRequest = await req.json();
 
+    console.log(`📝 [${requestId}] Request Details:`, {
+      imageId,
+      imageName,
+      aiModel,
+      hasUserContext: !!userContext,
+      userContextLength: userContext.length
+    });
+
     if (!imageId || !imageUrl || !imageName || !aiModel) {
+      console.error(`❌ [${requestId}] Missing required fields:`, {
+        hasImageId: !!imageId,
+        hasImageUrl: !!imageUrl,
+        hasImageName: !!imageName,
+        hasAiModel: !!aiModel
+      });
+      
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: imageId, imageUrl, imageName, aiModel' }),
+        JSON.stringify({ 
+          error: 'Missing required fields: imageId, imageUrl, imageName, aiModel',
+          debugInfo: {
+            requestId,
+            hasImageId: !!imageId,
+            hasImageUrl: !!imageUrl,
+            hasImageName: !!imageName,
+            hasAiModel: !!aiModel
+          }
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Starting AI analysis with ${aiModel} for image:`, imageId);
+    // Check API key availability
+    const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
+    const hasAnthropic = !!Deno.env.get('ANTHROPIC_API_KEY');
+    
+    console.log(`🔐 [${requestId}] API Key Status:`, {
+      openai: hasOpenAI,
+      anthropic: hasAnthropic,
+      requestedModel: aiModel
+    });
+    
+    if (aiModel === 'openai' && !hasOpenAI) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'OpenAI API key not configured. Please add OPENAI_API_KEY in Supabase Edge Function secrets.',
+          success: false,
+          debugInfo: { requestId, missingKey: 'OPENAI_API_KEY' }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (aiModel === 'claude' && !hasAnthropic) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Anthropic API key not configured. Please add ANTHROPIC_API_KEY in Supabase Edge Function secrets.',
+          success: false,
+          debugInfo: { requestId, missingKey: 'ANTHROPIC_API_KEY' }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`🔄 [${requestId}] Starting AI analysis with ${aiModel} for image:`, imageId);
 
     // Get pre-extracted metadata from database
     const { data: imageData, error: imageError } = await supabaseClient

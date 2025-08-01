@@ -86,17 +86,28 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
       console.log('Stage 2 completed: Initial vision analysis done');
     } catch (error) {
-      console.error('Stage 2 failed - Vision analysis:', error.message);
-      // Use fallback instead of throwing error
-      console.log('Using fallback vision analysis');
+      console.error(`❌ [${requestId}] Stage 2 FAILED - Vision analysis:`, {
+        error: error.message,
+        stack: error.stack,
+        selectedModel: visionModel,
+        availableKeys: availableSecrets
+      });
+      
+      // 🚨 CRITICAL: Make fallback usage VISIBLE
+      console.warn(`⚠️ [${requestId}] USING FALLBACK DATA - Real AI analysis failed!`);
+      console.warn(`⚠️ [${requestId}] This means you're getting mock/generic data instead of real AI insights!`);
+      
       visionAnalysisResult = createFallbackVisionAnalysis(metadataResult);
+      visionAnalysisResult._FALLBACK_WARNING = 'This is fallback data - real AI analysis failed';
+      
       stages.push({
         stage: 'vision_analysis',
         data: visionAnalysisResult,
         timestamp: new Date().toISOString(),
         model: 'fallback',
         success: false,
-        error: error.message
+        error: error.message,
+        warning: 'FALLBACK_DATA_USED'
       });
     }
 
@@ -114,17 +125,28 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       });
       console.log('Stage 3 completed: Comprehensive analysis done');
     } catch (error) {
-      console.error('Stage 3 failed - Comprehensive analysis:', error.message);
-      // Use fallback instead of throwing error
-      console.log('Using fallback comprehensive analysis');
+      console.error(`❌ [${requestId}] Stage 3 FAILED - Comprehensive analysis:`, {
+        error: error.message,
+        stack: error.stack,
+        availableKeys: availableSecrets,
+        modelUsed: 'claude-3-5-sonnet'
+      });
+      
+      // 🚨 CRITICAL: Make fallback usage VISIBLE
+      console.warn(`⚠️ [${requestId}] USING FALLBACK DATA - Comprehensive AI analysis failed!`);
+      console.warn(`⚠️ [${requestId}] This means you're getting generic mock data instead of real Claude insights!`);
+      
       finalAnalysisResult = createFallbackComprehensiveAnalysis(metadataResult, visionAnalysisResult);
+      finalAnalysisResult._FALLBACK_WARNING = 'This is fallback data - comprehensive AI analysis failed';
+      
       stages.push({
         stage: 'comprehensive_analysis',
         data: finalAnalysisResult,
         timestamp: new Date().toISOString(),
         model: 'fallback',
         success: false,
-        error: error.message
+        error: error.message,
+        warning: 'FALLBACK_DATA_USED'
       });
     }
 
@@ -170,7 +192,19 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
       throw error;
     }
 
-    console.log('Multi-stage analysis pipeline completed and stored');
+    const processingTime = Date.now() - startTime;
+    const pipelineSuccess = stages.every(s => s.success);
+    const fallbacksUsed = stages.filter(s => !s.success).length;
+    
+    console.log(`✅ [${requestId}] Multi-stage analysis pipeline completed:`, {
+      processingTime: `${processingTime}ms`,
+      pipelineSuccess,
+      fallbacksUsed,
+      stagesCompleted: stages.length,
+      analysisId: analysis.id
+    });
+    
+    // 🚨 CRITICAL: Include debug info in response to make issues visible
     return {
       success: true,
       data: {
@@ -185,18 +219,43 @@ async function analyzeImage(payload: { imageId: string; imageUrl: string; imageN
         metadata: analysis.metadata,
         createdAt: analysis.created_at,
         aiModel: 'multi-stage-pipeline'
+      },
+      debugInfo: {
+        requestId,
+        processingTime,
+        pipelineSuccess,
+        fallbacksUsed,
+        stages: stages.map(s => ({
+          stage: s.stage,
+          model: s.model,
+          success: s.success,
+          error: s.error,
+          warning: s.warning
+        })),
+        availableAPIs: availableSecrets,
+        timestamp: new Date().toISOString()
       }
     };
 
   } catch (error) {
-    console.error('CRITICAL ERROR in multi-stage analysis pipeline:', error);
-    console.error('Error details:', {
-      message: error?.message || 'Unknown error',
-      stack: error?.stack || 'No stack trace available',
-      payload: payload
+    const processingTime = Date.now() - startTime;
+    
+    console.error(`💥 [${requestId}] CRITICAL ERROR in analysis pipeline:`, {
+      error: error.message,
+      stack: error.stack,
+      processingTime: `${processingTime}ms`,
+      payload: {
+        imageId: payload?.imageId,
+        imageName: payload?.imageName,
+        hasUrl: !!payload?.imageUrl,
+        userContextLength: payload?.userContext?.length || 0
+      },
+      availableAPIs: availableSecrets,
+      timestamp: new Date().toISOString()
     });
     
-    throw new Error(`Analysis pipeline failed: ${error?.message || 'Unknown error'}`);
+    // 🚨 CRITICAL: Return detailed error instead of generic fallback
+    throw new Error(`Analysis pipeline failed [${requestId}]: ${error?.message || 'Unknown error'}. Available APIs: ${availableSecrets.join(', ') || 'None'}. Processing time: ${processingTime}ms.`);
   }
 }
 
@@ -2605,12 +2664,58 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // 🔧 STEP 2: Enhanced debugging for analysis pipeline
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  
+  console.log(`🚀 [${requestId}] UX Analysis Request Started`);
+  console.log(`📊 [${requestId}] Timestamp: ${new Date().toISOString()}`);
+  console.log(`🔍 [${requestId}] Method: ${req.method}`);
+  console.log(`📍 [${requestId}] URL: ${req.url}`);
+
   try {
     const requestData = await req.json()
     
-    // Debug logging
-    console.log('Raw request data:', JSON.stringify(requestData, null, 2))
-    console.log('Request data keys:', Object.keys(requestData))
+    // Enhanced request logging
+    console.log(`📝 [${requestId}] Raw request data structure:`, {
+      hasType: !!requestData.type,
+      hasPayload: !!requestData.payload,
+      hasAiModel: !!requestData.aiModel,
+      dataKeys: Object.keys(requestData),
+      payloadSize: JSON.stringify(requestData).length
+    });
+    
+    // Check API key availability FIRST
+    const requiredSecrets = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_VISION_API_KEY'];
+    const availableSecrets = requiredSecrets.filter(secret => !!Deno.env.get(secret));
+    
+    console.log(`🔐 [${requestId}] API Key Status:`, {
+      total: availableSecrets.length,
+      available: availableSecrets,
+      missing: requiredSecrets.filter(s => !availableSecrets.includes(s))
+    });
+
+    // 🚨 CRITICAL: Stop fallback masking - expose API key issues
+    if (availableSecrets.length === 0) {
+      console.error(`❌ [${requestId}] CRITICAL: No API keys configured!`);
+      return new Response(
+        JSON.stringify({
+          error: 'No AI service API keys configured. Please add at least one: OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_VISION_API_KEY in Supabase Edge Function secrets.',
+          success: false,
+          debugInfo: {
+            requestId,
+            timestamp: new Date().toISOString(),
+            availableSecrets: availableSecrets.length,
+            requiredSecrets,
+            step: 'API_KEY_VALIDATION'
+          }
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
     
     // Validate request data structure
     if (!requestData || typeof requestData !== 'object') {
