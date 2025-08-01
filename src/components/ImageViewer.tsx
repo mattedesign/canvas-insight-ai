@@ -5,8 +5,9 @@ import { AnnotationComment } from './AnnotationComment';
 import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { ImageAnalysisDialog } from './ImageAnalysisDialog';
+import OptimizedAnalysisDialog from './OptimizedAnalysisDialog';
 import { Button } from './ui/button';
-import { Brain } from 'lucide-react';
+import { Brain, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -43,6 +44,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  const [showOptimizedDialog, setShowOptimizedDialog] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   // Remove useImageTransform hook that was interfering with TransformWrapper
@@ -235,15 +237,23 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         </div>
       </div>
 
-      {/* AI Analysis Button */}
-      <div className="absolute top-4 right-4 z-30">
+      {/* AI Analysis Buttons */}
+      <div className="absolute top-4 right-4 z-30 flex flex-col gap-2">
         <Button
           onClick={() => setShowAnalysisDialog(true)}
           className="bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg"
           size="sm"
         >
           <Brain className="h-4 w-4 mr-2" />
-          Analyze with AI
+          Standard Analysis
+        </Button>
+        <Button
+          onClick={() => setShowOptimizedDialog(true)}
+          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
+          size="sm"
+        >
+          <Zap className="h-4 w-4 mr-2" />
+          Optimized Pipeline
         </Button>
       </div>
 
@@ -268,7 +278,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         </div>
       )}
       
-      {/* AI Analysis Dialog */}
+      {/* AI Analysis Dialogs */}
       {showAnalysisDialog && (
         <ImageAnalysisDialog
           imageId={analysis.imageId}
@@ -277,6 +287,22 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           onClose={() => setShowAnalysisDialog(false)}
           onAnalysisComplete={(newAnalysis) => {
             setShowAnalysisDialog(false);
+            if (onAnalysisComplete) {
+              onAnalysisComplete(newAnalysis);
+            }
+          }}
+        />
+      )}
+      
+      {showOptimizedDialog && (
+        <OptimizedAnalysisDialog
+          isOpen={showOptimizedDialog}
+          onClose={() => setShowOptimizedDialog(false)}
+          imageUrl={analysis.imageUrl}
+          imageName={analysis.imageName}
+          imageId={analysis.imageId}
+          onAnalysisComplete={(newAnalysis) => {
+            setShowOptimizedDialog(false);
             if (onAnalysisComplete) {
               onAnalysisComplete(newAnalysis);
             }
