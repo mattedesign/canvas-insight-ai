@@ -159,6 +159,30 @@ src/
 - [x] DO NOT add animations
 - [x] DO NOT add extra styling
 
+**Phase 5: Create Edge Functions**
+- [ ] Replace main edge function completely
+- [ ] Create context-detection edge function
+- [ ] DO NOT add fallback logic
+- [ ] Use ONLY specified model configurations
+
+**Phase 6: Update Frontend Integration**
+- [ ] Replace the pipeline hook implementation
+- [ ] Create Pipeline Monitor component
+- [ ] Create Analysis Context Display component
+- [ ] Update Image Analysis View component
+
+**Phase 7: Environment Configuration**
+- [ ] Update local environment variables
+- [ ] Configure Supabase Edge Function environment
+- [ ] Add ALL required API keys
+- [ ] DO NOT add optional keys unless specified
+
+**Phase 8: Testing & Validation**
+- [ ] Test context detection scenarios
+- [ ] Test clarification flow
+- [ ] Test error handling with NO API keys
+- [ ] Verify NO fallback data is shown
+
 ### RED FLAGS TO AVOID
 
 If you find yourself thinking any of these, STOP:
