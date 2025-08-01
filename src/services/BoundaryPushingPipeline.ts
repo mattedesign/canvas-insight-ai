@@ -43,6 +43,12 @@ export class BoundaryPushingPipeline {
     this.abortController = new AbortController();
     const startTime = Date.now();
     
+    console.log('BoundaryPushingPipeline.execute() called with:', {
+      imageUrl: imageUrl ? 'provided' : 'missing',
+      userContext: userContext ? `"${userContext.substring(0, 50)}..."` : 'empty',
+      hasProgressCallback: !!onProgress
+    });
+    
     try {
       // CRITICAL: Context Detection Phase (5% progress) - THIS IS PRIORITY
       onProgress?.(2, 'Analyzing image context...');
@@ -203,17 +209,26 @@ export class BoundaryPushingPipeline {
     imageUrl: string,
     prompt: string
   ): Promise<any> {
+    const payload = {
+      imageUrl,
+      model,
+      prompt,
+      stage: 'vision',
+      systemPrompt: this.getSystemPromptForContext()
+    };
+    
+    console.log('Vision Stage - Sending payload:', payload);
+    
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
-      body: {
-        imageUrl,
-        model,
-        prompt,
-        stage: 'vision',
-        systemPrompt: this.getSystemPromptForContext()
-      }
+      body: payload
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Vision Stage - Error:', error);
+      throw error;
+    }
+    
+    console.log('Vision Stage - Response:', data);
     return data;
   }
 
@@ -316,18 +331,27 @@ export class BoundaryPushingPipeline {
     visionData: any,
     prompt: string
   ): Promise<any> {
+    const payload = {
+      imageUrl,
+      model,
+      prompt,
+      visionData,
+      stage: 'analysis',
+      systemPrompt: this.getSystemPromptForContext()
+    };
+    
+    console.log('Analysis Stage - Sending payload:', payload);
+    
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
-      body: {
-        imageUrl,
-        model,
-        prompt,
-        visionData,
-        stage: 'analysis',
-        systemPrompt: this.getSystemPromptForContext()
-      }
+      body: payload
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Analysis Stage - Error:', error);
+      throw error;
+    }
+    
+    console.log('Analysis Stage - Response:', data);
     return data;
   }
 
@@ -417,18 +441,27 @@ export class BoundaryPushingPipeline {
     analysisData: any,
     prompt: string
   ): Promise<any> {
+    const payload = {
+      model,
+      prompt,
+      visionData,
+      analysisData,
+      stage: 'synthesis',
+      systemPrompt: this.getSystemPromptForContext()
+    };
+    
+    console.log('Synthesis Stage - Sending payload:', payload);
+    
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
-      body: {
-        model,
-        prompt,
-        visionData,
-        analysisData,
-        stage: 'synthesis',
-        systemPrompt: this.getSystemPromptForContext()
-      }
+      body: payload
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Synthesis Stage - Error:', error);
+      throw error;
+    }
+    
+    console.log('Synthesis Stage - Response:', data);
     return data;
   }
 
@@ -488,10 +521,19 @@ export class BoundaryPushingPipeline {
   }
 
   private getAvailableModels(stage: 'vision' | 'analysis'): string[] {
-    const stageConfig = pipelineConfig.models[stage];
+    console.log(`Getting available models for stage: ${stage}`);
     
-    // For now, return all models - edge function will filter by available keys
-    return [...stageConfig.primary, ...stageConfig.secondary];
+    if (stage === 'vision') {
+      // For vision, we only use vision-capable models
+      const visionModels = ['openai-vision', 'anthropic-vision'];
+      console.log('Vision models available:', visionModels);
+      return visionModels;
+    } else {
+      // For analysis and synthesis, use text models
+      const analysisModels = ['gpt-4.1-2025-04-14', 'claude-opus-4-20250514'];
+      console.log('Analysis models available:', analysisModels);
+      return analysisModels;
+    }
   }
 
   private hasApiKey(keyName: string): boolean {
@@ -510,13 +552,19 @@ export class BoundaryPushingPipeline {
     executor: (model: string) => Promise<any>,
     timeout: number
   ): Promise<ModelResult[]> {
+    console.log('Executing models in parallel:', models);
+    
     const promises = models.map(async (model) => {
       const startTime = Date.now();
+      console.log(`Starting execution for model: ${model}`);
+      
       try {
         const data = await Promise.race([
           executor(model),
           this.timeout(timeout, model)
         ]);
+        
+        console.log(`Model ${model} executed successfully`);
         
         return {
           model,
@@ -528,10 +576,12 @@ export class BoundaryPushingPipeline {
           }
         };
       } catch (error) {
+        console.error(`Model ${model} failed:`, error);
+        
         return {
           model,
           success: false,
-          error,
+          error: error instanceof Error ? error : new Error(String(error)),
           metrics: {
             startTime,
             endTime: Date.now()
@@ -540,7 +590,10 @@ export class BoundaryPushingPipeline {
       }
     });
 
-    return Promise.all(promises);
+    const results = await Promise.all(promises);
+    console.log('All models execution complete. Results:', results.map(r => ({ model: r.model, success: r.success })));
+    
+    return results;
   }
 
   private timeout(ms: number, model: string): Promise<never> {

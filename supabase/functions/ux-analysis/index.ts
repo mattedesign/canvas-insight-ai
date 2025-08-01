@@ -42,26 +42,21 @@ serve(async (req) => {
   }
 
   try {
-    const payload = await req.json()
-    console.log('Received payload:', { 
-      action: payload.action,
-      stage: payload.stage,
-      model: payload.model 
-    })
-
-    // Check for available API keys
+    const { action, ...payload } = await req.json()
+    
+    console.log('UX Analysis Edge Function - Raw Request Body:', JSON.stringify(payload, null, 2))
+    console.log('UX Analysis Edge Function - Action:', action)
+    console.log('UX Analysis Edge Function - Payload Fields:', Object.keys(payload))
+    
+    // Check available API keys
     const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY')
     const hasAnthropic = !!Deno.env.get('ANTHROPIC_API_KEY')
     const hasGoogle = !!Deno.env.get('GOOGLE_VISION_API_KEY')
+    
+    console.log('Available APIs:', { hasOpenAI, hasAnthropic, hasGoogle })
 
-    if (!hasOpenAI && !hasAnthropic && !hasGoogle) {
-      throw new Error(
-        'No API keys configured. Please add at least one API key (OpenAI, Anthropic, or Google) to enable analysis.'
-      )
-    }
-
-    // Handle different actions
-    switch (payload.action) {
+    // Handle special actions
+    switch (action) {
       case 'store':
         return await storeAnalysisResults(payload.pipelineResults)
       
@@ -78,7 +73,7 @@ serve(async (req) => {
         )
       
       default:
-        // Execute model based on stage
+        // Execute model based on stage - no action means direct execution
         return await executeModel(payload)
     }
 
@@ -98,11 +93,33 @@ serve(async (req) => {
 })
 
 async function executeModel(payload: any) {
-  const { model, stage, imageUrl, prompt, systemPrompt, visionData } = payload
+  console.log('executeModel - Full payload received:', JSON.stringify(payload, null, 2))
+  
+  const { model, stage, imageUrl, prompt, systemPrompt, visionData, analysisData } = payload
+  
+  console.log('executeModel - Extracted fields:', { 
+    model, 
+    stage, 
+    hasImageUrl: !!imageUrl, 
+    hasPrompt: !!prompt, 
+    hasSystemPrompt: !!systemPrompt,
+    hasVisionData: !!visionData,
+    hasAnalysisData: !!analysisData
+  })
+  
+  if (!model) {
+    throw new Error(`Model is required but received: ${model}. Full payload: ${JSON.stringify(payload)}`)
+  }
+  
+  if (!stage) {
+    throw new Error(`Stage is required but received: ${stage}. Full payload: ${JSON.stringify(payload)}`)
+  }
+  
   const modelConfig = MODEL_CONFIGS[model]
   
   if (!modelConfig) {
-    throw new Error(`Unknown model: ${model}`)
+    const availableModels = Object.keys(MODEL_CONFIGS)
+    throw new Error(`Unknown model: ${model}. Available models: ${availableModels.join(', ')}`)
   }
 
   const apiKey = Deno.env.get(modelConfig.requiresKey)

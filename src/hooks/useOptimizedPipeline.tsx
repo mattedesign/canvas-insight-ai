@@ -93,7 +93,8 @@ export function useOptimizedPipeline() {
     userContext: string
   ) => {
     if (!pipelineRef.current) {
-      throw new Error('No active pipeline to resume');
+      // Create new pipeline if none exists
+      pipelineRef.current = new BoundaryPushingPipeline();
     }
 
     setState(prev => ({
@@ -104,6 +105,8 @@ export function useOptimizedPipeline() {
     }));
 
     try {
+      console.log('Resuming analysis with clarification:', { clarificationResponses, resumeToken });
+      
       const result = await pipelineRef.current.resumeWithClarification(
         resumeToken,
         clarificationResponses,
@@ -112,21 +115,26 @@ export function useOptimizedPipeline() {
         handleProgress
       );
       
+      console.log('Resume result:', result);
+      
       setState(prev => ({
         ...prev,
         isAnalyzing: false,
         progress: 100,
         stage: 'complete',
-        analysisContext: result.analysisContext
+        analysisContext: result.data?.analysisContext || result.analysisContext
       }));
 
       return { success: true, data: result };
 
     } catch (error) {
+      console.error('Resume failed:', error);
+      
       setState(prev => ({
         ...prev,
         isAnalyzing: false,
-        stage: 'error'
+        stage: 'error',
+        error: error instanceof Error ? error.message : String(error)
       }));
 
       throw error;
