@@ -156,7 +156,7 @@ src/
 **Phase 4: UI Components**
 - [x] Build ONLY listed components
 - [x] Use ONLY the props specified
-- [ ] DO NOT add animations
+- [x] DO NOT add animations
 - [ ] DO NOT add extra styling
 
 ### RED FLAGS TO AVOID
