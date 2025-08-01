@@ -157,7 +157,7 @@ src/
 - [x] Build ONLY listed components
 - [x] Use ONLY the props specified
 - [x] DO NOT add animations
-- [ ] DO NOT add extra styling
+- [x] DO NOT add extra styling
 
 ### RED FLAGS TO AVOID
 
