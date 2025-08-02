@@ -17,12 +17,6 @@ const MODEL_CONFIGS = {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     requiresKey: 'OPENAI_API_KEY'
   },
-  'openai-vision': {
-    api: 'openai',
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4o',
-    requiresKey: 'OPENAI_API_KEY'
-  },
   'claude-opus-4-20250514': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
@@ -430,7 +424,7 @@ function mapModelName(requestedModel: string): string {
     'gpt-4.1-2025-04-14': 'gpt-4o',
     'gpt-4o': 'gpt-4o',
     'gpt-4o-mini': 'gpt-4o-mini',
-    'openai-vision': 'gpt-4o',
+    
     
     // Anthropic model mappings
     'claude-opus-4-20250514': 'claude-3-5-sonnet-20241022',
