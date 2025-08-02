@@ -7,6 +7,7 @@ import { AnalysisContext } from '@/types/contextTypes';
 import { AdaptiveTimeoutCalculator, ImageComplexity } from '@/config/adaptiveTimeoutConfig';
 import { ProgressPersistenceService } from './ProgressPersistenceService';
 import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
+import { ValidationService } from './ValidationService';
 
 interface ModelResult {
   model: string;
@@ -36,6 +37,8 @@ export class BoundaryPushingPipeline {
   private progressService: ProgressPersistenceService;
   private modelOptimizer: ModelSelectionOptimizer;
   private currentRequestId: string | null = null;
+  // PHASE 1: Validation Service
+  private validationService: ValidationService;
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
@@ -43,6 +46,8 @@ export class BoundaryPushingPipeline {
     // PHASE 3: Initialize performance enhancement services
     this.progressService = ProgressPersistenceService.getInstance();
     this.modelOptimizer = ModelSelectionOptimizer.getInstance();
+    // PHASE 1: Initialize validation service
+    this.validationService = ValidationService.getInstance();
   }
 
   async execute(
@@ -985,27 +990,74 @@ export class BoundaryPushingPipeline {
   }
 
   private async storeResults(data: any): Promise<any> {
-    // Store results and return final formatted output
-    return {
+    // PHASE 1: Pre-storage validation
+    const storageValidation = this.validationService.validateBeforeStorage(data);
+    if (!storageValidation.isValid) {
+      console.error('[BoundaryPushingPipeline] Storage validation failed:', storageValidation.errors);
+      // Log but don't fail - attempt to fix data
+      
+      // Apply fixes if available
+      if (storageValidation.fixedData) {
+        console.warn('[BoundaryPushingPipeline] Using fixed data for storage');
+        data = storageValidation.fixedData;
+      }
+    }
+
+    // Build result with safe property access
+    const result = {
       success: true,
       data: {
-        executiveSummary: data.synthesisResults.fusedData?.executiveSummary || 'Analysis completed successfully.',
-        vision: data.visionResults.fusedData,
-        analysis: data.analysisResults.fusedData,
-        recommendations: data.synthesisResults.fusedData,
+        executiveSummary: this.safeGetProperty(data, 'synthesisResults.fusedData.executiveSummary', 'Analysis completed successfully.'),
+        vision: this.safeGetProperty(data, 'visionResults.fusedData', {}),
+        analysis: this.safeGetProperty(data, 'analysisResults.fusedData', {}),
+        recommendations: this.safeGetProperty(data, 'synthesisResults.fusedData', {}),
         analysisContext: data.analysisContext, // CRITICAL: Include context for UI display
         metadata: {
-          executionTime: data.executionTime,
-          modelsUsed: data.modelsUsed,
+          executionTime: data.executionTime || 0,
+          modelsUsed: data.modelsUsed || [],
           stages: ['vision', 'analysis', 'synthesis'],
           quality: {
-            visionConfidence: data.visionResults.confidence,
-            analysisConfidence: data.analysisResults.confidence,
-            synthesisConfidence: data.synthesisResults.confidence
+            visionConfidence: this.safeGetProperty(data, 'visionResults.confidence', 0),
+            analysisConfidence: this.safeGetProperty(data, 'analysisResults.confidence', 0),
+            synthesisConfidence: this.safeGetProperty(data, 'synthesisResults.confidence', 0)
           }
         }
       }
     };
+
+    // Final validation of the result
+    const finalValidation = this.validationService.validateAnalysisResult(result.data);
+    if (!finalValidation.isValid) {
+      console.warn('[BoundaryPushingPipeline] Final result validation warnings:', finalValidation.warnings);
+      
+      // Use fixed data if available
+      if (finalValidation.fixedData) {
+        result.data = finalValidation.fixedData;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * PHASE 1: Safe property access helper
+   */
+  private safeGetProperty(obj: any, path: string, defaultValue: any = null): any {
+    if (!obj || typeof obj !== 'object') {
+      return defaultValue;
+    }
+
+    const keys = path.split('.');
+    let current = obj;
+
+    for (const key of keys) {
+      if (current === null || current === undefined || !(key in current)) {
+        return defaultValue;
+      }
+      current = current[key];
+    }
+
+    return current !== null && current !== undefined ? current : defaultValue;
   }
 
   private getAvailableModels(stage: 'vision' | 'analysis'): string[] {
@@ -1148,15 +1200,47 @@ export class BoundaryPushingPipeline {
   }
 
   private calculateConfidence(successful: any[], total: number): number {
+    // PHASE 1: Safe confidence calculation to prevent NaN
+    if (!Array.isArray(successful) || total <= 0) {
+      this.validationService.debugLog('calculateConfidence: invalid inputs', { successful, total });
+      return 0;
+    }
+    
+    const validation = this.validationService.validateArray(successful, 'successfulResults');
+    if (!validation.isValid) {
+      this.validationService.debugLog('calculateConfidence: array validation failed', validation.errors);
+      return 0;
+    }
+    
     const successRate = successful.length / total;
     const agreementScore = this.calculateAgreement(successful);
-    return (successRate * 0.4 + agreementScore * 0.6);
+    
+    // Ensure no NaN values
+    if (isNaN(successRate) || isNaN(agreementScore)) {
+      this.validationService.debugLog('calculateConfidence: NaN detected', { successRate, agreementScore });
+      return 0;
+    }
+    
+    const confidence = (successRate * 0.4 + agreementScore * 0.6);
+    return Math.max(0, Math.min(1, confidence));
   }
 
   private calculateAgreement(results: any[]): number {
+    // PHASE 1: Safe agreement calculation with validation
+    const validation = this.validationService.validateArray(results, 'agreementResults');
+    if (!validation.isValid) {
+      return 0.5; // Default moderate agreement
+    }
+    
+    // Filter out null/undefined results
+    const validResults = results.filter(r => r && r.data);
+    if (validResults.length === 0) {
+      return 0.3; // Low agreement for no valid results
+    }
+    
     // Implement agreement calculation based on result similarity
-    // For now, return a simplified score
-    return results.length > 1 ? 0.85 : 0.65;
+    // For now, return a simplified score based on valid result count
+    return validResults.length > 1 ? 0.85 : 0.65;
   }
 
   private calculatePriority(suggestion: any): 'critical' | 'high' | 'medium' | 'low' {
@@ -1227,13 +1311,23 @@ export class BoundaryPushingPipeline {
   }
 
   private calculateCategoryConfidence(results: any[], category: string): number {
-    const scores = results
-      .filter(r => r.data?.[category])
-      .map(r => r.confidence || 0.5);
+    // PHASE 1: Safe category confidence calculation
+    const validation = this.validationService.validateArray(results, 'categoryResults');
+    if (!validation.isValid) {
+      return 0.5;
+    }
     
-    return scores.length > 0 
-      ? scores.reduce((a, b) => a + b) / scores.length
-      : 0.5;
+    const scores = this.validationService.safeArrayMap(
+      results.filter(r => r?.data?.[category]),
+      (r: any) => {
+        const confidence = r.confidence || 0.5;
+        const scoreValidation = this.validationService.validateScore(confidence);
+        return scoreValidation.isValid ? confidence : 0.5;
+      },
+      []
+    );
+    
+    return this.validationService.safeCalculateAverage(scores);
   }
 
   private aggregateBusinessImpact(results: ModelResult[]): any {
