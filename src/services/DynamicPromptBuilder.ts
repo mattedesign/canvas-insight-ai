@@ -385,6 +385,12 @@ ${context.user.inferredRole === 'designer' ? `Designer Perspective:
   "successMetrics": [{ "metric": "", "currentState": "", "targetState": "", "measurement": "" }],
   "summary": {
     "overallScore": 0,
+    "categoryScores": {
+      "usability": 0,
+      "accessibility": 0,
+      "visual": 0,
+      "content": 0
+    },
     "keyIssues": ["Most critical issues found"],
     "keyOpportunities": ["Highest impact improvements"],
     "confidenceScore": 0.85

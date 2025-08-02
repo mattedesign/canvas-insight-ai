@@ -121,18 +121,26 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
               <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(analysis.summary.categoryScores).map(([category, score]) => (
-                <div key={category} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      {getCategoryIcon(category)}
-                      <span className="capitalize font-medium text-foreground">{category}</span>
+              {Object.entries(analysis.summary?.categoryScores || {}).map(([category, score]) => {
+                const safeScore = typeof score === 'number' ? score : 0;
+                return (
+                  <div key={category} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        {getCategoryIcon(category)}
+                        <span className="capitalize font-medium text-foreground">{category}</span>
+                      </div>
+                      <span className={`font-medium ${getScoreColor(safeScore)}`}>{safeScore}%</span>
                     </div>
-                    <span className={`font-medium ${getScoreColor(score)}`}>{score}%</span>
+                    <Progress value={safeScore} className="h-2" />
                   </div>
-                  <Progress value={score} className="h-2" />
+                );
+              })}
+              {(!analysis.summary?.categoryScores || Object.keys(analysis.summary.categoryScores).length === 0) && (
+                <div className="text-sm text-muted-foreground">
+                  Category scores not available
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 

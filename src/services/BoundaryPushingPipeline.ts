@@ -732,6 +732,7 @@ export class BoundaryPushingPipeline {
       console.warn('[BoundaryPushingPipeline] Synthesis results missing summary object, creating default');
       synthesis.summary = {
         overallScore: this.calculateOverallScore(synthesis),
+        categoryScores: this.calculateCategoryScores(synthesis),
         keyIssues: this.extractKeyIssues(synthesis),
         keyOpportunities: this.extractKeyOpportunities(synthesis),
         confidenceScore: 0.8
@@ -740,6 +741,10 @@ export class BoundaryPushingPipeline {
       // Ensure overallScore exists if summary exists but is incomplete
       if (typeof synthesis.summary.overallScore !== 'number') {
         synthesis.summary.overallScore = this.calculateOverallScore(synthesis);
+      }
+      // CRITICAL FIX: Ensure categoryScores exists if summary exists but is incomplete
+      if (!synthesis.summary.categoryScores || typeof synthesis.summary.categoryScores !== 'object') {
+        synthesis.summary.categoryScores = this.calculateCategoryScores(synthesis);
       }
       if (!synthesis.summary.keyIssues) {
         synthesis.summary.keyIssues = this.extractKeyIssues(synthesis);
@@ -790,6 +795,77 @@ export class BoundaryPushingPipeline {
         .filter(Boolean);
     }
     return [];
+  }
+
+  private calculateCategoryScores(synthesis: any): Record<string, number> {
+    // Default category scores
+    const defaultScores = {
+      usability: 70,
+      accessibility: 70,
+      visual: 70,
+      content: 70
+    };
+
+    // If we have prioritized actions, calculate scores based on issues found
+    if (synthesis.prioritizedActions && synthesis.prioritizedActions.length > 0) {
+      const categoryIssues = {
+        usability: 0,
+        accessibility: 0,
+        visual: 0,
+        content: 0
+      };
+
+      // Count issues by category
+      synthesis.prioritizedActions.forEach(action => {
+        const category = this.mapActionToCategory(action);
+        if (category && categoryIssues.hasOwnProperty(category)) {
+          const penalty = this.getIssuePenalty(action.priority);
+          categoryIssues[category] += penalty;
+        }
+      });
+
+      // Calculate scores by reducing from base score based on issues
+      return Object.keys(defaultScores).reduce((scores, category) => {
+        const baseScore = 85;
+        const penalty = categoryIssues[category];
+        scores[category] = Math.max(30, Math.min(100, baseScore - penalty));
+        return scores;
+      }, {} as Record<string, number>);
+    }
+
+    return defaultScores;
+  }
+
+  private mapActionToCategory(action: any): string | null {
+    const title = (action.title || '').toLowerCase();
+    const description = (action.description || '').toLowerCase();
+    const combined = `${title} ${description}`;
+
+    if (combined.includes('accessibility') || combined.includes('wcag') || combined.includes('screen reader') || combined.includes('contrast')) {
+      return 'accessibility';
+    }
+    if (combined.includes('visual') || combined.includes('color') || combined.includes('font') || combined.includes('layout') || combined.includes('design')) {
+      return 'visual';
+    }
+    if (combined.includes('content') || combined.includes('text') || combined.includes('copy') || combined.includes('messaging')) {
+      return 'content';
+    }
+    if (combined.includes('usability') || combined.includes('navigation') || combined.includes('interaction') || combined.includes('user') || combined.includes('flow')) {
+      return 'usability';
+    }
+
+    // Default to usability if can't categorize
+    return 'usability';
+  }
+
+  private getIssuePenalty(priority: string): number {
+    switch (priority) {
+      case 'critical': return 20;
+      case 'high': return 15;
+      case 'medium': return 10;
+      case 'low': return 5;
+      default: return 10;
+    }
   }
 
   private async storeResults(data: any): Promise<any> {
