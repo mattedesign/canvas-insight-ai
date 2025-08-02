@@ -1,3 +1,12 @@
+// Safe environment variable access for browser
+const getEnvVar = (key: string): string | undefined => {
+  // In Vite, environment variables are available on import.meta.env
+  if (typeof window !== 'undefined' && import.meta?.env) {
+    return import.meta.env[key];
+  }
+  return undefined;
+};
+
 export const pipelineConfig = {
   models: {
     vision: {
@@ -31,7 +40,7 @@ export const pipelineConfig = {
   },
   // Perplexity Integration (Optional Enhancement)
   perplexity: {
-    enabled: !!process.env.VITE_PERPLEXITY_API_KEY,
+    enabled: !!getEnvVar('VITE_PERPLEXITY_API_KEY'),
     features: {
       contextClarification: true,
       knowledgeAugmentation: true,
