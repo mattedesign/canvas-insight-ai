@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, prompt, model = 'gpt-4.1-2025-04-14', maxTokens = 1000 } = await req.json();
+    const { imageUrl, prompt, model = 'gpt-4o', maxTokens = 1000 } = await req.json();
 
     // Quick context detection using GPT-4.1
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
