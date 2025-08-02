@@ -23,6 +23,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const TestOpenAI = lazy(() => import("./pages/TestOpenAI"));
 const ProductionReadiness = lazy(() => import("./pages/ProductionReadiness"));
 const PerformanceTestingDashboard = lazy(() => import("./pages/PerformanceTestingDashboard"));
+const VerificationTests = lazy(() => import("./pages/VerificationTests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -131,6 +132,11 @@ const App = () => {
                 <Route path="/testing" element={
                   <ProtectedRoute>
                     <PerformanceTestingDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/verification" element={
+                  <ProtectedRoute>
+                    <VerificationTests />
                   </ProtectedRoute>
                 } />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
