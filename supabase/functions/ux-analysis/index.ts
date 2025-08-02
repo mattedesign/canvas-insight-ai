@@ -33,6 +33,17 @@ const MODEL_CONFIGS = {
     endpoint: 'https://api.anthropic.com/v1/messages',
     model: 'claude-opus-4-20250514',
     requiresKey: 'ANTHROPIC_API_KEY'
+  },
+  'perplexity-research': {
+    api: 'perplexity',
+    endpoint: 'https://api.perplexity.ai/chat/completions',
+    model: 'llama-3.1-sonar-small-128k-online',
+    requiresKey: 'PERPLEXITY_API_KEY'
+  },
+  'stability-inpainting': {
+    api: 'stability',
+    endpoint: 'https://api.stability.ai/v1/generation/stable-diffusion-v1-6/image-to-image',
+    requiresKey: 'STABILITY_API_KEY'
   }
 }
 
@@ -56,8 +67,10 @@ serve(async (req) => {
     const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY')
     const hasAnthropic = !!Deno.env.get('ANTHROPIC_API_KEY')
     const hasGoogle = !!Deno.env.get('GOOGLE_VISION_API_KEY')
+    const hasPerplexity = !!Deno.env.get('PERPLEXITY_API_KEY')
+    const hasStability = !!Deno.env.get('STABILITY_API_KEY')
     
-    console.log('Available APIs:', { hasOpenAI, hasAnthropic, hasGoogle })
+    console.log('Available APIs:', { hasOpenAI, hasAnthropic, hasGoogle, hasPerplexity, hasStability })
 
     // Handle special actions
     switch (action) {
@@ -70,7 +83,9 @@ serve(async (req) => {
             available: {
               openai: hasOpenAI,
               anthropic: hasAnthropic,
-              google: hasGoogle
+              google: hasGoogle,
+              perplexity: hasPerplexity,
+              stability: hasStability
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -146,6 +161,12 @@ async function executeModel(payload: any) {
     
     case 'anthropic':
       return await executeAnthropic(modelConfig, apiKey, payload)
+    
+    case 'perplexity':
+      return await executePerplexity(modelConfig, apiKey, payload)
+    
+    case 'stability':
+      return await executeStability(modelConfig, apiKey, payload)
     
     default:
       throw new Error(`Unsupported API: ${modelConfig.api}`)
@@ -259,6 +280,91 @@ async function executeAnthropic(config: any, apiKey: string, payload: any) {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
+}
+
+async function executePerplexity(config: any, apiKey: string, payload: any) {
+  const { prompt, systemPrompt } = payload
+  
+  const response = await fetch(config.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt || 'You are a research assistant providing current UX/UI insights and best practices.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 2000,
+      temperature: 0.2
+    })
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Perplexity API error: ${error}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices[0].message.content
+  
+  return new Response(
+    JSON.stringify({ content, citations: data.citations || [] }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
+}
+
+async function executeStability(config: any, apiKey: string, payload: any) {
+  const { imageUrl, prompt, mask } = payload
+  
+  // For inpainting, we need to handle form data differently
+  const formData = new FormData()
+  
+  // Fetch the original image
+  const imageResponse = await fetch(imageUrl)
+  const imageBlob = await imageResponse.blob()
+  formData.append('init_image', imageBlob)
+  
+  if (mask) {
+    const maskBlob = new Blob([mask], { type: 'image/png' })
+    formData.append('mask_image', maskBlob)
+  }
+  
+  formData.append('text_prompts[0][text]', prompt)
+  formData.append('text_prompts[0][weight]', '1')
+  formData.append('cfg_scale', '7')
+  formData.append('steps', '30')
+  
+  const response = await fetch(config.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Stability AI API error: ${error}`)
+  }
+
+  const data = await response.json()
+  
+  return new Response(
+    JSON.stringify({ 
+      imageBase64: data.artifacts[0].base64,
+      finishReason: data.artifacts[0].finishReason
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
 }
 
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
