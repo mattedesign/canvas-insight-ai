@@ -125,8 +125,7 @@ export class SummaryGenerator {
         case 'OVERALL_SCORE_MISSING':
         case 'OVERALL_SCORE_NOT_NUMBER':
         case 'OVERALL_SCORE_NAN':
-          repaired.overallScore = this.calculateFallbackOverallScore(analysisData);
-          break;
+          throw new Error('Overall score is invalid and cannot be repaired');
           
         case 'CATEGORY_SCORES_MISSING':
         case 'CATEGORY_SCORES_NOT_OBJECT':
@@ -139,7 +138,7 @@ export class SummaryGenerator {
           if (!repaired.categoryScores) repaired.categoryScores = {};
           const category = this.extractCategoryFromPath(error.path);
           if (category) {
-            repaired.categoryScores[category] = this.calculateFallbackCategoryScore(category, analysisData);
+            throw new Error(`Category score for ${category} is invalid and cannot be repaired`);
           }
           break;
       }
@@ -172,8 +171,8 @@ export class SummaryGenerator {
       }
     }
 
-    // Priority 3: Calculate from analysis data
-    return this.calculateFallbackOverallScore(analysisData);
+    // Throw error if no valid score can be calculated
+    throw new Error('Unable to calculate overall score from available data');
   }
 
   /**
@@ -195,13 +194,13 @@ export class SummaryGenerator {
         if (typeof score === 'number' && !isNaN(score) && isFinite(score)) {
           result[category] = Math.max(0, Math.min(100, score));
         } else {
-          result[category] = this.calculateFallbackCategoryScore(category, analysisData);
+          throw new Error(`Category score for ${category} is invalid and cannot be calculated`);
         }
       });
     } else {
       // Generate all scores from analysis data
       requiredCategories.forEach(category => {
-        result[category] = this.calculateFallbackCategoryScore(category, analysisData);
+        throw new Error(`Unable to calculate score for category: ${category}`);
       });
     }
 
@@ -275,56 +274,11 @@ export class SummaryGenerator {
       return Math.max(0, Math.min(1, summary.confidenceScore));
     }
 
-    // Calculate from analysis quality
-    return this.calculateFallbackConfidence(analysisData);
+    // Throw error if no valid confidence can be calculated
+    throw new Error('Unable to calculate confidence from available data');
   }
 
-  // === FALLBACK CALCULATION METHODS ===
-
-  private calculateFallbackOverallScore(analysisData: any): number {
-    // Base score calculation logic
-    let score = 75; // Default moderate score
-    
-    if (analysisData.prioritizedActions?.length > 0) {
-      const criticalIssues = analysisData.prioritizedActions.filter(a => a.priority === 'critical').length;
-      const highIssues = analysisData.prioritizedActions.filter(a => a.priority === 'high').length;
-      
-      score -= criticalIssues * 15;
-      score -= highIssues * 8;
-    }
-    
-    return Math.max(10, Math.min(100, score));
-  }
-
-  private calculateFallbackCategoryScore(category: string, analysisData: any): number {
-    const baseScores = {
-      usability: 75,
-      accessibility: 70,
-      visual: 80,
-      content: 75
-    };
-
-    let score = baseScores[category] || 70;
-
-    // Adjust based on analysis findings
-    if (analysisData.prioritizedActions?.length > 0) {
-      const relatedActions = this.getActionsForCategory(category, analysisData.prioritizedActions);
-      const criticalCount = relatedActions.filter(a => a.priority === 'critical').length;
-      const highCount = relatedActions.filter(a => a.priority === 'high').length;
-      
-      score -= criticalCount * 20;
-      score -= highCount * 10;
-    }
-
-    return Math.max(0, Math.min(100, score));
-  }
-
-  private calculateFallbackConfidence(analysisData: any): number {
-    if (analysisData.prioritizedActions?.length > 0) {
-      return 0.8; // High confidence with analysis data
-    }
-    return 0.65; // Moderate confidence
-  }
+  // === DATA EXTRACTION METHODS ===
 
   private extractIssuesFromAnalysis(analysisData: any): string[] {
     if (analysisData.prioritizedActions?.length > 0) {
@@ -356,22 +310,6 @@ export class SummaryGenerator {
     ];
   }
 
-  private getActionsForCategory(category: string, actions: any[]): any[] {
-    const categoryKeywords = {
-      usability: ['usability', 'navigation', 'interaction', 'user experience'],
-      accessibility: ['accessibility', 'a11y', 'inclusive', 'screen reader'],
-      visual: ['visual', 'design', 'layout', 'color', 'typography'],
-      content: ['content', 'text', 'copywriting', 'information', 'messaging']
-    };
-
-    const keywords = categoryKeywords[category] || [];
-    return actions.filter(action => 
-      keywords.some(keyword => 
-        (action.category || action.title || action.description || '').toLowerCase().includes(keyword)
-      )
-    );
-  }
-
   private isGroupAnalysis(analysisData: any): boolean {
     return !!(analysisData.groupMetrics || analysisData.consistency);
   }
@@ -394,17 +332,6 @@ export class SummaryGenerator {
   }
 
   private generateEmergencyFallbackSummary(): GeneratedSummary {
-    return {
-      overallScore: 50,
-      categoryScores: {
-        usability: 50,
-        accessibility: 50,
-        visual: 50,
-        content: 50
-      },
-      keyIssues: ['Analysis requires review'],
-      strengths: ['Interface structure present'],
-      confidence: 0.3
-    };
+    throw new Error('Analysis failed completely - unable to generate summary');
   }
 }

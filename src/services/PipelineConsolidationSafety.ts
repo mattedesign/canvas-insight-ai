@@ -101,7 +101,7 @@ export class PipelineConsolidationSafety {
         warnings.push(`Final analysis validation warnings: ${validation.warnings.map(w => w.message).join(', ')}`);
         
         if (validation.fixedData) {
-          fallbacksApplied.push('Applied validation fixes to final analysis');
+          warnings.push('Applied validation fixes to final analysis');
           return {
             success: true,
             data: validation.fixedData,
@@ -252,8 +252,7 @@ export class PipelineConsolidationSafety {
     }
 
     if (!baseAnalysis || Object.keys(baseAnalysis).length === 0) {
-      baseAnalysis = this.createFallbackAnalysis(imageId, imageName);
-      fallbacksApplied.push('Created fallback analysis structure');
+      throw new Error('No valid analysis data available from any pipeline stage');
     }
 
     // Phase 4: Safe property merging
@@ -264,11 +263,13 @@ export class PipelineConsolidationSafety {
       metadata: this.buildSafeMetadata(stageData, baseAnalysis.metadata, warnings, fallbacksApplied)
     };
 
-    // Phase 4: Ensure required properties exist
-    finalAnalysis.summary = finalAnalysis.summary || this.createFallbackSummary();
-    finalAnalysis.suggestions = this.arraySafety.isValidArray(finalAnalysis.suggestions) 
-      ? finalAnalysis.suggestions 
-      : this.createFallbackSuggestions();
+    // Phase 4: Ensure required properties exist (throw errors for missing data)
+    if (!finalAnalysis.summary) {
+      throw new Error('Analysis summary is missing and cannot be generated');
+    }
+    if (!this.arraySafety.isValidArray(finalAnalysis.suggestions)) {
+      throw new Error('Analysis suggestions are missing and cannot be generated');
+    }
     finalAnalysis.visualAnnotations = this.arraySafety.isValidArray(finalAnalysis.visualAnnotations)
       ? finalAnalysis.visualAnnotations
       : [];
@@ -341,58 +342,6 @@ export class PipelineConsolidationSafety {
     return total;
   }
 
-  /**
-   * Phase 4: Fallback Creation Methods
-   */
-  private createFallbackAnalysis(imageId: string, imageName: string): any {
-    return {
-      imageId,
-      imageName,
-      summary: this.createFallbackSummary(),
-      suggestions: this.createFallbackSuggestions(),
-      visualAnnotations: [],
-      createdAt: new Date().toISOString(),
-      metadata: {
-        fallbackGenerated: true,
-        reason: 'No valid stage data available'
-      }
-    };
-  }
-
-  private createFallbackSummary(): any {
-    return {
-      overallScore: 50,
-      categoryScores: {
-        usability: 50,
-        accessibility: 50,
-        visual: 50,
-        content: 50
-      },
-      keyIssues: ['Analysis requires review due to processing issues'],
-      strengths: ['Interface structure is present'],
-      confidence: 0.3
-    };
-  }
-
-  private createFallbackSuggestions(): any[] {
-    return [
-      {
-        id: 'fallback-1',
-        title: 'Review Analysis Results',
-        description: 'This analysis was generated with limited data. Please review and re-run if needed.',
-        category: 'general',
-        priority: 'medium',
-        impact: 'medium',
-        effort: 'low',
-        actionItems: [
-          'Verify image quality and content',
-          'Check analysis pipeline status',
-          'Consider re-running the analysis'
-        ]
-      }
-    ];
-  }
-
   private createFailureResult(
     errors: string[],
     warnings: string[],
@@ -418,46 +367,5 @@ export class PipelineConsolidationSafety {
     context = 'unknown'
   ): any {
     return this.arraySafety.safeGetProperty(obj, path, defaultValue, context);
-  }
-
-  /**
-   * Phase 4: Runtime Type Checking for Complex Objects
-   */
-  validateComplexObject(
-    obj: any,
-    requiredStructure: Record<string, string>,
-    context = 'unknown'
-  ): { isValid: boolean; missingProperties: string[]; invalidTypes: string[] } {
-    const missingProperties: string[] = [];
-    const invalidTypes: string[] = [];
-
-    if (!obj || typeof obj !== 'object') {
-      missingProperties.push('entire object');
-      return { isValid: false, missingProperties, invalidTypes };
-    }
-
-    Object.entries(requiredStructure).forEach(([property, expectedType]) => {
-      if (!(property in obj)) {
-        missingProperties.push(property);
-      } else {
-        const actualValue = obj[property];
-        const actualType = Array.isArray(actualValue) ? 'array' : typeof actualValue;
-        
-        if (actualType !== expectedType) {
-          invalidTypes.push(`${property}: expected ${expectedType}, got ${actualType}`);
-        }
-      }
-    });
-
-    const isValid = missingProperties.length === 0 && invalidTypes.length === 0;
-    
-    if (!isValid && context !== 'unknown') {
-      this.validationService.debugLog(
-        `Complex object validation failed for ${context}:`,
-        { missingProperties, invalidTypes }
-      );
-    }
-
-    return { isValid, missingProperties, invalidTypes };
   }
 }

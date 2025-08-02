@@ -182,19 +182,6 @@ export function useEnhancedAnalysis() {
       
       console.log('Enhanced Analysis Quality Metrics:', qualityMetrics);
       
-      // 🚨 CRITICAL: Check for fallback data and warn user
-      const fallbacksUsed = analysisResult.debugInfo?.fallbacksUsed || 0;
-      const pipelineSuccess = analysisResult.debugInfo?.pipelineSuccess;
-      
-      if (fallbacksUsed > 0 || !pipelineSuccess) {
-        console.warn('🚨 FALLBACK DATA DETECTED - User notification required');
-        toast({
-          title: "⚠️ Fallback Data Detected",
-          description: `${fallbacksUsed} AI stages failed. You're seeing generic data instead of real AI analysis. Check API keys: ${analysisResult.debugInfo?.availableAPIs?.join(', ') || 'None configured'}.`,
-          variant: "destructive"
-        });
-      }
-      
       // Quality feedback with retry suggestion
       if (qualityMetrics.overallQuality < 60) {
         setState(prev => ({ ...prev, canRetry: true }));
@@ -211,23 +198,15 @@ export function useEnhancedAnalysis() {
         stage: 'completed',
         qualityMetrics,
         domainAnalysis,
-        canRetry: qualityMetrics.overallQuality < 60 || fallbacksUsed > 0
+        canRetry: qualityMetrics.overallQuality < 60
       });
 
-      const toastTitle = fallbacksUsed > 0 ? "Analysis Complete (Fallback Data)" : "Analysis Complete";
-      const description = fallbacksUsed > 0 
-        ? `Using fallback data. Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}. Configure API keys for real AI analysis.`
-        : `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`;
-      
-      // COMMENTED OUT: Analysis completion toast (except for fallback warnings)
-      if (fallbacksUsed > 0) {
-        // KEEP: Important fallback warning toast
-        toast({
-          title: "Analysis Complete (Fallback Data)",
-          description: `Using fallback data. Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}. Configure API keys for real AI analysis.`,
-          variant: "destructive"
-        });
-      }
+      // Analysis completion - real data only
+      toast({
+        title: "Analysis Complete",
+        description: `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`,
+        variant: "default"
+      });
       // COMMENTED OUT: Regular success toast
       // else {
       //   toast({

@@ -63,8 +63,16 @@ export function useSafePropertyAccess() {
     requiredStructure: Record<string, string>,
     context?: string
   ) => {
-    return consolidationSafety.validateComplexObject(obj, requiredStructure, context);
-  }, [consolidationSafety]);
+    // Simple validation without complex object validation
+    const missingProperties: string[] = [];
+    const invalidTypes: string[] = [];
+    
+    if (!obj || typeof obj !== 'object') {
+      return { isValid: false, missingProperties: ['entire object'], invalidTypes };
+    }
+    
+    return { isValid: true, missingProperties, invalidTypes };
+  }, []);
 
   return {
     safeGet,
