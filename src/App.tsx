@@ -20,7 +20,7 @@ const Projects = lazy(() => import("./pages/Projects"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Subscription = lazy(() => import("./pages/Subscription"));
 const Auth = lazy(() => import("./pages/Auth"));
-const TestOpenAI = lazy(() => import("./pages/TestOpenAI"));
+
 const ProductionReadiness = lazy(() => import("./pages/ProductionReadiness"));
 const PerformanceTestingDashboard = lazy(() => import("./pages/PerformanceTestingDashboard"));
 const VerificationTests = lazy(() => import("./pages/VerificationTests"));
@@ -117,11 +117,6 @@ const App = () => {
                 <Route path="/subscription" element={
                   <ProtectedRoute>
                     <Subscription />
-                  </ProtectedRoute>
-                } />
-                <Route path="/test-openai" element={
-                  <ProtectedRoute>
-                    <TestOpenAI />
                   </ProtectedRoute>
                 } />
                 <Route path="/production" element={

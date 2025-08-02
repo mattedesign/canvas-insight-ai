@@ -24,7 +24,6 @@ export const AIAnalysisConnectionEdge: React.FC<EdgeProps> = ({
     targetPosition,
   });
 
-  const isAIConnection = data?.type === 'ai-analysis';
   const isGroupAnalysis = data?.type === 'group-analysis';
 
   return (
@@ -33,21 +32,17 @@ export const AIAnalysisConnectionEdge: React.FC<EdgeProps> = ({
         id={id}
         style={{
           ...style,
-          stroke: isAIConnection ? 'hsl(var(--primary))' : 
-                  isGroupAnalysis ? 'hsl(var(--secondary))' : 
-                  style.stroke,
-          strokeWidth: isAIConnection || isGroupAnalysis ? 3 : 2,
-          strokeDasharray: isAIConnection ? '5,5' : 
-                          isGroupAnalysis ? '8,3' : 
-                          undefined,
+          stroke: isGroupAnalysis ? 'hsl(var(--secondary))' : style.stroke,
+          strokeWidth: isGroupAnalysis ? 3 : 2,
+          strokeDasharray: isGroupAnalysis ? '8,3' : undefined,
         }}
-        className={`react-flow__edge-path ${isAIConnection || isGroupAnalysis ? 'animate-pulse' : ''}`}
+        className={`react-flow__edge-path ${isGroupAnalysis ? 'animate-pulse' : ''}`}
         d={edgePath}
         markerEnd={markerEnd}
       />
       
       {/* Edge Label */}
-      {(isAIConnection || isGroupAnalysis) && (
+      {isGroupAnalysis && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -59,12 +54,11 @@ export const AIAnalysisConnectionEdge: React.FC<EdgeProps> = ({
             className="nodrag nopan"
           >
             <Badge 
-              variant={isAIConnection ? "default" : "secondary"} 
+              variant="secondary" 
               className="bg-background/90 backdrop-blur-sm border shadow-lg"
             >
-              {isAIConnection && <Bot className="h-3 w-3 mr-1" />}
-              {isGroupAnalysis && <Activity className="h-3 w-3 mr-1" />}
-              {isAIConnection ? 'AI Analysis' : 'Group Analysis'}
+              <Activity className="h-3 w-3 mr-1" />
+              Group Analysis
             </Badge>
           </div>
         </EdgeLabelRenderer>

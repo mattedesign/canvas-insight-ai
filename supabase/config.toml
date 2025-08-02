@@ -1,16 +1,10 @@
 project_id = "sdcmbfdtafkzpimwjpij"
 
-[functions.openai-test]
-verify_jwt = false
-
 [functions.ux-analysis]
 verify_jwt = true
 
 [functions.google-vision-metadata]
 verify_jwt = false
-
-[functions.ai-analysis]
-verify_jwt = true
 
 [functions.inpainting-service]
 verify_jwt = true
