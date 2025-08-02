@@ -1669,9 +1669,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
-        fitView={uploadedImages.length === 0} // Only fit view when no images to prevent zoom conflicts
+        fitView={uploadedImages.length > 0} // Fit view when images are loaded to center content
         fitViewOptions={{
-          padding: 0.1,
+          padding: 0.2,
           includeHiddenNodes: false,
           minZoom: 0.5,
           maxZoom: 2
