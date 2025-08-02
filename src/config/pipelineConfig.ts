@@ -11,13 +11,19 @@ const getEnvVar = (key: string): string | undefined => {
 
 export const pipelineConfig = {
   models: {
+    // Vision analysis models (image understanding)
+    vision: {
+      primary: ['gpt-4o', 'claude-opus-4-20250514'],
+      secondary: [],
+      timeout: 60000
+    },
     // Core analysis models for UX/UI evaluation
     analysis: {
       primary: ['gpt-4o', 'claude-opus-4-20250514'],
       secondary: [],
       timeout: 60000
     },
-    // Metadata extraction models (not for analysis selection)
+    // Metadata extraction models (separate from analysis pipeline)
     metadata: {
       primary: ['google-vision'],
       secondary: [],

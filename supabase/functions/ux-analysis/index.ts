@@ -426,6 +426,7 @@ function mapModelName(requestedModel: string): string {
     'claude-3-opus-20240229': 'claude-opus-4-20250514',
     
     // Note: Google Vision is handled separately for metadata extraction only
+    // It should NOT appear in vision/analysis pipelines
     
     // Perplexity mappings
     'perplexity-sonar': 'llama-3.1-sonar-small-128k-online'

@@ -67,14 +67,15 @@ export class BoundaryPushingPipeline {
       timestamp: new Date().toISOString()
     });
     
-    console.log('🔧 Pipeline configuration:', {
-      contextDetectionEnabled: pipelineConfig.contextDetection.enabled,
-      availableModels: {
-        metadata: pipelineConfig.models.metadata.primary,
-        analysis: pipelineConfig.models.analysis.primary
-      },
-      qualitySettings: pipelineConfig.quality
-    });
+      console.log('🔧 Pipeline configuration:', {
+        contextDetectionEnabled: pipelineConfig.contextDetection.enabled,
+        availableModels: {
+          vision: pipelineConfig.models.vision.primary,
+          analysis: pipelineConfig.models.analysis.primary,
+          metadata: pipelineConfig.models.metadata.primary
+        },
+        qualitySettings: pipelineConfig.quality
+      });
     
     try {
       // PHASE 3: Save context detection progress
@@ -753,26 +754,38 @@ export class BoundaryPushingPipeline {
     };
   }
 
-  private readonly ANALYSIS_MODELS = [
-    'gpt-4o',
-    'claude-opus-4-20250514',
-    'perplexity-sonar'
-  ];
-
   private getAvailableModels(stage: 'vision' | 'analysis'): string[] {
     console.log(`Getting available models for stage: ${stage}`);
     
-    if (stage === 'vision') {
-      // For vision, we only use vision-capable models
-      const visionModels = ['gpt-4o', 'claude-opus-4-20250514'];
-      console.log('Vision models available:', visionModels);
-      return visionModels;
-    } else {
-      // For analysis and synthesis, use text models
-      const analysisModels = ['gpt-4o', 'claude-opus-4-20250514'];
-      console.log('Analysis models available:', analysisModels);
-      return analysisModels;
+    const config = pipelineConfig.models[stage];
+    if (!config) {
+      throw new PipelineError(
+        `No configuration found for stage: ${stage}`,
+        stage,
+        { availableStages: Object.keys(pipelineConfig.models) },
+        false
+      );
     }
+    
+    const availableModels = [...config.primary, ...config.secondary];
+    
+    // CRITICAL: Validate that Google Vision is not used for vision/analysis stages
+    const invalidModels = availableModels.filter(model => model.includes('google-vision'));
+    if (invalidModels.length > 0) {
+      throw new PipelineError(
+        `Google Vision models are not allowed for ${stage} stage. They are only for metadata extraction.`,
+        stage,
+        { 
+          invalidModels,
+          stage,
+          note: 'Google Vision should only be configured in pipelineConfig.models.metadata'
+        },
+        false
+      );
+    }
+    
+    console.log(`${stage} models available:`, availableModels);
+    return availableModels;
   }
 
   // Add new method for conversational analysis
