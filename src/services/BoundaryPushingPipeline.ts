@@ -162,11 +162,60 @@ export class BoundaryPushingPipeline {
 
     this.analysisContext = clarifiedContext;
     
-    // Continue with enhanced context
-    onProgress?.(10, 'Resuming with clarified context...');
+    console.log('📊 Enhanced Analysis Context after clarification:', {
+      imageType: this.analysisContext.image.primaryType,
+      userRole: this.analysisContext.user.inferredRole,
+      confidence: this.analysisContext.confidence,
+      focusAreas: this.analysisContext.focusAreas,
+      industryStandards: this.analysisContext.industryStandards
+    });
     
-    // Continue from vision stage with better context
-    return this.execute(imageUrl, userContext, onProgress);
+    // Continue with enhanced context - skip context detection and go straight to vision
+    onProgress?.(10, 'Proceeding with enhanced context...');
+    
+    try {
+      // Stage 1: Vision Extraction with Enhanced Context (30% progress)
+      onProgress?.(15, `Analyzing ${this.analysisContext.image.primaryType} interface...`);
+      const visionResults = await this.executeVisionStage(imageUrl);
+      onProgress?.(30, 'Vision analysis complete');
+
+      // Stage 2: Deep Analysis with Context (80% progress)
+      onProgress?.(35, `Performing ${this.analysisContext.analysisDepth} analysis...`);
+      const analysisResults = await this.executeAnalysisStage(
+        imageUrl,
+        visionResults.fusedData,
+        userContext
+      );
+      onProgress?.(80, 'Analysis complete');
+
+      // Stage 3: Synthesis and Recommendations (100% progress)
+      onProgress?.(85, 'Generating recommendations...');
+      const synthesisResults = await this.executeSynthesisStage(
+        visionResults,
+        analysisResults,
+        userContext
+      );
+      onProgress?.(100, 'Analysis complete');
+
+      // Store and return final results
+      return await this.storeResults({
+        visionResults,
+        analysisResults,
+        synthesisResults,
+        executionTime: Date.now() - Date.now(), // Will be calculated properly in real implementation
+        modelsUsed: this.getUsedModels([visionResults, analysisResults, synthesisResults]),
+        analysisContext: this.analysisContext
+      });
+      
+    } catch (error) {
+      console.error('❌ Pipeline execution failed during resume:', error);
+      throw new PipelineError(
+        'Pipeline execution failed',
+        'resume',
+        { originalError: error.message },
+        false
+      );
+    }
   }
 
   private generateResumeToken(): string {
