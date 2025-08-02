@@ -20,6 +20,8 @@ interface AnalysisRequestNodeProps extends NodeProps {
 }
 
 export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps) => {
+  console.log('[AnalysisRequestNode] Component mounted with data:', data);
+  
   const { imageId, imageName, imageUrl, userContext, onAnalysisComplete, onError } = data;
   const [showClarification, setShowClarification] = useState(false);
   const [resumeToken, setResumeToken] = useState<string>('');
@@ -37,10 +39,19 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
 
   // Start analysis when node is created
   useEffect(() => {
+    console.log('[AnalysisRequestNode] useEffect triggered with:', {
+      isAnalyzing,
+      requiresClarification,
+      error,
+      imageUrl,
+      imageName
+    });
+    
     if (!isAnalyzing && !requiresClarification && !error) {
-      console.log('Starting analysis for:', imageName);
+      console.log('[AnalysisRequestNode] Starting analysis for:', imageName);
       executeAnalysis(imageUrl, userContext || '')
         .then((result) => {
+          console.log('[AnalysisRequestNode] Analysis result:', result);
           if (result.requiresClarification) {
             setShowClarification(true);
             // Store questions for resume token - using a simple identifier

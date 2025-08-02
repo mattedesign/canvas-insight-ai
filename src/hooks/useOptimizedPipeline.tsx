@@ -37,6 +37,8 @@ export function useOptimizedPipeline() {
     imageUrl: string,
     userContext: string
   ) => {
+    console.log('[useOptimizedPipeline] executeAnalysis called with:', { imageUrl, userContext });
+    
     setState({
       isAnalyzing: true,
       progress: 0,
@@ -45,13 +47,17 @@ export function useOptimizedPipeline() {
     });
 
     try {
+      console.log('[useOptimizedPipeline] Creating pipeline instance...');
       pipelineRef.current = new BoundaryPushingPipeline();
       
+      console.log('[useOptimizedPipeline] Executing pipeline...');
       const result = await pipelineRef.current.execute(
         imageUrl,
         userContext,
         handleProgress
       );
+      
+      console.log('[useOptimizedPipeline] Pipeline result:', result);
 
       if (result.requiresClarification) {
         setState(prev => ({
