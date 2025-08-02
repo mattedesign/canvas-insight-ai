@@ -696,7 +696,7 @@ export class BoundaryPushingPipeline {
       return visionModels;
     } else {
       // For analysis and synthesis, use text models
-      const analysisModels = ['gpt-4.1-2025-04-14', 'claude-opus-4-20250514'];
+      const analysisModels = ['gpt-4o', 'claude-3-5-sonnet-20241022'];
       console.log('Analysis models available:', analysisModels);
       return analysisModels;
     }

@@ -15,7 +15,7 @@ export const pipelineConfig = {
       timeout: 30000
     },
     analysis: {
-      primary: ['gpt-4.1-2025-04-14', 'claude-opus-4-20250514'],
+      primary: ['gpt-4o', 'claude-3-5-sonnet-20241022'],
       secondary: ['gemini-1.5-pro'],
       timeout: 60000
     }

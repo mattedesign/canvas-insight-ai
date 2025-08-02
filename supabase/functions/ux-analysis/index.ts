@@ -142,11 +142,20 @@ async function executeModel(payload: any) {
     throw new Error(`Stage is required but received: ${stage}. Full payload: ${JSON.stringify(payload)}`)
   }
   
-  const modelConfig = MODEL_CONFIGS[model]
+  // Map newer model names to edge function model names
+  const mappedModel = mapModelName(model)
+  const modelConfig = MODEL_CONFIGS[mappedModel]
   
   if (!modelConfig) {
     const availableModels = Object.keys(MODEL_CONFIGS)
-    throw new Error(`Unknown model: ${model}. Available models: ${availableModels.join(', ')}`)
+    const suggestion = findBestModelMatch(model, availableModels)
+    console.error(`Model mapping failed:`, {
+      requestedModel: model,
+      mappedModel,
+      availableModels,
+      suggestion
+    })
+    throw new Error(`Unknown model: ${model} (mapped to: ${mappedModel}). Available models: ${availableModels.join(', ')}. Did you mean: ${suggestion}?`)
   }
 
   const apiKey = Deno.env.get(modelConfig.requiresKey)
@@ -274,14 +283,14 @@ async function executeAnthropic(config: any, apiKey: string, payload: any) {
       role: 'user',
       content: imageUrl ? [
         { type: 'text', text: prompt },
-        { 
-          type: 'image', 
-          source: {
-            type: 'base64',
-            media_type: 'image/jpeg',
-            data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : base64Data
+          { 
+            type: 'image', 
+            source: {
+              type: 'base64',
+              media_type: detectImageFormat(imageUrl, base64Data),
+              data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : base64Data
+            }
           }
-        }
       ] : prompt
     }];
 
@@ -412,6 +421,81 @@ async function executeStability(config: any, apiKey: string, payload: any) {
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+// Model name mapping function
+function mapModelName(requestedModel: string): string {
+  const modelMapping: Record<string, string> = {
+    // OpenAI model mappings
+    'gpt-4.1-2025-04-14': 'gpt-4o',
+    'gpt-4o': 'gpt-4o',
+    'gpt-4o-mini': 'gpt-4o-mini',
+    'openai-vision': 'gpt-4o',
+    
+    // Anthropic model mappings
+    'claude-opus-4-20250514': 'claude-3-5-sonnet-20241022',
+    'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet-20241022',
+    'claude-3-opus-20240229': 'claude-3-5-sonnet-20241022',
+    'anthropic-vision': 'claude-3-5-sonnet-20241022',
+    
+    // Google model mappings
+    'gemini-1.5-pro': 'gemini-1.5-pro',
+    'google-vision': 'gemini-1.5-pro',
+    
+    // Perplexity mappings
+    'perplexity-sonar': 'llama-3.1-sonar-small-128k-online'
+  }
+  
+  const mapped = modelMapping[requestedModel] || requestedModel
+  console.log(`Model mapping: ${requestedModel} -> ${mapped}`)
+  return mapped
+}
+
+// Find best model match for suggestions
+function findBestModelMatch(requestedModel: string, availableModels: string[]): string {
+  // Simple fuzzy matching
+  if (requestedModel.includes('gpt') || requestedModel.includes('openai')) {
+    return availableModels.find(m => m.includes('gpt')) || 'gpt-4o'
+  }
+  if (requestedModel.includes('claude') || requestedModel.includes('anthropic')) {
+    return availableModels.find(m => m.includes('claude')) || 'claude-3-5-sonnet-20241022'
+  }
+  if (requestedModel.includes('gemini') || requestedModel.includes('google')) {
+    return availableModels.find(m => m.includes('gemini')) || 'gemini-1.5-pro'
+  }
+  return availableModels[0] || 'gpt-4o'
+}
+
+// Image format detection function
+function detectImageFormat(imageUrl: string, base64Data?: string): string {
+  // Check data URL format first
+  if (imageUrl.startsWith('data:image/')) {
+    const format = imageUrl.match(/data:image\/([^;]+)/)?.[1]
+    if (format) {
+      return `image/${format}`
+    }
+  }
+  
+  // Check file extension
+  const urlLower = imageUrl.toLowerCase()
+  if (urlLower.includes('.png')) return 'image/png'
+  if (urlLower.includes('.webp')) return 'image/webp'
+  if (urlLower.includes('.gif')) return 'image/gif'
+  if (urlLower.includes('.svg')) return 'image/svg+xml'
+  
+  // Check base64 data if available
+  if (base64Data) {
+    // PNG starts with iVBORw0KGgo
+    if (base64Data.startsWith('iVBORw0KGgo')) return 'image/png'
+    // WebP starts with UklGR
+    if (base64Data.startsWith('UklGR')) return 'image/webp'
+    // GIF starts with R0lGODlh or R0lGODdh
+    if (base64Data.startsWith('R0lGOD')) return 'image/gif'
+  }
+  
+  // Default to JPEG if unable to detect
+  console.warn(`Could not detect image format for ${imageUrl}, defaulting to JPEG`)
+  return 'image/jpeg'
 }
 
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
