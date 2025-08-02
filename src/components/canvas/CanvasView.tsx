@@ -1614,45 +1614,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
 
       {/* AI Canvas Toolbar - Will be added in next phase */}
       
-      {/* Undo/Redo Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => {
-            const previousState = undo();
-            if (previousState) {
-              setIsUpdating(true);
-              setNodes(previousState.nodes);
-              setEdges(previousState.edges);
-              setTimeout(() => setIsUpdating(false), 0);
-            }
-          }}
-          disabled={!canUndo}
-          className="bg-background/90 backdrop-blur-sm"
-          title={`Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)`}
-        >
-          <Undo2 className="h-4 w-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => {
-            const nextState = redo();
-            if (nextState) {
-              setIsUpdating(true);
-              setNodes(nextState.nodes);
-              setEdges(nextState.edges);
-              setTimeout(() => setIsUpdating(false), 0);
-            }
-          }}
-          disabled={!canRedo}
-          className="bg-background/90 backdrop-blur-sm"
-          title={`Redo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Shift+Z)`}
-        >
-          <Redo2 className="h-4 w-4" />
-        </Button>
-      </div>
 
       {/* Visual feedback when panning is disabled */}
       {isPanningDisabled && (
