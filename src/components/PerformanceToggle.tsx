@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { BarChart3 } from 'lucide-react';
-import { PerformanceDashboard } from './PerformanceDashboard';
+import { PerformanceDashboard } from './legacy/LegacyPerformanceDashboard';
 
 export const PerformanceToggle: React.FC = () => {
   const [showDashboard, setShowDashboard] = useState(false);

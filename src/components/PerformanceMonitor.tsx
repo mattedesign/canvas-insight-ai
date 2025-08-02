@@ -6,7 +6,7 @@
 import React, { useState, useEffect, memo } from 'react';
 import { RenderOptimizationService } from '@/services/RenderOptimizationService';
 import { useRenderTracker } from '@/hooks/useRenderTracker';
-import { PerformanceDashboard } from '@/components/PerformanceDashboard';
+// import { PerformanceDashboard } from '@/components/PerformanceDashboard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -111,11 +111,21 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = memo(({
         )}
       </div>
 
-      {/* Performance Dashboard */}
-      <PerformanceDashboard
-        isVisible={showDashboard}
-        onClose={() => setShowDashboard(false)}
-      />
+      {/* New Performance Dashboard */}
+      {showDashboard && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Performance Dashboard</h2>
+              <Button variant="ghost" onClick={() => setShowDashboard(false)}>×</Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Enhanced performance monitoring with RenderOptimizationService integration.
+              Tracking {summary.totalComponents} components with {summary.averageRenderTime.toFixed(1)}ms average render time.
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 });
