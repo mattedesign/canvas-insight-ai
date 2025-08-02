@@ -3,6 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthContextValidator } from '@/hooks/useContextValidator';
+import { useContextOptimization } from '@/services/ContextOptimizationService';
+import { useContextBatching } from '@/services/ContextBatchingService';
 
 interface SubscriptionInfo {
   subscribed: boolean;
@@ -49,6 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[AuthProvider] Validation warnings:', warnings);
     },
   });
+
+  // ✅ PHASE 6.2: CONTEXT OPTIMIZATION
+  const optimization = useContextOptimization('AuthContext');
+  const batching = useContextBatching('AuthContext');
 
   const checkSubscription = async () => {
     if (!session) return;
@@ -280,16 +286,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const value: AuthContextType = {
+  // ✅ PHASE 6.2: MEMOIZED CONTEXT VALUE FOR OPTIMIZATION
+  const value: AuthContextType = React.useMemo(() => ({
     user,
     session,
     loading,
     subscription,
-    signUp,
-    signIn,
-    signOut,
-    checkSubscription,
-  };
+    signUp: (email: string, password: string) => {
+      optimization.trackUpdate();
+      return signUp(email, password);
+    },
+    signIn: (email: string, password: string) => {
+      optimization.trackUpdate();
+      return signIn(email, password);
+    },
+    signOut: () => {
+      optimization.trackUpdate();
+      return signOut();
+    },
+    checkSubscription: async () => {
+      return new Promise<void>((resolve) => {
+        batching.scheduleUpdate(() => {
+          checkSubscription().then(resolve);
+          optimization.trackUpdate();
+        }, 'normal');
+      });
+    },
+  }), [user, session, loading, subscription, signUp, signIn, signOut, checkSubscription, optimization, batching]);
 
   // ✅ PHASE 6.1: VALIDATE AUTH CONTEXT VALUE ON CHANGES
   useEffect(() => {
@@ -298,6 +321,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[AuthProvider] Context validation failed, but continuing...', result.errors);
     }
   }, [value, validator]);
+
+  // ✅ PHASE 6.2: TRACK RE-RENDERS
+  useEffect(() => {
+    optimization.trackReRender();
+  });
 
   return (
     <AuthContext.Provider value={value}>

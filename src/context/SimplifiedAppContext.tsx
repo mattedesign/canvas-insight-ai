@@ -7,6 +7,8 @@ import { useStableHelpers } from '@/hooks/useStableHelpers';
 import { useInitializationManager } from '@/hooks/useInitializationManager';
 import { InitializationErrorBoundary } from '@/components/InitializationErrorBoundary';
 import { useAppContextValidator } from '@/hooks/useContextValidator';
+import { useContextOptimization } from '@/services/ContextOptimizationService';
+import { useContextBatching } from '@/services/ContextBatchingService';
 import type { 
   StrictAppContextValue,
   StrictStableHelpers,
@@ -44,6 +46,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
   });
 
+  // ✅ PHASE 6.2: CONTEXT OPTIMIZATION
+  const optimization = useContextOptimization('AppContext');
+  const batching = useContextBatching('AppContext');
+
   // ✅ PHASE 3.2: ONE-TIME INITIALIZATION EFFECT - Empty dependencies
   useEffect(() => {
     if (user?.id) {
@@ -77,7 +83,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Promise.resolve();
   };
 
-  const value = { state, dispatch, stableHelpers };
+  // ✅ PHASE 6.2: MEMOIZED CONTEXT VALUE FOR OPTIMIZATION
+  const value = React.useMemo(() => ({
+    state,
+    dispatch: (action: AppAction) => {
+      // ✅ PHASE 6.2: BATCH CONTEXT UPDATES
+      batching.scheduleUpdate(() => {
+        dispatch(action);
+        optimization.trackUpdate();
+      }, 'normal');
+    },
+    stableHelpers,
+  }), [state, stableHelpers, dispatch, batching, optimization]);
 
   // ✅ PHASE 6.1: VALIDATE CONTEXT VALUE ON CHANGES
   useEffect(() => {
@@ -86,6 +103,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('[AppProvider] Context validation failed, but continuing...', result.errors);
     }
   }, [value, validator]);
+
+  // ✅ PHASE 6.2: TRACK RE-RENDERS
+  useEffect(() => {
+    optimization.trackReRender();
+  });
 
   return (
     <InitializationErrorBoundary onRetry={handleInitializationRetry} maxRetries={3}>
