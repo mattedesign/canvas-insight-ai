@@ -26,7 +26,7 @@ export class ContextDetectionService {
       body: {
         imageUrl,
         prompt: contextPrompt,
-        model: 'gpt-4-vision-preview', // Use vision model
+        model: 'gpt-4o', // Use vision model
         maxTokens: 1000
       }
     });
