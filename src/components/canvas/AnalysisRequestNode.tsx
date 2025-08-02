@@ -67,7 +67,7 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           }
         });
     }
-  }, [imageUrl, imageName, userContext, executeAnalysis, isAnalyzing, requiresClarification, error, onAnalysisComplete, onError]);
+  }, [imageUrl, imageName, userContext, isAnalyzing, requiresClarification, error]); // Removed callback dependencies
 
   const handleClarificationSubmit = async (responses: Record<string, string>) => {
     setShowClarification(false);
