@@ -5,6 +5,8 @@ import { ContextDetectionService } from './ContextDetectionService';
 import { DynamicPromptBuilder } from './DynamicPromptBuilder';
 import { AnalysisContext } from '@/types/contextTypes';
 import { AdaptiveTimeoutCalculator, ImageComplexity } from '@/config/adaptiveTimeoutConfig';
+import { ProgressPersistenceService } from './ProgressPersistenceService';
+import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
 
 interface ModelResult {
   model: string;
@@ -30,10 +32,17 @@ export class BoundaryPushingPipeline {
   private contextDetector: ContextDetectionService;
   private promptBuilder: DynamicPromptBuilder;
   private analysisContext: AnalysisContext | null = null;
+  // PHASE 3: Performance Enhancement Services
+  private progressService: ProgressPersistenceService;
+  private modelOptimizer: ModelSelectionOptimizer;
+  private currentRequestId: string | null = null;
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
     this.promptBuilder = new DynamicPromptBuilder();
+    // PHASE 3: Initialize performance enhancement services
+    this.progressService = ProgressPersistenceService.getInstance();
+    this.modelOptimizer = ModelSelectionOptimizer.getInstance();
   }
 
   async execute(
@@ -44,10 +53,17 @@ export class BoundaryPushingPipeline {
     this.abortController = new AbortController();
     const startTime = Date.now();
     
+    // PHASE 3: Generate request ID and check for resumption
+    this.currentRequestId = this.progressService.generateRequestId(imageUrl, userContext);
+    const resumption = this.progressService.checkResumption(this.currentRequestId);
+    
     console.log('🚀 BoundaryPushingPipeline.execute() called with:', {
       imageUrl: imageUrl ? 'provided' : 'missing',
       userContext: userContext ? `"${userContext.substring(0, 50)}..."` : 'empty',
       hasProgressCallback: !!onProgress,
+      requestId: this.currentRequestId,
+      canResume: resumption.canResume,
+      lastStage: resumption.lastStage,
       timestamp: new Date().toISOString()
     });
     
@@ -61,7 +77,8 @@ export class BoundaryPushingPipeline {
     });
     
     try {
-      // CRITICAL: Context Detection Phase (5% progress) - THIS IS PRIORITY
+      // PHASE 3: Save context detection progress
+      this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext, 'context-detection', 5);
       onProgress?.(2, 'Analyzing image context...');
       const imageContext = await this.contextDetector.detectImageContext(imageUrl);
       
@@ -95,10 +112,26 @@ export class BoundaryPushingPipeline {
         };
       }
 
-      // Stage 1: Vision Extraction with Context (30% progress)
-      onProgress?.(10, `Initializing vision models for ${imageContext.primaryType} analysis...`);
-      const visionResults = await this.executeVisionStage(imageUrl);
-      onProgress?.(30, 'Vision analysis complete');
+      // PHASE 3: Check for resumption from vision stage
+      let visionResults: StageResult;
+      if (resumption.canResume && resumption.lastStage === 'vision' && resumption.resumeData?.visionData) {
+        console.log('📋 Resuming from vision stage with cached data');
+        onProgress?.(30, 'Resuming from vision analysis...');
+        visionResults = {
+          stage: 'vision',
+          results: [],
+          fusedData: resumption.resumeData.visionData,
+          confidence: 0.8
+        };
+      } else {
+        // Stage 1: Vision Extraction with Context (30% progress)
+        onProgress?.(10, `Initializing vision models for ${imageContext.primaryType} analysis...`);
+        visionResults = await this.executeVisionStage(imageUrl);
+        onProgress?.(30, 'Vision analysis complete');
+        
+        // PHASE 3: Save vision progress
+        this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext, 'vision', 30, visionResults.fusedData);
+      }
 
       // Stage 2: Deep Analysis with Context (60% progress)
       onProgress?.(40, `Performing ${this.analysisContext.user.inferredRole || 'comprehensive'} analysis...`);
@@ -225,7 +258,9 @@ export class BoundaryPushingPipeline {
   }
 
   private async executeVisionStage(imageUrl: string): Promise<StageResult> {
-    const models = this.getAvailableModels('vision');
+    // PHASE 3: Optimize model selection based on context and performance
+    const optimizedSelection = this.modelOptimizer.selectOptimalModels('vision', this.analysisContext);
+    const models = [...optimizedSelection.primaryModels, ...optimizedSelection.secondaryModels];
     
     if (models.length === 0) {
       throw new PipelineError(
@@ -248,10 +283,18 @@ export class BoundaryPushingPipeline {
     
     const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('vision', this.analysisContext);
 
-    // PHASE 1: Adaptive Timeout - Calculate timeout based on context
-    const adaptiveTimeout = pipelineConfig.execution.adaptiveTimeouts
-      ? pipelineConfig.execution.timeoutCalculator.calculateTimeout('vision', 'moderate', models.length)
-      : pipelineConfig.models.vision.timeout;
+    // PHASE 3: Use optimized timeout from model selection
+    const adaptiveTimeout = optimizedSelection.expectedTimeout || (
+      pipelineConfig.execution.adaptiveTimeouts
+        ? pipelineConfig.execution.timeoutCalculator.calculateTimeout('vision', 'moderate', models.length)
+        : pipelineConfig.models.vision.timeout
+    );
+
+    console.log('👁️ Vision Stage - Optimized execution plan:', {
+      selectedModels: models,
+      reasoning: optimizedSelection.reasoning,
+      expectedTimeout: adaptiveTimeout
+    });
 
     const results = await this.executeModelsInParallel(
       models,
@@ -259,8 +302,23 @@ export class BoundaryPushingPipeline {
       adaptiveTimeout
     );
 
+    // PHASE 3: Record model performance for future optimization
+    results.forEach(result => {
+      const responseTime = result.metrics.endTime - result.metrics.startTime;
+      this.modelOptimizer.recordPerformance(
+        result.model,
+        responseTime,
+        result.success,
+        result.success ? 0.8 : 0.2 // Simple quality score based on success
+      );
+    });
     const successfulResults = results.filter(r => r.success);
     if (successfulResults.length === 0) {
+      // PHASE 3: Mark request as failed
+      if (this.currentRequestId) {
+        this.progressService.failRequest(this.currentRequestId, 'All vision models failed');
+      }
+      
       throw new PipelineError(
         'All vision models failed. Check API keys and try again.',
         'vision',
@@ -934,9 +992,15 @@ export class BoundaryPushingPipeline {
     this.abortController?.abort();
     this.abortController = null;
     this.analysisContext = null;
+    // PHASE 3: Reset current request tracking
+    this.currentRequestId = null;
   }
 
   cancel(): void {
     this.abortController?.abort();
+    // PHASE 3: Mark request as cancelled if active
+    if (this.currentRequestId) {
+      this.progressService.failRequest(this.currentRequestId, 'Request cancelled by user');
+    }
   }
 }
