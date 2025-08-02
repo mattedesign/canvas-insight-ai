@@ -213,7 +213,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [onOpenAnalysisPanel]);
 
   // Analysis workflow handlers
-  const handleCreateAnalysisRequest = useCallback((imageId: string) => {
+  const handleCreateAnalysisRequest = useCallback(async (imageId: string) => {
     const image = uploadedImages.find(img => img.id === imageId);
     if (!image) {
       console.error('[CanvasView] Image not found for analysis request:', imageId);
@@ -221,7 +221,30 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
     
     console.log('[CanvasView] Creating analysis request for image:', image.name);
-    setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name, imageUrl: image.url })));
+    
+    // Get the proper Supabase storage URL instead of using blob URL
+    try {
+      const { data: imageData, error } = await supabase
+        .from('images')
+        .select('storage_path')
+        .eq('id', imageId)
+        .single();
+      
+      if (error || !imageData) {
+        console.error('[CanvasView] Failed to get image storage path:', error);
+        return;
+      }
+      
+      const publicUrl = supabase.storage.from('images').getPublicUrl(imageData.storage_path).data.publicUrl;
+      
+      setAnalysisRequests(prev => new Map(prev.set(imageId, { 
+        imageId, 
+        imageName: image.name, 
+        imageUrl: publicUrl 
+      })));
+    } catch (err) {
+      console.error('[CanvasView] Error getting Supabase storage URL:', err);
+    }
     
     // COMMENTED OUT: Repetitive analysis request toast
     // toast({
