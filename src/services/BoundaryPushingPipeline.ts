@@ -1455,20 +1455,11 @@ export class BoundaryPushingPipeline {
     if (this.currentRequestId) {
       this.progressService.failRequest(this.currentRequestId, 'Request cancelled by user');
     }
-    }
   }
 
   /**
    * PHASE 5: Simple retry for transient errors
    */
-  private async executeRetryableOperation(
-    imageUrl: string,
-    userContext: string,
-    onProgress?: (progress: number, stage: string) => void
-  ): Promise<any> {
-    return this.execute(imageUrl, userContext, onProgress);
-  }
-}
   private async executeRetryableOperation(
     imageUrl: string,
     userContext: string,

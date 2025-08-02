@@ -41,7 +41,13 @@ export function EnhancedAnalysisPanelWithErrorBoundary({
     >
       <AnalysisPanel 
         analysis={analysis}
-        imageUrl={imageUrl}
+        image={imageUrl ? { 
+          id: 'temp', 
+          url: imageUrl, 
+          name: 'Analysis Image',
+          file: new File([], 'temp'),
+          dimensions: { width: 1920, height: 1080 }
+        } : null}
         isOpen={true}
         onClose={() => {}}
       />
