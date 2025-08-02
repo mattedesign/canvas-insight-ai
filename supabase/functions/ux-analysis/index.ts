@@ -23,7 +23,7 @@ const MODEL_CONFIGS = {
     model: 'gpt-4o',
     requiresKey: 'OPENAI_API_KEY'
   },
-  'claude-3-5-sonnet-20241022': {
+  'claude-opus-4-20250514': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
     requiresKey: 'ANTHROPIC_API_KEY'
@@ -31,7 +31,7 @@ const MODEL_CONFIGS = {
   'anthropic-vision': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-opus-4-20250514',
     requiresKey: 'ANTHROPIC_API_KEY'
   },
   'perplexity-research': {
