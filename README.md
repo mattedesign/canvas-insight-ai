@@ -609,7 +609,7 @@ export interface ClarifiedContext extends AnalysisContext {
 export const pipelineConfig = {
   models: {
     vision: {
-      primary: ['openai-vision', 'anthropic-vision'],
+      primary: ['gpt-4o', 'anthropic-vision'],
       secondary: ['google-vision'],
       timeout: 10000
     },
@@ -2363,12 +2363,6 @@ const MODEL_CONFIGS = {
   'gpt-4o': {
     api: 'openai',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    requiresKey: 'OPENAI_API_KEY'
-  },
-  'openai-vision': {
-    api: 'openai',
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4-vision-preview',
     requiresKey: 'OPENAI_API_KEY'
   },
   'claude-3-5-sonnet-20241022': {
