@@ -16,7 +16,9 @@ interface StableHelpers extends StrictStableHelpers {
   readonly loadData: StrictAsyncFunction<string | undefined, void>;
   readonly uploadImages: StrictAsyncFunction<readonly File[], void>;
   readonly createGroup: StrictCallbackFunction<ImageGroup, void>;
-  readonly deleteImage: StrictCallbackFunction<string, void>;
+  readonly deleteImage: StrictAsyncFunction<string, void>;
+  readonly deleteGroup: StrictAsyncFunction<string, void>;
+  readonly cleanWorkspace: StrictAsyncFunction<{ clearImages: boolean; clearAnalyses: boolean; clearGroups: boolean; }, void>;
   readonly resetAll: StrictCallbackFunction<void, void>;
 }
 
@@ -152,16 +154,81 @@ export const useStableHelpers = (dispatch: StrictDispatchFunction): StableHelper
   }, []); // ✅ Empty dependencies - only depends on dispatch
 
   // ✅ PHASE 4.1: Delete image with explicit return type and strict typing
-  const deleteImage = useCallback((id: string): void => {
-    dispatch({ type: 'REMOVE_IMAGE', payload: id });
-    
-    // ✅ PHASE 3.2: Fire event-driven sync for image deletion
-    eventDrivenSyncService.emitSyncEvent({
-      type: 'image_deleted',
-      payload: id,
-      source: 'local'
-    });
+  const deleteImage = useCallback(async (id: string): Promise<void> => {
+    try {
+      // Delete from database first
+      const { ImageMigrationService } = await import('@/services/DataMigrationService');
+      await ImageMigrationService.deleteImageFromDatabase(id);
+      
+      // Then update local state
+      dispatch({ type: 'REMOVE_IMAGE', payload: id });
+      
+      // ✅ PHASE 3.2: Fire event-driven sync for image deletion
+      eventDrivenSyncService.emitSyncEvent({
+        type: 'image_deleted',
+        payload: id,
+        source: 'local'
+      });
+    } catch (error) {
+      console.error('Failed to delete image:', error);
+      throw error;
+    }
   }, []); // ✅ Empty dependencies - only depends on dispatch
+
+  // ✅ Delete group with database persistence
+  const deleteGroup = useCallback(async (id: string): Promise<void> => {
+    try {
+      // Delete from database first
+      const { GroupMigrationService } = await import('@/services/DataMigrationService');
+      await GroupMigrationService.deleteGroupFromDatabase(id);
+      
+      // Then update local state
+      dispatch({ type: 'REMOVE_GROUP', payload: id });
+      
+      // Fire event-driven sync for group deletion
+      eventDrivenSyncService.emitSyncEvent({
+        type: 'group_deleted',
+        payload: id,
+        source: 'local'
+      });
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      throw error;
+    }
+  }, []);
+
+  // ✅ Clean workspace with selective deletion
+  const cleanWorkspace = useCallback(async (options: { 
+    clearImages: boolean; 
+    clearAnalyses: boolean; 
+    clearGroups: boolean; 
+  }): Promise<void> => {
+    try {
+      const { DataMigrationService } = await import('@/services/DataMigrationService');
+      await DataMigrationService.cleanWorkspaceData(options);
+      
+      // Update local state based on options
+      if (options.clearImages) {
+        dispatch({ type: 'CLEAR_IMAGES' });
+      }
+      if (options.clearAnalyses) {
+        dispatch({ type: 'CLEAR_ANALYSES' });
+      }
+      if (options.clearGroups) {
+        dispatch({ type: 'CLEAR_GROUPS' });
+      }
+      
+      // Fire event-driven sync for workspace cleanup
+      eventDrivenSyncService.emitSyncEvent({
+        type: 'workspace_cleaned',
+        payload: options,
+        source: 'local'
+      });
+    } catch (error) {
+      console.error('Failed to clean workspace:', error);
+      throw error;
+    }
+  }, []);
 
   // ✅ PHASE 4.1: Reset all with explicit return type and strict typing
   const resetAll = useCallback((): void => {
@@ -180,6 +247,8 @@ export const useStableHelpers = (dispatch: StrictDispatchFunction): StableHelper
     uploadImages,
     createGroup,
     deleteImage,
+    deleteGroup,
+    cleanWorkspace,
     resetAll
   };
 };

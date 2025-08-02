@@ -2,12 +2,15 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '@/context/SimplifiedAppContext';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { ProjectContextBanner } from '@/components/ProjectContextBanner';
+import { WorkspaceCleanupDialog, CleanupOptions } from '@/components/WorkspaceCleanupDialog';
 
 interface ErrorDisplayProps {
   error: string;
@@ -75,6 +78,8 @@ const Canvas = () => {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
+  const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
+  const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   const { generateEnhancedConcept } = useEnhancedAnalysis();
   const { toast } = useFilteredToast();
   
@@ -149,6 +154,18 @@ const Canvas = () => {
         
         // Clear any previous errors
         setCanvasError(null);
+        
+        // Set project name for context banner
+        if (currentSlug) {
+          const { data: project } = await supabase
+            .from('projects')
+            .select('name')
+            .eq('slug', currentSlug)
+            .single();
+          setCurrentProjectName(project?.name || currentSlug);
+        } else {
+          setCurrentProjectName(null);
+        }
         
       } catch (error) {
         console.error('[Canvas] Load failed:', error);
@@ -238,9 +255,22 @@ const Canvas = () => {
     console.log('Ungroup:', groupId);
   }, []);
 
-  const handleDeleteGroup = useCallback((groupId: string) => {
-    console.log('Delete group:', groupId);
-  }, []);
+  const handleDeleteGroup = useCallback(async (groupId: string) => {
+    try {
+      await stableHelpers.deleteGroup(groupId);
+      toast({
+        category: 'success',
+        title: 'Group Deleted',
+        description: 'Group has been successfully removed.'
+      });
+    } catch (error) {
+      toast({
+        category: 'error',
+        title: 'Delete Failed',
+        description: 'Failed to delete group. Please try again.'
+      });
+    }
+  }, [stableHelpers, toast]);
 
   const handleEditGroup = useCallback((groupId: string) => {
     console.log('Edit group:', groupId);
@@ -301,6 +331,27 @@ const Canvas = () => {
       });
     }
   }, [dispatch, toast]);
+
+  const handleCleanupWorkspace = useCallback(() => {
+    setIsCleanupDialogOpen(true);
+  }, []);
+
+  const handleConfirmCleanup = useCallback(async (options: CleanupOptions) => {
+    try {
+      await stableHelpers.cleanWorkspace(options);
+      toast({
+        category: 'success',
+        title: 'Workspace Cleaned',
+        description: 'Selected items have been removed from your workspace.'
+      });
+    } catch (error) {
+      toast({
+        category: 'error',
+        title: 'Cleanup Failed',
+        description: 'Failed to clean workspace. Please try again.'
+      });
+    }
+  }, [stableHelpers, toast]);
 
   console.log('[Canvas] Current state:', {
     uploadedImages: uploadedImages?.length || 0,
@@ -367,7 +418,7 @@ const Canvas = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar 
+      <Sidebar
         selectedView="canvas"
         onViewChange={(view) => {
           if (view === 'summary') navigate('/dashboard');
@@ -397,7 +448,14 @@ const Canvas = () => {
         showAnnotations={showAnnotations}
       />
       
-      <div className="flex-1 relative w-full h-full">
+      <div className="flex-1 flex flex-col">
+        <ProjectContextBanner
+          onCleanupWorkspace={handleCleanupWorkspace}
+          isLoading={isLoading}
+          projectName={currentProjectName}
+        />
+        
+        <div className="flex-1 relative w-full h-full">
         
         <ErrorBoundary
           fallback={
@@ -449,6 +507,13 @@ const Canvas = () => {
           isOpen={isAnalysisPanelOpen}
           onClose={handleCloseAnalysisPanel}
         />
+        
+        <WorkspaceCleanupDialog
+          isOpen={isCleanupDialogOpen}
+          onClose={() => setIsCleanupDialogOpen(false)}
+          onConfirmCleanup={handleConfirmCleanup}
+        />
+        </div>
       </div>
     </div>
   );

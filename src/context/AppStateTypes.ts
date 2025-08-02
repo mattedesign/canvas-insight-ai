@@ -85,6 +85,9 @@ export type AppAction =
   | { type: 'UPDATE_GROUP'; payload: { id: string; updates: Partial<LegacyImageGroup> } }
   | { type: 'DELETE_GROUP'; payload: string }
   | { type: 'REMOVE_GROUP'; payload: string }
+  | { type: 'CLEAR_IMAGES' }
+  | { type: 'CLEAR_ANALYSES' }
+  | { type: 'CLEAR_GROUPS' }
   | { type: 'ADD_GROUP_ANALYSIS'; payload: GroupAnalysisWithPrompt }
   | { type: 'ADD_GENERATED_CONCEPT'; payload: LegacyGeneratedConcept }
   | { type: 'SET_CONCEPTS'; payload: LegacyGeneratedConcept[] }

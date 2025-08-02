@@ -275,6 +275,32 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
       return newState;
     }
     
+    case 'CLEAR_IMAGES':
+      return {
+        ...state,
+        uploadedImages: [],
+        analyses: state.analyses.filter(analysis => 
+          !state.uploadedImages.some(img => img.id === analysis.imageId)
+        ),
+        selectedImageId: null,
+        version: state.version + 1,
+      };
+
+    case 'CLEAR_ANALYSES':
+      return {
+        ...state,
+        analyses: [],
+        version: state.version + 1,
+      };
+
+    case 'CLEAR_GROUPS':
+      return {
+        ...state,
+        imageGroups: [],
+        groupAnalysesWithPrompts: [],
+        version: state.version + 1,
+      };
+
     case 'CLEAR_ALL_DATA':
     case 'RESET_STATE':
       return {

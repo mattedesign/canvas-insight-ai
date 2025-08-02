@@ -49,7 +49,9 @@ export interface StrictStableHelpers {
   readonly loadData: (expectedProjectId?: string) => Promise<void>;
   readonly uploadImages: (files: readonly File[]) => Promise<void>;
   readonly createGroup: (data: unknown) => void;
-  readonly deleteImage: (id: string) => void;
+  readonly deleteImage: (id: string) => Promise<void>;
+  readonly deleteGroup: (id: string) => Promise<void>;
+  readonly cleanWorkspace: (options: { clearImages: boolean; clearAnalyses: boolean; clearGroups: boolean; }) => Promise<void>;
   readonly resetAll: () => void;
 }
 

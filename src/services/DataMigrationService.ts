@@ -337,6 +337,66 @@ export class ImageMigrationService {
   }
 
   // Load images from database back to UploadedImage format
+  // Delete specific image from database
+  static async deleteImageFromDatabase(imageId: string) {
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      
+      // Delete related analyses first
+      const { error: analysisError } = await supabase
+        .from('ux_analyses')
+        .delete()
+        .eq('image_id', imageId);
+        
+      if (analysisError) {
+        console.error('Failed to delete image analyses:', analysisError);
+      }
+      
+      // Delete group associations
+      const { error: groupError } = await supabase
+        .from('group_images')
+        .delete()
+        .eq('image_id', imageId);
+        
+      if (groupError) {
+        console.error('Failed to delete group associations:', groupError);
+      }
+      
+      // Get storage path before deleting the record
+      const { data: imageData } = await supabase
+        .from('images')
+        .select('storage_path')
+        .eq('id', imageId)
+        .eq('project_id', projectId)
+        .single();
+      
+      // Delete from storage if storage path exists
+      if (imageData?.storage_path) {
+        const { error: storageError } = await supabase.storage
+          .from('images')
+          .remove([imageData.storage_path]);
+          
+        if (storageError) {
+          console.error('Failed to delete from storage:', storageError);
+        }
+      }
+      
+      // Finally delete the image record
+      const { error: imageError } = await supabase
+        .from('images')
+        .delete()
+        .eq('id', imageId)
+        .eq('project_id', projectId);
+        
+      if (imageError) throw imageError;
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Delete image failed:', error);
+      return { success: false, error };
+    }
+  }
+
   static async loadImagesFromDatabase(): Promise<UploadedImage[]> {
     try {
       const projectId = await ProjectService.getCurrentProject();
@@ -590,6 +650,46 @@ export class GroupMigrationService {
     return groupData.id;
   }
 
+  static async deleteGroupFromDatabase(groupId: string) {
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      
+      // Delete group analyses first
+      const { error: analysisError } = await supabase
+        .from('group_analyses')
+        .delete()
+        .eq('group_id', groupId);
+        
+      if (analysisError) {
+        console.error('Failed to delete group analyses:', analysisError);
+      }
+      
+      // Delete group-image associations
+      const { error: associationError } = await supabase
+        .from('group_images')
+        .delete()
+        .eq('group_id', groupId);
+        
+      if (associationError) {
+        console.error('Failed to delete group associations:', associationError);
+      }
+      
+      // Finally delete the group
+      const { error: groupError } = await supabase
+        .from('image_groups')
+        .delete()
+        .eq('id', groupId)
+        .eq('project_id', projectId);
+        
+      if (groupError) throw groupError;
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Delete group failed:', error);
+      return { success: false, error };
+    }
+  }
+
   static async loadGroupsFromDatabase(): Promise<ImageGroup[]> {
     try {
       const projectId = await ProjectService.getCurrentProject();
@@ -778,6 +878,65 @@ export class GroupAnalysisMigrationService {
 
 // Master migration service that coordinates all data migration
 export class DataMigrationService {
+  // Clean workspace data selectively
+  static async cleanWorkspaceData(options: { 
+    clearImages: boolean; 
+    clearAnalyses: boolean; 
+    clearGroups: boolean; 
+  }) {
+    try {
+      const projectId = await ProjectService.getCurrentProject();
+      
+      if (options.clearGroups) {
+        // Get group IDs first
+        const { data: groups } = await supabase
+          .from('image_groups')
+          .select('id')
+          .eq('project_id', projectId);
+          
+        const groupIds = groups?.map(g => g.id) || [];
+        
+        if (groupIds.length > 0) {
+          await Promise.all([
+            supabase.from('group_analyses').delete().in('group_id', groupIds),
+            supabase.from('group_images').delete().in('group_id', groupIds)
+          ]);
+          
+          await supabase.from('image_groups').delete().eq('project_id', projectId);
+        }
+      }
+      
+      if (options.clearAnalyses || options.clearImages) {
+        // Get image IDs first
+        const { data: images } = await supabase
+          .from('images')
+          .select('id, storage_path')
+          .eq('project_id', projectId);
+          
+        const imageIds = images?.map(img => img.id) || [];
+        
+        if (imageIds.length > 0 && options.clearAnalyses) {
+          await supabase.from('ux_analyses').delete().in('image_id', imageIds);
+        }
+        
+        if (options.clearImages && images) {
+          // Delete from storage
+          const storagePaths = images.map(img => img.storage_path).filter(Boolean);
+          if (storagePaths.length > 0) {
+            await supabase.storage.from('images').remove(storagePaths);
+          }
+          
+          // Delete image records
+          await supabase.from('images').delete().eq('project_id', projectId);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Clean workspace failed:', error);
+      return { success: false, error };
+    }
+  }
   // Migrate current in-memory state to database
   static async migrateAllToDatabase(state: {
     uploadedImages: UploadedImage[];

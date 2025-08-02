@@ -4,11 +4,22 @@
  * Separates initialization from ongoing synchronization
  */
 
+export type SyncEventType = 
+  | 'group_created'
+  | 'image_added'
+  | 'image_updated'
+  | 'image_deleted'
+  | 'group_updated'
+  | 'group_deleted'
+  | 'analysis_completed'
+  | 'analysis_updated'
+  | 'analysis_deleted'
+  | 'data_invalidated'
+  | 'project_changed'
+  | 'workspace_cleaned';
+
 interface SyncEvent {
-  type: 'image_added' | 'image_updated' | 'image_deleted' | 
-        'group_created' | 'group_updated' | 'group_deleted' |
-        'analysis_completed' | 'analysis_updated' | 'analysis_deleted' |
-        'data_invalidated' | 'project_changed';
+  type: SyncEventType;
   payload: any;
   timestamp: Date;
   source: 'local' | 'remote' | 'user';
@@ -131,6 +142,10 @@ class EventDrivenSyncService {
           await this.handleProjectChange(event);
           break;
         
+        case 'workspace_cleaned':
+          await this.handleWorkspaceCleaned(event);
+          break;
+        
         default:
           console.warn('[EventDrivenSync] Unknown event type:', event.type);
       }
@@ -218,6 +233,18 @@ class EventDrivenSyncService {
     
     // Fire project change event
     window.dispatchEvent(new CustomEvent('projectChanged', {
+      detail: event.payload
+    }));
+  }
+
+  /**
+   * ✅ PHASE 3.2: Handle workspace cleaning
+   */
+  private async handleWorkspaceCleaned(event: SyncEvent): Promise<void> {
+    console.log('[EventDrivenSync] Processing workspace cleaned:', event);
+    
+    // Fire workspace cleaned event
+    window.dispatchEvent(new CustomEvent('workspaceCleaned', {
       detail: event.payload
     }));
   }
