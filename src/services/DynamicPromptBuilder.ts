@@ -376,7 +376,7 @@ ${context.user.inferredRole === 'designer' ? `Designer Perspective:
 - Consider emotional design impact
 - Identify design system opportunities
 
-` : ''}Create final recommendations as JSON:
+` : ''}Create final recommendations as JSON with EXACTLY these properties:
 {
   "executiveSummary": "Brief overview of key findings",
   "prioritizedActions": [{ "title": "", "description": "", "priority": "critical|high|medium|low", "effort": "", "impact": "", "timeline": "" }],
@@ -392,10 +392,19 @@ ${context.user.inferredRole === 'designer' ? `Designer Perspective:
       "content": 0
     },
     "keyIssues": ["Most critical issues found"],
-    "keyOpportunities": ["Highest impact improvements"],
-    "confidenceScore": 0.85
+    "strengths": ["Key design strengths identified"],
+    "confidence": 0.85
   }
-}`
+}
+
+CRITICAL: The summary object MUST include:
+- keyIssues: array of critical problems found
+- strengths: array of positive design elements
+- confidence: decimal confidence score (not confidenceScore)
+- overallScore: numeric score 0-100
+- categoryScores: object with usability, accessibility, visual, content scores
+
+Always include ALL properties in the exact format shown above.`
     };
     
     // Ensure all prompts explicitly mention JSON formatting

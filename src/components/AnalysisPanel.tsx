@@ -145,18 +145,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
           </Card>
 
           {/* Key Issues */}
-          {analysis.summary.keyIssues.length > 0 && (
+          {(analysis.summary?.keyIssues?.length || 0) > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-destructive" />
                   <CardTitle>Key Issues</CardTitle>
-                  <Badge variant="outline">{analysis.summary.keyIssues.length}</Badge>
+                  <Badge variant="outline">{analysis.summary?.keyIssues?.length || 0}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {analysis.summary.keyIssues.map((issue, index) => (
+                  {(analysis.summary?.keyIssues || []).map((issue, index) => (
                     <div key={index} className="p-3 bg-destructive/5 border-l-2 border-destructive/30 rounded-r">
                       <p className="text-sm text-foreground">{issue}</p>
                     </div>
@@ -167,18 +167,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
           )}
 
           {/* Strengths */}
-          {analysis.summary.strengths.length > 0 && (
+          {(analysis.summary?.strengths?.length || 0) > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <CardTitle>Strengths</CardTitle>
-                  <Badge variant="outline">{analysis.summary.strengths.length}</Badge>
+                  <Badge variant="outline">{analysis.summary?.strengths?.length || 0}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {analysis.summary.strengths.map((strength, index) => (
+                  {(analysis.summary?.strengths || []).map((strength, index) => (
                     <div key={index} className="p-3 bg-green-50 dark:bg-green-950/20 border-l-2 border-green-600/30 rounded-r">
                       <p className="text-sm text-foreground">{strength}</p>
                     </div>

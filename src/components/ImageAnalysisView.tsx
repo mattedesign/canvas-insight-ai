@@ -29,9 +29,9 @@ export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
             </Badge>
           ))}
           
-          {analysis.summary?.confidence && (
+          {(analysis.summary?.confidence || analysis.summary?.confidenceScore) && (
             <Badge variant="outline" className="gap-1">
-              Confidence: {Math.round(analysis.summary.confidence * 100)}%
+              Confidence: {Math.round((analysis.summary?.confidence || analysis.summary?.confidenceScore || 0) * 100)}%
             </Badge>
           )}
         </div>

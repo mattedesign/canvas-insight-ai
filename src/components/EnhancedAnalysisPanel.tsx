@@ -194,7 +194,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                   {/* Key Issues and Strengths */}
                   {analysis.summary && (
                     <div className="grid md:grid-cols-2 gap-4">
-                      {analysis.summary.keyIssues?.length > 0 && (
+                       {(analysis.summary?.keyIssues?.length || 0) > 0 && (
                         <Card>
                           <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-destructive">
@@ -204,7 +204,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                           </CardHeader>
                           <CardContent>
                             <ul className="space-y-1">
-                              {analysis.summary.keyIssues.map((issue, index) => (
+                              {(analysis.summary?.keyIssues || []).map((issue, index) => (
                                 <li key={index} className="flex items-start gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full bg-destructive mt-2 flex-shrink-0" />
                                   <span className="text-sm">{issue}</span>
@@ -215,7 +215,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                         </Card>
                       )}
 
-                      {analysis.summary.strengths?.length > 0 && (
+                      {(analysis.summary?.strengths?.length || 0) > 0 && (
                         <Card>
                           <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-green-600">
@@ -225,7 +225,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                           </CardHeader>
                           <CardContent>
                             <ul className="space-y-1">
-                              {analysis.summary.strengths.map((strength, index) => (
+                              {(analysis.summary?.strengths || []).map((strength, index) => (
                                 <li key={index} className="flex items-start gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full bg-green-600 mt-2 flex-shrink-0" />
                                   <span className="text-sm">{strength}</span>
