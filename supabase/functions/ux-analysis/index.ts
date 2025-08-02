@@ -181,6 +181,34 @@ function ensureJsonInPrompt(prompt: string): string {
   return prompt;
 }
 
+// Pre-flight validation for JSON prompt requirements
+function validateJsonPromptRequirement(payload: any): { isValid: boolean; error?: string; fixedPrompt?: string } {
+  const { prompt, model } = payload;
+  
+  // Check if this is an OpenAI model that might use JSON mode
+  const isOpenAIModel = model && (model.includes('gpt-') || model.includes('openai'));
+  
+  if (!isOpenAIModel) {
+    return { isValid: true }; // Non-OpenAI models don't need this validation
+  }
+  
+  // Check if prompt contains "json" keyword
+  const hasJsonKeyword = prompt.toLowerCase().includes('json');
+  
+  if (!hasJsonKeyword) {
+    console.log('🔧 Pre-flight validation: JSON keyword missing, auto-fixing prompt');
+    const fixedPrompt = ensureJsonInPrompt(prompt);
+    return { 
+      isValid: true, 
+      fixedPrompt,
+      error: `Original prompt lacked "json" keyword required for OpenAI JSON mode. Auto-fixed.`
+    };
+  }
+  
+  console.log('✅ Pre-flight validation: JSON keyword present in prompt');
+  return { isValid: true };
+}
+
 async function executeOpenAI(config: any, apiKey: string, payload: any) {
   console.log('Executing OpenAI with payload:', { 
     model: config.model || payload.model,
@@ -189,15 +217,24 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
     promptLength: payload.prompt?.length || 0
   });
   
+  
   try {
     const { imageUrl, systemPrompt } = payload;
     
-    // CRITICAL: Ensure prompt contains "json" for OpenAI JSON mode
-    const enhancedPrompt = ensureJsonInPrompt(payload.prompt);
+    // PHASE 2.1: Pre-flight validation with auto-fixing
+    const validation = validateJsonPromptRequirement(payload);
+    const promptToUse = validation.fixedPrompt || payload.prompt;
+    
+    if (validation.error) {
+      console.log('⚠️ JSON validation warning:', validation.error);
+    }
+    
+    // Additional logging for debugging
     console.log('🔍 JSON prompt check:', {
       originalContainsJson: payload.prompt.toLowerCase().includes('json'),
-      enhancedContainsJson: enhancedPrompt.toLowerCase().includes('json'),
-      promptWasModified: enhancedPrompt !== payload.prompt
+      finalPromptContainsJson: promptToUse.toLowerCase().includes('json'),
+      promptWasModified: promptToUse !== payload.prompt,
+      validationPassed: validation.isValid
     });
     
     let processedImageUrl = imageUrl;
@@ -216,9 +253,9 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
       {
         role: 'user',
         content: processedImageUrl ? [
-          { type: 'text', text: enhancedPrompt },
+          { type: 'text', text: promptToUse },
           { type: 'image_url', image_url: { url: processedImageUrl } }
-        ] : enhancedPrompt
+        ] : promptToUse
       }
     ];
 
@@ -241,6 +278,23 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, response.statusText, errorText);
+      
+      // PHASE 2.2: Enhanced error handling for JSON format issues
+      if (response.status === 400 && errorText.includes('json')) {
+        const enhancedError = `OpenAI JSON Format Error: ${errorText}
+        
+🔧 Troubleshooting Steps:
+1. Ensure your prompt contains the word "json" when using JSON mode
+2. Original prompt contained JSON keyword: ${payload.prompt.toLowerCase().includes('json')}
+3. Final prompt contained JSON keyword: ${promptToUse.toLowerCase().includes('json')}
+4. Prompt was auto-fixed: ${promptToUse !== payload.prompt}
+
+💡 This error typically occurs when response_format: { type: 'json_object' } is used without mentioning "json" in the prompt.
+The system attempted to auto-fix this issue. If you continue seeing this error, please check the prompt content.`;
+
+        throw new Error(enhancedError);
+      }
+      
       throw new Error(`OpenAI API error: ${response.status} ${response.statusText}: ${errorText}`);
     }
 

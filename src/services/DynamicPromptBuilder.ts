@@ -327,7 +327,17 @@ export class DynamicPromptBuilder {
     const { user } = context;
     
     const formats: Record<string, string> = {
-      vision: `Return analysis as structured JSON with:
+      vision: `Perform comprehensive UX analysis of this interface, identifying its purpose, user flows, and optimization opportunities.
+
+${context.user.inferredRole === 'designer' ? `Designer Perspective:
+- Evaluate visual hierarchy and gestalt principles
+- Analyze color theory application and accessibility
+- Assess typography system and readability
+- Review spacing consistency and visual rhythm
+- Consider emotional design impact
+- Identify design system opportunities
+
+` : ''}Return analysis as structured JSON with:
 {
   "elements": { /* UI elements detected */ },
   "layout": { /* Grid, spacing, hierarchy */ },
@@ -337,7 +347,17 @@ export class DynamicPromptBuilder {
   "confidence": { /* Detection confidence scores */ }
 }`,
       
-      analysis: `Provide insights as structured JSON with:
+      analysis: `Provide comprehensive UX insights covering usability, accessibility, and optimization opportunities.
+
+${context.user.inferredRole === 'designer' ? `Designer Perspective:
+- Evaluate visual hierarchy and gestalt principles
+- Analyze color theory application and accessibility
+- Assess typography system and readability
+- Review spacing consistency and visual rhythm
+- Consider emotional design impact
+- Identify design system opportunities
+
+` : ''}Provide insights as structured JSON with:
 {
   "usabilityIssues": [{ "severity": "high|medium|low", "category": "", "description": "", "recommendation": "" }],
   "accessibilityFindings": [{ "wcagLevel": "AA|AAA", "guideline": "", "issue": "", "solution": "" }],
