@@ -55,10 +55,11 @@ export default function TestOpenAI() {
       id: imageId
     });
     
-    toast({
-      title: "Image Ready",
-      description: "Image uploaded and ready for analysis.",
-    });
+    // COMMENTED OUT: Repetitive upload success toast
+    // toast({
+    //   title: "Image Ready",
+    //   description: "Image uploaded and ready for analysis.",
+    // });
   }, [toast]);
 
   const handleAnalyze = useCallback(async () => {

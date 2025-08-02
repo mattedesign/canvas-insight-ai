@@ -167,11 +167,13 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
 
   const handleViewAnalysis = useCallback((imageId: string) => {
     if (analysis) {
-      toast({
-        title: "Analysis Available",
-        description: "View the analysis card connected to this image",
-      });
+      // COMMENTED OUT: Repetitive analysis available toast
+      // toast({
+      //   title: "Analysis Available",
+      //   description: "View the analysis card connected to this image",
+      // });
     } else {
+      // KEEP: Error message toast - this is important
       toast({
         title: "No Analysis",
         description: "This image hasn't been analyzed yet. Click 'AI Analysis' to start.",

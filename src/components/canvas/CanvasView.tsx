@@ -139,15 +139,16 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     );
     
     if (imagesWithoutAnalysis.length > 0 && uploadedImages.length > 0) {
-      const timer = setTimeout(() => {
-        toast({
-          title: "AI Analysis Available",
-          description: `Click the "AI Analysis" button on any image to get instant UX insights. ${imagesWithoutAnalysis.length} image(s) ready for analysis.`,
-          category: "action-required"
-        });
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      // COMMENTED OUT: Repetitive "ready for analysis" toast
+      // const timer = setTimeout(() => {
+      //   toast({
+      //     title: "AI Analysis Available",
+      //     description: `Click the "AI Analysis" button on any image to get instant UX insights. ${imagesWithoutAnalysis.length} image(s) ready for analysis.`,
+      //     category: "action-required"
+      //   });
+      // }, 2000);
+      // 
+      // return () => clearTimeout(timer);
     }
   }, [uploadedImages.length, analyses.length]);
   

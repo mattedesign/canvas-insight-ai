@@ -138,10 +138,11 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   }, [toast]);
 
   const handleDrawingComplete = useCallback((drawingData: ImageData, bounds: { x: number; y: number; width: number; height: number }) => {
-    toast({
-      title: "Drawing Complete",
-      description: "Your drawing has been captured and is ready for analysis.",
-    });
+    // COMMENTED OUT: Repetitive drawing complete toast
+    // toast({
+    //   title: "Drawing Complete",
+    //   description: "Your drawing has been captured and is ready for analysis.",
+    // });
     console.log('Drawing completed with bounds:', bounds);
   }, [toast]);
 
