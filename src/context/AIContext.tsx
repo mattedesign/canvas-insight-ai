@@ -4,13 +4,12 @@ import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionLogger } from '@/services/EdgeFunctionLogger';
 
 interface AIContextType {
-  selectedAIModel: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o';
-  setSelectedAIModel: (model: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o') => void;
+  selectedAIModel: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o';
+  setSelectedAIModel: (model: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o') => void;
   isAnalyzing: boolean;
   analyzeImageWithAI: (imageId: string, imageUrl: string, imageName: string, userContext?: string) => Promise<any>;
   availableModels: {
     'claude-opus-4-20250514': boolean;
-    'google-vision': boolean;
     'stability-ai': boolean;
     'gpt-4o': boolean;
   };
@@ -27,11 +26,10 @@ export const useAI = () => {
 };
 
 export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedAIModel, setSelectedAIModel] = useState<'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o'>('auto');
+  const [selectedAIModel, setSelectedAIModel] = useState<'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o'>('auto');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [availableModels, setAvailableModels] = useState({
     'claude-opus-4-20250514': true, // Assume available, will be checked by backend
-    'google-vision': true,
     'stability-ai': true,
     'gpt-4o': true
   });
@@ -48,7 +46,6 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     
     const modelName = selectedAIModel === 'auto' ? 'Smart Selection' : 
                      selectedAIModel === 'claude-opus-4-20250514' ? 'Claude Opus 4' :
-                     selectedAIModel === 'google-vision' ? 'Google Vision' : 
                      selectedAIModel === 'stability-ai' ? 'Stability AI' : 'GPT 4o';
 
     toast({

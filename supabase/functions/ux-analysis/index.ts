@@ -425,9 +425,7 @@ function mapModelName(requestedModel: string): string {
     'claude-3-5-sonnet-20241022': 'claude-opus-4-20250514',
     'claude-3-opus-20240229': 'claude-opus-4-20250514',
     
-    // Google model mappings
-    'gemini-2.5-pro': 'gemini-2.5-pro',
-    'google-vision': 'gemini-2.5-pro',
+    // Note: Google Vision is handled separately for metadata extraction only
     
     // Perplexity mappings
     'perplexity-sonar': 'llama-3.1-sonar-small-128k-online'

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Brain, Eye, Lightbulb, Zap, CheckCircle, AlertCircle, Palette } from 'lucide-react';
 
 interface AIModel {
-  id: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o';
+  id: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o';
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -18,8 +18,8 @@ interface AIModel {
 }
 
 interface AIModelSelectorProps {
-  selectedModel: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o';
-  onModelChange: (model: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o') => void;
+  selectedModel: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o';
+  onModelChange: (model: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o') => void;
   onAnalyze: () => void;
   isAnalyzing?: boolean;
 }
@@ -44,15 +44,6 @@ const aiModels: AIModel[] = [
     bestFor: ['UX audits', 'Accessibility review', 'Design critique'],
     status: 'available',
     badge: 'Best for UX'
-  },
-  {
-    id: 'google-vision',
-    name: 'Google Vision',
-    description: 'Powerful object detection, text recognition, and content analysis',
-    icon: <Zap className="h-5 w-5 text-blue-600" />,
-    strengths: ['Object detection', 'Text recognition', 'Face detection'],
-    bestFor: ['Content analysis', 'Layout detection', 'Image elements'],
-    status: 'available'
   },
   {
     id: 'stability-ai',

@@ -70,7 +70,7 @@ export class BoundaryPushingPipeline {
     console.log('🔧 Pipeline configuration:', {
       contextDetectionEnabled: pipelineConfig.contextDetection.enabled,
       availableModels: {
-        vision: pipelineConfig.models.vision.primary,
+        metadata: pipelineConfig.models.metadata.primary,
         analysis: pipelineConfig.models.analysis.primary
       },
       qualitySettings: pipelineConfig.quality
@@ -287,7 +287,7 @@ export class BoundaryPushingPipeline {
     const adaptiveTimeout = optimizedSelection.expectedTimeout || (
       pipelineConfig.execution.adaptiveTimeouts
         ? pipelineConfig.execution.timeoutCalculator.calculateTimeout('vision', 'moderate', models.length)
-        : pipelineConfig.models.vision.timeout
+        : pipelineConfig.models.metadata.timeout
     );
 
     console.log('👁️ Vision Stage - Optimized execution plan:', {
