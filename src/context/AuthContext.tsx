@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthContextValidator } from '@/hooks/useContextValidator';
 
 interface SubscriptionInfo {
   subscribed: boolean;
@@ -38,6 +39,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const { toast } = useToast();
+
+  // ✅ PHASE 6.1: AUTH CONTEXT VALIDATION
+  const validator = useAuthContextValidator({
+    onValidationError: (errors) => {
+      console.error('[AuthProvider] Validation errors:', errors);
+    },
+    onValidationWarning: (warnings) => {
+      console.warn('[AuthProvider] Validation warnings:', warnings);
+    },
+  });
 
   const checkSubscription = async () => {
     if (!session) return;
@@ -279,6 +290,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     checkSubscription,
   };
+
+  // ✅ PHASE 6.1: VALIDATE AUTH CONTEXT VALUE ON CHANGES
+  useEffect(() => {
+    const result = validator.validateNow(value);
+    if (!result.isValid && process.env.NODE_ENV === 'development') {
+      console.warn('[AuthProvider] Context validation failed, but continuing...', result.errors);
+    }
+  }, [value, validator]);
 
   return (
     <AuthContext.Provider value={value}>

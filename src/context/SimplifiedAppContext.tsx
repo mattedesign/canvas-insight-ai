@@ -6,6 +6,7 @@ import type { AppState, AppAction } from '@/context/AppStateTypes';
 import { useStableHelpers } from '@/hooks/useStableHelpers';
 import { useInitializationManager } from '@/hooks/useInitializationManager';
 import { InitializationErrorBoundary } from '@/components/InitializationErrorBoundary';
+import { useAppContextValidator } from '@/hooks/useContextValidator';
 import type { 
   StrictAppContextValue,
   StrictStableHelpers,
@@ -31,6 +32,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ✅ PHASE 3.2: USE INITIALIZATION MANAGER
   const initializationManager = useInitializationManager(dispatch);
+
+  // ✅ PHASE 6.1: CONTEXT VALIDATION
+  const validator = useAppContextValidator({
+    onValidationError: (errors) => {
+      console.error('[AppProvider] Validation errors:', errors);
+      // Could dispatch error action or trigger error boundary
+    },
+    onValidationWarning: (warnings) => {
+      console.warn('[AppProvider] Validation warnings:', warnings);
+    },
+  });
 
   // ✅ PHASE 3.2: ONE-TIME INITIALIZATION EFFECT - Empty dependencies
   useEffect(() => {
@@ -66,6 +78,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const value = { state, dispatch, stableHelpers };
+
+  // ✅ PHASE 6.1: VALIDATE CONTEXT VALUE ON CHANGES
+  useEffect(() => {
+    const result = validator.validateNow(value);
+    if (!result.isValid && process.env.NODE_ENV === 'development') {
+      console.warn('[AppProvider] Context validation failed, but continuing...', result.errors);
+    }
+  }, [value, validator]);
 
   return (
     <InitializationErrorBoundary onRetry={handleInitializationRetry} maxRetries={3}>
