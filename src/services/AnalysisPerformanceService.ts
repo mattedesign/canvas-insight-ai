@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 
 interface PerformanceMetrics {
   analysisTime: number;
@@ -174,16 +175,16 @@ export class AnalysisPerformanceService {
         if (error) throw error;
 
         if (data.success && data.data) {
-          const analysis = data.data as UXAnalysis;
+          // Use the robust validator to normalize the analysis data
+          const validationResult = AnalysisValidator.validateAndNormalize(data.data);
           
-          // Validate analysis before caching
-          const validation = this.validateAnalysis(analysis);
-          if (!validation.isValid) {
-            console.warn('Received invalid analysis:', validation);
-            // Continue with analysis but log warning
+          if (validationResult.warnings.length > 0) {
+            console.warn('Analysis validation warnings:', validationResult.warnings);
           }
 
-          // Cache the successful analysis
+          const analysis = validationResult.data;
+
+          // Cache the normalized analysis
           this.setCachedAnalysis(imageId, analysis, userContext);
 
           // Update performance metrics
