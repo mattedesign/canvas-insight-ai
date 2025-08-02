@@ -12,7 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Available model configurations
 const MODEL_CONFIGS = {
-  'gpt-4.1-2025-04-14': {
+  'gpt-4o': {
     api: 'openai',
     endpoint: 'https://api.openai.com/v1/chat/completions',
     requiresKey: 'OPENAI_API_KEY'
@@ -20,10 +20,10 @@ const MODEL_CONFIGS = {
   'openai-vision': {
     api: 'openai',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4.1-2025-04-14',
+    model: 'gpt-4o',
     requiresKey: 'OPENAI_API_KEY'
   },
-  'claude-opus-4-20250514': {
+  'claude-3-5-sonnet-20241022': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
     requiresKey: 'ANTHROPIC_API_KEY'
@@ -31,7 +31,7 @@ const MODEL_CONFIGS = {
   'anthropic-vision': {
     api: 'anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    model: 'claude-opus-4-20250514',
+    model: 'claude-3-5-sonnet-20241022',
     requiresKey: 'ANTHROPIC_API_KEY'
   },
   'perplexity-research': {
@@ -395,7 +395,7 @@ async function handleCanvasRequest(action: string, payload: any) {
     case 'ANALYZE_IMAGE':
       // Map Canvas format to pipeline format
       const convertedPayload = {
-        model: 'gpt-4.1-2025-04-14', // Default model for Canvas requests
+        model: 'gpt-4o', // Default model for Canvas requests
         stage: 'vision', // Start with vision stage
         imageUrl: payload.payload?.imageUrl,
         prompt: `Analyze this ${payload.payload?.imageName || 'image'} for UX/UI insights. Context: ${payload.payload?.userContext || 'General analysis'}`,
