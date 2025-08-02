@@ -53,61 +53,63 @@ serve(async (req) => {
   }
 
   try {
-    const requestBody = await req.json()
-    console.log('UX Analysis Edge Function - Raw Request Body:', JSON.stringify(requestBody, null, 2))
-    
-    // Handle both old Canvas format (with action) and new pipeline format (with stage)
-    const { action, stage, ...payload } = requestBody
-    
-    console.log('UX Analysis Edge Function - Action:', action)
-    console.log('UX Analysis Edge Function - Stage:', stage) 
-    console.log('UX Analysis Edge Function - Payload Fields:', Object.keys(payload))
+    const body = await req.json()
+    console.log('🔥 Pipeline Request:', {
+      stage: body.stage,
+      model: body.model,
+      timestamp: new Date().toISOString()
+    })
     
     // Check available API keys
-    const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY')
-    const hasAnthropic = !!Deno.env.get('ANTHROPIC_API_KEY')
-    const hasGoogle = !!Deno.env.get('GOOGLE_VISION_API_KEY')
-    const hasPerplexity = !!Deno.env.get('PERPLEXITY_API_KEY')
-    const hasStability = !!Deno.env.get('STABILITY_API_KEY')
+    const availableAPIs = {
+      openai: !!Deno.env.get('OPENAI_API_KEY'),
+      anthropic: !!Deno.env.get('ANTHROPIC_API_KEY'),
+      google: !!Deno.env.get('GOOGLE_VISION_API_KEY'),
+      perplexity: !!Deno.env.get('PERPLEXITY_API_KEY'),
+      stability: !!Deno.env.get('STABILITY_API_KEY')
+    }
     
-    console.log('Available APIs:', { hasOpenAI, hasAnthropic, hasGoogle, hasPerplexity, hasStability })
+    console.log('📝 Available APIs:', availableAPIs)
 
-    // Handle special actions
-    switch (action) {
-      case 'store':
-        return await storeAnalysisResults(payload.pipelineResults)
-      
-      case 'check-keys':
-        return new Response(
-          JSON.stringify({
-            available: {
-              openai: hasOpenAI,
-              anthropic: hasAnthropic,
-              google: hasGoogle,
-              perplexity: hasPerplexity,
-              stability: hasStability
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      
-      default:
-        // Handle both formats: Canvas (with action) and Pipeline (with stage) 
-        if (action) {
-          // Old Canvas format - convert to new format
-          return await handleCanvasRequest(action, payload)
-        } else {
-          // New pipeline format - direct execution
-          return await executeModel({ stage, ...payload })
-        }
+    // Handle special actions first
+    if (body.action) {
+      switch (body.action) {
+        case 'store':
+          return await storeAnalysisResults(body.pipelineResults)
+        
+        case 'check-keys':
+          return new Response(
+            JSON.stringify({ available: availableAPIs }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        
+        case 'ANALYZE_IMAGE':
+          // Convert old Canvas format to new pipeline format
+          return await handleCanvasRequest(body.action, body)
+        
+        default:
+          throw new Error(`Unknown action: ${body.action}`)
+      }
     }
 
+    // Handle pipeline requests (must have stage and model)
+    if (!body.stage) {
+      throw new Error(`Stage is required for pipeline execution`)
+    }
+    
+    if (!body.model) {
+      throw new Error(`Model is required for pipeline execution`)
+    }
+
+    return await executeModel(body)
+
   } catch (error) {
-    console.error('Edge function error:', error)
+    console.error('❌ Edge function error:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: error.stack 
+        details: error.stack,
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500,
