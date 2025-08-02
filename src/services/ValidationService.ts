@@ -409,7 +409,7 @@ export class ValidationService {
   }
 
   /**
-   * Phase 2: Enhanced Summary Validation (to be expanded)
+   * Phase 2: Enhanced Summary Validation with Comprehensive Structure Fixes
    */
   private validateSummaryStructure(summary: any): { errors: ValidationError[], warnings: ValidationWarning[] } {
     const errors: ValidationError[] = [];
@@ -426,23 +426,340 @@ export class ValidationService {
       return { errors, warnings };
     }
 
-    // Validate overall score
-    const scoreValidation = this.validateScore(summary.overallScore, 'summary.overallScore');
-    errors.push(...scoreValidation.errors);
-    warnings.push(...scoreValidation.warnings);
+    if (typeof summary !== 'object') {
+      errors.push({
+        type: 'error',
+        code: 'SUMMARY_NOT_OBJECT',
+        message: 'Summary must be an object',
+        path: 'summary',
+        value: typeof summary,
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
 
-    // Validate category scores
-    if (summary.categoryScores) {
-      const categories = ['usability', 'accessibility', 'visual', 'content'];
-      categories.forEach(category => {
-        if (summary.categoryScores[category] !== undefined) {
-          const categoryValidation = this.validateScore(
-            summary.categoryScores[category], 
-            `summary.categoryScores.${category}`
-          );
-          errors.push(...categoryValidation.errors);
-          warnings.push(...categoryValidation.warnings);
-        }
+    // Phase 2: Enhanced overall score validation
+    const overallScoreValidation = this.validateOverallScore(summary.overallScore);
+    errors.push(...overallScoreValidation.errors);
+    warnings.push(...overallScoreValidation.warnings);
+
+    // Phase 2: Enhanced category scores validation
+    const categoryScoresValidation = this.validateCategoryScores(summary.categoryScores);
+    errors.push(...categoryScoresValidation.errors);
+    warnings.push(...categoryScoresValidation.warnings);
+
+    // Phase 2: Validate required array properties
+    const arrayPropsValidation = this.validateSummaryArrays(summary);
+    errors.push(...arrayPropsValidation.errors);
+    warnings.push(...arrayPropsValidation.warnings);
+
+    // Phase 2: Validate confidence score
+    const confidenceValidation = this.validateConfidenceScore(summary.confidence);
+    errors.push(...confidenceValidation.errors);
+    warnings.push(...confidenceValidation.warnings);
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Phase 2: Comprehensive Overall Score Validation
+   */
+  private validateOverallScore(overallScore: any): { errors: ValidationError[], warnings: ValidationWarning[] } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    if (overallScore === null || overallScore === undefined) {
+      errors.push({
+        type: 'error',
+        code: 'OVERALL_SCORE_MISSING',
+        message: 'Overall score is missing',
+        path: 'summary.overallScore',
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    if (typeof overallScore !== 'number') {
+      errors.push({
+        type: 'error',
+        code: 'OVERALL_SCORE_NOT_NUMBER',
+        message: 'Overall score must be a number',
+        path: 'summary.overallScore',
+        value: overallScore,
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    if (isNaN(overallScore)) {
+      errors.push({
+        type: 'error',
+        code: 'OVERALL_SCORE_NAN',
+        message: 'Overall score is NaN',
+        path: 'summary.overallScore',
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    if (!isFinite(overallScore)) {
+      errors.push({
+        type: 'error',
+        code: 'OVERALL_SCORE_INFINITE',
+        message: 'Overall score is infinite',
+        path: 'summary.overallScore',
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    // Phase 2: Range validation with context-aware suggestions
+    if (overallScore < 0) {
+      warnings.push({
+        code: 'OVERALL_SCORE_NEGATIVE',
+        message: 'Overall score is negative',
+        path: 'summary.overallScore',
+        value: overallScore,
+        suggestion: 'Clamp to 0'
+      });
+    } else if (overallScore > 100) {
+      warnings.push({
+        code: 'OVERALL_SCORE_TOO_HIGH',
+        message: 'Overall score exceeds 100',
+        path: 'summary.overallScore',
+        value: overallScore,
+        suggestion: 'Clamp to 100'
+      });
+    }
+
+    // Phase 2: Quality warnings for suspicious scores
+    if (overallScore === 0) {
+      warnings.push({
+        code: 'OVERALL_SCORE_ZERO',
+        message: 'Overall score is zero - may indicate calculation error',
+        path: 'summary.overallScore',
+        suggestion: 'Verify calculation logic'
+      });
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Phase 2: Comprehensive Category Scores Validation
+   */
+  private validateCategoryScores(categoryScores: any): { errors: ValidationError[], warnings: ValidationWarning[] } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+    const requiredCategories = ['usability', 'accessibility', 'visual', 'content'];
+
+    if (!categoryScores) {
+      errors.push({
+        type: 'error',
+        code: 'CATEGORY_SCORES_MISSING',
+        message: 'Category scores object is missing',
+        path: 'summary.categoryScores',
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    if (typeof categoryScores !== 'object') {
+      errors.push({
+        type: 'error',
+        code: 'CATEGORY_SCORES_NOT_OBJECT',
+        message: 'Category scores must be an object',
+        path: 'summary.categoryScores',
+        value: typeof categoryScores,
+        timestamp: new Date()
+      });
+      return { errors, warnings };
+    }
+
+    // Phase 2: Validate each required category
+    requiredCategories.forEach(category => {
+      const score = categoryScores[category];
+      const categoryPath = `summary.categoryScores.${category}`;
+
+      if (score === null || score === undefined) {
+        errors.push({
+          type: 'error',
+          code: 'CATEGORY_SCORE_MISSING',
+          message: `Category score missing: ${category}`,
+          path: categoryPath,
+          timestamp: new Date()
+        });
+        return;
+      }
+
+      if (typeof score !== 'number') {
+        errors.push({
+          type: 'error',
+          code: 'CATEGORY_SCORE_NOT_NUMBER',
+          message: `Category score must be a number: ${category}`,
+          path: categoryPath,
+          value: score,
+          timestamp: new Date()
+        });
+        return;
+      }
+
+      if (isNaN(score)) {
+        errors.push({
+          type: 'error',
+          code: 'CATEGORY_SCORE_NAN',
+          message: `Category score is NaN: ${category}`,
+          path: categoryPath,
+          timestamp: new Date()
+        });
+        return;
+      }
+
+      if (!isFinite(score)) {
+        errors.push({
+          type: 'error',
+          code: 'CATEGORY_SCORE_INFINITE',
+          message: `Category score is infinite: ${category}`,
+          path: categoryPath,
+          timestamp: new Date()
+        });
+        return;
+      }
+
+      // Range validation
+      if (score < 0) {
+        warnings.push({
+          code: 'CATEGORY_SCORE_NEGATIVE',
+          message: `Category score is negative: ${category}`,
+          path: categoryPath,
+          value: score,
+          suggestion: 'Clamp to 0'
+        });
+      } else if (score > 100) {
+        warnings.push({
+          code: 'CATEGORY_SCORE_TOO_HIGH',
+          message: `Category score exceeds 100: ${category}`,
+          path: categoryPath,
+          value: score,
+          suggestion: 'Clamp to 100'
+        });
+      }
+    });
+
+    // Phase 2: Check for unexpected categories
+    const extraCategories = Object.keys(categoryScores).filter(
+      cat => !requiredCategories.includes(cat)
+    );
+    if (extraCategories.length > 0) {
+      warnings.push({
+        code: 'UNEXPECTED_CATEGORIES',
+        message: `Unexpected category scores found: ${extraCategories.join(', ')}`,
+        path: 'summary.categoryScores',
+        value: extraCategories,
+        suggestion: 'Consider removing or documenting these categories'
+      });
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Phase 2: Summary Arrays Validation
+   */
+  private validateSummaryArrays(summary: any): { errors: ValidationError[], warnings: ValidationWarning[] } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    // Validate keyIssues
+    if (summary.keyIssues !== undefined) {
+      const issuesValidation = this.validateArray(summary.keyIssues, 'summary.keyIssues');
+      errors.push(...issuesValidation.errors);
+      warnings.push(...issuesValidation.warnings);
+
+      if (Array.isArray(summary.keyIssues)) {
+        summary.keyIssues.forEach((issue, index) => {
+          if (typeof issue !== 'string') {
+            warnings.push({
+              code: 'KEY_ISSUE_NOT_STRING',
+              message: `Key issue at index ${index} is not a string`,
+              path: `summary.keyIssues[${index}]`,
+              value: issue,
+              suggestion: 'Convert to string or remove invalid entry'
+            });
+          }
+        });
+      }
+    }
+
+    // Validate strengths
+    if (summary.strengths !== undefined) {
+      const strengthsValidation = this.validateArray(summary.strengths, 'summary.strengths');
+      errors.push(...strengthsValidation.errors);
+      warnings.push(...strengthsValidation.warnings);
+
+      if (Array.isArray(summary.strengths)) {
+        summary.strengths.forEach((strength, index) => {
+          if (typeof strength !== 'string') {
+            warnings.push({
+              code: 'STRENGTH_NOT_STRING',
+              message: `Strength at index ${index} is not a string`,
+              path: `summary.strengths[${index}]`,
+              value: strength,
+              suggestion: 'Convert to string or remove invalid entry'
+            });
+          }
+        });
+      }
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Phase 2: Confidence Score Validation
+   */
+  private validateConfidenceScore(confidence: any): { errors: ValidationError[], warnings: ValidationWarning[] } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    if (confidence === null || confidence === undefined) {
+      warnings.push({
+        code: 'CONFIDENCE_MISSING',
+        message: 'Confidence score is missing',
+        path: 'summary.confidence',
+        suggestion: 'Provide default confidence value'
+      });
+      return { errors, warnings };
+    }
+
+    if (typeof confidence !== 'number') {
+      warnings.push({
+        code: 'CONFIDENCE_NOT_NUMBER',
+        message: 'Confidence score must be a number',
+        path: 'summary.confidence',
+        value: confidence,
+        suggestion: 'Convert to number or use default value'
+      });
+      return { errors, warnings };
+    }
+
+    if (isNaN(confidence)) {
+      warnings.push({
+        code: 'CONFIDENCE_NAN',
+        message: 'Confidence score is NaN',
+        path: 'summary.confidence',
+        suggestion: 'Use default confidence value'
+      });
+      return { errors, warnings };
+    }
+
+    if (confidence < 0 || confidence > 1) {
+      warnings.push({
+        code: 'CONFIDENCE_OUT_OF_RANGE',
+        message: 'Confidence score should be between 0-1',
+        path: 'summary.confidence',
+        value: confidence,
+        suggestion: `Clamp to valid range: ${Math.max(0, Math.min(1, confidence))}`
       });
     }
 

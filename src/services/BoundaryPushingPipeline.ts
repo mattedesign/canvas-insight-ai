@@ -8,6 +8,7 @@ import { AdaptiveTimeoutCalculator, ImageComplexity } from '@/config/adaptiveTim
 import { ProgressPersistenceService } from './ProgressPersistenceService';
 import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
 import { ValidationService } from './ValidationService';
+import { SummaryGenerator } from './SummaryGenerator';
 
 interface ModelResult {
   model: string;
@@ -39,6 +40,8 @@ export class BoundaryPushingPipeline {
   private currentRequestId: string | null = null;
   // PHASE 1: Validation Service
   private validationService: ValidationService;
+  // PHASE 2: Summary Generator
+  private summaryGenerator: SummaryGenerator;
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
@@ -48,6 +51,8 @@ export class BoundaryPushingPipeline {
     this.modelOptimizer = ModelSelectionOptimizer.getInstance();
     // PHASE 1: Initialize validation service
     this.validationService = ValidationService.getInstance();
+    // PHASE 2: Initialize summary generator
+    this.summaryGenerator = SummaryGenerator.getInstance();
   }
 
   async execute(
@@ -749,16 +754,17 @@ export class BoundaryPushingPipeline {
       }));
     }
 
-    // CRITICAL FIX: Ensure summary object exists with complete required structure
+    // PHASE 2: Enhanced Summary Generation with ValidationService
     if (!synthesis.summary) {
-      console.warn('[BoundaryPushingPipeline] Synthesis results missing summary object, creating default');
-      synthesis.summary = this.createDefaultSummary(synthesis);
+      console.warn('[BoundaryPushingPipeline] Synthesis results missing summary object, generating with SummaryGenerator');
+      synthesis.summary = this.summaryGenerator.generateValidSummary({}, synthesis);
     } else {
-      // Ensure all required properties exist with proper fallbacks
-      synthesis.summary = this.validateAndFixSummary(synthesis.summary, synthesis);
+      // Validate and enhance existing summary
+      console.log('[BoundaryPushingPipeline] Validating and enhancing existing summary');
+      synthesis.summary = this.summaryGenerator.generateValidSummary(synthesis.summary, synthesis);
     }
 
-    // Log any missing properties for monitoring
+    // Log any remaining issues for monitoring
     this.logMissingProperties(synthesis);
 
     return synthesis;
