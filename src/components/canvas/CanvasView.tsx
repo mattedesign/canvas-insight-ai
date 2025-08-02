@@ -1429,7 +1429,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           setEdges(previousState.edges);
           setTimeout(() => setIsUpdating(false), 0);
         }
-      } else if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+      } else if ((event.ctrlKey || event.metaKey) && event.key === 'z' && event.shiftKey) {
         event.preventDefault();
         const nextState = redo();
         if (nextState) {
@@ -1630,7 +1630,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           }}
           disabled={!canUndo}
           className="bg-background/90 backdrop-blur-sm"
-          title="Undo (Ctrl+Z)"
+          title={`Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)`}
         >
           <Undo2 className="h-4 w-4" />
         </Button>
@@ -1648,7 +1648,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           }}
           disabled={!canRedo}
           className="bg-background/90 backdrop-blur-sm"
-          title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+          title={`Redo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Shift+Z)`}
         >
           <Redo2 className="h-4 w-4" />
         </Button>
