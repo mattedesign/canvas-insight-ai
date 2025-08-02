@@ -49,8 +49,8 @@ export const MODEL_REGISTRY = {
       complexReasoning: true
     }
   },
-  'gemini-pro': {
-    name: 'Gemini Pro',
+  'gemini-2.5-pro': {
+    name: 'Gemini 2.5 Pro',
     category: 'conversational',
     capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning'],
     provider: 'google',

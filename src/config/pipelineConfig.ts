@@ -14,11 +14,11 @@ export const pipelineConfig = {
       secondary: ['google-vision'],
       timeout: 30000
     },
-    analysis: {
-      primary: ['gpt-4o', 'claude-opus-4-20250514'],
-      secondary: ['gemini-1.5-pro'],
-      timeout: 60000
-    }
+  analysis: {
+    primary: ['gpt-4o', 'claude-opus-4-20250514'],
+    secondary: ['gemini-2.5-pro'],
+    timeout: 60000
+  }
   },
   execution: {
     maxParallelism: 5,

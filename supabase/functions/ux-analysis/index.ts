@@ -426,8 +426,8 @@ function mapModelName(requestedModel: string): string {
     'claude-3-opus-20240229': 'claude-opus-4-20250514',
     
     // Google model mappings
-    'gemini-1.5-pro': 'gemini-1.5-pro',
-    'google-vision': 'gemini-1.5-pro',
+    'gemini-2.5-pro': 'gemini-2.5-pro',
+    'google-vision': 'gemini-2.5-pro',
     
     // Perplexity mappings
     'perplexity-sonar': 'llama-3.1-sonar-small-128k-online'
@@ -448,7 +448,7 @@ function findBestModelMatch(requestedModel: string, availableModels: string[]): 
     return availableModels.find(m => m.includes('claude')) || 'claude-opus-4-20250514'
   }
   if (requestedModel.includes('gemini') || requestedModel.includes('google')) {
-    return availableModels.find(m => m.includes('gemini')) || 'gemini-1.5-pro'
+    return availableModels.find(m => m.includes('gemini')) || 'gemini-2.5-pro'
   }
   return availableModels[0] || 'gpt-4o'
 }

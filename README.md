@@ -615,7 +615,7 @@ export const pipelineConfig = {
     },
     analysis: {
       primary: ['gpt-4o', 'claude-3-5-sonnet-20241022'],
-      secondary: ['gemini-1.5-pro'],
+      secondary: ['gemini-2.5-pro'],
       timeout: 30000
     }
   },
