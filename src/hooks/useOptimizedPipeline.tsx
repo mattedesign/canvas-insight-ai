@@ -64,10 +64,10 @@ export function useOptimizedPipeline() {
           ...prev,
           isAnalyzing: false,
           requiresClarification: true,
-          clarificationQuestions: result.clarificationQuestions,
+          clarificationQuestions: result.questions, // Fixed: use result.questions instead of result.clarificationQuestions
           analysisContext: result.partialContext
         }));
-        return { requiresClarification: true, questions: result.clarificationQuestions };
+        return { requiresClarification: true, questions: result.questions };
       }
 
       setState(prev => ({
