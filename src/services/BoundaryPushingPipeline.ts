@@ -10,6 +10,7 @@ import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
 import { ValidationService } from './ValidationService';
 import { SummaryGenerator } from './SummaryGenerator';
 import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
+import { PipelineRecoveryService } from './PipelineRecoveryService';
 
 interface ModelResult {
   model: string;
@@ -45,6 +46,8 @@ export class BoundaryPushingPipeline {
   private summaryGenerator: SummaryGenerator;
   // PHASE 3: Array & Numeric Safety
   private arraySafety: ArrayNumericSafety;
+  // PHASE 5: Pipeline Recovery Service
+  private recoveryService: PipelineRecoveryService;
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
@@ -58,6 +61,8 @@ export class BoundaryPushingPipeline {
     this.summaryGenerator = SummaryGenerator.getInstance();
     // PHASE 3: Initialize array & numeric safety
     this.arraySafety = ArrayNumericSafety.getInstance();
+    // PHASE 5: Initialize pipeline recovery service
+    this.recoveryService = PipelineRecoveryService.getInstance();
   }
 
   async execute(
@@ -199,13 +204,37 @@ export class BoundaryPushingPipeline {
       return finalResult;
 
     } catch (error) {
+      // PHASE 5: Enhanced error handling with recovery attempts
+      console.error('❌ Pipeline execution failed:', error);
+      
+      // Attempt recovery if error is recoverable
+      if (this.recoveryService.isTransientError(error as Error)) {
+        console.log('🔄 Attempting pipeline recovery...');
+        
+        try {
+          const recoveryResult = await this.recoveryService.retryWithBackoff(
+            () => this.executeRetryableOperation(imageUrl, userContext, onProgress),
+            3,
+            2000,
+            'pipeline-execution'
+          );
+          
+          if (recoveryResult.success && recoveryResult.result) {
+            console.log('✅ Pipeline recovery successful');
+            return recoveryResult.result;
+          }
+        } catch (recoveryError) {
+          console.warn('⚠️ Pipeline recovery failed:', recoveryError);
+        }
+      }
+
       if (error instanceof PipelineError) {
         throw error;
       }
       throw new PipelineError(
         'Pipeline execution failed',
         'unknown',
-        { originalError: error.message },
+        { originalError: (error as Error).message },
         false
       );
     }
@@ -1426,5 +1455,70 @@ export class BoundaryPushingPipeline {
     if (this.currentRequestId) {
       this.progressService.failRequest(this.currentRequestId, 'Request cancelled by user');
     }
+    }
+  }
+
+  /**
+   * PHASE 5: Simple retry for transient errors
+   */
+  private async executeRetryableOperation(
+    imageUrl: string,
+    userContext: string,
+    onProgress?: (progress: number, stage: string) => void
+  ): Promise<any> {
+    return this.execute(imageUrl, userContext, onProgress);
+  }
+}
+  private async executeRetryableOperation(
+    imageUrl: string,
+    userContext: string,
+    onProgress?: (progress: number, stage: string) => void
+  ): Promise<any> {
+    // Re-execute the main pipeline logic without the outer try-catch
+    // to allow the recovery service to handle retries properly
+    const startTime = Date.now();
+    
+    this.currentRequestId = this.progressService.generateRequestId(imageUrl, userContext);
+    onProgress?.(2, 'Retrying analysis...');
+    
+    // Continue with pipeline execution...
+    let imageContext: any;
+    try {
+      imageContext = await this.contextDetector.detectImageContext(imageUrl);
+    } catch (contextError) {
+      imageContext = {
+        primaryType: 'app',
+        subTypes: ['fallback'],
+        domain: 'general',
+        complexity: 'moderate',
+        userIntent: ['general analysis'],
+        platform: 'web'
+      };
+    }
+    
+    const userContextParsed = this.contextDetector.inferUserContext(userContext);
+    this.analysisContext = this.contextDetector.createAnalysisContext(imageContext, userContextParsed);
+    
+    if (this.analysisContext.clarificationNeeded && this.analysisContext.clarificationQuestions) {
+      return {
+        requiresClarification: true,
+        questions: this.analysisContext.clarificationQuestions,
+        partialContext: this.analysisContext,
+        resumeToken: this.generateResumeToken()
+      };
+    }
+
+    const visionResults = await this.executeVisionStage(imageUrl);
+    const analysisResults = await this.executeAnalysisStage(imageUrl, visionResults.fusedData, userContext);
+    const synthesisResults = await this.executeSynthesisStage(visionResults, analysisResults, userContext);
+    
+    return await this.storeResults({
+      visionResults,
+      analysisResults,
+      synthesisResults,
+      executionTime: Date.now() - startTime,
+      modelsUsed: this.getUsedModels([visionResults, analysisResults, synthesisResults]),
+      analysisContext: this.analysisContext
+    });
   }
 }
