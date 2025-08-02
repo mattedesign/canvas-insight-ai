@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
+import { PipelineConsolidationSafety } from '@/services/PipelineConsolidationSafety';
 
 /**
  * Optimized Multi-Stage Analysis Pipeline Service
@@ -58,6 +60,8 @@ export class OptimizedAnalysisPipeline {
 
   private currentTokenUsage = 0;
   private progressCallback?: (progress: PipelineProgress) => void;
+  private arraySafety = ArrayNumericSafety.getInstance();
+  private consolidationSafety = PipelineConsolidationSafety.getInstance();
 
   constructor(onProgress?: (progress: PipelineProgress) => void) {
     this.progressCallback = onProgress;
@@ -71,7 +75,7 @@ export class OptimizedAnalysisPipeline {
     imageName: string,
     imageId: string,
     userContext?: string
-  ): Promise<{ success: boolean; data?: any; error?: string; stages: StageResult[] }> {
+  ): Promise<{ success: boolean; data?: any; error?: string; stages: StageResult[]; warnings?: string[]; fallbacksApplied?: string[] }> {
     const stages: StageResult[] = [];
     
     try {
@@ -122,11 +126,26 @@ export class OptimizedAnalysisPipeline {
         tokenUsage: claudeResult.tokenUsage
       });
 
-      // Stage 4: Data Consolidation and Storage
-      this.updateProgress('consolidation', 90, 'Consolidating results and preparing for storage');
-      const finalAnalysis = this.consolidateOptimizedResults(stages, imageId, imageName);
+      // Stage 4: Enhanced Data Consolidation with Safety
+      this.updateProgress('consolidation', 90, 'Safely consolidating results and preparing for storage');
+      const consolidationResult = this.consolidationSafety.safeConsolidateResults(stages, imageId, imageName);
 
-      // Store optimized analysis
+      if (!consolidationResult.success) {
+        throw new Error(`Consolidation failed: ${consolidationResult.errors.join(', ')}`);
+      }
+
+      const finalAnalysis = consolidationResult.data;
+
+      // Log consolidation warnings and fallbacks
+      if (consolidationResult.warnings.length > 0) {
+        console.warn('[OptimizedAnalysisPipeline] Consolidation warnings:', consolidationResult.warnings);
+      }
+      
+      if (consolidationResult.fallbacksApplied.length > 0) {
+        console.warn('[OptimizedAnalysisPipeline] Fallbacks applied:', consolidationResult.fallbacksApplied);
+      }
+
+      // Store optimized analysis with enhanced safety
       await this.storeOptimizedAnalysis(imageId, finalAnalysis, stages, userContext || '');
 
       this.updateProgress('complete', 100, 'Analysis pipeline completed successfully');
@@ -134,6 +153,8 @@ export class OptimizedAnalysisPipeline {
       return {
         success: true,
         data: finalAnalysis,
+        warnings: consolidationResult.warnings,
+        fallbacksApplied: consolidationResult.fallbacksApplied,
         stages
       };
 
@@ -555,7 +576,7 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
 
 
   /**
-   * Store optimized analysis in database
+   * Phase 4: Enhanced Storage with Safe Property Access
    */
   private async storeOptimizedAnalysis(
     imageId: string, 
@@ -564,16 +585,19 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
     userContext = ''
   ): Promise<void> {
     try {
+      // Phase 4: Safe property extraction for storage
+      const storageData = {
+        image_id: imageId,
+        user_context: userContext || '',
+        visual_annotations: this.arraySafety.safeGetProperty(analysis, 'visualAnnotations', [], 'storage-annotations'),
+        suggestions: this.arraySafety.safeGetProperty(analysis, 'suggestions', [], 'storage-suggestions'),
+        summary: this.arraySafety.safeGetProperty(analysis, 'summary', {}, 'storage-summary'),
+        metadata: this.arraySafety.safeGetProperty(analysis, 'metadata', {}, 'storage-metadata')
+      };
+
       const { error } = await supabase
         .from('ux_analyses')
-        .insert({
-          image_id: imageId,
-          user_context: userContext || '',
-          visual_annotations: analysis.visualAnnotations,
-          suggestions: analysis.suggestions,
-          summary: analysis.summary,
-          metadata: analysis.metadata
-        });
+        .insert(storageData);
 
       if (error) throw error;
       

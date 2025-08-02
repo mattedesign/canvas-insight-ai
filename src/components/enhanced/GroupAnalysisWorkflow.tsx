@@ -535,7 +535,7 @@ Provide a structured response that executives and development teams can act upon
                       <div className="text-sm text-muted-foreground">Total Time</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold">{analysisResults.metadata.focusAreas.length}</div>
+                      <div className="text-2xl font-bold">{analysisResults.metadata?.focusAreas?.length || 0}</div>
                       <div className="text-sm text-muted-foreground">Focus Areas</div>
                     </div>
                   </div>

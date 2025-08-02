@@ -251,19 +251,19 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Objects Detected</p>
-                  <p className="font-medium">{analysis.metadata.objects.length}</p>
+                  <p className="font-medium">{analysis.metadata?.objects?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Text Elements</p>
-                  <p className="font-medium">{analysis.metadata.text.length}</p>
+                  <p className="font-medium">{analysis.metadata?.text?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Colors</p>
-                  <p className="font-medium">{analysis.metadata.colors.length}</p>
+                  <p className="font-medium">{analysis.metadata?.colors?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Faces</p>
-                  <p className="font-medium">{analysis.metadata.faces}</p>
+                  <p className="font-medium">{analysis.metadata?.faces || 0}</p>
                 </div>
               </div>
               <Separator className="my-4" />

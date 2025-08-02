@@ -23,7 +23,7 @@ export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
         <div className="flex flex-wrap gap-2 mb-4">
           <Badge variant="outline" className="gap-1">
             <Info className="h-3 w-3" />
-            {analysis.metadata.modelsUsed.length} AI Models Used
+            {analysis.metadata?.modelsUsed?.length || 0} AI Models Used
           </Badge>
           
           {analysis.metadata.modelsUsed.map((model: string) => (
@@ -46,7 +46,7 @@ export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
           <div className="text-sm font-medium mb-2">Analysis Pipeline</div>
           <div className="flex gap-2">
             {['context', 'vision', 'analysis', 'synthesis'].map((stage) => {
-              const completed = analysis.metadata.stagesCompleted.includes(stage);
+              const completed = analysis.metadata?.stagesCompleted?.includes(stage) || false;
               return (
                 <Badge 
                   key={stage} 
