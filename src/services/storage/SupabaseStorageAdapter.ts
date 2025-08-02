@@ -12,13 +12,12 @@ interface SupabaseStorageOptions extends StorageOptions {
 }
 
 export class SupabaseStorageAdapter extends StorageAdapter {
-  private tableName: string;
-  private bucketName: string;
+  private tableName: string = 'storage_data';
 
   constructor(options: SupabaseStorageOptions = {}) {
     super('Supabase', options);
-    this.tableName = options.tableName || 'storage_data';
-    this.bucketName = options.bucketName || 'app-storage';
+    // Use the storage_data table we created
+    this.tableName = 'storage_data';
   }
 
   async get<T>(key: string): Promise<StorageResult<T>> {
@@ -26,7 +25,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       this.debugLog('Getting data', { key });
 
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('value, metadata')
         .eq('key', key)
         .single();
@@ -41,8 +40,8 @@ export class SupabaseStorageAdapter extends StorageAdapter {
 
       return {
         success: true,
-        data: data.value,
-        metadata: data.metadata
+        data: data.value as T,
+        metadata: data.metadata as unknown as StorageMetadata
       };
     } catch (error) {
       this.debugLog('Get operation failed', { key, error });
@@ -60,11 +59,12 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       const fullMetadata = this.createMetadata(value, metadata);
 
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .upsert({
           key,
-          value,
-          metadata: fullMetadata,
+          value: value as any,
+          metadata: fullMetadata as any,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
           updated_at: new Date().toISOString()
         });
 
@@ -85,7 +85,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       this.debugLog('Deleting data', { key });
 
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .delete()
         .eq('key', key);
 
@@ -104,7 +104,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
   async exists(key: string): Promise<boolean> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('key')
         .eq('key', key)
         .single();
@@ -120,7 +120,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       this.debugLog('Clearing all data');
 
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .delete()
         .neq('key', ''); // Delete all records
 
@@ -141,7 +141,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       this.debugLog('Getting multiple items', { keys });
 
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('key, value, metadata')
         .in('key', keys);
 
@@ -149,7 +149,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
 
       const result: Record<string, T> = {};
       data?.forEach(item => {
-        result[item.key] = item.value;
+        result[item.key] = item.value as T;
       });
 
       return { success: true, data: result };
@@ -168,13 +168,14 @@ export class SupabaseStorageAdapter extends StorageAdapter {
 
       const records = Object.entries(items).map(([key, value]) => ({
         key,
-        value,
-        metadata: this.createMetadata(value),
+        value: value as any,
+        metadata: this.createMetadata(value) as any,
+        user_id: null, // Will be set by RLS
         updated_at: new Date().toISOString()
       }));
 
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .upsert(records);
 
       if (error) throw error;
@@ -194,7 +195,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
       this.debugLog('Deleting multiple items', { keys });
 
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .delete()
         .in('key', keys);
 
@@ -213,7 +214,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
   async getMetadata(key: string): Promise<StorageResult<StorageMetadata>> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('metadata')
         .eq('key', key)
         .single();
@@ -225,7 +226,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
         throw error;
       }
 
-      return { success: true, data: data.metadata };
+      return { success: true, data: data.metadata as unknown as StorageMetadata };
     } catch (error) {
       return {
         success: false,
@@ -236,7 +237,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
 
   async listKeys(prefix?: string): Promise<StorageResult<string[]>> {
     try {
-      let query = supabase.from(this.tableName).select('key');
+      let query = supabase.from('storage_data').select('key');
       
       if (prefix) {
         query = query.like('key', `${prefix}%`);
@@ -259,13 +260,13 @@ export class SupabaseStorageAdapter extends StorageAdapter {
   async getSize(): Promise<StorageResult<number>> {
     try {
       const { data, error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('metadata');
 
       if (error) throw error;
 
       const totalSize = data?.reduce((sum, item) => {
-        return sum + (item.metadata?.size || 0);
+        return sum + ((item.metadata as any)?.size || 0);
       }, 0) || 0;
 
       return { success: true, data: totalSize };
@@ -283,7 +284,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
     try {
       // Simple health check - try to read from the table
       const { error } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('count')
         .limit(1);
 
@@ -308,7 +309,7 @@ export class SupabaseStorageAdapter extends StorageAdapter {
   async getStats(): Promise<Record<string, any>> {
     try {
       const { data: countData } = await supabase
-        .from(this.tableName)
+        .from('storage_data')
         .select('*', { count: 'exact', head: true });
 
       const sizeResult = await this.getSize();
@@ -317,7 +318,6 @@ export class SupabaseStorageAdapter extends StorageAdapter {
         totalItems: countData?.length || 0,
         totalSize: sizeResult.success ? sizeResult.data : 0,
         adapter: this.name,
-        table: this.tableName,
         lastUpdated: Date.now()
       };
     } catch (error) {

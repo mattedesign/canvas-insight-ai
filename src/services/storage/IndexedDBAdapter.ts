@@ -139,7 +139,7 @@ export class IndexedDBAdapter extends StorageAdapter {
 
   async exists(key: string): Promise<boolean> {
     try {
-      const result = await this.executeTransaction(
+      const result: number = await this.executeTransaction(
         'readonly',
         (store) => store.count(key)
       );

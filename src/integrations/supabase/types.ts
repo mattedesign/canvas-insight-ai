@@ -858,6 +858,36 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_data: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          metadata: Json
+          updated_at: string
+          user_id: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          metadata?: Json
+          updated_at?: string
+          user_id?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          metadata?: Json
+          updated_at?: string
+          user_id?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       subscribers: {
         Row: {
           analysis_count: number | null
