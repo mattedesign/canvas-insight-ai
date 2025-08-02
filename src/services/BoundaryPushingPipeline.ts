@@ -337,6 +337,28 @@ export class BoundaryPushingPipeline {
       pipelineConfig.models.analysis.timeout
     );
 
+    // Add Perplexity conversational analysis if available
+    if (this.hasPerplexity()) {
+      try {
+        const conversationalAnalysis = await this.executeConversationalAnalysis(
+          visionData,
+          userContext
+        );
+        
+        results.push({
+          model: 'perplexity-sonar',
+          success: true,
+          data: conversationalAnalysis,
+          metrics: {
+            startTime: Date.now(),
+            endTime: Date.now()
+          }
+        });
+      } catch (error) {
+        console.warn('Conversational analysis failed:', error);
+      }
+    }
+
     const successfulResults = results.filter(r => r.success);
     if (successfulResults.length === 0) {
       throw new PipelineError(
@@ -585,6 +607,12 @@ export class BoundaryPushingPipeline {
     };
   }
 
+  private readonly ANALYSIS_MODELS = [
+    'gpt-4-turbo-preview',
+    'claude-opus-4',
+    'perplexity-sonar' // ADD THIS
+  ];
+
   private getAvailableModels(stage: 'vision' | 'analysis'): string[] {
     console.log(`Getting available models for stage: ${stage}`);
     
@@ -599,6 +627,33 @@ export class BoundaryPushingPipeline {
       console.log('Analysis models available:', analysisModels);
       return analysisModels;
     }
+  }
+
+  // Add new method for conversational analysis
+  private async executeConversationalAnalysis(
+    visionData: any,
+    userContext: string
+  ): Promise<any> {
+    console.log('💬 Executing conversational analysis with Perplexity');
+    
+    const { data, error } = await supabase.functions.invoke('ux-analysis', {
+      body: {
+        stage: 'conversational',
+        model: 'perplexity-sonar',
+        visionData,
+        prompt: userContext,
+        systemPrompt: 'Analyze conversational UX patterns and user interaction flows'
+      }
+    });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  // Add helper method to check Perplexity availability
+  private hasPerplexity(): boolean {
+    // This will be determined by the edge function
+    return true; // Let edge function handle the check
   }
 
   private hasApiKey(keyName: string): boolean {
