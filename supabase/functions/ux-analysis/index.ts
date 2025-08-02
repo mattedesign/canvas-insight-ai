@@ -22,12 +22,6 @@ const MODEL_CONFIGS = {
     endpoint: 'https://api.anthropic.com/v1/messages',
     requiresKey: 'ANTHROPIC_API_KEY'
   },
-  'anthropic-vision': {
-    api: 'anthropic',
-    endpoint: 'https://api.anthropic.com/v1/messages',
-    model: 'claude-opus-4-20250514',
-    requiresKey: 'ANTHROPIC_API_KEY'
-  },
   'perplexity-research': {
     api: 'perplexity',
     endpoint: 'https://api.perplexity.ai/chat/completions',
@@ -430,7 +424,6 @@ function mapModelName(requestedModel: string): string {
     'claude-opus-4-20250514': 'claude-opus-4-20250514',
     'claude-3-5-sonnet-20241022': 'claude-opus-4-20250514',
     'claude-3-opus-20240229': 'claude-opus-4-20250514',
-    'anthropic-vision': 'claude-opus-4-20250514',
     
     // Google model mappings
     'gemini-1.5-pro': 'gemini-1.5-pro',

@@ -691,7 +691,7 @@ export class BoundaryPushingPipeline {
     
     if (stage === 'vision') {
       // For vision, we only use vision-capable models
-      const visionModels = ['gpt-4o', 'anthropic-vision'];
+      const visionModels = ['gpt-4o', 'claude-opus-4-20250514'];
       console.log('Vision models available:', visionModels);
       return visionModels;
     } else {
