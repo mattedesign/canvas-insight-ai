@@ -37,7 +37,7 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
     resumeWithClarification
   } = useOptimizedPipeline();
 
-  // Start analysis when node is created
+  // Start analysis when node is created - only run once
   useEffect(() => {
     console.log('[AnalysisRequestNode] useEffect triggered with:', {
       isAnalyzing,
@@ -54,7 +54,6 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           console.log('[AnalysisRequestNode] Analysis result:', result);
           if (result.requiresClarification) {
             setShowClarification(true);
-            // Store questions for resume token - using a simple identifier
             setResumeToken('resume-' + Date.now());
           } else if (result.success && onAnalysisComplete) {
             onAnalysisComplete(result.data);
@@ -67,7 +66,7 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           }
         });
     }
-  }, [imageUrl, imageName, userContext, isAnalyzing, requiresClarification, error]); // Removed callback dependencies
+  }, [imageId]); // Only depend on imageId to prevent re-runs
 
   const handleClarificationSubmit = async (responses: Record<string, string>) => {
     setShowClarification(false);

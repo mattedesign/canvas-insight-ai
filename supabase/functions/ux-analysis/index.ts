@@ -176,111 +176,156 @@ async function executeModel(payload: any) {
 }
 
 async function executeOpenAI(config: any, apiKey: string, payload: any) {
-  const { imageUrl, prompt, systemPrompt } = payload
-  
-  const messages = [
-    {
-      role: 'system',
-      content: systemPrompt || 'You are an expert UX/UI analyst.'
-    },
-    {
-      role: 'user',
-      content: imageUrl ? [
-        { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: imageUrl } }
-      ] : prompt
-    }
-  ]
-
-  const response = await fetch(config.endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model || payload.model,
-      messages,
-      max_tokens: 4000,
-      temperature: 0.3,
-      response_format: { type: 'json_object' }
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`OpenAI API error: ${error}`)
-  }
-
-  const data = await response.json()
-  const content = data.choices[0].message.content
+  console.log('Executing OpenAI with payload:', { 
+    model: config.model || payload.model,
+    stage: payload.stage,
+    hasImage: !!payload.imageUrl,
+    promptLength: payload.prompt?.length || 0
+  });
   
   try {
-    return new Response(
-      JSON.stringify(JSON.parse(content)),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  } catch (e) {
-    // If JSON parsing fails, return the raw content
-    return new Response(
-      JSON.stringify({ content }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    const { imageUrl, prompt, systemPrompt } = payload;
+    
+    let processedImageUrl = imageUrl;
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      console.log('Converting image to base64 for OpenAI...');
+      const base64Data = await fetchImageAsBase64(imageUrl);
+      processedImageUrl = `data:image/jpeg;base64,${base64Data}`;
+      console.log('Image converted successfully');
+    }
+    
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt || 'You are an expert UX/UI analyst.'
+      },
+      {
+        role: 'user',
+        content: processedImageUrl ? [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: processedImageUrl } }
+        ] : prompt
+      }
+    ];
+
+    console.log('Sending request to OpenAI API...');
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.model || payload.model,
+        messages,
+        max_tokens: 4000,
+        temperature: 0.3,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, response.statusText, errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('OpenAI response received successfully');
+    const content = data.choices[0].message.content;
+    
+    try {
+      return new Response(
+        JSON.stringify(JSON.parse(content)),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } catch (e) {
+      // If JSON parsing fails, return the raw content
+      return new Response(
+        JSON.stringify({ content }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+  } catch (error) {
+    console.error('Error in executeOpenAI:', error);
+    throw error;
   }
 }
 
 async function executeAnthropic(config: any, apiKey: string, payload: any) {
-  const { imageUrl, prompt, systemPrompt } = payload
-  
-  const messages = [{
-    role: 'user',
-    content: imageUrl ? [
-      { type: 'text', text: prompt },
-      { 
-        type: 'image', 
-        source: {
-          type: 'base64',
-          media_type: 'image/jpeg',
-          data: await fetchImageAsBase64(imageUrl)
-        }
-      }
-    ] : prompt
-  }]
-
-  const response = await fetch(config.endpoint, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model || payload.model,
-      system: systemPrompt || 'You are an expert UX/UI analyst.',
-      messages,
-      max_tokens: 4000,
-      temperature: 0.3
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Anthropic API error: ${error}`)
-  }
-
-  const data = await response.json()
-  const content = data.content[0].text
+  console.log('Executing Anthropic with payload:', { 
+    model: config.model || payload.model,
+    stage: payload.stage,
+    hasImage: !!payload.imageUrl,
+    promptLength: payload.prompt?.length || 0
+  });
   
   try {
-    return new Response(
-      JSON.stringify(JSON.parse(content)),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ content }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    const { imageUrl, prompt, systemPrompt } = payload;
+    
+    let base64Data = '';
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      console.log('Converting image to base64 for Anthropic...');
+      base64Data = await fetchImageAsBase64(imageUrl);
+      console.log('Image converted successfully for Anthropic');
+    }
+    
+    const messages = [{
+      role: 'user',
+      content: imageUrl ? [
+        { type: 'text', text: prompt },
+        { 
+          type: 'image', 
+          source: {
+            type: 'base64',
+            media_type: 'image/jpeg',
+            data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : base64Data
+          }
+        }
+      ] : prompt
+    }];
+
+    console.log('Sending request to Anthropic API...');
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.model || payload.model,
+        system: systemPrompt || 'You are an expert UX/UI analyst.',
+        messages,
+        max_tokens: 4000,
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Anthropic API error:', response.status, response.statusText, errorText);
+      throw new Error(`Anthropic API error: ${response.status} ${response.statusText}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Anthropic response received successfully');
+    const content = data.content[0].text;
+    
+    try {
+      return new Response(
+        JSON.stringify(JSON.parse(content)),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ content }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+  } catch (error) {
+    console.error('Error in executeAnthropic:', error);
+    throw error;
   }
 }
 
@@ -370,21 +415,28 @@ async function executeStability(config: any, apiKey: string, payload: any) {
 }
 
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
-  const response = await fetch(imageUrl)
-  const blob = await response.blob()
-  const arrayBuffer = await blob.arrayBuffer()
+  console.log('Fetching image from URL:', imageUrl);
   
-  // Handle large images efficiently - convert chunks to avoid stack overflow
-  const uint8Array = new Uint8Array(arrayBuffer)
-  let binaryString = ''
-  const chunkSize = 32768 // Process in 32KB chunks
-  
-  for (let i = 0; i < uint8Array.length; i += chunkSize) {
-    const chunk = uint8Array.slice(i, i + chunkSize)
-    binaryString += String.fromCharCode.apply(null, Array.from(chunk))
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    console.log('Image fetched successfully, size:', arrayBuffer.byteLength, 'bytes');
+    
+    // Convert ArrayBuffer to base64 using Deno's built-in btoa
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+    const base64String = btoa(binaryString);
+    
+    console.log('Base64 conversion complete, length:', base64String.length);
+    return base64String;
+  } catch (error) {
+    console.error('Error in fetchImageAsBase64:', error);
+    throw new Error(`Failed to convert image to base64: ${error.message}`);
   }
-  
-  return btoa(binaryString)
 }
 
 async function handleCanvasRequest(action: string, payload: any) {

@@ -12,17 +12,17 @@ export const pipelineConfig = {
     vision: {
       primary: ['openai-vision', 'anthropic-vision'],
       secondary: ['google-vision'],
-      timeout: 10000
+      timeout: 30000
     },
     analysis: {
       primary: ['gpt-4.1-2025-04-14', 'claude-opus-4-20250514'],
       secondary: ['gemini-1.5-pro'],
-      timeout: 30000
+      timeout: 60000
     }
   },
   execution: {
     maxParallelism: 5,
-    globalTimeout: 45000,
+    globalTimeout: 120000,
     retryAttempts: 3,
     retryDelay: 1000,
     exponentialBackoff: true

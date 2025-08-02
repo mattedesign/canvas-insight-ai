@@ -43,7 +43,8 @@ export function useOptimizedPipeline() {
       isAnalyzing: true,
       progress: 0,
       stage: 'initializing',
-      requiresClarification: false
+      requiresClarification: false,
+      error: undefined
     });
 
     try {
@@ -64,7 +65,7 @@ export function useOptimizedPipeline() {
           ...prev,
           isAnalyzing: false,
           requiresClarification: true,
-          clarificationQuestions: result.questions, // Fixed: use result.questions instead of result.clarificationQuestions
+          clarificationQuestions: result.questions,
           analysisContext: result.partialContext
         }));
         return { requiresClarification: true, questions: result.questions };
@@ -85,12 +86,13 @@ export function useOptimizedPipeline() {
         ...prev,
         isAnalyzing: false,
         progress: 0,
-        stage: 'error'
+        stage: 'error',
+        error: error instanceof Error ? error.message : String(error)
       }));
 
       throw error;
     }
-  }, [handleProgress]);
+  }, []);
 
   const resumeWithClarification = useCallback(async (
     clarificationResponses: Record<string, string>,
@@ -99,7 +101,6 @@ export function useOptimizedPipeline() {
     userContext: string
   ) => {
     if (!pipelineRef.current) {
-      // Create new pipeline if none exists
       pipelineRef.current = new BoundaryPushingPipeline();
     }
 
@@ -107,7 +108,8 @@ export function useOptimizedPipeline() {
       ...prev,
       isAnalyzing: true,
       requiresClarification: false,
-      stage: 'resuming'
+      stage: 'resuming',
+      error: undefined
     }));
 
     try {
@@ -145,7 +147,7 @@ export function useOptimizedPipeline() {
 
       throw error;
     }
-  }, [handleProgress]);
+  }, []);
 
   const cancelAnalysis = useCallback(() => {
     if (pipelineRef.current) {

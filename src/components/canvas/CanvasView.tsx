@@ -1750,7 +1750,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         <CanvasUploadZone 
           onImageUpload={onImageUpload}
           isUploading={false}
-          hasImages={false}
+          hasImages={uploadedImages.length > 0}
         />
       )}
 
