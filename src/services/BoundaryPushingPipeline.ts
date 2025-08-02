@@ -9,6 +9,7 @@ import { ProgressPersistenceService } from './ProgressPersistenceService';
 import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
 import { ValidationService } from './ValidationService';
 import { SummaryGenerator } from './SummaryGenerator';
+import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
 
 interface ModelResult {
   model: string;
@@ -42,6 +43,8 @@ export class BoundaryPushingPipeline {
   private validationService: ValidationService;
   // PHASE 2: Summary Generator
   private summaryGenerator: SummaryGenerator;
+  // PHASE 3: Array & Numeric Safety
+  private arraySafety: ArrayNumericSafety;
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
@@ -53,6 +56,8 @@ export class BoundaryPushingPipeline {
     this.validationService = ValidationService.getInstance();
     // PHASE 2: Initialize summary generator
     this.summaryGenerator = SummaryGenerator.getInstance();
+    // PHASE 3: Initialize array & numeric safety
+    this.arraySafety = ArrayNumericSafety.getInstance();
   }
 
   async execute(
@@ -412,8 +417,20 @@ export class BoundaryPushingPipeline {
     return data;
   }
 
+  /**
+   * PHASE 3: Enhanced Vision Results Fusion with Array Safety
+   */
   private async fuseVisionResults(results: ModelResult[]): Promise<any> {
-    // Intelligent fusion of multiple model outputs
+    // PHASE 3: Safe array validation before processing
+    if (!this.arraySafety.isValidArray(results, 'fuseVisionResults')) {
+      throw new PipelineError(
+        'Invalid vision results for fusion',
+        'vision-fusion',
+        { invalidResults: true },
+        false
+      );
+    }
+
     const fusedData: any = {
       elements: {},
       layout: {},
@@ -422,42 +439,55 @@ export class BoundaryPushingPipeline {
       confidence: {}
     };
 
-    // Merge element detections
-    results.forEach(result => {
-      if (result.data?.elements) {
-        Object.entries(result.data.elements).forEach(([key, value]) => {
-          if (!fusedData.elements[key]) {
-            fusedData.elements[key] = [];
-          }
-        fusedData.elements[key].push({
-          ...(value as object),
-          detectedBy: result.model
-        });
-        });
-      }
-    });
+    // PHASE 3: Safe element detection merging
+    this.arraySafety.safeMap(
+      results,
+      (result: ModelResult) => {
+        const elements = this.arraySafety.safeGetProperty(result, 'data.elements', {}, 'vision-elements');
+        if (elements && typeof elements === 'object') {
+          Object.entries(elements).forEach(([key, value]) => {
+            if (!fusedData.elements[key]) {
+              fusedData.elements[key] = [];
+            }
+            fusedData.elements[key].push({
+              ...(value as object),
+              detectedBy: result.model
+            });
+          });
+        }
+        return result;
+      },
+      [],
+      'vision-element-merging'
+    );
 
-    // Aggregate layout analysis
+    // PHASE 3: Safe layout analysis aggregation
     fusedData.layout = {
       grid: this.detectGridSystem(results),
       hierarchy: this.analyzeHierarchy(results),
       spacing: this.analyzeSpacing(results)
     };
 
-    // Merge color analysis
-    const allColors = results.flatMap(r => r.data?.colors?.palette || []);
+    // PHASE 3: Safe color analysis merging
+    const allColors = this.arraySafety.safeFlatMap(
+      results,
+      (r: ModelResult) => this.arraySafety.safeGetProperty(r, 'data.colors.palette', [], 'color-palette'),
+      [],
+      'vision-color-merging'
+    );
+
     fusedData.colors = {
       primary: this.findPrimaryColors(allColors),
       secondary: this.findSecondaryColors(allColors),
       contrast: this.analyzeContrast(allColors)
     };
 
-    // Aggregate content
+    // PHASE 3: Safe content aggregation
     fusedData.content = this.mergeTextContent(results);
     
-    // Calculate confidence scores
+    // PHASE 3: Safe confidence score calculation
     fusedData.confidence = {
-      overall: this.calculateAgreement(results),
+      overall: this.validationService.safeCalculateConfidence(results),
       byCategory: {
         elements: this.calculateCategoryConfidence(results, 'elements'),
         layout: this.calculateCategoryConfidence(results, 'layout'),
@@ -585,7 +615,20 @@ export class BoundaryPushingPipeline {
     return data;
   }
 
+  /**
+   * PHASE 3: Enhanced Analysis Results Fusion with Array Safety
+   */
   private async fuseAnalysisResults(results: ModelResult[]): Promise<any> {
+    // PHASE 3: Safe array validation
+    if (!this.arraySafety.isValidArray(results, 'fuseAnalysisResults')) {
+      throw new PipelineError(
+        'Invalid analysis results for fusion',
+        'analysis-fusion',
+        { invalidResults: true },
+        false
+      );
+    }
+
     const fusedAnalysis: any = {
       usabilityIssues: [],
       accessibilityFindings: [],
@@ -595,30 +638,39 @@ export class BoundaryPushingPipeline {
       confidence: {}
     };
 
-    // Merge all issues and deduplicate
-    results.forEach(result => {
-      if (result.data?.usabilityIssues) {
-        fusedAnalysis.usabilityIssues.push(...result.data.usabilityIssues);
-      }
-      if (result.data?.accessibilityFindings) {
-        fusedAnalysis.accessibilityFindings.push(...result.data.accessibilityFindings);
-      }
-      if (result.data?.designOpportunities) {
-        fusedAnalysis.designOpportunities.push(...result.data.designOpportunities);
-      }
-    });
+    // PHASE 3: Safe merging of all issues with deduplication
+    const allUsabilityIssues = this.arraySafety.safeFlatMap(
+      results,
+      (result: ModelResult) => this.arraySafety.safeGetProperty(result, 'data.usabilityIssues', [], 'usability-issues'),
+      [],
+      'analysis-usability-merging'
+    );
 
-    // Deduplicate issues
-    fusedAnalysis.usabilityIssues = this.deduplicateIssues(fusedAnalysis.usabilityIssues);
-    fusedAnalysis.accessibilityFindings = this.deduplicateIssues(fusedAnalysis.accessibilityFindings);
-    fusedAnalysis.designOpportunities = this.deduplicateIssues(fusedAnalysis.designOpportunities);
+    const allAccessibilityFindings = this.arraySafety.safeFlatMap(
+      results,
+      (result: ModelResult) => this.arraySafety.safeGetProperty(result, 'data.accessibilityFindings', [], 'accessibility-findings'),
+      [],
+      'analysis-accessibility-merging'
+    );
 
-    // Aggregate business impact
+    const allDesignOpportunities = this.arraySafety.safeFlatMap(
+      results,
+      (result: ModelResult) => this.arraySafety.safeGetProperty(result, 'data.designOpportunities', [], 'design-opportunities'),
+      [],
+      'analysis-design-merging'
+    );
+
+    // PHASE 3: Safe deduplication
+    fusedAnalysis.usabilityIssues = this.deduplicateIssues(allUsabilityIssues);
+    fusedAnalysis.accessibilityFindings = this.deduplicateIssues(allAccessibilityFindings);
+    fusedAnalysis.designOpportunities = this.deduplicateIssues(allDesignOpportunities);
+
+    // PHASE 3: Safe business impact aggregation
     fusedAnalysis.businessImpact = this.aggregateBusinessImpact(results);
 
-    // Calculate confidence
+    // PHASE 3: Safe confidence calculation
     fusedAnalysis.confidence = {
-      overall: this.calculateAgreement(results),
+      overall: this.validationService.safeCalculateConfidence(results),
       byCategory: {
         usability: this.calculateCategoryConfidence(results, 'usabilityIssues'),
         accessibility: this.calculateCategoryConfidence(results, 'accessibilityFindings'),
