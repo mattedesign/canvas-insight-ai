@@ -2,6 +2,8 @@ import React from 'react';
 import type { CanvasViewProps } from './CanvasView';
 import { CanvasView } from './CanvasView';
 import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
+import { useSafePropertyAccess } from '@/hooks/useSafePropertyAccess';
+import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
 
 // Performance thresholds for virtualization
 const VIRTUALIZATION_THRESHOLDS = {
@@ -11,35 +13,44 @@ const VIRTUALIZATION_THRESHOLDS = {
 };
 
 export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
-  const { uploadedImages, imageGroups = [], analyses = [] } = props;
+  const { safeGetArray, safeGetNumber } = useSafePropertyAccess();
+  const arraySafety = ArrayNumericSafety.getInstance();
   
-  // Calculate total elements to determine if virtualization is needed
-  const totalElements = uploadedImages.length + imageGroups.length + analyses.length;
+  // Safe array access with defaults
+  const uploadedImages = safeGetArray(props, 'uploadedImages', [], 'PerformantCanvasView.uploadedImages');
+  const imageGroups = safeGetArray(props, 'imageGroups', [], 'PerformantCanvasView.imageGroups');
+  const analyses = safeGetArray(props, 'analyses', [], 'PerformantCanvasView.analyses');
   
-  // Decision logic for virtualization
+  // Safe length calculation
+  const imageCount = arraySafety.safeLength(uploadedImages, 0);
+  const groupCount = arraySafety.safeLength(imageGroups, 0);
+  const analysisCount = arraySafety.safeLength(analyses, 0);
+  const totalElements = arraySafety.safeAdd(arraySafety.safeAdd(imageCount, groupCount), analysisCount);
+  
+  // Decision logic for virtualization with safe comparisons
   const shouldVirtualize = 
-    uploadedImages.length > VIRTUALIZATION_THRESHOLDS.IMAGES ||
-    imageGroups.length > VIRTUALIZATION_THRESHOLDS.GROUPS ||
+    imageCount > VIRTUALIZATION_THRESHOLDS.IMAGES ||
+    groupCount > VIRTUALIZATION_THRESHOLDS.GROUPS ||
     totalElements > VIRTUALIZATION_THRESHOLDS.TOTAL_ELEMENTS;
   
-  // Performance logging
+  // Performance logging with safe array access
   React.useEffect(() => {
     if (shouldVirtualize) {
       console.log(`[PerformantCanvas] Using virtualized rendering:`, {
-        images: uploadedImages.length,
-        groups: imageGroups.length,
-        analyses: analyses.length,
+        images: imageCount,
+        groups: groupCount,
+        analyses: analysisCount,
         total: totalElements
       });
     } else {
       console.log(`[PerformantCanvas] Using standard ReactFlow rendering:`, {
-        images: uploadedImages.length,
-        groups: imageGroups.length,
-        analyses: analyses.length,
+        images: imageCount,
+        groups: groupCount,
+        analyses: analysisCount,
         total: totalElements
       });
     }
-  }, [shouldVirtualize, uploadedImages.length, imageGroups.length, analyses.length, totalElements]);
+  }, [shouldVirtualize, imageCount, groupCount, analysisCount, totalElements]);
   
   // Use virtualized view for large datasets
   if (shouldVirtualize) {
@@ -66,21 +77,37 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   );
 };
 
-// Export performance utilities
+// Export performance utilities with safe arithmetic
 export const CanvasPerformanceUtils = {
   shouldVirtualize: (imageCount: number, groupCount: number, analysisCount: number): boolean => {
-    const total = imageCount + groupCount + analysisCount;
+    const arraySafety = ArrayNumericSafety.getInstance();
+    const safeImageCount = arraySafety.safeAdd(imageCount || 0, 0);
+    const safeGroupCount = arraySafety.safeAdd(groupCount || 0, 0);
+    const safeAnalysisCount = arraySafety.safeAdd(analysisCount || 0, 0);
+    const total = arraySafety.safeAdd(arraySafety.safeAdd(safeImageCount, safeGroupCount), safeAnalysisCount);
+    
     return (
-      imageCount > VIRTUALIZATION_THRESHOLDS.IMAGES ||
-      groupCount > VIRTUALIZATION_THRESHOLDS.GROUPS ||
+      safeImageCount > VIRTUALIZATION_THRESHOLDS.IMAGES ||
+      safeGroupCount > VIRTUALIZATION_THRESHOLDS.GROUPS ||
       total > VIRTUALIZATION_THRESHOLDS.TOTAL_ELEMENTS
     );
   },
   
-  getPerformanceMetrics: (imageCount: number, groupCount: number, analysisCount: number) => ({
-    totalElements: imageCount + groupCount + analysisCount,
-    shouldVirtualize: CanvasPerformanceUtils.shouldVirtualize(imageCount, groupCount, analysisCount),
-    estimatedMemoryUsage: (imageCount * 0.5 + groupCount * 0.1 + analysisCount * 0.3) + 'MB', // Rough estimate
-    recommendedAction: imageCount > 100 ? 'Consider pagination' : 'Performance optimal'
-  })
+  getPerformanceMetrics: (imageCount: number, groupCount: number, analysisCount: number) => {
+    const arraySafety = ArrayNumericSafety.getInstance();
+    const safeImageCount = arraySafety.safeAdd(imageCount || 0, 0);
+    const safeGroupCount = arraySafety.safeAdd(groupCount || 0, 0);
+    const safeAnalysisCount = arraySafety.safeAdd(analysisCount || 0, 0);
+    const totalElements = arraySafety.safeAdd(arraySafety.safeAdd(safeImageCount, safeGroupCount), safeAnalysisCount);
+    
+    return {
+      totalElements,
+      shouldVirtualize: CanvasPerformanceUtils.shouldVirtualize(safeImageCount, safeGroupCount, safeAnalysisCount),
+      estimatedMemoryUsage: arraySafety.safeAdd(
+        arraySafety.safeAdd(safeImageCount * 0.5, safeGroupCount * 0.1),
+        safeAnalysisCount * 0.3
+      ).toFixed(1) + 'MB',
+      recommendedAction: safeImageCount > 100 ? 'Consider pagination' : 'Performance optimal'
+    };
+  }
 };
