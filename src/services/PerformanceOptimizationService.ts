@@ -497,12 +497,27 @@ export class PerformanceOptimizationService {
   }
 
   /**
-   * Track performance entry
+   * ✅ UPDATED: Enhanced performance entry tracking with empty query detection
    */
   private static trackPerformanceEntry(entry: PerformanceEntry): void {
-    // Log significant performance events
-    if (entry.duration > 1000) {
-      console.warn(`Slow operation detected: ${entry.name} took ${entry.duration}ms`);
+    const isEmptyQuery = entry.name.includes('image_id=in.%28%29');
+    const isSupabaseQuery = entry.name.includes('supabase.co/rest/v1/');
+    
+    // ✅ FIX: Special detection for empty query pattern
+    if (isEmptyQuery) {
+      console.warn(`🚨 EMPTY QUERY DETECTED: ${entry.name} took ${entry.duration}ms`);
+      console.warn('This indicates a project with no images is still querying for analyses');
+      console.warn('Consider using OptimizedProjectService to fix this issue');
+      return;
+    }
+    
+    // Increased threshold to reduce noise
+    if (entry.duration > 2000) {
+      if (isSupabaseQuery) {
+        console.warn(`Slow Supabase operation: ${entry.name} took ${entry.duration}ms`);
+      } else {
+        console.warn(`Slow operation detected: ${entry.name} took ${entry.duration}ms`);
+      }
     }
   }
 

@@ -3,15 +3,15 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { MonitoringService } from './services/MonitoringService'
-import { PerformanceOptimizationService } from './services/PerformanceOptimizationService'
+import { OptimizedPerformanceService } from './services/OptimizedPerformanceService'
 
-// Initialize monitoring and performance optimization as early as possible
+// Initialize monitoring and optimized performance tracking
 MonitoringService.initialize()
-PerformanceOptimizationService.initialize()
+OptimizedPerformanceService.initialize()
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-  PerformanceOptimizationService.cleanup()
+  OptimizedPerformanceService.cleanup()
   MonitoringService.cleanup()
 })
 

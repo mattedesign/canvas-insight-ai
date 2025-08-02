@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DashboardService, DashboardMetrics } from '@/services/DashboardService';
-import { ProjectService } from '@/services/DataMigrationService';
+import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { useAuth } from '@/context/AuthContext';
 
 export const useDashboardMetrics = () => {
@@ -30,7 +30,7 @@ export const useDashboardMetrics = () => {
       setLoading(true);
       setError(null);
       
-      const projectId = await ProjectService.getCurrentProject();
+      const projectId = await OptimizedProjectService.getCurrentProject();
       const data = await DashboardService.getDashboardMetrics(projectId);
       
       setMetrics(data);

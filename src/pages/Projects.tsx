@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { FileImage, Clock, Users, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
-import { ProjectService } from '@/services/DataMigrationService';
+import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { CanvasStateService } from '@/services/CanvasStateService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ const Projects = () => {
     
     try {
       setLoading(true);
-      const projectsData = await ProjectService.getAllProjects();
+      const projectsData = await OptimizedProjectService.getAllProjects();
       setProjects(projectsData);
     } catch (error) {
       console.error('Error loading projects:', error);
@@ -49,7 +49,7 @@ const Projects = () => {
   const handleCreateProject = async () => {
     try {
       // Create project with auto-generated name and slug
-      const project = await ProjectService.createNewProject();
+      const project = await OptimizedProjectService.createNewProject();
       
       // Create a default blank canvas state for the new project
       const defaultState = await CanvasStateService.createDefaultState('New Analysis Session');
@@ -77,7 +77,7 @@ const Projects = () => {
       console.log('Switching to project:', project.name);
       
       // Switch to the project using the service
-      await ProjectService.switchToProject(project.id);
+      await OptimizedProjectService.switchToProject(project.id);
       
       // Clear any existing canvas state for clean start
       await CanvasStateService.clearCanvasState();

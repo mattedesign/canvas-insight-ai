@@ -69,61 +69,14 @@ export class ProjectService {
     }
   }
 
+  // ⚠️ DEPRECATED: Use OptimizedProjectService.getAllProjects() instead
+  // This method has been replaced with an optimized version that fixes empty query issues
   static async getAllProjects() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    // Get basic project info first
-    const { data: projects, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    if (error) throw error;
-    if (!projects) return [];
-
-    // Get counts for each project
-    const projectsWithCounts = await Promise.all(
-      projects.map(async (project) => {
-        try {
-          // Get image count
-          const { count: imageCount } = await supabase
-            .from('images')
-            .select('id', { count: 'exact' })
-            .eq('project_id', project.id);
-
-          // Get image IDs for this project to count analyses
-          const { data: projectImages } = await supabase
-            .from('images')
-            .select('id')
-            .eq('project_id', project.id);
-          
-          const imageIds = projectImages?.map(img => img.id) || [];
-          
-          // Get analysis count for these images
-          const { count: analysisCount } = await supabase
-            .from('ux_analyses')
-            .select('id', { count: 'exact' })
-            .in('image_id', imageIds.length > 0 ? imageIds : ['']);
-
-          return {
-            ...project,
-            images: [{ count: imageCount || 0 }],
-            ux_analyses: [{ count: analysisCount || 0 }]
-          };
-        } catch (error) {
-          console.error('Error getting counts for project', project.id, error);
-          return {
-            ...project,
-            images: [{ count: 0 }],
-            ux_analyses: [{ count: 0 }]
-          };
-        }
-      })
-    );
-
-    return projectsWithCounts;
+    console.warn('⚠️ DEPRECATED: ProjectService.getAllProjects() - Use OptimizedProjectService.getAllProjects() instead');
+    
+    // Import and delegate to optimized service
+    const { OptimizedProjectService } = await import('./OptimizedProjectService');
+    return OptimizedProjectService.getAllProjects();
   }
 
   static async createProject(name: string, description?: string) {
