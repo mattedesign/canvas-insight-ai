@@ -65,6 +65,101 @@ export type Database = {
         }
         Relationships: []
       }
+      analyses: {
+        Row: {
+          analysis_type: string | null
+          created_at: string | null
+          id: string
+          image_name: string | null
+          image_url: string
+          results: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analysis_type?: string | null
+          created_at?: string | null
+          id?: string
+          image_name?: string | null
+          image_url: string
+          results?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analysis_type?: string | null
+          created_at?: string | null
+          id?: string
+          image_name?: string | null
+          image_url?: string
+          results?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      analysis_cache: {
+        Row: {
+          created_at: string
+          id: string
+          image_hash: string
+          results: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_hash: string
+          results?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_hash?: string
+          results?: Json
+        }
+        Relationships: []
+      }
+      analysis_metrics: {
+        Row: {
+          analysis_id: string | null
+          cost_usd: number | null
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          model: string
+          stage: string
+          tokens_used: number | null
+        }
+        Insert: {
+          analysis_id?: string | null
+          cost_usd?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          model: string
+          stage: string
+          tokens_used?: number | null
+        }
+        Update: {
+          analysis_id?: string | null
+          cost_usd?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          model?: string
+          stage?: string
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_metrics_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_keys: {
         Row: {
           api_key: string
@@ -352,6 +447,63 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_concepts: {
+        Row: {
+          analysis_id: string | null
+          created_at: string
+          description: string
+          id: string
+          image_id: string | null
+          image_url: string
+          improvements: Json
+          metadata: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          image_id?: string | null
+          image_url: string
+          improvements?: Json
+          metadata?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_id?: string | null
+          image_url?: string
+          improvements?: Json
+          metadata?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_concepts_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ux_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_concepts_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_analyses: {
         Row: {
           created_at: string | null
@@ -541,6 +693,44 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inpainting_results: {
+        Row: {
+          analysis_id: string | null
+          created_at: string | null
+          id: string
+          inpainted_url: string
+          mask_data: Json | null
+          original_url: string
+          suggestion_id: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          created_at?: string | null
+          id?: string
+          inpainted_url: string
+          mask_data?: Json | null
+          original_url: string
+          suggestion_id: string
+        }
+        Update: {
+          analysis_id?: string | null
+          created_at?: string | null
+          id?: string
+          inpainted_url?: string
+          mask_data?: Json | null
+          original_url?: string
+          suggestion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inpainting_results_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "analyses"
             referencedColumns: ["id"]
           },
         ]
@@ -831,6 +1021,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      clear_expired_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       generate_api_key: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -845,6 +1039,16 @@ export type Database = {
           name: string
           slug: string
         }[]
+      }
+      get_cached_analysis: {
+        Args: { p_image_hash: string }
+        Returns: {
+          results: Json
+        }[]
+      }
+      upsert_cached_analysis: {
+        Args: { p_image_hash: string; p_results: Json }
+        Returns: undefined
       }
       validate_user_permission: {
         Args: { operation: string; resource_id?: string }

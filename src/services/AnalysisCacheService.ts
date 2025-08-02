@@ -15,27 +15,21 @@ export class AnalysisCacheService {
     const imageHash = await this.hashImage(imageUrl);
     
     const { data, error } = await supabase
-      .from('analysis_cache')
-      .select('*')
-      .eq('image_hash', imageHash)
-      .gte('created_at', new Date(Date.now() - this.CACHE_DURATION).toISOString())
-      .single();
+      .rpc('get_cached_analysis', { p_image_hash: imageHash });
 
-    if (error || !data) return null;
+    if (error || !data || data.length === 0) return null;
     
     console.log('📦 Cache hit for image:', imageHash);
-    return data.results;
+    return data[0].results;
   }
 
   async cacheAnalysis(imageUrl: string, results: any): Promise<void> {
     const imageHash = await this.hashImage(imageUrl);
     
     const { error } = await supabase
-      .from('analysis_cache')
-      .upsert({
-        image_hash: imageHash,
-        results,
-        created_at: new Date().toISOString()
+      .rpc('upsert_cached_analysis', {
+        p_image_hash: imageHash,
+        p_results: results
       });
 
     if (error) {
@@ -64,14 +58,17 @@ export class AnalysisCacheService {
     }
   }
 
-  async clearExpiredCache(): Promise<void> {
-    const { error } = await supabase
-      .from('analysis_cache')
-      .delete()
-      .lt('created_at', new Date(Date.now() - this.CACHE_DURATION).toISOString());
+  async clearExpiredCache(): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('clear_expired_cache');
 
     if (error) {
       console.error('Failed to clear expired cache:', error);
+      return 0;
     }
+
+    const deletedCount = data || 0;
+    console.log(`🧹 Cleared ${deletedCount} expired cache entries`);
+    return deletedCount;
   }
 }
