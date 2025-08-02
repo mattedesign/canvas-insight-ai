@@ -1,46 +1,121 @@
 import { ImageContext, UserContext, AnalysisContext, ClarifiedContext } from '@/types/contextTypes';
 import { supabase } from '@/integrations/supabase/client';
+import { PipelineError } from '@/types/pipelineErrors';
 
 export class ContextDetectionService {
   async detectImageContext(imageUrl: string): Promise<ImageContext> {
-    const contextPrompt = `Analyze this UI/UX interface image and determine:
-    1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
-    2. Sub-types or specific patterns
-    3. Domain/industry (finance/healthcare/education/retail/etc)
-    4. Complexity level (simple/moderate/complex)
-    5. Likely user intents based on UI elements
-    6. Business model indicators
-    7. Target audience indicators
-    8. Product maturity stage
-    9. Platform type (web/mobile/desktop/responsive)
-    10. Design system presence and consistency
+    const timeoutMs = 30000; // 30 second timeout
+    
+    try {
+      console.log('[ContextDetection] Starting image context detection...');
+      
+      const contextPrompt = `Analyze this UI/UX interface image and determine:
+      1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
+      2. Sub-types or specific patterns
+      3. Domain/industry (finance/healthcare/education/retail/etc)
+      4. Complexity level (simple/moderate/complex)
+      5. Likely user intents based on UI elements
+      6. Business model indicators
+      7. Target audience indicators
+      8. Product maturity stage
+      9. Platform type (web/mobile/desktop/responsive)
+      10. Design system presence and consistency
 
-    Return as JSON with confidence scores for each determination.`;
+      Return as JSON with confidence scores for each determination.`;
 
-    // Add timeout wrapper
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Context detection timeout after 15 seconds')), 15000)
-    );
+      console.log('[ContextDetection] Calling edge function with:', { imageUrl, prompt: contextPrompt });
+      
+      // Add timeout to the function call
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Context detection timed out')), timeoutMs);
+      });
 
-    const detectionPromise = supabase.functions.invoke('context-detection', {
-      body: {
-        imageUrl,
-        prompt: contextPrompt,
-        model: 'gpt-4o', // Use vision model
-        maxTokens: 1000
+      const analysisPromise = supabase.functions.invoke('context-detection', {
+        body: {
+          imageUrl,
+          prompt: contextPrompt,
+          model: 'gpt-4o',
+          maxTokens: 1000
+        }
+      });
+
+      const { data, error } = await Promise.race([analysisPromise, timeoutPromise]) as any;
+
+      if (error) {
+        console.error('[ContextDetection] Supabase function error:', error);
+        throw new PipelineError(
+          `Context detection API error: ${error.message}`, 
+          'context-detection',
+          { originalError: error, stage: 'api-call' }
+        );
       }
-    });
 
-    const { data, error } = await Promise.race([
-      detectionPromise,
-      timeoutPromise
-    ]) as any;
+      if (!data) {
+        console.error('[ContextDetection] No data returned from function');
+        throw new PipelineError(
+          'No context data received from analysis service', 
+          'context-detection',
+          { stage: 'data-validation' }
+        );
+      }
 
-    if (error) {
-      throw new Error(`Context detection failed: ${error.message}. Ensure OpenAI API key is configured in Supabase Edge Functions.`);
+      console.log('[ContextDetection] Successfully received response:', data);
+      return this.parseImageContext(data);
+      
+    } catch (error) {
+      console.error('[ContextDetection] Failed to detect context:', error);
+      
+      // Enhanced error classification for better user experience
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('timeout')) {
+        throw new PipelineError(
+          'Context detection timed out. The AI service may be experiencing high load.',
+          'context-detection',
+          { originalError: error, timeout: timeoutMs, stage: 'timeout' }
+        );
+      }
+      
+      if (errorMessage.includes('API key') || errorMessage.includes('unauthorized')) {
+        throw new PipelineError(
+          'AI service is not properly configured. Please check your API settings.',
+          'context-detection',
+          { originalError: error, stage: 'authentication' }
+        );
+      }
+      
+      if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        throw new PipelineError(
+          'Network error during context detection. Please check your connection.',
+          'context-detection',
+          { originalError: error, stage: 'network' }
+        );
+      }
+      
+      // For any other errors, provide a graceful fallback with logging
+      console.warn('[ContextDetection] Falling back to default context due to error:', error);
+      return this.createFallbackContext(errorMessage);
     }
+  }
 
-    return this.parseImageContext(data);
+  private createFallbackContext(errorReason: string): ImageContext {
+    console.log('[ContextDetection] Creating fallback context due to:', errorReason);
+    
+    return {
+      primaryType: 'app', // Default to generic app instead of 'unknown'
+      subTypes: ['fallback'],
+      domain: 'general',
+      complexity: 'moderate',
+      userIntent: ['general analysis'],
+      platform: 'web',
+      businessModel: 'unknown',
+      targetAudience: 'general users',
+      maturityStage: 'mvp',
+      designSystem: {
+        detected: false,
+        consistency: 0.5
+      }
+    };
   }
 
 

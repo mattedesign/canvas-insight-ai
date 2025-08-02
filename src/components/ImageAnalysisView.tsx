@@ -1,4 +1,5 @@
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
+import { ContextDetectionErrorBoundary } from './ContextDetectionErrorBoundary';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Info, Code, Palette, Briefcase, TrendingUp } from 'lucide-react';
@@ -12,7 +13,9 @@ export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
     <div className="space-y-6">
       {/* Context Information - PRIORITY DISPLAY */}
       {analysis.analysisContext && (
-        <AnalysisContextDisplay context={analysis.analysisContext} />
+        <ContextDetectionErrorBoundary>
+          <AnalysisContextDisplay context={analysis.analysisContext} />
+        </ContextDetectionErrorBoundary>
       )}
 
       {/* Enhanced Model Information */}

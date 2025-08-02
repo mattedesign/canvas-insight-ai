@@ -81,7 +81,24 @@ export class BoundaryPushingPipeline {
       // PHASE 3: Save context detection progress
       this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext, 'context-detection', 5);
       onProgress?.(2, 'Analyzing image context...');
-      const imageContext = await this.contextDetector.detectImageContext(imageUrl);
+      
+      let imageContext: any;
+      try {
+        imageContext = await this.contextDetector.detectImageContext(imageUrl);
+      } catch (contextError) {
+        console.error('[Pipeline] Context detection failed, using fallback:', contextError);
+        onProgress?.(4, 'Context detection failed, continuing with fallback...');
+        
+        // Create a minimal fallback context to continue analysis
+        imageContext = {
+          primaryType: 'app',
+          subTypes: ['fallback'],
+          domain: 'general',
+          complexity: 'moderate',
+          userIntent: ['general analysis'],
+          platform: 'web'
+        };
+      }
       
       onProgress?.(5, 'Understanding user needs...');
       const userContextParsed = this.contextDetector.inferUserContext(userContext);
