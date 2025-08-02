@@ -11,6 +11,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import { UXAnalysis, Suggestion } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 
 interface SuggestionNodeProps {
   data: {
@@ -103,20 +104,22 @@ const SuggestionCard: React.FC<{
               Action Items
             </h5>
             <div className="space-y-1">
-              {suggestion.actionItems.map((item, index) => (
+              {Array.isArray(suggestion?.actionItems) ? suggestion.actionItems.map((item, index) => (
                 <div key={index} className="flex items-start gap-2 text-xs">
                   <CheckSquare className="w-3 h-3 mt-0.5 text-muted-foreground flex-shrink-0" />
-                  <span>{item}</span>
+                  <span>{item || 'Action item description unavailable'}</span>
                 </div>
-              ))}
+              )) : (
+                <div className="text-xs text-muted-foreground">No action items available</div>
+              )}
             </div>
           </div>
 
           <div className="flex justify-between items-center pt-2">
             <div className="flex gap-2 text-xs text-muted-foreground">
-              <span>Effort: {suggestion.effort}</span>
+              <span>Effort: {suggestion?.effort || 'unknown'}</span>
               <span>•</span>
-              <span>Category: {suggestion.category}</span>
+              <span>Category: {suggestion?.category || 'general'}</span>
             </div>
             <button
               onClick={onSelect}
@@ -132,7 +135,19 @@ const SuggestionCard: React.FC<{
 };
 
 export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => {
-  const { analysis, onSuggestionSelect } = data;
+  // Apply validation safety check as secondary defense
+  let safeAnalysis = data.analysis;
+  if (!AnalysisValidator.isValidAnalysis(data.analysis)) {
+    console.warn('SuggestionNode: Invalid analysis detected, applying validation...');
+    const validationResult = AnalysisValidator.validateAndNormalize(data.analysis);
+    safeAnalysis = validationResult.data;
+    
+    if (validationResult.warnings.length > 0) {
+      console.warn('SuggestionNode validation warnings:', validationResult.warnings);
+    }
+  }
+
+  const { onSuggestionSelect } = data;
   const [expandedSuggestions, setExpandedSuggestions] = useState<string[]>([]);
 
   const toggleSuggestion = (suggestionId: string) => {
@@ -143,8 +158,10 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
     );
   };
 
-  const categoryStats = analysis.suggestions.reduce((acc, suggestion) => {
-    acc[suggestion.category] = (acc[suggestion.category] || 0) + 1;
+  const categoryStats = (Array.isArray(safeAnalysis.suggestions) ? safeAnalysis.suggestions : []).reduce((acc, suggestion) => {
+    if (suggestion?.category) {
+      acc[suggestion.category] = (acc[suggestion.category] || 0) + 1;
+    }
     return acc;
   }, {} as Record<string, number>);
 
@@ -155,7 +172,7 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
         <div className="text-primary-foreground">
           <h3 className="font-semibold text-lg">UX Analysis</h3>
           <p className="text-primary-foreground/80 text-sm">
-            {analysis.suggestions.length} suggestions • Score: {analysis.summary?.overallScore || 'N/A'}/100
+            {Array.isArray(safeAnalysis.suggestions) ? safeAnalysis.suggestions.length : 0} suggestions • Score: {safeAnalysis.summary?.overallScore || 'N/A'}/100
           </p>
         </div>
       </div>
@@ -164,9 +181,9 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
       <div className="p-4 border-b border-border bg-muted/30">
         <h4 className="font-medium text-sm mb-3">Categories</h4>
         <div className="grid grid-cols-2 gap-3">
-          {Object.entries(analysis.summary.categoryScores).map(([category, score]) => (
+          {Object.entries(safeAnalysis.summary?.categoryScores || {}).map(([category, score]) => (
             <div key={category} className="text-center">
-              <div className="text-lg font-semibold">{score}</div>
+              <div className="text-lg font-semibold">{score || 0}</div>
               <div className="text-xs text-muted-foreground capitalize">{category}</div>
               {categoryStats[category] && (
                 <div className="text-xs text-primary">{categoryStats[category]} items</div>
@@ -181,19 +198,21 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-sm">Suggestions</h4>
           <span className="text-xs text-muted-foreground">
-            {analysis.suggestions.length} total
+            {Array.isArray(safeAnalysis.suggestions) ? safeAnalysis.suggestions.length : 0} total
           </span>
         </div>
         
-        {analysis.suggestions.map((suggestion) => (
-          <SuggestionCard
-            key={suggestion.id}
-            suggestion={suggestion}
-            isExpanded={expandedSuggestions.includes(suggestion.id)}
-            onToggle={() => toggleSuggestion(suggestion.id)}
-            onSelect={() => onSuggestionSelect(suggestion.id)}
-          />
-        ))}
+        {(Array.isArray(safeAnalysis.suggestions) ? safeAnalysis.suggestions : [])
+          .filter(suggestion => suggestion && typeof suggestion === 'object')
+          .map((suggestion, index) => (
+            <SuggestionCard
+              key={suggestion?.id || `suggestion-${index}`}
+              suggestion={suggestion}
+              isExpanded={expandedSuggestions.includes(suggestion?.id || '')}
+              onToggle={() => toggleSuggestion(suggestion?.id || '')}
+              onSelect={() => onSuggestionSelect(suggestion?.id || '')}
+            />
+          ))}
       </div>
 
       {/* Footer Summary */}
@@ -201,10 +220,10 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">Key Issues:</div>
           <div className="space-y-1">
-            {analysis.summary.keyIssues.slice(0, 2).map((issue, index) => (
+            {(Array.isArray(safeAnalysis.summary?.keyIssues) ? safeAnalysis.summary.keyIssues : []).slice(0, 2).map((issue, index) => (
               <div key={index} className="text-xs flex items-center gap-2">
                 <AlertTriangle className="w-3 h-3 text-red-500" />
-                <span>{issue}</span>
+                <span>{issue || 'Issue description unavailable'}</span>
               </div>
             ))}
           </div>

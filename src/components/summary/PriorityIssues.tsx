@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Clock, Zap, ArrowRight } from 'lucide-react';
 import { UXAnalysis, Suggestion } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import { DashboardMetrics } from '@/services/DashboardService';
 
 interface PriorityIssuesProps {
@@ -9,23 +10,37 @@ interface PriorityIssuesProps {
 }
 
 export const PriorityIssues: React.FC<PriorityIssuesProps> = ({ analyses, metrics }) => {
-  // Aggregate all suggestions and prioritize them
+  // Apply validation safety checks to all analyses
+  const safeAnalyses = analyses.map(analysis => {
+    if (!AnalysisValidator.isValidAnalysis(analysis)) {
+      console.warn('PriorityIssues: Invalid analysis detected, applying validation...');
+      const validationResult = AnalysisValidator.validateAndNormalize(analysis);
+      return validationResult.data;
+    }
+    return analysis;
+  });
+
+  // Aggregate all suggestions and prioritize them with safety checks
   const allSuggestions: (Suggestion & { designName: string })[] = [];
   
-  analyses.forEach(analysis => {
-    analysis.suggestions.forEach(suggestion => {
-      allSuggestions.push({
-        ...suggestion,
-        designName: analysis.imageName
-      });
+  safeAnalyses.forEach(analysis => {
+    const suggestions = Array.isArray(analysis.suggestions) ? analysis.suggestions : [];
+    suggestions.forEach(suggestion => {
+      if (suggestion && typeof suggestion === 'object') {
+        allSuggestions.push({
+          ...suggestion,
+          designName: analysis.imageName || 'Unnamed Design'
+        });
+      }
     });
   });
 
   // Sort by impact (high first) and then by frequency across designs
   const prioritizedSuggestions = allSuggestions
+    .filter(suggestion => suggestion && suggestion.impact) // Safety filter
     .sort((a, b) => {
       const impactOrder = { high: 3, medium: 2, low: 1 };
-      return impactOrder[b.impact] - impactOrder[a.impact];
+      return (impactOrder[b.impact] || 1) - (impactOrder[a.impact] || 1);
     })
     .slice(0, 8); // Top 8 priority items
 
@@ -67,7 +82,7 @@ export const PriorityIssues: React.FC<PriorityIssuesProps> = ({ analyses, metric
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <AlertTriangle className="w-4 h-4" />
-            <span>{allSuggestions.filter(s => s.impact === 'high').length} high priority</span>
+            <span>{allSuggestions.filter(s => s?.impact === 'high').length} high priority</span>
           </div>
         </div>
 
@@ -79,31 +94,31 @@ export const PriorityIssues: React.FC<PriorityIssuesProps> = ({ analyses, metric
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
-                  <h4 className="font-medium text-sm mb-1">{suggestion.title}</h4>
+                  <h4 className="font-medium text-sm mb-1">{suggestion?.title || 'Untitled Suggestion'}</h4>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Found in: {suggestion.designName}
+                    Found in: {suggestion?.designName || 'Unknown Design'}
                   </p>
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {suggestion.description}
+                    {suggestion?.description || 'No description available'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2 ml-3">
-                  <span className={`px-2 py-1 text-xs rounded-full border ${getImpactStyle(suggestion.impact)}`}>
-                    {suggestion.impact} impact
+                  <span className={`px-2 py-1 text-xs rounded-full border ${getImpactStyle(suggestion?.impact || 'low')}`}>
+                    {suggestion?.impact || 'low'} impact
                   </span>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {getEffortIcon(suggestion.effort)}
-                    <span>{suggestion.effort} effort</span>
+                    {getEffortIcon(suggestion?.effort || 'low')}
+                    <span>{suggestion?.effort || 'low'} effort</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-border/50">
                 <span className="text-xs text-muted-foreground capitalize">
-                  {suggestion.category}
+                  {suggestion?.category || 'general'}
                 </span>
                 <span className="text-xs text-primary">
-                  {suggestion.actionItems.length} action item{suggestion.actionItems.length !== 1 ? 's' : ''}
+                  {Array.isArray(suggestion?.actionItems) ? suggestion.actionItems.length : 0} action item{Array.isArray(suggestion?.actionItems) && suggestion.actionItems.length !== 1 ? 's' : ''}
                 </span>
               </div>
             </div>
