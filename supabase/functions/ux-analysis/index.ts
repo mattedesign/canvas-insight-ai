@@ -75,6 +75,13 @@ serve(async (req) => {
           // Convert old Canvas format to new pipeline format
           return await handleCanvasRequest(body.action, body)
         
+        case 'get-parsing-metrics':
+          // PHASE 4.2: Return JSON parsing metrics for monitoring
+          return new Response(
+            JSON.stringify(getParsingMetrics()),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        
         default:
           throw new Error(`Unknown action: ${body.action}`)
       }
@@ -181,13 +188,56 @@ function ensureJsonInPrompt(prompt: string): string {
   return prompt;
 }
 
+// PHASE 4.2: JSON Parsing Monitoring
+interface JsonParsingMetrics {
+  model: string;
+  stage: string;
+  method: 'direct' | 'smart-pattern' | 'content-cleaning' | 'failed';
+  success: boolean;
+  responseLength: number;
+  parseTime: number;
+}
+
+// Simple in-memory metrics store for edge function
+const parsingMetrics: JsonParsingMetrics[] = [];
+
+function trackJsonParsing(
+  model: string,
+  stage: string,
+  method: 'direct' | 'smart-pattern' | 'content-cleaning' | 'failed',
+  success: boolean,
+  responseLength: number,
+  parseTime: number
+) {
+  const metric: JsonParsingMetrics = {
+    model,
+    stage,
+    method,
+    success,
+    responseLength,
+    parseTime
+  };
+  
+  parsingMetrics.push(metric);
+  
+  // Keep only recent metrics to avoid memory bloat
+  if (parsingMetrics.length > 500) {
+    parsingMetrics.splice(0, 250); // Remove oldest half
+  }
+  
+  console.log(`📊 JSON Parse Tracking [${model}/${stage}]: ${method} ${success ? '✅' : '❌'} (${parseTime}ms)`);
+}
+
 // PHASE 3.1: Smart Response Parsing - Alternative approach that doesn't rely on response_format
-function parseJsonFromResponse(responseText: string): { success: boolean; data?: any; error?: string } {
+function parseJsonFromResponse(responseText: string, model: string, stage: string): { success: boolean; data?: any; error?: string } {
   console.log('🔍 PHASE 3.1: Attempting to parse JSON from response');
+  const startTime = Date.now();
   
   try {
     // Method 1: Try direct JSON parsing first
     const directParse = JSON.parse(responseText);
+    const parseTime = Date.now() - startTime;
+    trackJsonParsing(model, stage, 'direct', true, responseText.length, parseTime);
     console.log('✅ Direct JSON parse successful');
     return { success: true, data: directParse };
   } catch (directError) {
@@ -207,6 +257,8 @@ function parseJsonFromResponse(responseText: string): { success: boolean; data?:
         const extractedJson = match[1] || match[0];
         try {
           const parsed = JSON.parse(extractedJson);
+          const parseTime = Date.now() - startTime;
+          trackJsonParsing(model, stage, 'smart-pattern', true, responseText.length, parseTime);
           console.log('✅ JSON extracted successfully using pattern:', pattern.source.substring(0, 20) + '...');
           return { success: true, data: parsed };
         } catch (parseError) {
@@ -225,6 +277,8 @@ function parseJsonFromResponse(responseText: string): { success: boolean; data?:
       
       if (cleaned.includes('{') && cleaned.includes('}')) {
         const parsed = JSON.parse(cleaned);
+        const parseTime = Date.now() - startTime;
+        trackJsonParsing(model, stage, 'content-cleaning', true, responseText.length, parseTime);
         console.log('✅ JSON parsed after cleaning');
         return { success: true, data: parsed };
       }
@@ -232,12 +286,60 @@ function parseJsonFromResponse(responseText: string): { success: boolean; data?:
       console.log('❌ Cleaned JSON parse also failed');
     }
     
+    const parseTime = Date.now() - startTime;
+    trackJsonParsing(model, stage, 'failed', false, responseText.length, parseTime);
     console.error('❌ All JSON parsing methods failed');
     return { 
       success: false, 
       error: `Failed to extract valid JSON from response. Response length: ${responseText.length}` 
     };
   }
+}
+
+// PHASE 4.2: Get parsing metrics for monitoring endpoint
+function getParsingMetrics() {
+  const totalAttempts = parsingMetrics.length;
+  const successfulAttempts = parsingMetrics.filter(m => m.success).length;
+  const successRate = totalAttempts > 0 ? successfulAttempts / totalAttempts : 0;
+
+  // Method breakdown
+  const methodBreakdown: Record<string, number> = {};
+  parsingMetrics.forEach(m => {
+    methodBreakdown[m.method] = (methodBreakdown[m.method] || 0) + 1;
+  });
+
+  // Model performance breakdown
+  const modelPerformance: Record<string, { success: number; total: number; rate: number }> = {};
+  parsingMetrics.forEach(m => {
+    if (!modelPerformance[m.model]) {
+      modelPerformance[m.model] = { success: 0, total: 0, rate: 0 };
+    }
+    modelPerformance[m.model].total++;
+    if (m.success) {
+      modelPerformance[m.model].success++;
+    }
+  });
+
+  // Calculate rates
+  Object.keys(modelPerformance).forEach(model => {
+    const perf = modelPerformance[model];
+    perf.rate = perf.total > 0 ? perf.success / perf.total : 0;
+  });
+
+  // Average parse time
+  const parseTimes = parsingMetrics.map(m => m.parseTime);
+  const averageParseTime = parseTimes.length > 0 
+    ? parseTimes.reduce((a, b) => a + b, 0) / parseTimes.length 
+    : 0;
+
+  return {
+    totalAttempts,
+    successRate: Math.round(successRate * 100) / 100,
+    methodBreakdown,
+    modelPerformance,
+    averageParseTime: Math.round(averageParseTime * 100) / 100,
+    timestamp: new Date().toISOString()
+  };
 }
 
 // Pre-flight validation for JSON prompt requirements
@@ -374,7 +476,7 @@ The system attempted to auto-fix this issue. If you continue seeing this error, 
       console.log('⚠️ PHASE 3.2: Direct JSON parse failed, attempting smart parsing');
       
       // Method 2: Smart parsing fallback
-      const smartParseResult = parseJsonFromResponse(content);
+      const smartParseResult = parseJsonFromResponse(content, payload.model, payload.stage);
       
       if (smartParseResult.success) {
         console.log('✅ PHASE 3.2: Smart parsing successful');
@@ -474,7 +576,7 @@ async function executeAnthropic(config: any, apiKey: string, payload: any) {
       console.log('⚠️ Anthropic: Direct JSON parse failed, attempting smart parsing');
       
       // Method 2: Smart parsing fallback
-      const smartParseResult = parseJsonFromResponse(content);
+      const smartParseResult = parseJsonFromResponse(content, payload.model, payload.stage);
       
       if (smartParseResult.success) {
         console.log('✅ Anthropic: Smart parsing successful');

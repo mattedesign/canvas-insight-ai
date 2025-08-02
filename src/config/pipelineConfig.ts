@@ -45,6 +45,43 @@ export const pipelineConfig = {
     minModelAgreement: 0.6,
     requiredStages: ['vision', 'analysis', 'synthesis']
   },
+  
+  // PHASE 4.1: JSON Handling Strategy Configuration
+  jsonHandling: {
+    strategy: 'hybrid' as 'strict' | 'hybrid' | 'smart-parsing-only',
+    enableSmartParsing: true,
+    enablePreflightValidation: true,
+    modelSpecificRules: {
+      'gpt-4o': {
+        requireJsonKeyword: true,
+        useResponseFormat: true,
+        enableSmartFallback: true
+      },
+      'claude-opus-4-20250514': {
+        requireJsonKeyword: false,
+        useResponseFormat: false,
+        enableSmartFallback: true
+      },
+      'perplexity-sonar': {
+        requireJsonKeyword: false,
+        useResponseFormat: false,
+        enableSmartFallback: true
+      }
+    },
+    parsing: {
+      enableMultiplePatterns: true,
+      enableContentCleaning: true,
+      enableCodeBlockExtraction: true,
+      maxParseAttempts: 3
+    },
+    fallbackBehavior: 'return-raw-with-metadata' as 'return-raw-with-metadata' | 'throw-error' | 'return-empty',
+    monitoring: {
+      trackSuccessRates: true,
+      logParsingMethods: true,
+      enablePerformanceMetrics: true
+    }
+  },
+  
   contextDetection: {
     enabled: true,
     priority: 'high',
