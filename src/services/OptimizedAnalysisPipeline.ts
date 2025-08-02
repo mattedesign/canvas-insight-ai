@@ -48,7 +48,7 @@ export class OptimizedAnalysisPipeline {
       stage3_comprehensive: 15000,
       buffer: 5000
     },
-    'gpt-4.1': {
+    'gpt-4o': {
       stage1_metadata: 3000,
       stage2_vision: 10000,
       stage3_comprehensive: 20000,
@@ -98,7 +98,7 @@ export class OptimizedAnalysisPipeline {
       );
       stages.push({
         stage: 'openai_ux_analysis',
-        model: 'openai-gpt-4.1',
+        model: 'gpt-4o',
         success: true,
         timestamp: new Date().toISOString(),
         data: openaiResult.data,
@@ -230,7 +230,7 @@ export class OptimizedAnalysisPipeline {
 
       return {
         data: data.analysis,
-        model: 'openai-gpt-4.1',
+        model: 'gpt-4o',
         tokenUsage: data.tokenUsage || 1500
       };
     } catch (error) {
@@ -539,7 +539,7 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
       claudeSynthesis: claudeStage?.data,
       // Pipeline information
       pipelineOptimized: true,
-      pipelineModel: 'Google Vision → OpenAI GPT-4.1 → Claude Sonnet-4',
+      pipelineModel: 'Google Vision → GPT 4o → Claude Opus 4',
       totalTokenUsage: stages.reduce((sum, stage) => sum + (stage.tokenUsage || 0), 0),
       stages: stages.map(s => ({
         stage: s.stage,

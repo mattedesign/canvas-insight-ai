@@ -225,7 +225,7 @@ export function VerificationTestSuite() {
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
           stage: 'vision',
-          model: 'gpt-4.1-2025-04-14',
+          model: 'gpt-4o',
           imageUrl: 'https://example.com/test-image.jpg',
           prompt: 'Test analysis prompt',
           systemPrompt: 'You are a UX analyst'

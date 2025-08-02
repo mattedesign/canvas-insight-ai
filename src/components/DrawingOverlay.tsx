@@ -149,10 +149,10 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
             imageUrl: imageUrl,
             imageName: 'drawing-region',
             prompt: prompt,
-            action: 'analyze',
-            bounds: drawingBounds
-          },
-          aiModel: 'claude-vision'
+          action: 'analyze',
+          bounds: drawingBounds
+        },
+        aiModel: 'claude-opus-4-20250514'
         }
       });
 

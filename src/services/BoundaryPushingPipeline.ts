@@ -681,9 +681,9 @@ export class BoundaryPushingPipeline {
   }
 
   private readonly ANALYSIS_MODELS = [
-    'gpt-4-turbo-preview',
-    'claude-opus-4',
-    'perplexity-sonar' // ADD THIS
+    'gpt-4o',
+    'claude-opus-4-20250514',
+    'perplexity-sonar'
   ];
 
   private getAvailableModels(stage: 'vision' | 'analysis'): string[] {

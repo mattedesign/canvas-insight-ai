@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Brain, Eye, Lightbulb, Zap, CheckCircle, AlertCircle, Palette } from 'lucide-react';
 
 interface AIModel {
-  id: 'auto' | 'claude-vision' | 'google-vision' | 'stability-ai' | 'openai';
+  id: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o';
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -18,8 +18,8 @@ interface AIModel {
 }
 
 interface AIModelSelectorProps {
-  selectedModel: string;
-  onModelChange: (model: string) => void;
+  selectedModel: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o';
+  onModelChange: (model: 'auto' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai' | 'gpt-4o') => void;
   onAnalyze: () => void;
   isAnalyzing?: boolean;
 }
@@ -36,8 +36,8 @@ const aiModels: AIModel[] = [
     badge: 'Recommended'
   },
   {
-    id: 'claude-vision',
-    name: 'Claude Vision',
+    id: 'claude-opus-4-20250514',
+    name: 'Claude Opus 4',
     description: 'Advanced visual reasoning and comprehensive UX critique by Anthropic',
     icon: <Eye className="h-5 w-5 text-purple-600" />,
     strengths: ['Deep UX analysis', 'Accessibility insights', 'Detailed critique'],
@@ -65,8 +65,8 @@ const aiModels: AIModel[] = [
     badge: 'Creative'
   },
   {
-    id: 'openai',
-    name: 'OpenAI GPT-4o',
+    id: 'gpt-4o',
+    name: 'GPT 4o',
     description: 'Versatile AI with vision capabilities for general UX analysis',
     icon: <Lightbulb className="h-5 w-5 text-green-600" />,
     strengths: ['Versatile analysis', 'Good reasoning', 'Detailed feedback'],

@@ -1,37 +1,15 @@
 export const MODEL_REGISTRY = {
-  'gpt-3.5-turbo': {
-    name: 'GPT 3.5 Turbo',
+  'gpt-4o': {
+    name: 'GPT 4o',
     category: 'conversational',
-    capabilities: ['conversational-analysis', 'multi-turn-conversation'],
-    provider: 'openai',
-    costPerRequest: 0.002,
-    contextWindow: 4096,
-    features: {
-      conversationalFlow: true
-    }
-  },
-  'gpt-4': {
-    name: 'GPT 4',
-    category: 'conversational',
-    capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning'],
+    capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning', 'vision'],
     provider: 'openai',
     costPerRequest: 0.06,
-    contextWindow: 8192,
+    contextWindow: 128000,
     features: {
       conversationalFlow: true,
-      complexReasoning: true
-    }
-  },
-  'gpt-4-32k': {
-    name: 'GPT 4 32k',
-    category: 'conversational',
-    capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning'],
-    provider: 'openai',
-    costPerRequest: 0.12,
-    contextWindow: 32768,
-    features: {
-      conversationalFlow: true,
-      complexReasoning: true
+      complexReasoning: true,
+      vision: true
     }
   },
   'claude-opus-4-20250514': {

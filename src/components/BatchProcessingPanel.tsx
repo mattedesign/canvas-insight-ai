@@ -254,8 +254,8 @@ export const BatchProcessingPanel = React.memo<BatchProcessingPanelProps>(({ pro
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">Auto-Select Best Model</SelectItem>
-                    <SelectItem value="openai">OpenAI GPT-4o</SelectItem>
-                    <SelectItem value="claude-vision">Claude Opus 4 (claude-opus-4-20250514)</SelectItem>
+                    <SelectItem value="gpt-4o">GPT 4o</SelectItem>
+                    <SelectItem value="claude-opus-4-20250514">Claude Opus 4</SelectItem>
                     <SelectItem value="google-vision">Google Vision</SelectItem>
                     <SelectItem value="stability-ai">Stability.ai</SelectItem>
                   </SelectContent>
