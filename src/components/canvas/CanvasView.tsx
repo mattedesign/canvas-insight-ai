@@ -169,10 +169,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   // Group management handlers
   const handleDeleteGroup = useCallback((groupId: string) => {
     setGroups(prev => prev.filter(g => g.id !== groupId));
-    toast({
-      description: "Group deleted successfully",
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive group deletion toast
+    // toast({
+    //   description: "Group deleted successfully",
+    //   category: "success",
+    // });
   }, [toast]);
 
   const handleViewGroup = useCallback((groupId: string) => {
@@ -186,11 +187,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleAnalyzeGroup = useCallback((groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      toast({
-        title: "Group Analysis",
-        description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
-        category: "success",
-      });
+      // COMMENTED OUT: Repetitive group analysis start toast
+      // toast({
+      //   title: "Group Analysis",
+      //   description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
+      //   category: "success",
+      // });
     }
   }, [groups, toast]);
 
@@ -222,11 +224,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     console.log('[CanvasView] Creating analysis request for image:', image.name);
     setAnalysisRequests(prev => new Map(prev.set(imageId, { imageId, imageName: image.name, imageUrl: image.url })));
     
-    toast({
-      title: "Analysis Request Created",
-      description: `Created analysis request for ${image.name}`,
-      category: "success"
-    });
+    // COMMENTED OUT: Repetitive analysis request toast
+    // toast({
+    //   title: "Analysis Request Created",
+    //   description: `Created analysis request for ${image.name}`,
+    //   category: "success"
+    // });
   }, [uploadedImages, toast]);
 
 
@@ -277,11 +280,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   // AI Integration Handlers
   const handleAnalysisTriggered = useCallback((imageId: string, analysis: any) => {
     onAnalysisComplete?.(imageId, analysis);
-    toast({
-      title: "Analysis Complete",
-      description: "AI analysis completed successfully",
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive analysis completion toast
+    // toast({
+    //   title: "Analysis Complete",
+    //   description: "AI analysis completed successfully",
+    //   category: "success",
+    // });
   }, [onAnalysisComplete, toast]);
   
   const handleAnalyzeImage = useCallback(async (imageId: string) => {
@@ -304,11 +308,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleBatchAnalysis = useCallback(async (imageIds: string[]) => {
     const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
     
-    toast({
-      title: "Batch Analysis Started",
-      description: `Analyzing ${imagesToAnalyze.length} images...`,
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive batch analysis start toast
+    // toast({
+    //   title: "Batch Analysis Started",
+    //   description: `Analyzing ${imagesToAnalyze.length} images...`,
+    //   category: "success",
+    // });
 
     for (const image of imagesToAnalyze) {
       try {
@@ -319,21 +324,23 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       }
     }
 
-    toast({
-      title: "Batch Analysis Complete",
-      description: `Completed analysis for ${imagesToAnalyze.length} images`,
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive batch analysis completion toast
+    // toast({
+    //   title: "Batch Analysis Complete",
+    //   description: `Completed analysis for ${imagesToAnalyze.length} images`,
+    //   category: "success",
+    // });
   }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleGroupAnalysis = useCallback(async (imageIds: string[]) => {
     const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
     
-    toast({
-      title: "Group Analysis Started",
-      description: `Analyzing patterns across ${imagesToAnalyze.length} images...`,
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive group analysis start toast
+    // toast({
+    //   title: "Group Analysis Started",
+    //   description: `Analyzing patterns across ${imagesToAnalyze.length} images...`,
+    //   category: "success",
+    // });
 
     // For now, this does individual analysis. In the future, this could call a group-specific analysis endpoint
     for (const image of imagesToAnalyze) {
@@ -345,11 +352,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       }
     }
 
-    toast({
-      title: "Group Analysis Complete",
-      description: `Completed group analysis for ${imagesToAnalyze.length} images`,
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive group analysis completion toast
+    // toast({
+    //   title: "Group Analysis Complete",
+    //   description: `Completed group analysis for ${imagesToAnalyze.length} images`,
+    //   category: "success",
+    // });
   }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
@@ -360,11 +368,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       const result = await performEnhancedAnalysis(image.url, image.name, image.id);
       if (result.success && result.data) {
         onAnalysisComplete?.(image.id, result.data);
-        toast({
-          title: "Enhanced Analysis Complete",
-          description: `Enhanced AI analysis completed for ${image.name}`,
-          category: "success",
-        });
+        // COMMENTED OUT: Repetitive enhanced analysis completion toast
+        // toast({
+        //   title: "Enhanced Analysis Complete",
+        //   description: `Enhanced AI analysis completed for ${image.name}`,
+        //   category: "success",
+        // });
       } else {
         throw new Error(result.error || 'Enhanced analysis failed');
       }
@@ -1492,11 +1501,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     onCreateGroup?.(multiSelection.state.selectedIds);
     multiSelection.clearSelection();
     
-    toast({
-      title: "Group Created",
-      description: `Successfully created group with ${multiSelection.state.selectedIds.length} images`,
-      category: "success",
-    });
+    // COMMENTED OUT: Repetitive group creation toast
+    // toast({
+    //   title: "Group Created",
+    //   description: `Successfully created group with ${multiSelection.state.selectedIds.length} images`,
+    //   category: "success",
+    // });
   }, [onCreateGroup, multiSelection, toast]);
 
 

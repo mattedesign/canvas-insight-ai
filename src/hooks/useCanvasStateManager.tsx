@@ -307,11 +307,12 @@ export function useCanvasStateManager({
       
       await confirm();
       
-      toast({
-        title: "Group Created",
-        description: `Created group "${name}" with ${imageIds.length} images`,
-        category: "success"
-      });
+      // COMMENTED OUT: Repetitive group creation toast
+      // toast({
+      //   title: "Group Created",
+      //   description: `Created group "${name}" with ${imageIds.length} images`,
+      //   category: "success"
+      // });
     } catch (error) {
       optimisticUpdates.failOperation(operationId, (error as Error).message);
       // Remove optimistic group node

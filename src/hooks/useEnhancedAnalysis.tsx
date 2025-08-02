@@ -219,11 +219,23 @@ export function useEnhancedAnalysis() {
         ? `Using fallback data. Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}. Configure API keys for real AI analysis.`
         : `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`;
       
-      toast({
-        title: toastTitle,
-        description,
-        variant: fallbacksUsed > 0 ? "destructive" : "default"
-      });
+      // COMMENTED OUT: Analysis completion toast (except for fallback warnings)
+      if (fallbacksUsed > 0) {
+        // KEEP: Important fallback warning toast
+        toast({
+          title: "Analysis Complete (Fallback Data)",
+          description: `Using fallback data. Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}. Configure API keys for real AI analysis.`,
+          variant: "destructive"
+        });
+      }
+      // COMMENTED OUT: Regular success toast
+      // else {
+      //   toast({
+      //     title: "Analysis Complete",
+      //     description: `Generated ${qualityMetrics.annotationCount} annotations and ${qualityMetrics.suggestionCount} suggestions for ${domainAnalysis.uiType}`,
+      //     variant: "default"
+      //   });
+      // }
 
       return {
         success: true,

@@ -68,7 +68,8 @@ export const GalleryFloatingToolbar: React.FC<GalleryFloatingToolbarProps> = ({
 
   const handleDelete = () => {
     onDelete();
-    toast({ description: "Image deleted", category: "success" });
+    // COMMENTED OUT: Repetitive delete confirmation toast
+    // toast({ description: "Image deleted", category: "success" });
   };
 
   const handleAddComment = () => {

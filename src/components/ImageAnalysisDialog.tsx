@@ -56,7 +56,8 @@ export function ImageAnalysisDialog({
         throw new Error(data.error || 'Analysis failed');
       }
 
-      toast.success('AI analysis completed successfully!');
+      // COMMENTED OUT: Repetitive analysis completion toast
+      // toast.success('AI analysis completed successfully!');
       onAnalysisComplete(data.data);
       onClose();
     } catch (error) {

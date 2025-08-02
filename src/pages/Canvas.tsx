@@ -198,11 +198,12 @@ const Canvas = () => {
       const result = await generateEnhancedConcept(analysis, image.url, image.name);
       
       if (result.success) {
-        toast({
-          category: 'success',
-          title: 'Concept Generated',
-          description: 'AI design concept has been generated successfully.'
-        });
+        // COMMENTED OUT: Repetitive concept generation toast
+        // toast({
+        //   category: 'success',
+        //   title: 'Concept Generated',
+        //   description: 'AI design concept has been generated successfully.'
+        // });
         
         // Trigger data reload to show the new concept
         await stableHelpers.loadData();
@@ -285,11 +286,12 @@ const Canvas = () => {
       setSelectedAnalysisId(analysisWithId.id);
       setIsAnalysisPanelOpen(true);
       
-      toast({
-        category: "success",
-        title: "Analysis Stored",
-        description: "Analysis has been saved and opened for viewing",
-      });
+      // COMMENTED OUT: Repetitive analysis storage toast
+      // toast({
+      //   category: "success",
+      //   title: "Analysis Stored",
+      //   description: "Analysis has been saved and opened for viewing",
+      // });
     } else {
       console.error('No analysis data received');
       toast({
