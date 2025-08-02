@@ -1,28 +1,44 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react';
+import { AlertCircle, RefreshCw, Home, Undo2 } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
   onRetry?: () => void;
   onNavigateHome?: () => void;
+  enableRecovery?: boolean;
+  enableStateRollback?: boolean;
+  onRecovery?: () => void;
+  onStateRollback?: () => void;
 }
 
 interface State {
   hasError: boolean;
   error?: Error;
   errorInfo?: ErrorInfo;
+  retryCount: number;
+  canRollback: boolean;
 }
 
 export class CanvasErrorBoundary extends Component<Props, State> {
+  private maxRetries = 2;
+
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { 
+      hasError: false,
+      retryCount: 0,
+      canRollback: false 
+    };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { 
+      hasError: true, 
+      error,
+      canRollback: true 
+    };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -41,10 +57,38 @@ export class CanvasErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    console.log('[CanvasErrorBoundary] Attempting recovery...');
+    
+    this.setState({ 
+      hasError: false, 
+      error: undefined, 
+      errorInfo: undefined,
+      retryCount: this.state.retryCount + 1,
+      canRollback: false
+    });
+
     if (this.props.onRetry) {
       this.props.onRetry();
     }
+    if (this.props.onRecovery) {
+      this.props.onRecovery();
+    }
+  };
+
+  handleStateRollback = () => {
+    console.log('[CanvasErrorBoundary] Attempting state rollback...');
+    
+    if (this.props.onStateRollback) {
+      this.props.onStateRollback();
+    }
+    
+    this.setState({ 
+      hasError: false, 
+      error: undefined, 
+      errorInfo: undefined,
+      retryCount: 0,
+      canRollback: false
+    });
   };
 
   handleNavigateHome = () => {
@@ -59,6 +103,7 @@ export class CanvasErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isDimensionError = this.state.error?.message?.includes('dimensions') || 
                                this.state.error?.message?.includes('Cannot read properties of undefined');
+      const hasExceededRetries = this.state.retryCount >= this.maxRetries;
 
       return (
         <Card className="max-w-2xl mx-auto m-8">
@@ -89,6 +134,14 @@ export class CanvasErrorBoundary extends Component<Props, State> {
               <li>Temporary component state issues</li>
             </ul>
             
+            {hasExceededRetries && (
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground">
+                  Canvas failed to load after multiple attempts. Try navigating to a different page.
+                </p>
+              </div>
+            )}
+
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="mt-4">
                 <summary className="text-sm font-medium cursor-pointer">Error Details (Development)</summary>
@@ -101,10 +154,20 @@ export class CanvasErrorBoundary extends Component<Props, State> {
             )}
             
             <div className="flex gap-2 pt-4">
-              <Button onClick={this.handleReset} variant="default">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Try Again
-              </Button>
+              {(this.props.enableRecovery !== false) && !hasExceededRetries && (
+                <Button onClick={this.handleReset} variant="default">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Try Again ({this.state.retryCount}/{this.maxRetries})
+                </Button>
+              )}
+              
+              {this.props.enableStateRollback && this.state.canRollback && (
+                <Button onClick={this.handleStateRollback} variant="outline">
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  Reset Canvas
+                </Button>
+              )}
+              
               <Button onClick={this.handleNavigateHome} variant="outline">
                 <Home className="mr-2 h-4 w-4" />
                 Go to Dashboard
