@@ -111,7 +111,12 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     case 'ADD_ANALYSIS':
       return {
         ...state,
-        analyses: [...state.analyses, action.payload],
+        analyses: [...(state.analyses || []), action.payload],
+        // Preserve all arrays with fallbacks
+        uploadedImages: state.uploadedImages || [],
+        imageGroups: state.imageGroups || [],
+        groupAnalysesWithPrompts: state.groupAnalysesWithPrompts || [],
+        generatedConcepts: state.generatedConcepts || [],
         version: state.version + 1,
       };
     

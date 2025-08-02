@@ -88,9 +88,9 @@ export interface CanvasViewProps {
 }
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
-  uploadedImages,
-  analyses,
-  generatedConcepts,
+  uploadedImages = [],
+  analyses = [],
+  generatedConcepts = [],
   imageGroups = [],
   groupAnalyses = [],
   groupPromptSessions = [],
@@ -133,11 +133,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       return;
     }
 
-    const imagesWithoutAnalysis = uploadedImages.filter(img => 
-      !analyses.some(analysis => analysis.imageId === img.id)
+    const imagesWithoutAnalysis = (uploadedImages || []).filter(img => 
+      !(analyses || []).some(analysis => analysis.imageId === img.id)
     );
     
-    if (imagesWithoutAnalysis.length > 0 && uploadedImages.length > 0) {
+    if (imagesWithoutAnalysis.length > 0 && (uploadedImages?.length || 0) > 0) {
       // COMMENTED OUT: Repetitive "ready for analysis" toast
       // const timer = setTimeout(() => {
       //   toast({
@@ -214,7 +214,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Analysis workflow handlers
   const handleCreateAnalysisRequest = useCallback(async (imageId: string) => {
-    const image = uploadedImages.find(img => img.id === imageId);
+    const image = (uploadedImages || []).find(img => img.id === imageId);
     if (!image) {
       console.error('[CanvasView] Image not found for analysis request:', imageId);
       return;
@@ -311,7 +311,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [onAnalysisComplete, toast]);
   
   const handleAnalyzeImage = useCallback(async (imageId: string) => {
-    const image = uploadedImages.find(img => img.id === imageId);
+    const image = (uploadedImages || []).find(img => img.id === imageId);
     if (!image) return;
 
     try {
@@ -328,7 +328,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [uploadedImages, analyzeImageWithAI, handleAnalysisTriggered, toast]);
 
   const handleBatchAnalysis = useCallback(async (imageIds: string[]) => {
-    const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
+    const imagesToAnalyze = (uploadedImages || []).filter(img => imageIds.includes(img.id));
     
     // COMMENTED OUT: Repetitive batch analysis start toast
     // toast({
@@ -355,7 +355,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleGroupAnalysis = useCallback(async (imageIds: string[]) => {
-    const imagesToAnalyze = uploadedImages.filter(img => imageIds.includes(img.id));
+    const imagesToAnalyze = (uploadedImages || []).filter(img => imageIds.includes(img.id));
     
     // COMMENTED OUT: Repetitive group analysis start toast
     // toast({
@@ -383,7 +383,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
-    const image = uploadedImages.find(img => img.id === imageId);
+    const image = (uploadedImages || []).find(img => img.id === imageId);
     if (!image) return;
 
     try {
@@ -410,7 +410,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
 
   const handleViewAnalysis = useCallback((imageId: string) => {
-    const analysis = analyses.find(a => a.imageId === imageId);
+    const analysis = (analyses || []).find(a => a.imageId === imageId);
     if (analysis) {
       onOpenAnalysisPanel?.(analysis.id);
     } else {
@@ -434,20 +434,20 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const initialElements = useMemo(() => {
   console.log('[CanvasView] === CANVAS RENDERING START ===');
   console.log('[CanvasView] Input data summary:', {
-    uploadedImages: uploadedImages.length,
-    analyses: analyses.length,
-    imageGroups: imageGroups.length,
+    uploadedImages: (uploadedImages || []).length,
+    analyses: (analyses || []).length,
+    imageGroups: (imageGroups || []).length,
     showAnalysis,
     currentTool,
     analysisRequestsCount: analysisRequests.size
   });
     
-    if (uploadedImages.length === 0) {
+    if ((uploadedImages || []).length === 0) {
       console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
       return { nodes: [], edges: [] };
     }
     
-    console.log('[CanvasView] Image details:', uploadedImages.map(img => ({
+    console.log('[CanvasView] Image details:', (uploadedImages || []).map(img => ({
       id: img.id,
       name: img.name,
       url: img.url ? `${img.url.substring(0, 50)}...` : 'NO_URL',
@@ -461,10 +461,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     let yOffset = 0;
     const horizontalSpacing = 100;
     const minVerticalSpacing = 150;
-    const groupedImageIds = new Set(imageGroups.flatMap(group => group.imageIds));
+    const groupedImageIds = new Set((imageGroups || []).flatMap(group => group.imageIds || []));
 
     // Process ungrouped images first
-    const ungroupedImages = uploadedImages.filter(image => !groupedImageIds.has(image.id));
+    const ungroupedImages = (uploadedImages || []).filter(image => !groupedImageIds.has(image.id));
     console.log('[CanvasView] Processing ungrouped images:', ungroupedImages.length);
     
     ungroupedImages.forEach((image, index) => {

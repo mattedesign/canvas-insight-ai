@@ -193,8 +193,18 @@ const Canvas = () => {
     console.log('Image selected:', imageId);
   }, []);
 
-  // Get state data first before using in callbacks
-  const { uploadedImages, analyses, imageGroups, groupAnalysesWithPrompts, error, generatedConcepts, groupDisplayModes, showAnnotations, isLoading } = state;
+  // Get state data first before using in callbacks with default values
+  const { 
+    uploadedImages = [], 
+    analyses = [], 
+    imageGroups = [], 
+    groupAnalysesWithPrompts = [], 
+    error, 
+    generatedConcepts = [], 
+    groupDisplayModes = {}, 
+    showAnnotations, 
+    isLoading 
+  } = state;
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
     try {
