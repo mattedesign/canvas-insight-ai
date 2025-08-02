@@ -951,9 +951,14 @@ export class BoundaryPushingPipeline {
 
     const base = roleDescriptions[user.inferredRole || 'designer'] || roleDescriptions.designer;
     
+    // PHASE 2.3: Enhanced system prompt with JSON formatting expectations
+    const jsonFormatting = 'Always provide your responses in valid JSON format as specified in the user prompt.';
+    
     return `${base} You are analyzing a ${image.primaryType} interface in the ${image.domain} domain. 
     Adapt your communication style to ${user.technicalLevel || 'intermediate'} technical level.
-    Focus on ${user.outputPreferences?.prioritization || 'impact'}-based prioritization.`;
+    Focus on ${user.outputPreferences?.prioritization || 'impact'}-based prioritization.
+    
+    ${jsonFormatting}`;
   }
 
   // Simplified methods for fusion logic

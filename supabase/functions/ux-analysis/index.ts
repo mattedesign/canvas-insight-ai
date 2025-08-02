@@ -181,6 +181,65 @@ function ensureJsonInPrompt(prompt: string): string {
   return prompt;
 }
 
+// PHASE 3.1: Smart Response Parsing - Alternative approach that doesn't rely on response_format
+function parseJsonFromResponse(responseText: string): { success: boolean; data?: any; error?: string } {
+  console.log('🔍 PHASE 3.1: Attempting to parse JSON from response');
+  
+  try {
+    // Method 1: Try direct JSON parsing first
+    const directParse = JSON.parse(responseText);
+    console.log('✅ Direct JSON parse successful');
+    return { success: true, data: directParse };
+  } catch (directError) {
+    console.log('⚠️ Direct JSON parse failed, trying extraction methods');
+    
+    // Method 2: Extract JSON using regex patterns
+    const jsonPatterns = [
+      /\{[\s\S]*\}/,                    // Basic JSON object
+      /```json\s*(\{[\s\S]*?\})\s*```/i, // JSON in code blocks
+      /```\s*(\{[\s\S]*?\})\s*```/,     // JSON in plain code blocks
+      /(?:^|\n)\s*(\{[\s\S]*?\})\s*(?:\n|$)/ // JSON at start/end of lines
+    ];
+    
+    for (const pattern of jsonPatterns) {
+      const match = responseText.match(pattern);
+      if (match) {
+        const extractedJson = match[1] || match[0];
+        try {
+          const parsed = JSON.parse(extractedJson);
+          console.log('✅ JSON extracted successfully using pattern:', pattern.source.substring(0, 20) + '...');
+          return { success: true, data: parsed };
+        } catch (parseError) {
+          console.log('❌ Pattern matched but JSON invalid:', pattern.source.substring(0, 20) + '...');
+          continue;
+        }
+      }
+    }
+    
+    // Method 3: Attempt to clean and parse
+    try {
+      // Remove common non-JSON prefixes/suffixes
+      let cleaned = responseText
+        .replace(/^[^{]*/, '')  // Remove everything before first {
+        .replace(/[^}]*$/, ''); // Remove everything after last }
+      
+      if (cleaned.includes('{') && cleaned.includes('}')) {
+        const parsed = JSON.parse(cleaned);
+        console.log('✅ JSON parsed after cleaning');
+        return { success: true, data: parsed };
+      }
+    } catch (cleanError) {
+      console.log('❌ Cleaned JSON parse also failed');
+    }
+    
+    console.error('❌ All JSON parsing methods failed');
+    return { 
+      success: false, 
+      error: `Failed to extract valid JSON from response. Response length: ${responseText.length}` 
+    };
+  }
+}
+
 // Pre-flight validation for JSON prompt requirements
 function validateJsonPromptRequirement(payload: any): { isValid: boolean; error?: string; fixedPrompt?: string } {
   const { prompt, model } = payload;
@@ -302,17 +361,39 @@ The system attempted to auto-fix this issue. If you continue seeing this error, 
     console.log('OpenAI response received successfully');
     const content = data.choices[0].message.content;
     
+    // PHASE 3.2: Hybrid Strategy - Try strict JSON first, fallback to smart parsing
     try {
+      // Method 1: Direct JSON parsing (for proper JSON responses)
+      const parsedJson = JSON.parse(content);
+      console.log('✅ PHASE 3.2: Direct JSON parsing successful');
       return new Response(
-        JSON.stringify(JSON.parse(content)),
+        JSON.stringify(parsedJson),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } catch (e) {
-      // If JSON parsing fails, return the raw content
-      return new Response(
-        JSON.stringify({ content }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
+    } catch (directParseError) {
+      console.log('⚠️ PHASE 3.2: Direct JSON parse failed, attempting smart parsing');
+      
+      // Method 2: Smart parsing fallback
+      const smartParseResult = parseJsonFromResponse(content);
+      
+      if (smartParseResult.success) {
+        console.log('✅ PHASE 3.2: Smart parsing successful');
+        return new Response(
+          JSON.stringify(smartParseResult.data),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        console.error('❌ PHASE 3.2: Both parsing methods failed:', smartParseResult.error);
+        // Return raw content with error info
+        return new Response(
+          JSON.stringify({ 
+            content, 
+            parseError: smartParseResult.error,
+            note: 'Raw response returned due to JSON parsing failure'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
   } catch (error) {
     console.error('Error in executeOpenAI:', error);
@@ -380,16 +461,34 @@ async function executeAnthropic(config: any, apiKey: string, payload: any) {
     console.log('Anthropic response received successfully');
     const content = data.content[0].text;
     
+    // PHASE 3.2: Apply hybrid strategy to Anthropic as well
     try {
+      // Method 1: Direct JSON parsing
+      const parsedJson = JSON.parse(content);
+      console.log('✅ Anthropic: Direct JSON parsing successful');
       return new Response(
-        JSON.stringify(JSON.parse(content)),
+        JSON.stringify(parsedJson),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } catch (e) {
-      return new Response(
-        JSON.stringify({ content }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
+    } catch (directParseError) {
+      console.log('⚠️ Anthropic: Direct JSON parse failed, attempting smart parsing');
+      
+      // Method 2: Smart parsing fallback
+      const smartParseResult = parseJsonFromResponse(content);
+      
+      if (smartParseResult.success) {
+        console.log('✅ Anthropic: Smart parsing successful');
+        return new Response(
+          JSON.stringify(smartParseResult.data),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        console.log('⚠️ Anthropic: Smart parsing failed, returning raw content');
+        return new Response(
+          JSON.stringify({ content }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
   } catch (error) {
     console.error('Error in executeAnthropic:', error);
