@@ -121,39 +121,15 @@ export class DynamicPromptBuilder {
   private async fetchResearchContext(
     context: AnalysisContext
   ): Promise<{ context: string; citations: Citation[] } | null> {
-    if (!this.perplexityEnabled) return null;
-
-    try {
-      // Build research query based on context
-      const queries = this.buildResearchQueries(context);
-      
-      // Mock implementation - replace with actual Perplexity API call
-      const mockResearch = {
-        context: `Latest ${context.image.domain} ${context.image.primaryType} best practices:
-- Ensure ${context.focusAreas.join(', ')} are optimized
-- Follow ${context.industryStandards?.join(', ') || 'standard'} guidelines
-- Current trends emphasize ${context.user.outputPreferences?.prioritization || 'user-centric'} approaches`,
-        citations: [
-          {
-            source: 'Nielsen Norman Group',
-            title: `${context.image.primaryType} Design Guidelines 2024`,
-            url: 'https://www.nngroup.com/articles/example',
-            relevance: 0.95
-          },
-          {
-            source: 'A List Apart',
-            title: 'Modern Web Accessibility Standards',
-            url: 'https://alistapart.com/article/example',
-            relevance: 0.88
-          }
-        ]
-      };
-
-      return mockResearch;
-    } catch (error) {
-      console.error('Failed to fetch research context:', error);
-      return null;
+    if (!this.perplexityEnabled) {
+      throw new Error('Research augmentation requires Perplexity API key. Configure PERPLEXITY_API_KEY in Supabase Edge Functions.');
     }
+
+    // Build research query based on context
+    const queries = this.buildResearchQueries(context);
+    
+    // TODO: Implement actual Perplexity API call here
+    throw new Error('Perplexity integration not yet implemented. Research augmentation unavailable.');
   }
 
   private buildResearchQueries(context: AnalysisContext): string[] {

@@ -47,7 +47,8 @@ export const pipelineConfig = {
       citationGeneration: true,
       standardsRetrieval: true
     },
-    timeout: 15000
+    timeout: 15000,
+    requiredForResearch: true
   },
   // Learning & Persistence (Optional Enhancement)
   learning: {

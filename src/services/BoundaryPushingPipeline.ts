@@ -187,9 +187,16 @@ export class BoundaryPushingPipeline {
     }
 
     // Build dynamic prompt based on context
-    const dynamicPrompt = this.analysisContext 
-      ? await this.promptBuilder.buildContextualPrompt('vision', this.analysisContext)
-      : this.getDefaultVisionPrompt();
+    if (!this.analysisContext) {
+      throw new PipelineError(
+        'Analysis context is required for vision stage execution',
+        'vision',
+        { missingContext: true },
+        false
+      );
+    }
+    
+    const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('vision', this.analysisContext);
 
     const results = await this.executeModelsInParallel(
       models,
@@ -327,9 +334,16 @@ export class BoundaryPushingPipeline {
   ): Promise<StageResult> {
     const models = this.getAvailableModels('analysis');
     
-    const dynamicPrompt = this.analysisContext
-      ? await this.promptBuilder.buildContextualPrompt('analysis', this.analysisContext, visionData)
-      : this.getDefaultAnalysisPrompt(visionData, userContext);
+    if (!this.analysisContext) {
+      throw new PipelineError(
+        'Analysis context is required for analysis stage execution',
+        'analysis',
+        { missingContext: true },
+        false
+      );
+    }
+    
+    const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('analysis', this.analysisContext, visionData);
 
     const results = await this.executeModelsInParallel(
       models,
@@ -339,24 +353,20 @@ export class BoundaryPushingPipeline {
 
     // Add Perplexity conversational analysis if available
     if (this.hasPerplexity()) {
-      try {
-        const conversationalAnalysis = await this.executeConversationalAnalysis(
-          visionData,
-          userContext
-        );
-        
-        results.push({
-          model: 'perplexity-sonar',
-          success: true,
-          data: conversationalAnalysis,
-          metrics: {
-            startTime: Date.now(),
-            endTime: Date.now()
-          }
-        });
-      } catch (error) {
-        console.warn('Conversational analysis failed:', error);
-      }
+      const conversationalAnalysis = await this.executeConversationalAnalysis(
+        visionData,
+        userContext
+      );
+      
+      results.push({
+        model: 'perplexity-sonar',
+        success: true,
+        data: conversationalAnalysis,
+        metrics: {
+          startTime: Date.now(),
+          endTime: Date.now()
+        }
+      });
     }
 
     const successfulResults = results.filter(r => r.success);
@@ -476,12 +486,19 @@ export class BoundaryPushingPipeline {
   ): Promise<StageResult> {
     const models = this.getAvailableModels('analysis'); // Use analysis models for synthesis
     
-    const dynamicPrompt = this.analysisContext
-      ? await this.promptBuilder.buildContextualPrompt('synthesis', this.analysisContext, {
-          vision: visionResults.fusedData,
-          analysis: analysisResults.fusedData
-        })
-      : this.getDefaultSynthesisPrompt(visionResults, analysisResults, userContext);
+    if (!this.analysisContext) {
+      throw new PipelineError(
+        'Analysis context is required for synthesis stage execution',
+        'synthesis',
+        { missingContext: true },
+        false
+      );
+    }
+    
+    const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('synthesis', this.analysisContext, {
+      vision: visionResults.fusedData,
+      analysis: analysisResults.fusedData
+    });
 
     const results = await this.executeModelsInParallel(
       models,
@@ -554,13 +571,12 @@ export class BoundaryPushingPipeline {
 
   private async fuseSynthesisResults(results: ModelResult[]): Promise<any> {
     if (results.length === 0) {
-      return {
-        executiveSummary: 'Analysis completed but synthesis failed.',
-        prioritizedActions: [],
-        visualAnnotations: [],
-        implementationRoadmap: { immediate: [], shortTerm: [], longTerm: [] },
-        successMetrics: []
-      };
+      throw new PipelineError(
+        'Synthesis stage failed - no successful model results',
+        'synthesis',
+        { attemptedModels: results.map(r => r.model) },
+        true
+      );
     }
 
     // Use the best result or merge if multiple
@@ -570,7 +586,15 @@ export class BoundaryPushingPipeline {
         : best;
     });
 
-    const synthesis = bestResult.data || {};
+    const synthesis = bestResult.data;
+    if (!synthesis) {
+      throw new PipelineError(
+        'Synthesis results are invalid - no data returned from models',
+        'synthesis',
+        { resultModel: bestResult.model },
+        true
+      );
+    }
 
     // Enhance with priority calculations
     if (synthesis.prioritizedActions) {
@@ -652,15 +676,9 @@ export class BoundaryPushingPipeline {
 
   // Add helper method to check Perplexity availability
   private hasPerplexity(): boolean {
-    // This will be determined by the edge function
-    return true; // Let edge function handle the check
+    return pipelineConfig.perplexity.enabled;
   }
 
-  private hasApiKey(keyName: string): boolean {
-    // This will be checked on the edge function side
-    // For now, return true and let the edge function handle missing keys
-    return true;
-  }
 
   private checkApiKeys(): string[] {
     // Return list of required API keys for error messages
@@ -763,7 +781,12 @@ export class BoundaryPushingPipeline {
   // Helper method for system prompts
   private getSystemPromptForContext(): string {
     if (!this.analysisContext) {
-      return 'You are an expert UX analyst. Provide detailed, actionable insights.';
+      throw new PipelineError(
+        'Analysis context is required for system prompt generation',
+        'prompt-generation',
+        { missingContext: true },
+        false
+      );
     }
 
     const { user, image } = this.analysisContext;
@@ -826,64 +849,6 @@ export class BoundaryPushingPipeline {
   private analyzeContrast(colors: any[]): any { return {}; }
   private mergeTextContent(results: ModelResult[]): any { return {}; }
 
-  // Fallback methods for backward compatibility
-  private getDefaultVisionPrompt(): string {
-    return `Analyze this interface with extreme detail. Focus on:
-    1. Every UI element and its position
-    2. Visual hierarchy and information architecture
-    3. Interaction patterns and affordances
-    4. Color usage and contrast ratios
-    5. Typography and readability
-    6. Spacing and alignment precision
-    Return a comprehensive JSON analysis.`;
-  }
-
-  private getDefaultAnalysisPrompt(visionData: any, userContext: string): string {
-    return `Perform deep UX/UI analysis based on:
-    - User Context: "${userContext}"
-    - Vision Data: ${JSON.stringify(visionData)}
-    
-    Provide comprehensive insights on:
-    1. Usability issues and improvements
-    2. Accessibility compliance (WCAG 2.1 AA)
-    3. Visual design effectiveness
-    4. Information architecture quality
-    5. Interaction design patterns
-    6. Performance implications
-    7. Mobile responsiveness
-    8. Conversion optimization opportunities
-    
-    Format as structured JSON with scores, issues, and recommendations.`;
-  }
-
-  private getDefaultSynthesisPrompt(
-    visionResults: StageResult,
-    analysisResults: StageResult,
-    userContext: string
-  ): string {
-    return `You are conducting final synthesis of multi-model UX analysis.
-    
-    Context: ${userContext}
-    
-    Vision Stage Results:
-    - Models Run: ${visionResults.results.length}
-    - Success Rate: ${(visionResults.results.filter(r => r.success).length / visionResults.results.length * 100).toFixed(0)}%
-    - Key Findings: ${JSON.stringify(visionResults.fusedData)}
-    
-    Analysis Stage Results:
-    - Models Run: ${analysisResults.results.length}
-    - Success Rate: ${(analysisResults.results.filter(r => r.success).length / analysisResults.results.length * 100).toFixed(0)}%
-    - Key Insights: ${JSON.stringify(analysisResults.fusedData)}
-    
-    Create comprehensive recommendations with:
-    1. Executive Summary
-    2. Prioritized Action Items
-    3. Visual Annotations
-    4. Implementation Roadmap
-    5. Success Metrics
-    
-    Format as structured JSON matching the synthesis schema.`;
-  }
 
   reset(): void {
     this.abortController?.abort();

@@ -195,16 +195,7 @@ export class OptimizedAnalysisPipeline {
       return compressed;
     } catch (error) {
       console.error('Metadata extraction failed:', error);
-      // Return minimal fallback metadata
-      return {
-        elements: 'interface components',
-        textSummary: 'UI text content',
-        colorPalette: 'standard colors',
-        labelsSummary: 'UI elements',
-        objectCount: 0,
-        textCount: 0,
-        faceCount: 0
-      };
+      throw new Error(`Metadata extraction failed: ${error.message}. Ensure Google Vision API key is configured.`);
     }
   }
 
@@ -244,11 +235,7 @@ export class OptimizedAnalysisPipeline {
       };
     } catch (error) {
       console.error('OpenAI analysis failed:', error);
-      return {
-        data: this.createOpenAIFallback(metadata),
-        model: 'openai-fallback',
-        tokenUsage: 0
-      };
+      throw new Error(`OpenAI analysis failed: ${error.message}. Ensure OpenAI API key is configured.`);
     }
   }
 
@@ -266,8 +253,7 @@ export class OptimizedAnalysisPipeline {
     const remainingBudget = budget.stage3_comprehensive - this.currentTokenUsage;
     
     if (remainingBudget < 3000) {
-      console.warn('Token budget low for Claude synthesis, using compressed approach');
-      return this.performCompressedSynthesis(metadata, openaiData);
+      throw new Error('Token budget insufficient for Claude synthesis. Increase token allocation or reduce earlier stage usage.');
     }
 
     const claudePrompt = this.createClaudePrompt(metadata, openaiData, userContext);
@@ -297,7 +283,7 @@ export class OptimizedAnalysisPipeline {
       };
     } catch (error) {
       console.error('Claude synthesis failed:', error);
-      return this.performCompressedSynthesis(metadata, openaiData);
+      throw new Error(`Claude synthesis failed: ${error.message}. Ensure Claude API key is configured.`);
     }
   }
 
@@ -316,8 +302,7 @@ export class OptimizedAnalysisPipeline {
     const remainingBudget = budget.stage3_comprehensive - this.currentTokenUsage;
     
     if (remainingBudget < 5000) {
-      console.warn('Token budget nearly exhausted, using compressed analysis');
-      return this.performCompressedAnalysis(metadata, visionData);
+      throw new Error('Token budget insufficient for comprehensive analysis. Increase token allocation.');
     }
 
     // Create token-optimized prompt
@@ -345,7 +330,7 @@ export class OptimizedAnalysisPipeline {
       };
     } catch (error) {
       console.error('Token-managed analysis failed:', error);
-      return this.performCompressedAnalysis(metadata, visionData);
+      throw new Error(`Token-managed analysis failed: ${error.message}`);
     }
   }
 
@@ -383,7 +368,7 @@ Return JSON:
     const isLowBudget = tokenBudget < 8000;
     
     if (isLowBudget) {
-      return this.createCompressedPrompt(metadata, visionData);
+      throw new Error('Token budget too low for meaningful analysis. Increase allocation.');
     }
 
     return `UX Analysis for ${visionData.layoutType || 'interface'} layout.
@@ -527,138 +512,6 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
 }`;
   }
 
-  /**
-   * Create OpenAI analysis fallback
-   */
-  private createOpenAIFallback(metadata: CompressedMetadata): any {
-    return {
-      layoutAnalysis: {
-        type: 'standard',
-        hierarchy: 'basic layout structure',
-        components: metadata.elements.split(', ').slice(0, 3),
-        patterns: ['standard patterns']
-      },
-      usabilityFindings: {
-        issues: [{ type: 'review', description: 'Manual review needed', severity: 'medium' }],
-        strengths: ['basic structure detected']
-      },
-      accessibilityReview: {
-        concerns: ['accessibility review needed'],
-        recommendations: ['conduct detailed accessibility audit']
-      }
-    };
-  }
-
-  /**
-   * Perform compressed synthesis when token budget is low
-   */
-  private async performCompressedSynthesis(
-    metadata: CompressedMetadata,
-    openaiData: any
-  ): Promise<{ data: any; model: string; tokenUsage: number }> {
-    const timestamp = Date.now();
-    
-    const compressedResult = {
-      visualAnnotations: [
-        {
-          id: `annotation-${timestamp}`,
-          x: 50,
-          y: 20,
-          type: 'issue',
-          title: 'Budget-Limited Analysis',
-          description: 'Token budget constraints limited analysis depth',
-          severity: 'medium'
-        }
-      ],
-      suggestions: [
-        {
-          id: `suggestion-${timestamp}`,
-          category: 'usability',
-          title: 'Detailed Review Recommended',
-          description: 'Complete manual UX review recommended for comprehensive insights',
-          impact: 'medium',
-          effort: 'medium',
-          actionItems: ['Manual UX review', 'User testing', 'Accessibility audit']
-        }
-      ],
-      summary: {
-        overallScore: 75,
-        categoryScores: {
-          usability: 70,
-          accessibility: 65,
-          visual: 80,
-          content: 75
-        },
-        keyIssues: ['Limited analysis depth due to token constraints'],
-        strengths: ['Basic structure and components identified']
-      }
-    };
-
-    return {
-      data: compressedResult,
-      model: 'claude-compressed',
-      tokenUsage: 300
-    };
-  }
-
-  /**
-   * Create vision analysis fallback
-   */
-  private createVisionFallback(metadata: CompressedMetadata): any {
-    return {
-      layoutType: 'standard',
-      components: metadata.elements.split(', ').slice(0, 3),
-      hierarchy: 'standard layout structure',
-      concerns: ['accessibility review needed'],
-      patterns: ['standard patterns detected']
-    };
-  }
-
-  /**
-   * Perform compressed analysis when token budget is low
-   */
-  private async performCompressedAnalysis(
-    metadata: CompressedMetadata, 
-    visionData: any
-  ): Promise<{ data: any; model: string; tokenUsage: number }> {
-    const timestamp = Date.now();
-    
-    const compressedResult = {
-      visualAnnotations: [
-        {
-          id: `annotation-${timestamp}`,
-          x: 50,
-          y: 20,
-          type: 'issue',
-          title: 'Compressed Analysis',
-          description: 'Token budget constraints - manual review recommended',
-          severity: 'medium'
-        }
-      ],
-      suggestions: [
-        {
-          id: `suggestion-${timestamp}`,
-          category: 'usability',
-          title: 'Detailed Review Needed',
-          description: 'Complete manual UX review to supplement automated analysis',
-          impact: 'medium',
-          effort: 'medium',
-          actionItems: ['Manual review', 'User testing']
-        }
-      ],
-      summary: {
-        overallScore: 70,
-        keyIssues: ['Requires detailed manual review'],
-        strengths: ['Basic structure identified']
-      }
-    };
-
-    return {
-      data: compressedResult,
-      model: 'compressed-fallback',
-      tokenUsage: 500
-    };
-  }
 
   /**
    * Consolidate all stage results into final analysis
@@ -669,8 +522,11 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
     const openaiStage = stages.find(s => s.stage === 'openai_ux_analysis');
     const metadataStage = stages.find(s => s.stage === 'google_vision_metadata');
 
-    // Use Claude's synthesis as the primary result, fallback to OpenAI if needed
-    const finalAnalysis = claudeStage?.data || openaiStage?.data || this.createBasicAnalysis(stages);
+    // Use Claude's synthesis as the primary result
+    if (!claudeStage?.data) {
+      throw new Error('Claude synthesis stage failed - no valid analysis data available');
+    }
+    const finalAnalysis = claudeStage.data;
 
     // Add comprehensive metadata showing the full pipeline journey
     finalAnalysis.metadata = {
@@ -697,42 +553,6 @@ Integrate the previous analysis into actionable UX recommendations. Provide the 
     return finalAnalysis;
   }
 
-  /**
-   * Create basic analysis from available data
-   */
-  private createBasicAnalysis(stages: StageResult[]): any {
-    const timestamp = Date.now();
-    
-    return {
-      visualAnnotations: [
-        {
-          id: `annotation-${timestamp}`,
-          x: 50,
-          y: 20,
-          type: 'suggestion',
-          title: 'Optimized Analysis Complete',
-          description: 'Analysis completed with optimization constraints',
-          severity: 'low'
-        }
-      ],
-      suggestions: [
-        {
-          id: `suggestion-${timestamp}`,
-          category: 'usability',
-          title: 'Review Interface Design',
-          description: 'Review based on optimized pipeline results',
-          impact: 'medium',
-          effort: 'medium',
-          actionItems: ['Detailed review', 'User feedback']
-        }
-      ],
-      summary: {
-        overallScore: 75,
-        keyIssues: ['Optimized analysis - consider detailed review'],
-        strengths: ['Structure analyzed', 'Pipeline successful']
-      }
-    };
-  }
 
   /**
    * Store optimized analysis in database

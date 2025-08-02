@@ -143,35 +143,23 @@ export function VerificationTestSuite() {
       }
       
       // Check if we get a valid context response
-      const isValidContext = data && 
-                            typeof data.confidence === 'number' &&
-                            Array.isArray(data.focusAreas) &&
-                            data.detectedAt;
+      const isValidContext = data && (
+        data.primaryType || 
+        data.interfaceType || 
+        data.domain || 
+        data.analysis
+      );
       
       updateTestStatus(testName, {
         status: isValidContext ? 'passed' : 'failed',
-        details: `Context detection: ${isValidContext ? 'PASS' : 'FAIL'}${data ? `, confidence: ${data.confidence}` : ''}`,
-        error: !isValidContext ? 'Invalid context response structure' : undefined
+        details: `Context detection: ${isValidContext ? 'PASS' : 'FAIL'}${data ? `, response keys: ${Object.keys(data).join(', ')}` : ''}`,
+        error: !isValidContext ? 'Invalid context response structure - expected interface analysis data' : undefined
       });
     } catch (error) {
-      // Fallback to local service test if edge function isn't available
-      try {
-        const contextService = new ContextDetectionService();
-        const userContext = contextService.inferUserContext(
-          'I am a developer looking to improve conversion rates on this dashboard'
-        );
-        
-        updateTestStatus(testName, {
-          status: 'passed',
-          details: `Local context service working (edge function unavailable)`,
-          error: undefined
-        });
-      } catch (localError) {
-        updateTestStatus(testName, {
-          status: 'failed',
-          error: `Both edge function and local service failed: ${error.message}`
-        });
-      }
+      updateTestStatus(testName, {
+        status: 'failed',
+        error: `Context detection failed: ${error.message}. Ensure OpenAI API key is configured.`
+      });
     }
   };
 

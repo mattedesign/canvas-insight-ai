@@ -111,7 +111,7 @@ export class EnhancedDomainDetector {
     const matches = this.findDomainMatches(text);
     
     if (matches.length === 0) {
-      return this.createFallbackAnalysis();
+      throw new Error('No domain patterns matched for the provided input. Ensure input contains recognizable UI/domain keywords.');
     }
 
     // Get the highest confidence match
