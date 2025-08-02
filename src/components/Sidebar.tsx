@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouterStateManager } from '@/services/RouterStateManager';
 import { 
   BarChart3, 
   Folder, 
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut, user } = useAuth();
+  const { navigate: enhancedNavigate, state: routerState } = useRouterStateManager();
   
   
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
@@ -83,11 +85,11 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
           <button
             key={index}
             onClick={
-              item.label === 'Dashboard' ? () => navigate('/dashboard') :
-              item.label === 'Previous' ? () => navigate('/projects') :
-              item.label === 'Analytics' ? () => navigate('/analytics') :
-              item.label === 'Production' ? () => navigate('/production') :
-              item.label === 'Subscription' ? () => navigate('/subscription') :
+              item.label === 'Dashboard' ? () => enhancedNavigate('/dashboard') :
+              item.label === 'Previous' ? () => enhancedNavigate('/projects') :
+              item.label === 'Analytics' ? () => enhancedNavigate('/analytics') :
+              item.label === 'Production' ? () => enhancedNavigate('/production') :
+              item.label === 'Subscription' ? () => enhancedNavigate('/subscription') :
               undefined
             }
             className={`

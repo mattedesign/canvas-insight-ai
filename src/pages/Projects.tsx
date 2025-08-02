@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileImage, Clock, Users, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useRouterStateManager } from '@/services/RouterStateManager';
 import { Sidebar } from '@/components/Sidebar';
 import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { CanvasStateService } from '@/services/CanvasStateService';
@@ -22,6 +23,7 @@ interface Project {
 
 const Projects = () => {
   const navigate = useNavigate();
+  const { navigate: enhancedNavigate } = useRouterStateManager();
   const { user } = useAuth();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -61,7 +63,7 @@ const Projects = () => {
       });
       
       // Navigate directly to canvas with the project slug
-      navigate(`/canvas/${project.slug}`);
+      await enhancedNavigate(`/canvas/${project.slug}`);
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
@@ -88,7 +90,7 @@ const Projects = () => {
       });
       
       // Navigate to canvas using project slug
-      navigate(`/canvas/${project.slug}`);
+      await enhancedNavigate(`/canvas/${project.slug}`);
     } catch (error) {
       console.error('Failed to switch project:', error);
       toast({
@@ -104,12 +106,12 @@ const Projects = () => {
     loadProjects();
   }, [user]);
 
-  const handleClearCanvas = () => {
-    navigate('/dashboard');
+  const handleClearCanvas = async () => {
+    await enhancedNavigate('/dashboard');
   };
 
-  const handleAddImages = () => {
-    navigate('/canvas');
+  const handleAddImages = async () => {
+    await enhancedNavigate('/canvas');
   };
 
   const handleNavigateToPreviousAnalyses = () => {

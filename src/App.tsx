@@ -9,6 +9,7 @@ import { AppProvider } from "./context/SimplifiedAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -83,59 +84,87 @@ const App = () => {
               </div>
             }>
               <Routes>
-                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth" element={
+                  <RouteErrorBoundary routeName="Auth" fallbackRoute="/">
+                    <Auth />
+                  </RouteErrorBoundary>
+                } />
                 <Route path="/" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/auth">
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/">
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/canvas" element={
-                  <ProtectedRoute>
-                    <Canvas />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Canvas" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <Canvas />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/canvas/:projectSlug" element={
-                  <ProtectedRoute>
-                    <Canvas />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Canvas Project" fallbackRoute="/projects">
+                    <ProtectedRoute>
+                      <Canvas />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/projects" element={
-                  <ProtectedRoute>
-                    <Projects />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <Projects />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/analytics" element={
-                  <ProtectedRoute>
-                    <Analytics />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Analytics" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <Analytics />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/subscription" element={
-                  <ProtectedRoute>
-                    <Subscription />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Subscription" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <Subscription />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/production" element={
-                  <ProtectedRoute>
-                    <ProductionReadiness />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Production" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <ProductionReadiness />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/testing" element={
-                  <ProtectedRoute>
-                    <PerformanceTestingDashboard />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Testing" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <PerformanceTestingDashboard />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 <Route path="/verification" element={
-                  <ProtectedRoute>
-                    <VerificationTests />
-                  </ProtectedRoute>
+                  <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
+                    <ProtectedRoute>
+                      <VerificationTests />
+                    </ProtectedRoute>
+                  </RouteErrorBoundary>
                 } />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={
+                  <RouteErrorBoundary routeName="NotFound" fallbackRoute="/">
+                    <NotFound />
+                  </RouteErrorBoundary>
+                } />
               </Routes>
             </Suspense>
           </AppProvider>
