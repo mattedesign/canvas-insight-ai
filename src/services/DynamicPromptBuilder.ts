@@ -382,7 +382,13 @@ ${context.user.inferredRole === 'designer' ? `Designer Perspective:
   "prioritizedActions": [{ "title": "", "description": "", "priority": "critical|high|medium|low", "effort": "", "impact": "", "timeline": "" }],
   "visualAnnotations": [{ "element": "", "x": 0, "y": 0, "issue": "", "recommendation": "" }],
   "implementationRoadmap": { "immediate": [], "shortTerm": [], "longTerm": [] },
-  "successMetrics": [{ "metric": "", "currentState": "", "targetState": "", "measurement": "" }]
+  "successMetrics": [{ "metric": "", "currentState": "", "targetState": "", "measurement": "" }],
+  "summary": {
+    "overallScore": 0,
+    "keyIssues": ["Most critical issues found"],
+    "keyOpportunities": ["Highest impact improvements"],
+    "confidenceScore": 0.85
+  }
 }`
     };
     

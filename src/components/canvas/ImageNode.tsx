@@ -280,11 +280,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         {analysis && (
           <div className="absolute top-2 right-2 z-10 space-y-2">
             <Badge 
-              variant={analysis.summary.overallScore >= 80 ? 'default' : 
-                     analysis.summary.overallScore >= 60 ? 'secondary' : 'destructive'}
+              variant={analysis.summary?.overallScore >= 80 ? 'default' : 
+                     analysis.summary?.overallScore >= 60 ? 'secondary' : 'destructive'}
               className="bg-background/90 backdrop-blur-sm"
             >
-              Score: {analysis.summary.overallScore}
+              Score: {analysis.summary?.overallScore || 'N/A'}
             </Badge>
             
             {/* AI Model Used Indicator */}
@@ -347,7 +347,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
                 </div>
                 {(analysis.summary?.keyIssues?.length || 0) > 0 && (
                   <div className="text-destructive">
-                    Top Issue: {analysis.summary.keyIssues[0].substring(0, 40)}...
+                    Top Issue: {analysis.summary.keyIssues[0]?.substring(0, 40) || 'N/A'}...
                   </div>
                 )}
                 {(analysis.suggestions?.length || 0) > 0 && (

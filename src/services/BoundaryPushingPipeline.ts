@@ -727,7 +727,69 @@ export class BoundaryPushingPipeline {
       }));
     }
 
+    // CRITICAL FIX: Ensure summary object exists with required structure
+    if (!synthesis.summary) {
+      console.warn('[BoundaryPushingPipeline] Synthesis results missing summary object, creating default');
+      synthesis.summary = {
+        overallScore: this.calculateOverallScore(synthesis),
+        keyIssues: this.extractKeyIssues(synthesis),
+        keyOpportunities: this.extractKeyOpportunities(synthesis),
+        confidenceScore: 0.8
+      };
+    } else {
+      // Ensure overallScore exists if summary exists but is incomplete
+      if (typeof synthesis.summary.overallScore !== 'number') {
+        synthesis.summary.overallScore = this.calculateOverallScore(synthesis);
+      }
+      if (!synthesis.summary.keyIssues) {
+        synthesis.summary.keyIssues = this.extractKeyIssues(synthesis);
+      }
+      if (!synthesis.summary.keyOpportunities) {
+        synthesis.summary.keyOpportunities = this.extractKeyOpportunities(synthesis);
+      }
+    }
+
     return synthesis;
+  }
+
+  private calculateOverallScore(synthesis: any): number {
+    // Calculate a reasonable overall score based on available data
+    if (synthesis.prioritizedActions && synthesis.prioritizedActions.length > 0) {
+      const criticalIssues = synthesis.prioritizedActions.filter(a => a.priority === 'critical').length;
+      const highIssues = synthesis.prioritizedActions.filter(a => a.priority === 'high').length;
+      
+      // Start with base score and reduce based on issues
+      let score = 85;
+      score -= criticalIssues * 15;
+      score -= highIssues * 10;
+      
+      return Math.max(0, Math.min(100, score));
+    }
+    
+    // Default moderate score if no prioritized actions
+    return 70;
+  }
+
+  private extractKeyIssues(synthesis: any): string[] {
+    if (synthesis.prioritizedActions) {
+      return synthesis.prioritizedActions
+        .filter(action => action.priority === 'critical' || action.priority === 'high')
+        .slice(0, 3)
+        .map(action => action.title || action.description)
+        .filter(Boolean);
+    }
+    return [];
+  }
+
+  private extractKeyOpportunities(synthesis: any): string[] {
+    if (synthesis.prioritizedActions) {
+      return synthesis.prioritizedActions
+        .filter(action => action.impact === 'high')
+        .slice(0, 3)
+        .map(action => action.title || action.description)
+        .filter(Boolean);
+    }
+    return [];
   }
 
   private async storeResults(data: any): Promise<any> {

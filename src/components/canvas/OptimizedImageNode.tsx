@@ -184,11 +184,11 @@ export const OptimizedImageNode: React.FC<OptimizedImageNodeProps> = memo(({ dat
         {analysis && imageLoaded && (
           <div className="absolute top-2 right-2 z-10">
             <Badge 
-              variant={analysis.summary.overallScore >= 80 ? 'default' : 
-                     analysis.summary.overallScore >= 60 ? 'secondary' : 'destructive'}
+              variant={analysis.summary?.overallScore >= 80 ? 'default' : 
+                     analysis.summary?.overallScore >= 60 ? 'secondary' : 'destructive'}
               className="bg-background/90"
             >
-              Score: {analysis.summary.overallScore}
+              Score: {analysis.summary?.overallScore || 'N/A'}
             </Badge>
           </div>
         )}
