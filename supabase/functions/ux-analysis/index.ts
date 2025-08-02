@@ -172,6 +172,15 @@ async function executeModel(payload: any) {
   }
 }
 
+// Helper function to ensure prompts contain "json" for OpenAI compatibility
+function ensureJsonInPrompt(prompt: string): string {
+  if (!prompt.toLowerCase().includes('json')) {
+    console.log('⚠️ Adding JSON requirement to prompt for OpenAI compatibility');
+    return prompt + '\n\nPlease format your response as JSON.';
+  }
+  return prompt;
+}
+
 async function executeOpenAI(config: any, apiKey: string, payload: any) {
   console.log('Executing OpenAI with payload:', { 
     model: config.model || payload.model,
@@ -181,7 +190,15 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
   });
   
   try {
-    const { imageUrl, prompt, systemPrompt } = payload;
+    const { imageUrl, systemPrompt } = payload;
+    
+    // CRITICAL: Ensure prompt contains "json" for OpenAI JSON mode
+    const enhancedPrompt = ensureJsonInPrompt(payload.prompt);
+    console.log('🔍 JSON prompt check:', {
+      originalContainsJson: payload.prompt.toLowerCase().includes('json'),
+      enhancedContainsJson: enhancedPrompt.toLowerCase().includes('json'),
+      promptWasModified: enhancedPrompt !== payload.prompt
+    });
     
     let processedImageUrl = imageUrl;
     if (imageUrl && !imageUrl.startsWith('data:')) {
@@ -199,9 +216,9 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
       {
         role: 'user',
         content: processedImageUrl ? [
-          { type: 'text', text: prompt },
+          { type: 'text', text: enhancedPrompt },
           { type: 'image_url', image_url: { url: processedImageUrl } }
-        ] : prompt
+        ] : enhancedPrompt
       }
     ];
 

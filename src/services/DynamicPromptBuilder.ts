@@ -346,7 +346,17 @@ export class DynamicPromptBuilder {
   "technicalConsiderations": [{ "area": "", "recommendation": "", "effort": "low|medium|high" }]
 }`,
       
-      synthesis: `Create final recommendations as:
+      synthesis: `Synthesize all findings into actionable recommendations prioritized by effort. Create a cohesive improvement strategy that balances user needs, business goals, and technical feasibility.
+
+${context.user.inferredRole === 'designer' ? `Designer Perspective:
+- Evaluate visual hierarchy and gestalt principles
+- Analyze color theory application and accessibility
+- Assess typography system and readability
+- Review spacing consistency and visual rhythm
+- Consider emotional design impact
+- Identify design system opportunities
+
+` : ''}Create final recommendations as JSON:
 {
   "executiveSummary": "Brief overview of key findings",
   "prioritizedActions": [{ "title": "", "description": "", "priority": "critical|high|medium|low", "effort": "", "impact": "", "timeline": "" }],
@@ -356,14 +366,22 @@ export class DynamicPromptBuilder {
 }`
     };
     
+    // Ensure all prompts explicitly mention JSON formatting
+    let baseFormat = formats[stage];
+    
     // Adjust format based on user technical level
     if (user.technicalLevel === 'non-technical') {
-      return formats[stage] + '\n\nUse simple, non-technical language and provide clear explanations.';
+      baseFormat += '\n\nUse simple, non-technical language and provide clear explanations.';
     } else if (user.technicalLevel === 'technical') {
-      return formats[stage] + '\n\nInclude detailed technical specifications and advanced implementation guidance.';
+      baseFormat += '\n\nInclude detailed technical specifications and advanced implementation guidance.';
     }
     
-    return formats[stage];
+    // CRITICAL: Ensure the word "json" appears in the prompt for OpenAI compatibility
+    if (!baseFormat.toLowerCase().includes('json')) {
+      baseFormat += '\n\nPlease format your response as JSON.';
+    }
+    
+    return baseFormat;
   }
 
   private getQualityMarkers(context: AnalysisContext): string[] {
