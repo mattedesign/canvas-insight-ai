@@ -70,11 +70,11 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   return (
     <div className="w-16 bg-sidebar flex flex-col items-center py-4 space-y-4">
       {/* Logo */}
-      <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+      <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center p-2">
         <img 
           src="/lovable-uploads/c671a789-96c3-47ab-a04b-9f06ab4b4592.png" 
           alt="Logo" 
-          className="w-8 h-8 object-contain"
+          className="w-full h-full object-contain"
         />
       </div>
 
