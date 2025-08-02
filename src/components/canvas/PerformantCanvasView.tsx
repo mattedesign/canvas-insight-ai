@@ -11,7 +11,7 @@ const VIRTUALIZATION_THRESHOLDS = {
 };
 
 export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
-  const { uploadedImages, imageGroups = [], analyses } = props;
+  const { uploadedImages, imageGroups = [], analyses = [] } = props;
   
   // Calculate total elements to determine if virtualization is needed
   const totalElements = uploadedImages.length + imageGroups.length + analyses.length;

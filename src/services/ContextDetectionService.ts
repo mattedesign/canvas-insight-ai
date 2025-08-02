@@ -380,18 +380,58 @@ export class ContextDetectionService {
   }
 
   private parseImageContext(data: any): ImageContext {
-    // Parse AI response and ensure all required fields
+    console.log('[ContextDetection] Raw AI response:', data);
+    
+    // Handle different response structures - AI might nest the data
+    const responseData = data.data || data.result || data;
+    
+    // Enhanced parsing with fallback detection
+    let primaryType = responseData.primaryType || responseData.interface_type || responseData.type || 'unknown';
+    
+    // Smart inference from detected elements if primaryType is unknown/unclear
+    if (primaryType === 'unknown' || !primaryType) {
+      primaryType = this.inferInterfaceFromElements(responseData);
+    }
+    
+    console.log('[ContextDetection] Parsed primaryType:', primaryType);
+    
     return {
-      primaryType: data.primaryType || 'unknown',
-      subTypes: data.subTypes || [],
-      domain: data.domain || 'general',
-      complexity: data.complexity || 'moderate',
-      userIntent: data.userIntent || [],
-      businessModel: data.businessModel,
-      targetAudience: data.targetAudience,
-      maturityStage: data.maturityStage || 'mvp',
-      platform: data.platform || 'web',
-      designSystem: data.designSystem
+      primaryType: primaryType as ImageContext['primaryType'],
+      subTypes: responseData.subTypes || responseData.sub_types || [],
+      domain: responseData.domain || responseData.industry || 'general',
+      complexity: responseData.complexity || 'moderate',
+      userIntent: responseData.userIntent || responseData.user_intent || [],
+      businessModel: responseData.businessModel || responseData.business_model,
+      targetAudience: responseData.targetAudience || responseData.target_audience,
+      maturityStage: responseData.maturityStage || responseData.maturity_stage || 'mvp',
+      platform: responseData.platform || 'web',
+      designSystem: responseData.designSystem || responseData.design_system
     };
+  }
+
+  private inferInterfaceFromElements(data: any): ImageContext['primaryType'] {
+    // Look for dashboard indicators in the AI response
+    const text = JSON.stringify(data).toLowerCase();
+    
+    if (text.includes('dashboard') || text.includes('metric') || text.includes('chart') || text.includes('kpi')) {
+      return 'dashboard';
+    }
+    if (text.includes('landing') || text.includes('hero') || text.includes('cta')) {
+      return 'landing';
+    }
+    if (text.includes('form') || text.includes('input') || text.includes('submit')) {
+      return 'form';
+    }
+    if (text.includes('mobile') || text.includes('app') || text.includes('touch')) {
+      return 'mobile';
+    }
+    if (text.includes('ecommerce') || text.includes('product') || text.includes('cart') || text.includes('shop')) {
+      return 'ecommerce';
+    }
+    if (text.includes('saas') || text.includes('software')) {
+      return 'saas';
+    }
+    
+    return 'app'; // Default fallback
   }
 }
