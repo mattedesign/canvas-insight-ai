@@ -395,7 +395,12 @@ export class ImageMigrationService {
           name: img.original_name || img.filename, // Handle both field names
           url: urlData.publicUrl,
           file: emptyFile,
-          dimensions: img.dimensions as { width: number; height: number },
+          dimensions: (img.dimensions && typeof img.dimensions === 'object' && 
+                       'width' in img.dimensions && 'height' in img.dimensions &&
+                       typeof img.dimensions.width === 'number' && typeof img.dimensions.height === 'number' &&
+                       img.dimensions.width > 0 && img.dimensions.height > 0) 
+                      ? { width: img.dimensions.width, height: img.dimensions.height }
+                      : { width: 800, height: 600 }, // Fallback dimensions
           status: 'completed' as const
         };
 

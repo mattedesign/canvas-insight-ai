@@ -149,7 +149,7 @@ export interface UploadedImage {
   name: string;
   url: string;
   file: File;
-  dimensions: {
+  dimensions?: {
     width: number;
     height: number;
   };

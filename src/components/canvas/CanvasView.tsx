@@ -13,6 +13,7 @@ import {
 import { BoundaryPushingPipeline } from '@/services/BoundaryPushingPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
+import { getSafeDimensions } from '@/utils/imageUtils';
 import { AnalysisRequestNodeData, AnalysisRequestNode } from './AnalysisRequestNode';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
@@ -470,10 +471,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     ungroupedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);
       
-      // Calculate image display dimensions (considering max-height: 80vh constraint)
-      const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.8);
-      const scaleFactor = maxDisplayHeight / image.dimensions.height;
-      const displayWidth = Math.min(image.dimensions.width * scaleFactor, 800); // max-width constraint
+      // Calculate image display dimensions with safe dimension access
+      const safeDimensions = getSafeDimensions(image);
+      const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.8);
+      const scaleFactor = maxDisplayHeight / safeDimensions.height;
+      const displayWidth = Math.min(safeDimensions.width * scaleFactor, 800); // max-width constraint
       const displayHeight = maxDisplayHeight;
       
       // Check if image is still loading or processing
@@ -697,9 +699,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
-          const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
           // Width needed for this pair: image + spacing + analysis card (expanded or collapsed)
@@ -733,9 +736,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
-          const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
           const analysisCardWidth = 400; // Standard width
@@ -789,9 +793,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         let currentY = headerHeight + padding; // Start below header with 32px top padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, window.innerHeight * 0.3);
-          const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 400);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
           // Check if image is still loading or processing
@@ -998,9 +1003,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         let currentY = headerHeight + padding; // Start below header with 32px top padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
-          const maxDisplayHeight = Math.min(image.dimensions.height, 200);
-          const scaleFactor = maxDisplayHeight / image.dimensions.height;
-          const displayWidth = Math.min(image.dimensions.width * scaleFactor, 250);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
           // Image node - positioned relative to group container origin

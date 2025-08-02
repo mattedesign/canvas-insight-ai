@@ -70,3 +70,21 @@ export function getImageDimensionsWithFallback(
     return fallback;
   });
 }
+
+/**
+ * Get safe dimensions from image object with fallback
+ */
+export function getSafeDimensions(
+  image: { dimensions?: { width: number; height: number } },
+  fallback: ImageDimensions = { width: 800, height: 600 }
+): ImageDimensions {
+  if (!image.dimensions || 
+      typeof image.dimensions.width !== 'number' || 
+      typeof image.dimensions.height !== 'number' ||
+      image.dimensions.width <= 0 || 
+      image.dimensions.height <= 0) {
+    console.warn('Invalid or missing image dimensions, using fallback:', fallback);
+    return fallback;
+  }
+  return image.dimensions;
+}
