@@ -42,7 +42,7 @@ interface PipelineProgress {
 
 export class OptimizedAnalysisPipeline {
   private tokenBudgets: Record<string, TokenBudget> = {
-    'claude-sonnet-4': {
+    'claude-opus-4-20250514': {
       stage1_metadata: 2000,
       stage2_vision: 8000,
       stage3_comprehensive: 15000,
@@ -115,7 +115,7 @@ export class OptimizedAnalysisPipeline {
       );
       stages.push({
         stage: 'claude_synthesis',
-        model: 'claude-sonnet-4',
+        model: 'claude-opus-4-20250514',
         success: true,
         timestamp: new Date().toISOString(),
         data: claudeResult.data,
@@ -249,7 +249,7 @@ export class OptimizedAnalysisPipeline {
     userContext?: string
   ): Promise<{ data: any; model: string; tokenUsage: number }> {
     
-    const budget = this.tokenBudgets['claude-sonnet-4'];
+    const budget = this.tokenBudgets['claude-opus-4-20250514'];
     const remainingBudget = budget.stage3_comprehensive - this.currentTokenUsage;
     
     if (remainingBudget < 3000) {
@@ -278,7 +278,7 @@ export class OptimizedAnalysisPipeline {
 
       return {
         data: data.analysis,
-        model: 'claude-sonnet-4',
+        model: 'claude-opus-4-20250514',
         tokenUsage: data.tokenUsage || 2000
       };
     } catch (error) {
@@ -298,7 +298,7 @@ export class OptimizedAnalysisPipeline {
   ): Promise<{ data: any; model: string; tokenUsage: number }> {
     
     // Calculate remaining token budget
-    const budget = this.tokenBudgets['claude-sonnet-4'];
+    const budget = this.tokenBudgets['claude-opus-4-20250514'];
     const remainingBudget = budget.stage3_comprehensive - this.currentTokenUsage;
     
     if (remainingBudget < 5000) {
@@ -325,7 +325,7 @@ export class OptimizedAnalysisPipeline {
 
       return {
         data: data.analysis,
-        model: data.model || 'claude-sonnet-4',
+        model: data.model || 'claude-opus-4-20250514',
         tokenUsage: data.tokenUsage || 2000
       };
     } catch (error) {

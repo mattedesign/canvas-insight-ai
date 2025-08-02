@@ -102,7 +102,7 @@ export function ImageAnalysisDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="claude">
-                  Claude Opus 4 - Most Advanced
+                  Claude Opus 4 (claude-opus-4-20250514) - Most Advanced
                 </SelectItem>
                 <SelectItem value="openai">
                   GPT-4.1 - Fast & Reliable

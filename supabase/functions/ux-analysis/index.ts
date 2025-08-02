@@ -427,10 +427,10 @@ function mapModelName(requestedModel: string): string {
     
     
     // Anthropic model mappings
-    'claude-opus-4-20250514': 'claude-3-5-sonnet-20241022',
-    'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet-20241022',
-    'claude-3-opus-20240229': 'claude-3-5-sonnet-20241022',
-    'anthropic-vision': 'claude-3-5-sonnet-20241022',
+    'claude-opus-4-20250514': 'claude-opus-4-20250514',
+    'claude-3-5-sonnet-20241022': 'claude-opus-4-20250514',
+    'claude-3-opus-20240229': 'claude-opus-4-20250514',
+    'anthropic-vision': 'claude-opus-4-20250514',
     
     // Google model mappings
     'gemini-1.5-pro': 'gemini-1.5-pro',
@@ -452,7 +452,7 @@ function findBestModelMatch(requestedModel: string, availableModels: string[]): 
     return availableModels.find(m => m.includes('gpt')) || 'gpt-4o'
   }
   if (requestedModel.includes('claude') || requestedModel.includes('anthropic')) {
-    return availableModels.find(m => m.includes('claude')) || 'claude-3-5-sonnet-20241022'
+    return availableModels.find(m => m.includes('claude')) || 'claude-opus-4-20250514'
   }
   if (requestedModel.includes('gemini') || requestedModel.includes('google')) {
     return availableModels.find(m => m.includes('gemini')) || 'gemini-1.5-pro'

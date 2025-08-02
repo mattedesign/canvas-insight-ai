@@ -43,7 +43,7 @@ export function ModelComparisonPanel({
 
   const availableModels = [
     { id: 'openai', name: 'OpenAI GPT-4o', icon: '🧠', color: 'bg-green-500' },
-    { id: 'claude-vision', name: 'Claude 3.5 Sonnet', icon: '🎯', color: 'bg-blue-500' },
+    { id: 'claude-vision', name: 'Claude Opus 4 (claude-opus-4-20250514)', icon: '🎯', color: 'bg-blue-500' },
     { id: 'google-vision', name: 'Google Vision', icon: '👁️', color: 'bg-red-500' },
     { id: 'stability-ai', name: 'Stability.ai', icon: '🎨', color: 'bg-purple-500' }
   ];

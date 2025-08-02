@@ -34,16 +34,17 @@ export const MODEL_REGISTRY = {
       complexReasoning: true
     }
   },
-  'claude-2': {
-    name: 'Claude 2',
+  'claude-opus-4-20250514': {
+    name: 'Claude Opus 4',
     category: 'conversational',
-    capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning'],
+    capabilities: ['conversational-analysis', 'multi-turn-conversation', 'complex-reasoning', 'vision'],
     provider: 'anthropic',
-    costPerRequest: 0.01102,
-    contextWindow: 100000,
+    costPerRequest: 0.015,
+    contextWindow: 200000,
     features: {
       conversationalFlow: true,
-      complexReasoning: true
+      complexReasoning: true,
+      vision: true
     }
   },
   'palm-2': {

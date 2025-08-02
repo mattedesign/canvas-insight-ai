@@ -10,7 +10,7 @@ const getEnvVar = (key: string): string | undefined => {
 export const pipelineConfig = {
   models: {
     vision: {
-      primary: ['gpt-4o', 'anthropic-vision'],
+      primary: ['gpt-4o', 'claude-opus-4-20250514'],
       secondary: ['google-vision'],
       timeout: 30000
     },
