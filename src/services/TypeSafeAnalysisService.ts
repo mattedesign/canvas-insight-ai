@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
@@ -72,13 +73,21 @@ class TypeSafeAnalysisService {
         throw new Error(`Analysis failed: ${error.message}`);
       }
       
-      if (!data || !this.isValidAnalysis(data)) {
-        throw new Error('Invalid analysis response format');
+      if (!data) {
+        throw new Error('No analysis data received');
       }
+
+      // Apply robust validation and normalization
+      console.log('🔍 TypeSafeAnalysisService: Validating analysis data...');
+      const validationResult = AnalysisValidator.validateAndNormalize(data);
       
+      if (validationResult.warnings.length > 0) {
+        console.warn('TypeSafeAnalysisService validation warnings:', validationResult.warnings);
+      }
+
       const response: AnalysisResponse = {
         success: true,
-        analysis: data,
+        analysis: validationResult.data,
         processingTime: performance.now() - startTime,
       };
       
@@ -140,9 +149,20 @@ class TypeSafeAnalysisService {
         throw new Error(`Group analysis failed: ${error.message}`);
       }
       
+      if (!data) {
+        throw new Error('No group analysis data received');
+      }
+
+      // Apply validation for group analysis results
+      const validationResult = AnalysisValidator.validateAndNormalize(data);
+      
+      if (validationResult.warnings.length > 0) {
+        console.warn('TypeSafeAnalysisService group analysis warnings:', validationResult.warnings);
+      }
+
       return {
         success: true,
-        analysis: data,
+        analysis: validationResult.data,
         processingTime: performance.now() - startTime,
       };
     } catch (error) {

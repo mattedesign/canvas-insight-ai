@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
 import { PipelineConsolidationSafety } from '@/services/PipelineConsolidationSafety';
 
@@ -134,7 +135,18 @@ export class OptimizedAnalysisPipeline {
         throw new Error(`Consolidation failed: ${consolidationResult.errors.join(', ')}`);
       }
 
-      const finalAnalysis = consolidationResult.data;
+      let finalAnalysis = consolidationResult.data;
+
+      // Apply robust validation and normalization as final safety step
+      console.log('🔍 OptimizedAnalysisPipeline: Applying final validation...');
+      const validationResult = AnalysisValidator.validateAndNormalize(finalAnalysis);
+      
+      if (validationResult.warnings.length > 0) {
+        console.warn('OptimizedAnalysisPipeline validation warnings:', validationResult.warnings);
+        consolidationResult.warnings.push(...validationResult.warnings);
+      }
+      
+      finalAnalysis = validationResult.data;
 
       // Log consolidation warnings and fallbacks
       if (consolidationResult.warnings.length > 0) {
