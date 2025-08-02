@@ -373,8 +373,18 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
   const response = await fetch(imageUrl)
   const blob = await response.blob()
   const arrayBuffer = await blob.arrayBuffer()
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-  return base64
+  
+  // Handle large images efficiently - convert chunks to avoid stack overflow
+  const uint8Array = new Uint8Array(arrayBuffer)
+  let binaryString = ''
+  const chunkSize = 32768 // Process in 32KB chunks
+  
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.slice(i, i + chunkSize)
+    binaryString += String.fromCharCode.apply(null, Array.from(chunk))
+  }
+  
+  return btoa(binaryString)
 }
 
 async function handleCanvasRequest(action: string, payload: any) {
