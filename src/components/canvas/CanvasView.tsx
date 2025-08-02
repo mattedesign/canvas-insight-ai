@@ -13,7 +13,7 @@ import {
 import { BoundaryPushingPipeline } from '@/services/BoundaryPushingPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
-import { AnalysisRequestNodeData } from './AnalysisRequestNode';
+import { AnalysisRequestNodeData, AnalysisRequestNode } from './AnalysisRequestNode';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
 import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
@@ -27,7 +27,6 @@ import { GroupAnalysisResultsNode } from './GroupAnalysisResultsNode';
 import { EnhancedGroupAnalysisNode } from './EnhancedGroupAnalysisNode';
 import { ImageLoadingNode } from './ImageLoadingNode';
 import { AnalysisLoadingNode } from './AnalysisLoadingNode';
-import { AnalysisRequestNode } from './AnalysisRequestNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
@@ -48,6 +47,7 @@ import { Undo2, Redo2 } from 'lucide-react';
 const nodeTypes = {
   image: ImageNode,
   analysisCard: AnalysisCardNode,
+  analysisRequest: AnalysisRequestNode,
   conceptImage: ConceptImageNode,
   conceptDetails: ConceptDetailsNode,
   group: GroupContainerNode,
@@ -57,7 +57,6 @@ const nodeTypes = {
   enhancedGroupAnalysis: EnhancedGroupAnalysisNode,
   imageLoading: ImageLoadingNode,
   analysisLoading: AnalysisLoadingNode,
-  analysisRequest: AnalysisRequestNode,
 };
 
 export interface CanvasViewProps {
@@ -497,8 +496,42 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           data: {
             imageId: image.id,
             imageName: image.name,
-            onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
-            onCancel: () => handleCancelAnalysisRequest(image.id)
+            imageUrl: image.url,
+            userContext: '',
+            onAnalysisComplete: (result: any) => {
+              // Handle successful analysis completion
+              console.log('[CanvasView] Analysis completed:', result);
+              
+              // Remove the analysis request
+              setAnalysisRequests(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(image.id);
+                return newMap;
+              });
+              
+              // Call the parent analysis complete handler
+              if (onAnalysisComplete && result.data) {
+                onAnalysisComplete(image.id, result.data);
+              }
+            },
+            onError: (error: string) => {
+              console.error('[CanvasView] Analysis failed:', error);
+              
+              // Remove the analysis request
+              setAnalysisRequests(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(image.id);
+                return newMap;
+              });
+              
+              // Show error toast
+              toast({
+                title: "Analysis Failed",
+                description: error,
+                variant: "destructive",
+                category: "error"
+              });
+            }
           }
         };
         nodes.push(requestNode);
@@ -785,8 +818,33 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               data: {
                 imageId: image.id,
                 imageName: image.name,
-                onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
-                onCancel: () => handleCancelAnalysisRequest(image.id)
+                imageUrl: image.url,
+                userContext: '',
+                onAnalysisComplete: (result: any) => {
+                  console.log('[CanvasView] Group analysis completed:', result);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  if (onAnalysisComplete && result.data) {
+                    onAnalysisComplete(image.id, result.data);
+                  }
+                },
+                onError: (error: string) => {
+                  console.error('[CanvasView] Group analysis failed:', error);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  toast({
+                    title: "Analysis Failed",
+                    description: error,
+                    variant: "destructive",
+                    category: "error"
+                  });
+                }
               }
             };
             nodes.push(requestNode);
@@ -961,8 +1019,33 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               data: {
                 imageId: image.id,
                 imageName: image.name,
-                onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(image.id, context, aiModel),
-                onCancel: () => handleCancelAnalysisRequest(image.id)
+                imageUrl: image.url,
+                userContext: '',
+                onAnalysisComplete: (result: any) => {
+                  console.log('[CanvasView] Stacked group analysis completed:', result);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  if (onAnalysisComplete && result.data) {
+                    onAnalysisComplete(image.id, result.data);
+                  }
+                },
+                onError: (error: string) => {
+                  console.error('[CanvasView] Stacked group analysis failed:', error);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  toast({
+                    title: "Analysis Failed",
+                    description: error,
+                    variant: "destructive",
+                    category: "error"
+                  });
+                }
               }
             };
             nodes.push(requestNode);
@@ -1234,7 +1317,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
 
     // Add analysis workflow nodes (requests and progress)
-    analysisRequests.forEach(({ imageId, imageName }) => {
+    analysisRequests.forEach(({ imageId, imageName, imageUrl }) => {
       const imageNode = nodes.find(n => n.id === `image-${imageId}`);
       const imagePosition = imageNode?.position || { x: 50, y: yOffset };
       
@@ -1248,8 +1331,33 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         data: {
           imageId,
           imageName,
-          onStartAnalysis: (context?: string, aiModel?: string) => handleStartAnalysis(imageId, context, aiModel),
-          onCancel: () => handleCancelAnalysisRequest(imageId)
+          imageUrl: imageUrl || '',
+          userContext: '',
+          onAnalysisComplete: (result: any) => {
+            console.log('[CanvasView] Gallery analysis completed:', result);
+            setAnalysisRequests(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(imageId);
+              return newMap;
+            });
+            if (onAnalysisComplete && result.data) {
+              onAnalysisComplete(imageId, result.data);
+            }
+          },
+          onError: (error: string) => {
+            console.error('[CanvasView] Gallery analysis failed:', error);
+            setAnalysisRequests(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(imageId);
+              return newMap;
+            });
+            toast({
+              title: "Analysis Failed",
+              description: error,
+              variant: "destructive",
+              category: "error"
+            });
+          }
         }
       };
       nodes.push(analysisRequestNode);
