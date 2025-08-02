@@ -147,8 +147,8 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
             UX Analysis
           </CardTitle>
           <div className="flex flex-col items-end gap-1">
-            <Badge variant={getScoreVariant(safeAnalysis.summary.overallScore)}>
-              {safeAnalysis.summary.overallScore}/100
+            <Badge variant={getScoreVariant(safeAnalysis.summary?.overallScore || 0)}>
+              {safeAnalysis.summary?.overallScore || 'N/A'}/100
             </Badge>
             {safeAnalysis.modelUsed && (
               <Badge variant="outline" className="text-xs">

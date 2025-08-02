@@ -229,11 +229,11 @@ export const OptimizedAnalysisResults = React.memo<OptimizedAnalysisResultsProps
   }, [onRegenerateAnalysis, analysis.id]);
 
   const scoreColor = useMemo(() => {
-    const score = analysis.summary.overallScore;
+    const score = analysis.summary?.overallScore || 0;
     if (score >= 80) return 'default';
     if (score >= 60) return 'secondary';
     return 'destructive';
-  }, [analysis.summary.overallScore]);
+  }, [analysis.summary?.overallScore]);
 
   return (
     <Card>
@@ -261,10 +261,10 @@ export const OptimizedAnalysisResults = React.memo<OptimizedAnalysisResultsProps
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium">Overall Score</span>
             <Badge variant={scoreColor}>
-              {analysis.summary.overallScore}/100
+              {analysis.summary?.overallScore || 'N/A'}/100
             </Badge>
           </div>
-          <Progress value={analysis.summary.overallScore} className="h-2" />
+          <Progress value={analysis.summary?.overallScore || 0} className="h-2" />
         </div>
 
         {/* Category Scores */}

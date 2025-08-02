@@ -35,7 +35,7 @@ export const GroupAnalysisCardNode: React.FC<NodeProps> = ({
           <CardTitle className="text-sm font-medium flex items-center justify-between">
             Group Analysis: {groupName}
             <Badge variant="secondary" className="ml-2">
-              {Math.round(analysis.summary.overallScore)}%
+              {Math.round(analysis.summary?.overallScore || 0)}%
             </Badge>
           </CardTitle>
         </CardHeader>

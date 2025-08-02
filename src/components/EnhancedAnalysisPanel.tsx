@@ -181,10 +181,10 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold text-center">
-                          {analysis.summary.overallScore}/100
+                          {analysis.summary?.overallScore || 'N/A'}/100
                         </div>
                         <Progress 
-                          value={analysis.summary.overallScore} 
+                          value={analysis.summary?.overallScore || 0} 
                           className="mt-2"
                         />
                       </CardContent>

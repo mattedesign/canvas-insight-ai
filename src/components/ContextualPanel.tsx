@@ -150,7 +150,7 @@ export const ContextualPanel: React.FC<ContextualPanelProps> = memo(({
       <div className="p-4 border-b">
         <h3 className="font-semibold text-lg">{analysis.imageName}</h3>
         <p className="text-sm text-muted-foreground">
-          Overall Score: {Math.round(analysis.summary.overallScore)}/100
+          Overall Score: {Math.round(analysis.summary?.overallScore || 0)}/100
         </p>
       </div>
 

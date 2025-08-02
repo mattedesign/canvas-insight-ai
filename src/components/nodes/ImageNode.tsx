@@ -201,10 +201,10 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
             <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"
-                style={{ width: `${analysis.summary.overallScore}%` }}
+                style={{ width: `${analysis.summary?.overallScore || 0}%` }}
               />
             </div>
-            <span className="font-medium">{analysis.summary.overallScore}/100</span>
+            <span className="font-medium">{analysis.summary?.overallScore || 'N/A'}/100</span>
           </div>
         </div>
 

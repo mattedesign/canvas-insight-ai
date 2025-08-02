@@ -78,8 +78,8 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
               <TrendingUp className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Overall Score</span>
             </div>
-            <Badge variant={getScoreVariant(analysis.summary.overallScore)} className="text-lg px-3 py-1">
-              {analysis.summary.overallScore}%
+            <Badge variant={getScoreVariant(analysis.summary?.overallScore || 0)} className="text-lg px-3 py-1">
+              {analysis.summary?.overallScore || 'N/A'}%
             </Badge>
           </div>
 

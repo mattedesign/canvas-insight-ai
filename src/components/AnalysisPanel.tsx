@@ -108,8 +108,8 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Overall Score</CardTitle>
-                <Badge variant={getScoreVariant(analysis.summary.overallScore)} className="text-lg px-3 py-1">
-                  {analysis.summary.overallScore}/100
+                <Badge variant={getScoreVariant(analysis.summary?.overallScore || 0)} className="text-lg px-3 py-1">
+                  {analysis.summary?.overallScore || 'N/A'}/100
                 </Badge>
               </div>
             </CardHeader>

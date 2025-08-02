@@ -155,7 +155,7 @@ export const SuggestionNode: React.FC<SuggestionNodeProps> = memo(({ data }) => 
         <div className="text-primary-foreground">
           <h3 className="font-semibold text-lg">UX Analysis</h3>
           <p className="text-primary-foreground/80 text-sm">
-            {analysis.suggestions.length} suggestions • Score: {analysis.summary.overallScore}/100
+            {analysis.suggestions.length} suggestions • Score: {analysis.summary?.overallScore || 'N/A'}/100
           </p>
         </div>
       </div>
