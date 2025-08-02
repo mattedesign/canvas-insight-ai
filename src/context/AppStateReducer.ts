@@ -254,14 +254,15 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
           )
         ],
         analyses: [
-          ...state.analyses.filter(analysis =>
+          ...(state.analyses || []).filter(analysis =>
             currentlyUploading.some(img => img.id === analysis.imageId)
           ),
           ...(action.payload.analyses || [])
         ],
-        imageGroups: action.payload.imageGroups || state.imageGroups,
-        groupAnalysesWithPrompts: action.payload.groupAnalysesWithPrompts || state.groupAnalysesWithPrompts,
-        generatedConcepts: action.payload.generatedConcepts || state.generatedConcepts,
+        // Claude's suggested fix: Ensure arrays are never undefined
+        imageGroups: action.payload.imageGroups || state.imageGroups || [],
+        groupAnalysesWithPrompts: action.payload.groupAnalysesWithPrompts || state.groupAnalysesWithPrompts || [],
+        generatedConcepts: action.payload.generatedConcepts || state.generatedConcepts || [],
         isLoading: false,
         version: state.version + 1,
       };
