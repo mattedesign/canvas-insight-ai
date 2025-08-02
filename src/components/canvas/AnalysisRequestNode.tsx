@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState, useRef } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { Card } from '@/components/ui/card';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -26,6 +26,10 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
   const [showClarification, setShowClarification] = useState(false);
   const [resumeToken, setResumeToken] = useState<string>('');
   
+  // PHASE 2: Re-rendering Fixes - Track mount state
+  const isMountedRef = useRef(true);
+  const hasExecutedRef = useRef(false);
+  
   const {
     isAnalyzing,
     progress,
@@ -37,20 +41,25 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
     resumeWithClarification
   } = useOptimizedPipeline();
 
-  // Start analysis when node is created - only run once
+  // PHASE 2: Re-rendering Fixes - Prevent duplicate executions
   useEffect(() => {
     console.log('[AnalysisRequestNode] useEffect triggered with:', {
+      imageId,
+      hasExecuted: hasExecutedRef.current,
       isAnalyzing,
       requiresClarification,
-      error,
-      imageUrl,
-      imageName
+      error
     });
     
-    if (!isAnalyzing && !requiresClarification && !error) {
+    // Only execute once per imageId and if not already executed
+    if (!hasExecutedRef.current && imageId && !isAnalyzing && !requiresClarification && !error) {
+      hasExecutedRef.current = true;
       console.log('[AnalysisRequestNode] Starting analysis for:', imageName);
+      
       executeAnalysis(imageUrl, userContext || '')
         .then((result) => {
+          if (!isMountedRef.current) return; // Check if still mounted
+          
           console.log('[AnalysisRequestNode] Analysis result:', result);
           if (result.requiresClarification) {
             setShowClarification(true);
@@ -60,13 +69,20 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           }
         })
         .catch((err) => {
+          if (!isMountedRef.current) return; // Check if still mounted
+          
           console.error('Analysis failed:', err);
           if (onError) {
             onError(err.message || 'Analysis failed');
           }
         });
     }
-  }, [imageId]); // Only depend on imageId to prevent re-runs
+    
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [imageId]); // Only depend on imageId
 
   const handleClarificationSubmit = async (responses: Record<string, string>) => {
     setShowClarification(false);

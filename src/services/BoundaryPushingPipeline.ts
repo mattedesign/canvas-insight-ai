@@ -4,6 +4,7 @@ import { PipelineError, ModelExecutionError } from '@/types/pipelineErrors';
 import { ContextDetectionService } from './ContextDetectionService';
 import { DynamicPromptBuilder } from './DynamicPromptBuilder';
 import { AnalysisContext } from '@/types/contextTypes';
+import { AdaptiveTimeoutCalculator, ImageComplexity } from '@/config/adaptiveTimeoutConfig';
 
 interface ModelResult {
   model: string;
@@ -247,10 +248,15 @@ export class BoundaryPushingPipeline {
     
     const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('vision', this.analysisContext);
 
+    // PHASE 1: Adaptive Timeout - Calculate timeout based on context
+    const adaptiveTimeout = pipelineConfig.execution.adaptiveTimeouts
+      ? pipelineConfig.execution.timeoutCalculator.calculateTimeout('vision', 'moderate', models.length)
+      : pipelineConfig.models.vision.timeout;
+
     const results = await this.executeModelsInParallel(
       models,
       async (model) => this.executeSingleVisionModel(model, imageUrl, dynamicPrompt),
-      pipelineConfig.models.vision.timeout
+      adaptiveTimeout
     );
 
     const successfulResults = results.filter(r => r.success);
@@ -394,10 +400,19 @@ export class BoundaryPushingPipeline {
     
     const dynamicPrompt = await this.promptBuilder.buildContextualPrompt('analysis', this.analysisContext, visionData);
 
+    // PHASE 1: Adaptive Timeout - Calculate timeout based on complexity
+    const imageComplexity = pipelineConfig.execution.adaptiveTimeouts
+      ? pipelineConfig.execution.timeoutCalculator.detectImageComplexity(visionData)
+      : 'moderate';
+    
+    const adaptiveTimeout = pipelineConfig.execution.adaptiveTimeouts
+      ? pipelineConfig.execution.timeoutCalculator.calculateTimeout('analysis', imageComplexity, models.length)
+      : pipelineConfig.models.analysis.timeout;
+
     const results = await this.executeModelsInParallel(
       models,
       async (model) => this.executeSingleAnalysisModel(model, imageUrl, visionData, dynamicPrompt),
-      pipelineConfig.models.analysis.timeout
+      adaptiveTimeout
     );
 
     // Add Perplexity conversational analysis if available
@@ -741,9 +756,19 @@ export class BoundaryPushingPipeline {
   ): Promise<ModelResult[]> {
     console.log('Executing models in parallel:', models);
     
+    // PHASE 1: Adaptive Timeout - Calculate warning threshold
+    const warningThreshold = pipelineConfig.execution.adaptiveTimeouts
+      ? pipelineConfig.execution.timeoutCalculator.getWarningThreshold(timeout)
+      : timeout * 0.8;
+    
     const promises = models.map(async (model) => {
       const startTime = Date.now();
-      console.log(`Starting execution for model: ${model}`);
+      console.log(`Starting execution for model: ${model} with timeout: ${timeout}ms`);
+      
+      // Set up warning timer
+      const warningTimer = setTimeout(() => {
+        console.warn(`⚠️ Model ${model} is taking longer than expected (${warningThreshold}ms)`);
+      }, warningThreshold);
       
       try {
         const data = await Promise.race([
@@ -751,7 +776,8 @@ export class BoundaryPushingPipeline {
           this.timeout(timeout, model)
         ]);
         
-        console.log(`Model ${model} executed successfully`);
+        clearTimeout(warningTimer);
+        console.log(`Model ${model} executed successfully in ${Date.now() - startTime}ms`);
         
         return {
           model,
@@ -763,7 +789,8 @@ export class BoundaryPushingPipeline {
           }
         };
       } catch (error) {
-        console.error(`Model ${model} failed:`, error);
+        clearTimeout(warningTimer);
+        console.error(`Model ${model} failed after ${Date.now() - startTime}ms:`, error);
         
         return {
           model,
@@ -778,7 +805,11 @@ export class BoundaryPushingPipeline {
     });
 
     const results = await Promise.all(promises);
-    console.log('All models execution complete. Results:', results.map(r => ({ model: r.model, success: r.success })));
+    console.log('All models execution complete. Results:', results.map(r => ({ 
+      model: r.model, 
+      success: r.success, 
+      duration: r.metrics.endTime - r.metrics.startTime 
+    })));
     
     return results;
   }

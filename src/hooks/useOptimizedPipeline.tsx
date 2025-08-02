@@ -24,6 +24,8 @@ export function useOptimizedPipeline() {
   });
 
   const pipelineRef = useRef<BoundaryPushingPipeline | null>(null);
+  // PHASE 0: Request Deduplication - Track active requests
+  const activeRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
 
   const handleProgress = useCallback((progress: number, stage: string) => {
     setState(prev => ({
@@ -39,60 +41,77 @@ export function useOptimizedPipeline() {
   ) => {
     console.log('[useOptimizedPipeline] executeAnalysis called with:', { imageUrl, userContext });
     
-    setState({
-      isAnalyzing: true,
-      progress: 0,
-      stage: 'initializing',
-      requiresClarification: false,
-      error: undefined
-    });
+    // PHASE 0: Request Deduplication - Check for active request
+    const requestKey = `${imageUrl}:${userContext}`;
+    if (activeRequestsRef.current.has(requestKey)) {
+      console.log('[useOptimizedPipeline] Deduplicating analysis request for:', requestKey);
+      return activeRequestsRef.current.get(requestKey);
+    }
 
-    try {
-      console.log('[useOptimizedPipeline] Creating pipeline instance...');
-      pipelineRef.current = new BoundaryPushingPipeline();
-      
-      console.log('[useOptimizedPipeline] Executing pipeline...');
-      const result = await pipelineRef.current.execute(
-        imageUrl,
-        userContext,
-        handleProgress
-      );
-      
-      console.log('[useOptimizedPipeline] Pipeline result:', result);
+    // Create analysis promise and store in map
+    const analysisPromise = (async () => {
+      setState({
+        isAnalyzing: true,
+        progress: 0,
+        stage: 'initializing',
+        requiresClarification: false,
+        error: undefined
+      });
 
-      if (result.requiresClarification) {
+      try {
+        console.log('[useOptimizedPipeline] Creating pipeline instance...');
+        pipelineRef.current = new BoundaryPushingPipeline();
+        
+        console.log('[useOptimizedPipeline] Executing pipeline...');
+        const result = await pipelineRef.current.execute(
+          imageUrl,
+          userContext,
+          handleProgress
+        );
+        
+        console.log('[useOptimizedPipeline] Pipeline result:', result);
+
+        if (result.requiresClarification) {
+          setState(prev => ({
+            ...prev,
+            isAnalyzing: false,
+            requiresClarification: true,
+            clarificationQuestions: result.questions,
+            analysisContext: result.partialContext
+          }));
+          return { requiresClarification: true, questions: result.questions };
+        }
+
         setState(prev => ({
           ...prev,
           isAnalyzing: false,
-          requiresClarification: true,
-          clarificationQuestions: result.questions,
-          analysisContext: result.partialContext
+          progress: 100,
+          stage: 'complete',
+          analysisContext: result.analysisContext
         }));
-        return { requiresClarification: true, questions: result.questions };
+
+        return { success: true, data: result };
+
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          isAnalyzing: false,
+          progress: 0,
+          stage: 'error',
+          error: error instanceof Error ? error.message : String(error)
+        }));
+
+        throw error;
+      } finally {
+        // Clean up request tracking
+        activeRequestsRef.current.delete(requestKey);
       }
+    })();
 
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        progress: 100,
-        stage: 'complete',
-        analysisContext: result.analysisContext
-      }));
-
-      return { success: true, data: result };
-
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isAnalyzing: false,
-        progress: 0,
-        stage: 'error',
-        error: error instanceof Error ? error.message : String(error)
-      }));
-
-      throw error;
-    }
-  }, []);
+    // Store promise for deduplication
+    activeRequestsRef.current.set(requestKey, analysisPromise);
+    return analysisPromise;
+  }, [handleProgress]);
 
   const resumeWithClarification = useCallback(async (
     clarificationResponses: Record<string, string>,
@@ -147,12 +166,15 @@ export function useOptimizedPipeline() {
 
       throw error;
     }
-  }, []);
+  }, [handleProgress]);
 
   const cancelAnalysis = useCallback(() => {
     if (pipelineRef.current) {
       pipelineRef.current.cancel();
     }
+    
+    // PHASE 0: Clear all active requests on cancel
+    activeRequestsRef.current.clear();
     
     setState({
       isAnalyzing: false,

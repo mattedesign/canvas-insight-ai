@@ -1,3 +1,5 @@
+import { AdaptiveTimeoutCalculator } from './adaptiveTimeoutConfig';
+
 // Safe environment variable access for browser
 const getEnvVar = (key: string): string | undefined => {
   // In Vite, environment variables are available on import.meta.env
@@ -25,7 +27,10 @@ export const pipelineConfig = {
     globalTimeout: 120000,
     retryAttempts: 3,
     retryDelay: 1000,
-    exponentialBackoff: true
+    exponentialBackoff: true,
+    // PHASE 1: Adaptive timeout integration
+    adaptiveTimeouts: true,
+    timeoutCalculator: AdaptiveTimeoutCalculator
   },
   quality: {
     minConfidence: 0.75,
