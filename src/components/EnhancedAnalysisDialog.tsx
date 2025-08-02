@@ -133,7 +133,6 @@ export default function EnhancedAnalysisDialog({
                 <option value="auto">Smart Selection (Recommended)</option>
                 <option value="gpt-4o">GPT 4o</option>
                 <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                <option value="google-vision">Google Vision</option>
                 <option value="stability-ai">Stability AI</option>
               </select>
               <p className="text-xs text-muted-foreground">

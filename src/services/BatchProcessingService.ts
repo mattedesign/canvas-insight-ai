@@ -26,7 +26,7 @@ export interface BatchImage {
 }
 
 export interface BatchJobSettings {
-  aiModel: 'auto' | 'gpt-4o' | 'claude-opus-4-20250514' | 'google-vision' | 'stability-ai';
+  aiModel: 'auto' | 'gpt-4o' | 'claude-opus-4-20250514' | 'stability-ai';
   analysisType: 'comprehensive' | 'accessibility' | 'usability' | 'visual';
   includeConceptGeneration: boolean;
   userContext?: string;

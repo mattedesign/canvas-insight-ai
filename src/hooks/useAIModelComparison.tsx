@@ -20,7 +20,7 @@ export const useAIModelComparison = () => {
     imageUrl: string, 
     imageName: string,
     userContext?: string,
-    modelsToCompare: string[] = ['claude-opus-4-20250514', 'google-vision', 'stability-ai']
+    modelsToCompare: string[] = ['claude-opus-4-20250514', 'gpt-4o', 'stability-ai']
   ) => {
     setIsComparing(true);
     setComparisonResults([]);
