@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo } from 'react';
 import { useRenderMonitor } from '@/hooks/useRenderMonitor';
 import { Handle, Position } from '@xyflow/react';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,26 +56,37 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   const { analysis, onGenerateConcept, isGeneratingConcept = false, onExpandedChange } = data;
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // ✅ REAL FIX: Memoize these objects to prevent infinite re-renders
+  // ✅ ENHANCED: Use robust validation as secondary defense
   const safeAnalysis = useMemo(() => {
-    // Ensure analysis has all required properties with fallbacks
+    // Quick validation check first
+    if (!AnalysisValidator.isValidAnalysis(analysis)) {
+      console.warn('AnalysisCardNode: Invalid analysis detected, applying validation...');
+      const validationResult = AnalysisValidator.validateAndNormalize(analysis);
+      
+      if (validationResult.warnings.length > 0) {
+        console.warn('Analysis validation warnings:', validationResult.warnings);
+      }
+      
+      return validationResult.data;
+    }
+    
+    // Fallback safety (legacy approach for additional safety)
     const baseSummary = analysis.summary || {} as any;
     const baseCategoryScores = (baseSummary.categoryScores || {}) as Record<string, number>;
     
-    // Create a safe categoryScores object with all required properties
     const safeCategoryScores = {
       usability: typeof baseCategoryScores.usability === 'number' ? baseCategoryScores.usability : 0,
       accessibility: typeof baseCategoryScores.accessibility === 'number' ? baseCategoryScores.accessibility : 0,
       visual: typeof baseCategoryScores.visual === 'number' ? baseCategoryScores.visual : 0,
       content: typeof baseCategoryScores.content === 'number' ? baseCategoryScores.content : 0,
-      ...baseCategoryScores // Include any additional category scores
+      ...baseCategoryScores
     };
 
     return {
-      ...analysis, // Spread first to get all original properties
+      ...analysis,
       id: analysis.id || '',
       summary: {
-        ...baseSummary, // Safely spread summary
+        ...baseSummary,
         overallScore: typeof baseSummary.overallScore === 'number' ? baseSummary.overallScore : 0,
         categoryScores: safeCategoryScores,
         keyIssues: Array.isArray(baseSummary.keyIssues) ? baseSummary.keyIssues : [],
@@ -82,7 +94,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
       },
       suggestions: Array.isArray(analysis.suggestions) ? analysis.suggestions : []
     };
-  }, [analysis]); // ✅ Only recreate when analysis actually changes
+  }, [analysis]);
 
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 

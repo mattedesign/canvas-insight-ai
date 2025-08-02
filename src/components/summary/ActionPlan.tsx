@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckSquare, Clock, Zap, Download, ArrowRight } from 'lucide-react';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import { DashboardMetrics } from '@/services/DashboardService';
 
 interface ActionPlanProps {
@@ -9,19 +10,31 @@ interface ActionPlanProps {
 }
 
 export const ActionPlan: React.FC<ActionPlanProps> = ({ analyses, metrics }) => {
-  // Generate action plan based on all analyses
-  const allSuggestions = analyses.flatMap(analysis => analysis.suggestions);
+  // Apply validation safety checks to all analyses
+  const safeAnalyses = analyses.map(analysis => {
+    if (!AnalysisValidator.isValidAnalysis(analysis)) {
+      console.warn('ActionPlan: Invalid analysis detected, applying validation...');
+      const validationResult = AnalysisValidator.validateAndNormalize(analysis);
+      return validationResult.data;
+    }
+    return analysis;
+  });
+
+  // Generate action plan based on validated analyses  
+  const allSuggestions = safeAnalyses.flatMap(analysis => 
+    Array.isArray(analysis.suggestions) ? analysis.suggestions : []
+  );
   
   const quickWins = allSuggestions
-    .filter(s => s.effort === 'low' && s.impact === 'high')
+    .filter(s => s?.effort === 'low' && s?.impact === 'high')
     .slice(0, 3);
 
   const mediumTermActions = allSuggestions
-    .filter(s => s.effort === 'medium' && (s.impact === 'high' || s.impact === 'medium'))
+    .filter(s => s?.effort === 'medium' && (s?.impact === 'high' || s?.impact === 'medium'))
     .slice(0, 3);
 
   const longTermProjects = allSuggestions
-    .filter(s => s.effort === 'high' && s.impact === 'high')
+    .filter(s => s?.effort === 'high' && s?.impact === 'high')
     .slice(0, 2);
 
   const estimatedROI = {
@@ -111,9 +124,9 @@ export const ActionPlan: React.FC<ActionPlanProps> = ({ analyses, metrics }) => 
                           {suggestion.description}
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium capitalize">{suggestion.category}</span>
+                          <span className="text-xs font-medium capitalize">{suggestion?.category || 'general'}</span>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <span>{suggestion.actionItems.length} tasks</span>
+                            <span>{Array.isArray(suggestion?.actionItems) ? suggestion.actionItems.length : 0} tasks</span>
                             <ArrowRight className="w-3 h-3" />
                           </div>
                         </div>
@@ -150,7 +163,7 @@ export const ActionPlan: React.FC<ActionPlanProps> = ({ analyses, metrics }) => 
                 </div>
                 <div>
                   <span className="text-muted-foreground">High Priority:</span>
-                  <span className="ml-2 font-medium">{allSuggestions.filter(s => s.impact === 'high').length}</span>
+                  <span className="ml-2 font-medium">{allSuggestions.filter(s => s?.impact === 'high').length}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Est. Timeline:</span>

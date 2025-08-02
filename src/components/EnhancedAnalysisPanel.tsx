@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
+import { AnalysisValidator } from '@/utils/analysisValidator';
 import { DomainAnalysis } from '@/services/EnhancedDomainDetector';
 import { RetryState } from '@/services/RetryService';
 import { EnhancedErrorDisplay } from './EnhancedErrorDisplay';
@@ -52,6 +53,18 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
 
   if (!isOpen) return null;
 
+  // Apply validation safety check as secondary defense
+  let safeAnalysis = analysis;
+  if (analysis && !AnalysisValidator.isValidAnalysis(analysis)) {
+    console.warn('EnhancedAnalysisPanel: Invalid analysis detected, applying validation...');
+    const validationResult = AnalysisValidator.validateAndNormalize(analysis);
+    safeAnalysis = validationResult.data;
+    
+    if (validationResult.warnings.length > 0) {
+      console.warn('Analysis validation warnings:', validationResult.warnings);
+    }
+  }
+
   const handleRetryAnalysis = async () => {
     if (!image) return;
     
@@ -60,11 +73,10 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
       image.url,
       image.name,
       image.id,
-      analysis?.userContext
+      safeAnalysis?.userContext
     );
     
     if (result.success) {
-      // Handle success - maybe refresh the parent component
       window.location.reload();
     }
   };
@@ -156,7 +168,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
             )}
 
             {/* Overview Tab */}
-            {analysis && !isAnalyzing && !error && (
+            {safeAnalysis && !isAnalyzing && !error && (
               <TabsContent value="overview" className="p-6 max-h-[70vh] overflow-y-auto">
                 <div className="space-y-6">
                   {/* Image Preview */}
@@ -171,7 +183,7 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                   )}
 
                   {/* Overall Score */}
-                  {analysis.summary && (
+                  {safeAnalysis.summary && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -181,10 +193,10 @@ export const EnhancedAnalysisPanel = React.memo<EnhancedAnalysisPanelProps>(({
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold text-center">
-                          {analysis.summary?.overallScore || 'N/A'}/100
+                          {safeAnalysis.summary?.overallScore || 'N/A'}/100
                         </div>
                         <Progress 
-                          value={analysis.summary?.overallScore || 0} 
+                          value={safeAnalysis.summary?.overallScore || 0} 
                           className="mt-2"
                         />
                       </CardContent>
