@@ -3,7 +3,7 @@ import { NodeProps, Handle, Position } from '@xyflow/react';
 import { Card } from '@/components/ui/card';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useOptimizedPipeline } from '@/hooks/useOptimizedPipeline';
+import { useAI } from '@/context/AIContext';
 import { ContextClarification } from '@/components/ContextClarification';
 
 export interface AnalysisRequestNodeData extends Record<string, unknown> {
@@ -24,22 +24,14 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
   
   const { imageId, imageName, imageUrl, userContext, onAnalysisComplete, onError } = data;
   const [showClarification, setShowClarification] = useState(false);
-  const [resumeToken, setResumeToken] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
   
   // PHASE 2: Re-rendering Fixes - Track mount state
   const isMountedRef = useRef(true);
   const hasExecutedRef = useRef(false);
   
-  const {
-    isAnalyzing,
-    progress,
-    stage,
-    requiresClarification,
-    clarificationQuestions,
-    error,
-    executeAnalysis,
-    resumeWithClarification
-  } = useOptimizedPipeline();
+  const { isAnalyzing, analyzeImageWithAI } = useAI();
 
   // PHASE 2: Re-rendering Fixes - Prevent duplicate executions
   useEffect(() => {
@@ -47,31 +39,29 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
       imageId,
       hasExecuted: hasExecutedRef.current,
       isAnalyzing,
-      requiresClarification,
       error
     });
     
     // Only execute once per imageId and if not already executed
-    if (!hasExecutedRef.current && imageId && !isAnalyzing && !requiresClarification && !error) {
+    if (!hasExecutedRef.current && imageId && !isAnalyzing && !error && !isComplete) {
       hasExecutedRef.current = true;
       console.log('[AnalysisRequestNode] Starting analysis for:', imageName);
       
-      executeAnalysis(imageUrl, userContext || '')
+      analyzeImageWithAI(imageId, imageUrl, imageName, userContext)
         .then((result) => {
           if (!isMountedRef.current) return; // Check if still mounted
           
           console.log('[AnalysisRequestNode] Analysis result:', result);
-          if (result.requiresClarification) {
-            setShowClarification(true);
-            setResumeToken('resume-' + Date.now());
-          } else if (result.success && onAnalysisComplete) {
-            onAnalysisComplete(result.data);
+          setIsComplete(true);
+          if (onAnalysisComplete) {
+            onAnalysisComplete(result);
           }
         })
         .catch((err) => {
           if (!isMountedRef.current) return; // Check if still mounted
           
           console.error('Analysis failed:', err);
+          setError(err.message || 'Analysis failed');
           if (onError) {
             onError(err.message || 'Analysis failed');
           }
@@ -82,36 +72,14 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
     return () => {
       isMountedRef.current = false;
     };
-  }, [imageId]); // Only depend on imageId
-
-  const handleClarificationSubmit = async (responses: Record<string, string>) => {
-    setShowClarification(false);
-    
-    try {
-      const result = await resumeWithClarification(
-        responses,
-        resumeToken,
-        imageUrl,
-        userContext || ''
-      );
-      
-      if (result.success && onAnalysisComplete) {
-        onAnalysisComplete(result.data);
-      }
-    } catch (err) {
-      console.error('Clarification resume failed:', err);
-      if (onError) {
-        onError(err.message || 'Analysis failed after clarification');
-      }
-    }
-  };
+  }, [imageId, analyzeImageWithAI]); // Only depend on imageId and analyzeImageWithAI
 
   // Determine current status
   const getStatus = () => {
     if (error) return 'error';
-    if (requiresClarification || showClarification) return 'clarification';
     if (isAnalyzing) return 'loading';
-    return 'complete';
+    if (isComplete) return 'complete';
+    return 'loading';
   };
 
   const currentStatus = getStatus();
@@ -128,30 +96,9 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{stage || 'Initializing analysis...'}</span>
+                <span>Analyzing interface...</span>
               </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
-          
-          {currentStatus === 'clarification' && !showClarification && clarificationQuestions && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                I need some clarification to provide the best analysis:
-              </p>
-              <div className="space-y-2">
-                {clarificationQuestions.map((question, index) => (
-                  <div key={index} className="p-2 bg-muted/50 rounded text-sm">
-                    {question}
-                  </div>
-                ))}
-              </div>
-              <button 
-                onClick={() => setShowClarification(true)}
-                className="text-xs text-primary hover:underline"
-              >
-                Click to answer questions →
-              </button>
+              <Progress value={75} className="h-2" />
             </div>
           )}
           
@@ -162,7 +109,7 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
             </div>
           )}
 
-          {currentStatus === 'complete' && !isAnalyzing && !error && (
+          {currentStatus === 'complete' && (
             <div className="flex items-center gap-2 text-sm text-emerald-600">
               <CheckCircle className="h-4 w-4" />
               <span>Analysis complete</span>
@@ -170,15 +117,6 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           )}
         </div>
       </Card>
-      
-      {showClarification && clarificationQuestions && (
-        <ContextClarification
-          questions={clarificationQuestions}
-          partialContext={{}}
-          onSubmit={handleClarificationSubmit}
-          onCancel={() => setShowClarification(false)}
-        />
-      )}
       
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </>
