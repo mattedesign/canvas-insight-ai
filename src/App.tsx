@@ -32,106 +32,126 @@ const queryClient = new QueryClient();
 // Emergency render monitoring removed - performance optimized
 
 const App = () => {
-  return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-      <AuthProvider>
-        <AIProvider>
-          <FinalAppProvider>
-            
-            <Suspense fallback={
-              <div className="min-h-screen flex items-center justify-center bg-background">
-                <LoadingSpinner />
-              </div>
-            }>
-              <Routes>
-                <Route path="/auth" element={
-                  <RouteErrorBoundary routeName="Auth" fallbackRoute="/">
-                    <Auth />
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/" element={
-                  <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/auth">
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/dashboard" element={
-                  <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/">
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/canvas" element={
-                  <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <Projects />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/canvas/:projectSlug" element={
-                  <RouteErrorBoundary routeName="Canvas Project" fallbackRoute="/projects">
-                    <ProtectedRoute>
-                      <Canvas />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/projects" element={
-                  <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <Projects />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/analytics" element={
-                  <RouteErrorBoundary routeName="Analytics" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <Analytics />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/subscription" element={
-                  <RouteErrorBoundary routeName="Subscription" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <Subscription />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                <Route path="/production" element={
-                  <RouteErrorBoundary routeName="Production" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <ProductionReadiness />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                {/* Testing routes removed for production optimization */}
-                <Route path="/verification" element={
-                  <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <VerificationTests />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={
-                  <RouteErrorBoundary routeName="NotFound" fallbackRoute="/">
-                    <NotFound />
-                  </RouteErrorBoundary>
-                } />
-              </Routes>
-            </Suspense>
-          </FinalAppProvider>
-        </AIProvider>
-      </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-  );
+  console.log('App component rendering...');
+  
+  try {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+          <AuthProvider>
+            <AIProvider>
+              <FinalAppProvider>
+                
+                <Suspense fallback={
+                  <div className="min-h-screen flex items-center justify-center bg-background">
+                    <LoadingSpinner />
+                  </div>
+                }>
+                  <Routes>
+                    <Route path="/auth" element={
+                      <RouteErrorBoundary routeName="Auth" fallbackRoute="/">
+                        <Auth />
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/" element={
+                      <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/auth">
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/dashboard" element={
+                      <RouteErrorBoundary routeName="Dashboard" fallbackRoute="/">
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/canvas" element={
+                      <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <Projects />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/canvas/:projectSlug" element={
+                      <RouteErrorBoundary routeName="Canvas Project" fallbackRoute="/projects">
+                        <ProtectedRoute>
+                          <Canvas />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/projects" element={
+                      <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <Projects />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/analytics" element={
+                      <RouteErrorBoundary routeName="Analytics" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <Analytics />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/subscription" element={
+                      <RouteErrorBoundary routeName="Subscription" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <Subscription />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    <Route path="/production" element={
+                      <RouteErrorBoundary routeName="Production" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <ProductionReadiness />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    {/* Testing routes removed for production optimization */}
+                    <Route path="/verification" element={
+                      <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
+                        <ProtectedRoute>
+                          <VerificationTests />
+                        </ProtectedRoute>
+                      </RouteErrorBoundary>
+                    } />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={
+                      <RouteErrorBoundary routeName="NotFound" fallbackRoute="/">
+                        <NotFound />
+                      </RouteErrorBoundary>
+                    } />
+                  </Routes>
+                </Suspense>
+              </FinalAppProvider>
+            </AIProvider>
+          </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  } catch (error) {
+    console.error('Error in App component:', error);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-destructive mb-4">Application Error</h1>
+          <p className="text-muted-foreground mb-4">Something went wrong loading the application.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default App;

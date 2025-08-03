@@ -65,8 +65,21 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-createRoot(document.getElementById("root")!).render(
-  <RootErrorBoundary>
-    <App />
-  </RootErrorBoundary>
-);
+try {
+  console.log('Starting React app...');
+  const rootElement = document.getElementById("root");
+  console.log('Root element found:', !!rootElement);
+  
+  if (!rootElement) {
+    throw new Error('Root element not found');
+  }
+  
+  createRoot(rootElement).render(
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
+  );
+  console.log('React app started successfully');
+} catch (error) {
+  console.error('Error starting React app:', error);
+}
