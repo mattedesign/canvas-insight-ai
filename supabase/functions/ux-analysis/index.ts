@@ -1498,8 +1498,8 @@ async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: strin
     
     if (error) {
       console.error('Google Vision service error:', error);
-      console.warn('⚠️ Falling back to mock metadata');
-      return createMockVisionMetadata();
+      console.log('🔧 Attempting direct Google Vision API call as fallback...');
+      return await performDirectVisionAPICall(imageUrl, imageBase64);
     }
     
     if (data?.success && data?.metadata) {
@@ -1515,13 +1515,116 @@ async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: strin
         timestamp: new Date().toISOString()
       };
     } else {
-      console.warn('⚠️ Google Vision service returned no metadata, using fallback');
-      return createMockVisionMetadata();
+      console.warn('⚠️ Google Vision service returned no metadata, trying direct API call...');
+      return await performDirectVisionAPICall(imageUrl, imageBase64);
     }
     
   } catch (error) {
     console.error('Error calling Google Vision service:', error);
-    console.warn('⚠️ Falling back to mock metadata');
+    console.log('🔧 Attempting direct Google Vision API call as final fallback...');
+    return await performDirectVisionAPICall(imageUrl, imageBase64);
+  }
+}
+
+async function performDirectVisionAPICall(imageUrl: string, imageBase64?: string): Promise<any> {
+  const googleApiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
+  
+  if (!googleApiKey) {
+    console.warn('⚠️ No Google Vision API key available, using mock metadata');
+    return createMockVisionMetadata();
+  }
+  
+  try {
+    console.log('🔧 Performing direct Google Vision API call...');
+    
+    // Convert image to base64 if we have a URL
+    let base64Image = imageBase64;
+    if (!base64Image && imageUrl) {
+      console.log('📥 Fetching image from URL for direct Vision API call...');
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+      }
+      const imageBuffer = await imageResponse.arrayBuffer();
+      base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      console.log('✅ Image converted to base64 for Vision API');
+    }
+    
+    if (!base64Image) {
+      throw new Error('No image data available for Vision API call');
+    }
+    
+    // Prepare Google Vision API request
+    const visionRequest = {
+      requests: [
+        {
+          image: {
+            content: base64Image
+          },
+          features: [
+            { type: 'LABEL_DETECTION', maxResults: 10 },
+            { type: 'TEXT_DETECTION', maxResults: 10 },
+            { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
+            { type: 'FACE_DETECTION', maxResults: 10 },
+            { type: 'IMAGE_PROPERTIES', maxResults: 10 }
+          ]
+        }
+      ]
+    };
+    
+    // Call Google Vision API directly
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(visionRequest)
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Google Vision API error: ${response.status} - ${errorText}`);
+    }
+    
+    const visionResponse = await response.json();
+    const result = visionResponse.responses?.[0];
+    
+    if (!result) {
+      throw new Error('No response from Google Vision API');
+    }
+    
+    // Transform Google Vision response to our format
+    const transformedMetadata = {
+      objects: (result.localizedObjectAnnotations || []).map((obj: any) => ({
+        name: obj.name,
+        score: obj.score,
+        boundingPoly: obj.boundingPoly
+      })),
+      text: (result.textAnnotations || []).map((text: any) => ({
+        description: text.description,
+        boundingPoly: text.boundingPoly
+      })),
+      colors: result.imagePropertiesAnnotation?.dominantColors?.colors || [],
+      faces: (result.faceAnnotations || []).length,
+      labels: (result.labelAnnotations || []).map((label: any) => ({
+        description: label.description,
+        score: label.score
+      })),
+      logos: [],
+      confidence: 0.9,
+      timestamp: new Date().toISOString(),
+      source: 'direct-api'
+    };
+    
+    console.log('✅ Direct Google Vision API call successful');
+    return transformedMetadata;
+    
+  } catch (error) {
+    console.error('❌ Direct Google Vision API call failed:', error);
+    console.warn('⚠️ Falling back to mock metadata as final option');
     return createMockVisionMetadata();
   }
 }
