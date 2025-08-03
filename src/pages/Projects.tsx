@@ -185,7 +185,10 @@ const Projects = () => {
     }
   };
 
-  const handleLongPress = (project: Project) => {
+  const handleLongPress = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
     const selectedCount = multiSelection.state.selectedIds.length > 0 
       ? multiSelection.state.selectedIds.length 
       : 1;
@@ -202,13 +205,37 @@ const Projects = () => {
     });
   };
 
-  const createLongPressHandler = (project: Project) => {
-    return useLongPress({
-      onLongPress: () => handleLongPress(project),
-      duration: 500,
-      hapticFeedback: true,
-    });
-  };
+  // Single useLongPress hook at component level
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      // Get project ID from the element's data attribute using event target
+      const currentEvent = window.event;
+      let clientX = 0;
+      let clientY = 0;
+      
+      if (currentEvent) {
+        const touchEvent = currentEvent as TouchEvent;
+        const mouseEvent = currentEvent as MouseEvent;
+        
+        if (touchEvent.touches && touchEvent.touches.length > 0) {
+          clientX = touchEvent.touches[0].clientX;
+          clientY = touchEvent.touches[0].clientY;
+        } else if (mouseEvent.clientX !== undefined && mouseEvent.clientY !== undefined) {
+          clientX = mouseEvent.clientX;
+          clientY = mouseEvent.clientY;
+        }
+      }
+      
+      const target = document.elementFromPoint(clientX, clientY);
+      const projectCard = target?.closest('[data-project-id]') as HTMLElement;
+      const projectId = projectCard?.dataset.projectId;
+      if (projectId) {
+        handleLongPress(projectId);
+      }
+    },
+    duration: 500,
+    hapticFeedback: true,
+  });
 
   if (loading) {
     return (
@@ -289,11 +316,11 @@ const Projects = () => {
               const imageCount = project.images?.[0]?.count || 0;
               const analysisCount = project.ux_analyses?.[0]?.count || 0;
               const isSelected = multiSelection.isSelected(project.id);
-              const longPressHandlers = createLongPressHandler(project);
               
               return (
                 <Card 
-                  key={project.id} 
+                  key={project.id}
+                  data-project-id={project.id}
                   className={`relative hover:shadow-lg transition-all cursor-pointer select-none ${
                     isSelected ? 'ring-2 ring-primary shadow-lg' : ''
                   }`}
