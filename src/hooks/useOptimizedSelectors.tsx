@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 import type { 
   AppState, 
   UploadedImage, 
@@ -18,7 +18,7 @@ type StateSelector<T> = (state: AppState) => T;
 
 // Core selector hook with memoization
 export const useAppSelector = <T,>(selector: StateSelector<T>): T => {
-  const { state } = useAppContext();
+  const { state } = useFinalAppContext();
   return useMemo(() => selector(state), [selector, state]);
 };
 
@@ -116,13 +116,13 @@ export const useStateMetrics = () => {
 
 // Action dispatchers (stable references)
 export const useAppActions = () => {
-  const { stableHelpers } = useAppContext();
+  const { dispatch } = useFinalAppContext();
   
-  return stableHelpers;
+  return { dispatch };
 };
 
 // Helper functions (stable references)  
 export const useAppHelpersLegacy = () => {
-  const { stableHelpers } = useAppContext();
-  return stableHelpers;
+  const { dispatch } = useFinalAppContext();
+  return { dispatch };
 };

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, CheckCircle, Clock, HardDrive, Wifi, WifiOff } from 'lucide-react';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 
 export const ClientStateStatus: React.FC = () => {
   // Simplified component without offlineCache dependency

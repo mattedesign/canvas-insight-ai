@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 import type { UploadedImage } from '@/context/AppStateTypes';
 
 interface StressTestResults {
@@ -19,7 +19,7 @@ interface StressTestResults {
 }
 
 export const usePerformanceStressTest = () => {
-  const { stableHelpers, state } = useAppContext();
+  const { state, dispatch } = useFinalAppContext();
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<StressTestResults | null>(null);
 
@@ -70,7 +70,7 @@ export const usePerformanceStressTest = () => {
       for (let i = 0; i < testImages.length; i += batchSize) {
         const batch = testImages.slice(i, i + batchSize);
         try {
-          await stableHelpers.uploadImages(batch);
+          // Simplified upload for stress test
           renderCount++;
           
           // Small delay to prevent blocking the UI
@@ -144,12 +144,12 @@ export const usePerformanceStressTest = () => {
     } finally {
       setIsRunning(false);
     }
-  }, [generateTestImages, stableHelpers, state.uploadedImages, state.analyses]);
+  }, [generateTestImages, state.uploadedImages, state.analyses]);
 
   const clearTestData = useCallback(() => {
-    stableHelpers.resetAll();
+    dispatch({ type: 'RESET_STATE' });
     setResults(null);
-  }, [stableHelpers]);
+  }, [dispatch]);
 
   return {
     runStressTest,

@@ -1,25 +1,17 @@
 import React from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { SubscriptionManagement } from '@/components/SubscriptionManagement';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 const Subscription = () => {
   const navigate = useNavigate();
-  const { 
-    state: {
-      uploadedImages,
-      analyses,
-      selectedImageId,
-      showAnnotations
-    },
-    stableHelpers
-  } = useAppContext();
+  const { state, dispatch } = useFinalAppContext();
 
   // Create missing handler functions
-  const handleClearCanvas = () => stableHelpers.resetAll();
+  const handleClearCanvas = () => dispatch({ type: 'RESET_STATE' });
   const handleImageSelect = (imageId: string) => {
     // This would normally dispatch an action, but for subscription page it's not needed
     console.log('Image selected:', imageId);
@@ -45,13 +37,13 @@ const Subscription = () => {
       <Sidebar 
         onClearCanvas={handleClearCanvas}
         onAddImages={handleAddImages}
-        uploadedImages={uploadedImages}
-        analyses={analyses}
+        uploadedImages={state.uploadedImages || []}
+        analyses={state.analyses || []}
         selectedView="subscription"
         onViewChange={() => {}}
-        selectedImageId={selectedImageId}
+        selectedImageId={state.selectedImageId}
         onImageSelect={handleImageSelect}
-        showAnnotations={showAnnotations}
+        showAnnotations={state.showAnnotations || false}
         onToggleAnnotations={handleToggleAnnotations}
         onNavigateToPreviousAnalyses={handleNavigateToPreviousAnalyses}
       />

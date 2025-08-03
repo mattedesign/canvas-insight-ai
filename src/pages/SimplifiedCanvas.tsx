@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { useAppState, useAppDispatch } from '@/hooks/useSimpleAppState';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
@@ -13,18 +13,20 @@ const SimplifiedCanvas = () => {
   const navigate = useNavigate();
   const { projectSlug } = useParams<{ projectSlug?: string }>();
   const { user } = useAuth();
-  const dispatch = useAppDispatch();
+  const { state, dispatch } = useFinalAppContext();
   
-  // Get state using selectors to prevent unnecessary re-renders
-  const uploadedImages = useAppState(state => state.uploadedImages || []);
-  const analyses = useAppState(state => state.analyses || []);
-  const imageGroups = useAppState(state => state.imageGroups || []);
-  const groupAnalysesWithPrompts = useAppState(state => state.groupAnalysesWithPrompts || []);
-  const generatedConcepts = useAppState(state => state.generatedConcepts || []);
-  const isLoading = useAppState(state => state.isLoading);
-  const error = useAppState(state => state.error);
-  const showAnnotations = useAppState(state => state.showAnnotations);
-  const groupDisplayModes = useAppState(state => state.groupDisplayModes || {});
+  // Direct state access - no selectors, maximum performance
+  const {
+    uploadedImages = [],
+    analyses = [],
+    imageGroups = [],
+    groupAnalysesWithPrompts = [],
+    generatedConcepts = [],
+    isLoading = false,
+    error = null,
+    showAnnotations = false,
+    groupDisplayModes = {}
+  } = state;
   
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);

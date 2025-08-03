@@ -5,13 +5,13 @@
 
 import { useContext, useMemo } from 'react';
 import type { AppState, StateSelector } from '@/context/AppStateTypes';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 
 // Main hook with overloads for typed access
 export function useAppState(): AppState;
 export function useAppState<T>(selector: StateSelector<T>): T;
 export function useAppState<T>(selector?: StateSelector<T>) {
-  const context = useAppContext();
+  const context = useFinalAppContext();
   
   if (!context) {
     throw new Error('useAppState must be used within AppProvider');

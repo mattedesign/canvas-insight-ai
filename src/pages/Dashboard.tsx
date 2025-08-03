@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { DashboardMetrics } from '@/services/DashboardService';
-import { useWhyDidYouUpdate } from '@/hooks/useWhyDidYouUpdate';
+// Performance monitoring removed for production optimization
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,17 +74,7 @@ const Dashboard = () => {
   const projectsLoadedRef = useRef(false);
   const lastMetricsRef = useRef<DashboardMetrics | null>(null);
 
-  // Phase 5.1: Re-render detection for performance monitoring
-  useWhyDidYouUpdate('Dashboard', {
-    user,
-    subscription,
-    metrics,
-    metricsLoading,
-    metricsError,
-    stats,
-    loading,
-    error
-  });
+  // Performance monitoring removed for production optimization
 
   const handleCreateProject = async () => {
     try {

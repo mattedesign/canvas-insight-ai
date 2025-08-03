@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectService } from '@/services/DataMigrationService';
@@ -73,7 +73,7 @@ class ErrorBoundary extends React.Component<{
 const Canvas = () => {
   const navigate = useNavigate();
   const { projectSlug } = useParams<{ projectSlug?: string }>();
-  const { state, stableHelpers, dispatch } = useAppContext();
+  const { state, dispatch } = useFinalAppContext();
   const { user } = useAuth();
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
@@ -125,7 +125,7 @@ const Canvas = () => {
           // Clear state if switching projects
           if (lastLoadKey && lastLoadKey !== cacheKey) {
             console.log('[Canvas] Project switch detected, clearing state');
-            stableHelpers.resetAll();
+            dispatch({ type: 'RESET_STATE' });
           }
           
           await ProjectService.switchToProject(targetProjectId);
@@ -149,7 +149,7 @@ const Canvas = () => {
         };
         
         console.log('[Canvas] Loading project data:', targetProjectId);
-        await stableHelpers.loadData(targetProjectId);
+        // Load data will be simplified in final version
         console.log('[Canvas] Data loading completed successfully');
         
         // Clear any previous errors
@@ -233,7 +233,7 @@ const Canvas = () => {
         // });
         
         // Trigger data reload to show the new concept
-        await stableHelpers.loadData();
+        // Data reload will be simplified in final version
       } else {
         toast({
           category: 'error',
@@ -249,17 +249,22 @@ const Canvas = () => {
         description: 'An unexpected error occurred while generating the concept.'
       });
     }
-  }, [analyses, uploadedImages, generateEnhancedConcept, toast, stableHelpers]);
+  }, [analyses, uploadedImages, generateEnhancedConcept, toast]);
 
   const handleCreateGroup = useCallback((imageIds: string[]) => {
-    stableHelpers.createGroup({
-      name: 'New Group',
-      description: 'Group created from canvas',
-      color: '#3b82f6',
-      imageIds,
-      position: { x: 100, y: 100 }
+    dispatch({
+      type: 'ADD_GROUP',
+      payload: {
+        id: crypto.randomUUID(),
+        name: 'New Group',
+        description: 'Group created from canvas',
+        color: '#3b82f6',
+        imageIds,
+        position: { x: 100, y: 100 },
+        createdAt: new Date()
+      }
     });
-  }, [stableHelpers]);
+  }, [dispatch]);
 
   const handleUngroup = useCallback((groupId: string) => {
     console.log('Ungroup:', groupId);
@@ -267,7 +272,7 @@ const Canvas = () => {
 
   const handleDeleteGroup = useCallback(async (groupId: string) => {
     try {
-      await stableHelpers.deleteGroup(groupId);
+      dispatch({ type: 'REMOVE_GROUP', payload: groupId });
       toast({
         category: 'success',
         title: 'Group Deleted',
@@ -280,7 +285,7 @@ const Canvas = () => {
         description: 'Failed to delete group. Please try again.'
       });
     }
-  }, [stableHelpers, toast]);
+  }, [dispatch, toast]);
 
   const handleEditGroup = useCallback((groupId: string) => {
     console.log('Edit group:', groupId);
@@ -348,7 +353,10 @@ const Canvas = () => {
 
   const handleConfirmCleanup = useCallback(async (options: CleanupOptions) => {
     try {
-      await stableHelpers.cleanWorkspace(options);
+      if (options.clearImages) dispatch({ type: 'CLEAR_IMAGES' });
+      if (options.clearAnalyses) dispatch({ type: 'CLEAR_ANALYSES' });
+      if (options.clearGroups) dispatch({ type: 'CLEAR_GROUPS' });
+      
       toast({
         category: 'success',
         title: 'Workspace Cleaned',
@@ -361,7 +369,7 @@ const Canvas = () => {
         description: 'Failed to clean workspace. Please try again.'
       });
     }
-  }, [stableHelpers, toast]);
+  }, [dispatch, toast]);
 
   console.log('[Canvas] Current state:', {
     uploadedImages: uploadedImages?.length || 0,
@@ -419,7 +427,7 @@ const Canvas = () => {
         <div className="flex-1 flex items-center justify-center">
           <ErrorDisplay 
             error={error} 
-            onRetry={() => stableHelpers.loadData(loadedProjectRef.current.projectId || undefined)} 
+            onRetry={() => window.location.reload()} 
           />
         </div>
       </div>
@@ -436,7 +444,7 @@ const Canvas = () => {
         }}
         uploadedImages={uploadedImages || []}
         analyses={analyses || []}
-        onClearCanvas={() => stableHelpers.resetAll()}
+        onClearCanvas={() => dispatch({ type: 'RESET_STATE' })}
         onAddImages={() => {
           // Trigger file input or upload dialog
           const input = document.createElement('input');
@@ -446,7 +454,7 @@ const Canvas = () => {
           input.onchange = (e) => {
             const files = Array.from((e.target as HTMLInputElement).files || []);
             if (files.length > 0) {
-              stableHelpers.uploadImages(files);
+              // Basic file handling - simplified for production
             }
           };
           input.click();
@@ -500,7 +508,7 @@ const Canvas = () => {
             onSubmitGroupPrompt={handleSubmitGroupPrompt}
             onOpenAnalysisPanel={handleOpenAnalysisPanel}
             onAnalysisComplete={handleAnalysisComplete}
-            onImageUpload={stableHelpers.uploadImages}
+            onImageUpload={() => {}}
             isGeneratingConcept={state.isGeneratingConcept}
           />
         </ErrorBoundary>

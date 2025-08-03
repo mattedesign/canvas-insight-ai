@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useAppState } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 
 /**
  * ✅ PHASE 2: Diagnostic component to debug image loading issues
  */
 export const ImageLoadingDiagnostic: React.FC = () => {
-  const { uploadedImages, analyses } = useAppState();
+  const { state } = useFinalAppContext();
+  const { uploadedImages, analyses } = state;
   const [imageStats, setImageStats] = useState<any>(null);
 
   useEffect(() => {

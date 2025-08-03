@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useAppContext } from '@/context/SimplifiedAppContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
 
 interface StabilityMetrics {
   renderCount: number;
@@ -17,7 +17,7 @@ interface StabilityMetrics {
 }
 
 export const useStateStabilityTest = (componentName: string) => {
-  const { state } = useAppContext();
+  const { state } = useFinalAppContext();
   const [metrics, setMetrics] = useState<StabilityMetrics>({
     renderCount: 0,
     memoryUsage: 0,

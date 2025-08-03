@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { MinimalAppProvider } from "./context/MinimalAppContext";
+import { FinalAppProvider } from "./context/FinalAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 // Performance monitoring disabled for production
@@ -23,7 +23,7 @@ const Subscription = lazy(() => import("./pages/Subscription"));
 const Auth = lazy(() => import("./pages/Auth"));
 
 const ProductionReadiness = lazy(() => import("./pages/ProductionReadiness"));
-const PerformanceTestingDashboard = lazy(() => import("./pages/PerformanceTestingDashboard"));
+// Performance testing dashboard removed for production
 const VerificationTests = lazy(() => import("./pages/VerificationTests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -40,7 +40,7 @@ const App = () => {
       <BrowserRouter>
       <AuthProvider>
         <AIProvider>
-          <MinimalAppProvider>
+          <FinalAppProvider>
             
             <Suspense fallback={
               <div className="min-h-screen flex items-center justify-center bg-background">
@@ -109,13 +109,7 @@ const App = () => {
                     </ProtectedRoute>
                   </RouteErrorBoundary>
                 } />
-                <Route path="/testing" element={
-                  <RouteErrorBoundary routeName="Testing" fallbackRoute="/dashboard">
-                    <ProtectedRoute>
-                      <PerformanceTestingDashboard />
-                    </ProtectedRoute>
-                  </RouteErrorBoundary>
-                } />
+                {/* Testing routes removed for production optimization */}
                 <Route path="/verification" element={
                   <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
                     <ProtectedRoute>
@@ -131,7 +125,7 @@ const App = () => {
                 } />
               </Routes>
             </Suspense>
-          </MinimalAppProvider>
+          </FinalAppProvider>
         </AIProvider>
       </AuthProvider>
       </BrowserRouter>
