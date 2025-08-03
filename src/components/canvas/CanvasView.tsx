@@ -882,8 +882,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                     newMap.delete(image.id);
                     return newMap;
                   });
-                  if (onAnalysisComplete && result.data) {
-                    onAnalysisComplete(image.id, result.data);
+                  if (onAnalysisComplete) {
+                    onAnalysisComplete(image.id, result);
                   }
                 },
                 onError: (error: string) => {
@@ -1084,8 +1084,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                     newMap.delete(image.id);
                     return newMap;
                   });
-                  if (onAnalysisComplete && result.data) {
-                    onAnalysisComplete(image.id, result.data);
+                  if (onAnalysisComplete) {
+                    onAnalysisComplete(image.id, result);
                   }
                 },
                 onError: (error: string) => {
@@ -1396,8 +1396,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               newMap.delete(imageId);
               return newMap;
             });
-            if (onAnalysisComplete && result.data) {
-              onAnalysisComplete(imageId, result.data);
+            // The result is already the analysis data structure, not wrapped in data
+            if (onAnalysisComplete) {
+              onAnalysisComplete(imageId, result);
             }
           },
           onError: (error: string) => {
