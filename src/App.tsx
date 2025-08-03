@@ -25,6 +25,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ProductionReadiness = lazy(() => import("./pages/ProductionReadiness"));
 // Performance testing dashboard removed for production
 const VerificationTests = lazy(() => import("./pages/VerificationTests"));
+const UploadPipelineTests = lazy(() => import("./pages/UploadPipelineTests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -113,14 +114,21 @@ const App = () => {
                       </RouteErrorBoundary>
                     } />
                     {/* Testing routes removed for production optimization */}
-                    <Route path="/verification" element={
-                      <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
-                        <ProtectedRoute>
-                          <VerificationTests />
-                        </ProtectedRoute>
-                      </RouteErrorBoundary>
-                    } />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                     <Route path="/verification" element={
+                       <RouteErrorBoundary routeName="Verification" fallbackRoute="/dashboard">
+                         <ProtectedRoute>
+                           <VerificationTests />
+                         </ProtectedRoute>
+                       </RouteErrorBoundary>
+                     } />
+                     <Route path="/upload-pipeline-tests" element={
+                       <RouteErrorBoundary routeName="UploadPipelineTests" fallbackRoute="/dashboard">
+                         <ProtectedRoute>
+                           <UploadPipelineTests />
+                         </ProtectedRoute>
+                       </RouteErrorBoundary>
+                     } />
+                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={
                       <RouteErrorBoundary routeName="NotFound" fallbackRoute="/">
                         <NotFound />

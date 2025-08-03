@@ -150,19 +150,44 @@ export class EnhancedAnalysisPipeline {
    */
   private async extractGoogleVisionMetadata(imageId: string, imageUrl: string): Promise<any> {
     try {
-      // PHASE 2: Enhanced URL processing for edge functions
+      // PHASE 3: Enhanced URL validation and processing
       let processedImageUrl = imageUrl;
       let imageBase64: string | undefined;
 
-      // Handle blob URLs - convert to base64 for edge function compatibility
+      // Validate URL format first
+      if (!this.isValidImageUrl(imageUrl)) {
+        console.warn('[EnhancedAnalysisPipeline] Invalid image URL format:', imageUrl);
+        throw new PipelineError('Invalid image URL format', 'url-validation', { url: imageUrl });
+      }
+
+      // Handle blob URLs - convert to base64 with retry logic
       if (imageUrl.startsWith('blob:')) {
         try {
           const { BlobUrlReplacementService } = await import('./BlobUrlReplacementService');
-          imageBase64 = await BlobUrlReplacementService.blobUrlToBase64(imageUrl);
+          imageBase64 = await this.retryOperation(
+            () => BlobUrlReplacementService.blobUrlToBase64(imageUrl),
+            3,
+            1000
+          );
           console.log('[EnhancedAnalysisPipeline] Converted blob URL to base64 for edge function');
         } catch (conversionError) {
-          console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64:', conversionError);
+          console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64 after retries:', conversionError);
           return this.createFallbackMetadata();
+        }
+      }
+
+      // Handle Supabase storage URLs - validate and use directly
+      if (imageUrl.includes('supabase')) {
+        try {
+          const response = await fetch(imageUrl, { method: 'HEAD' });
+          if (!response.ok) {
+            console.warn('[EnhancedAnalysisPipeline] Supabase storage URL not accessible:', response.status);
+            throw new PipelineError('Storage URL not accessible', 'url-validation', { url: imageUrl, status: response.status });
+          }
+          console.log('[EnhancedAnalysisPipeline] Supabase storage URL validated successfully');
+        } catch (fetchError) {
+          console.warn('[EnhancedAnalysisPipeline] Storage URL validation failed:', fetchError);
+          // Don't fail completely, let edge function handle it
         }
       }
 
@@ -177,18 +202,22 @@ export class EnhancedAnalysisPipeline {
         requestBody.imageBase64 = imageBase64;
       }
 
-      const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
-        body: requestBody
-      });
+      const { data, error } = await this.retryOperation(
+        () => supabase.functions.invoke('google-vision-metadata', {
+          body: requestBody
+        }),
+        2,
+        2000
+      );
 
       if (error) {
-        console.warn('Google Vision metadata extraction failed:', error);
+        console.warn('Google Vision metadata extraction failed after retries:', error);
         return this.createFallbackMetadata();
       }
 
       return data.metadata || this.createFallbackMetadata();
     } catch (error) {
-      console.warn('Google Vision API unavailable, using fallback metadata:', error);
+      console.warn('Google Vision API unavailable after all retries, using fallback metadata:', error);
       return this.createFallbackMetadata();
     }
   }
@@ -299,18 +328,27 @@ export class EnhancedAnalysisPipeline {
     metadata: any,
     userContext?: string
   ): Promise<any> {
-    // PHASE 2: Enhanced URL processing for edge functions
+    // PHASE 3: Enhanced URL processing with validation and retry logic
     let processedImageUrl = imageUrl;
     let imageBase64: string | undefined;
 
-    // Handle blob URLs - convert to base64 for edge function compatibility
+    // Validate URL before processing
+    if (!this.isValidImageUrl(imageUrl)) {
+      throw new PipelineError('Invalid image URL for analysis', 'url-validation', { url: imageUrl });
+    }
+
+    // Handle blob URLs - convert to base64 with retry logic
     if (imageUrl.startsWith('blob:')) {
       try {
         const { BlobUrlReplacementService } = await import('./BlobUrlReplacementService');
-        imageBase64 = await BlobUrlReplacementService.blobUrlToBase64(imageUrl);
+        imageBase64 = await this.retryOperation(
+          () => BlobUrlReplacementService.blobUrlToBase64(imageUrl),
+          3,
+          1000
+        );
         console.log('[EnhancedAnalysisPipeline] Converted blob URL to base64 for analysis');
       } catch (conversionError) {
-        console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64:', conversionError);
+        console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64 after retries:', conversionError);
         throw new PipelineError('Failed to process image URL for analysis', 'url-processing', { stage: 'blob-conversion' });
       }
     }
@@ -333,12 +371,16 @@ export class EnhancedAnalysisPipeline {
       requestPayload.imageBase64 = imageBase64;
     }
 
-    const { data, error } = await supabase.functions.invoke('ux-analysis', {
-      body: {
-        action: 'ENHANCED_CONTEXT_ANALYSIS',
-        payload: requestPayload
-      }
-    });
+    const { data, error } = await this.retryOperation(
+      () => supabase.functions.invoke('ux-analysis', {
+        body: {
+          action: 'ENHANCED_CONTEXT_ANALYSIS',
+          payload: requestPayload
+        }
+      }),
+      3,
+      2000
+    );
 
     if (error) throw new PipelineError(error.message, 'enhanced-analysis', { stage: 'api-call' });
     if (!data?.success) throw new PipelineError(data?.error || 'Analysis failed', 'enhanced-analysis', { stage: 'data-validation' });
@@ -487,6 +529,48 @@ Focus on:
       faces: 0,
       properties: {}
     };
+  }
+
+  /**
+   * PHASE 3: Enhanced utility methods for URL validation and retry logic
+   */
+  private isValidImageUrl(url: string): boolean {
+    if (!url || typeof url !== 'string') return false;
+    
+    // Allow blob URLs, data URLs, and HTTP(S) URLs
+    return url.startsWith('blob:') || 
+           url.startsWith('data:image/') || 
+           url.startsWith('http://') || 
+           url.startsWith('https://');
+  }
+
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number,
+    delayMs: number
+  ): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await operation();
+        if (attempt > 1) {
+          console.log(`[EnhancedAnalysisPipeline] Operation succeeded on attempt ${attempt}`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`[EnhancedAnalysisPipeline] Operation failed on attempt ${attempt}:`, error);
+        
+        if (attempt < maxRetries) {
+          console.log(`[EnhancedAnalysisPipeline] Retrying in ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs *= 1.5; // Exponential backoff
+        }
+      }
+    }
+    
+    throw lastError!;
   }
 
   /**
