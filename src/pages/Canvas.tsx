@@ -524,7 +524,7 @@ const Canvas = () => {
         
         {/* Analysis Flow Debugger - Only in development */}
         <AnalysisFlowDebugger 
-          visible={window.location.hostname.includes('localhost') || window.location.hostname.includes('lovable')}
+          visible={window.location.hostname.includes('localhost') || window.location.hostname.includes('lovableproject.com') || import.meta.env.DEV}
         />
         </div>
       </div>
