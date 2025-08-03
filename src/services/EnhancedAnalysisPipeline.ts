@@ -730,8 +730,7 @@ Focus on:
         summary: enhancedAnalysis.summary,
         metadata: enhancedAnalysis.metadata,
         status: 'completed',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
     if (error) {
