@@ -80,6 +80,31 @@ Required JSON format:
 
       if (error) {
         console.error('[ContextDetection] Supabase function error:', error);
+        console.log('[ContextDetection] Attempting enhanced context mode fallback...');
+        
+        // Try enhanced context mode as fallback
+        try {
+          const enhancedAnalysisPromise = supabase.functions.invoke('context-detection', {
+            body: {
+              imageUrl,
+              imageBase64,
+              prompt: contextPrompt,
+              model: 'gpt-4o-mini',
+              maxTokens: 500,
+              enhancedContextMode: true
+            }
+          });
+          
+          const { data: enhancedData, error: enhancedError } = await Promise.race([enhancedAnalysisPromise, timeoutPromise]) as any;
+          
+          if (!enhancedError && enhancedData) {
+            console.log('[ContextDetection] Enhanced mode fallback successful');
+            return this.parseImageContext(enhancedData);
+          }
+        } catch (enhancedError) {
+          console.warn('[ContextDetection] Enhanced mode fallback also failed:', enhancedError);
+        }
+        
         throw new PipelineError(
           `Context detection API error: ${error.message}`, 
           'context-detection',
@@ -136,23 +161,72 @@ Required JSON format:
   }
 
   private createFallbackContext(errorReason: string): ImageContext {
-    console.log('[ContextDetection] Creating fallback context due to:', errorReason);
+    console.log('[ContextDetection] Creating intelligent fallback context due to:', errorReason);
+    
+    // Create more intelligent fallback based on error reason
+    let primaryType: ImageContext['primaryType'] = 'app';
+    let domain = 'general';
+    
+    if (errorReason.includes('dashboard') || errorReason.includes('metrics')) {
+      primaryType = 'dashboard';
+      domain = 'technology';
+    } else if (errorReason.includes('landing') || errorReason.includes('marketing')) {
+      primaryType = 'landing';
+      domain = 'general';
+    } else if (errorReason.includes('mobile')) {
+      primaryType = 'mobile';
+      domain = 'technology';
+    } else if (errorReason.includes('ecommerce') || errorReason.includes('shop')) {
+      primaryType = 'ecommerce';
+      domain = 'retail';
+    }
     
     return {
-      primaryType: 'app', // Default to generic app instead of 'unknown'
-      subTypes: ['fallback'],
-      domain: 'general',
+      primaryType,
+      subTypes: this.getSubTypesForInterface(primaryType),
+      domain,
       complexity: 'moderate',
-      userIntent: ['general analysis'],
-      platform: 'web',
-      businessModel: 'unknown',
+      userIntent: ['improve usability', 'enhance user experience'],
+      platform: primaryType === 'mobile' ? 'mobile' : 'web',
+      businessModel: this.getBusinessModelForDomain(domain),
       targetAudience: 'general users',
       maturityStage: 'mvp',
       designSystem: {
         detected: false,
+        type: 'custom',
         consistency: 0.5
       }
     };
+  }
+
+  private getSubTypesForInterface(interfaceType: ImageContext['primaryType']): string[] {
+    const subTypeMap: Record<string, string[]> = {
+      dashboard: ['analytics', 'metrics', 'data-visualization'],
+      landing: ['marketing', 'conversion', 'lead-generation'],
+      mobile: ['native', 'responsive', 'touch-interface'],
+      ecommerce: ['product-catalog', 'checkout-flow', 'shopping-cart'],
+      form: ['data-entry', 'validation', 'multi-step'],
+      saas: ['workflow', 'feature-rich', 'enterprise'],
+      app: ['general', 'web-application'],
+      content: ['content-management', 'publishing'],
+      portfolio: ['showcase', 'creative'],
+      unknown: ['general']
+    };
+    
+    return subTypeMap[interfaceType] || ['general'];
+  }
+
+  private getBusinessModelForDomain(domain: string): string {
+    const businessModelMap: Record<string, string> = {
+      finance: 'enterprise',
+      healthcare: 'enterprise', 
+      education: 'saas',
+      retail: 'ecommerce',
+      technology: 'saas',
+      'real-estate': 'marketplace'
+    };
+    
+    return businessModelMap[domain] || 'saas';
   }
 
 

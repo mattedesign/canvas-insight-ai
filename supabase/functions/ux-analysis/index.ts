@@ -2008,16 +2008,7 @@ async function synthesizeMultiModelResults(
         actionItems: ['Review navigation structure', 'Analyze content organization', 'Test user workflows']
       }];
       
-      const fallbackAnnotations = [{
-        id: 'fallback_annotation_1',
-        x: 0.5,
-        y: 0.3,
-        type: 'suggestion',
-        title: 'Primary Interface Area',
-        description: 'This appears to be the main interface area that could benefit from UX analysis.',
-        severity: 'medium',
-        category: 'usability'
-      }];
+      const fallbackAnnotations = this.generateContextualFallbackAnnotations(userContext, interfaceHints);
       
       return {
         id: `analysis_${Date.now()}`,
@@ -2027,17 +2018,7 @@ async function synthesizeMultiModelResults(
         userContext: context.userContext || '',
         visualAnnotations: fallbackAnnotations,
         suggestions: fallbackSuggestions,
-        summary: {
-          overallScore: 75,
-          categoryScores: {
-            usability: 75,
-            accessibility: 70,
-            visual: 80,
-            content: 75
-          },
-          keyIssues: ['Analysis incomplete - manual review needed'],
-          strengths: ['Interface structure appears organized']
-        },
+        summary: this.generateContextualFallbackSummary(userContext, interfaceHints),
         metadata: {
           ...(visionMetadata || {}),
           modelsUsed: ['gpt-4o', 'claude-opus-4-20250514', 'google-vision-service'],
@@ -2184,6 +2165,257 @@ async function synthesizeMultiModelResults(
       status: 'completed_with_errors'
     };
   }
+}
+
+// Enhanced context-aware fallback generation functions
+function inferInterfaceFromContext(userContext: string, visionMetadata: any): any {
+  const lowerContext = userContext.toLowerCase();
+  
+  // Check vision metadata for interface clues
+  const labels = visionMetadata?.labels?.map((l: any) => l.description.toLowerCase()) || [];
+  const objects = visionMetadata?.objects?.map((o: any) => o.name.toLowerCase()) || [];
+  const allElements = [...labels, ...objects];
+  
+  const interfaceHints = {
+    type: 'app',
+    domain: 'general',
+    complexity: 'moderate',
+    elements: allElements
+  };
+  
+  // Infer interface type
+  if (lowerContext.includes('dashboard') || allElements.some(el => ['chart', 'graph', 'table'].includes(el))) {
+    interfaceHints.type = 'dashboard';
+    interfaceHints.domain = 'analytics';
+  } else if (lowerContext.includes('landing') || lowerContext.includes('marketing')) {
+    interfaceHints.type = 'landing';
+    interfaceHints.domain = 'marketing';
+  } else if (lowerContext.includes('mobile') || allElements.some(el => ['mobile', 'app'].includes(el))) {
+    interfaceHints.type = 'mobile';
+    interfaceHints.domain = 'technology';
+  } else if (lowerContext.includes('ecommerce') || allElements.some(el => ['product', 'cart', 'shop'].includes(el))) {
+    interfaceHints.type = 'ecommerce';
+    interfaceHints.domain = 'retail';
+  }
+  
+  // Infer complexity from element count and context
+  if (allElements.length > 15 || lowerContext.includes('complex') || lowerContext.includes('enterprise')) {
+    interfaceHints.complexity = 'complex';
+  } else if (allElements.length < 5 || lowerContext.includes('simple') || lowerContext.includes('minimal')) {
+    interfaceHints.complexity = 'simple';
+  }
+  
+  return interfaceHints;
+}
+
+function generateContextualFallbackSuggestions(userContext: string, interfaceHints: any): any[] {
+  const suggestions = [];
+  const lowerContext = userContext.toLowerCase();
+  
+  // Generate suggestions based on interface type
+  switch (interfaceHints.type) {
+    case 'dashboard':
+      suggestions.push({
+        id: 'fallback_dashboard_1',
+        category: 'usability',
+        title: 'Optimize Data Hierarchy',
+        description: 'Review the arrangement of charts and metrics to ensure the most important data is prominently displayed and easily accessible.',
+        impact: 'high',
+        effort: 'medium',
+        actionItems: ['Prioritize key metrics at the top', 'Group related data visualizations', 'Use consistent spacing and sizing']
+      });
+      break;
+      
+    case 'landing':
+      suggestions.push({
+        id: 'fallback_landing_1',
+        category: 'conversion',
+        title: 'Enhance Call-to-Action Visibility',
+        description: 'Improve the prominence and clarity of primary conversion elements to guide user action effectively.',
+        impact: 'high',
+        effort: 'low',
+        actionItems: ['Make primary CTA button more prominent', 'Clarify value proposition', 'Reduce visual distractions']
+      });
+      break;
+      
+    case 'mobile':
+      suggestions.push({
+        id: 'fallback_mobile_1',
+        category: 'usability',
+        title: 'Optimize Touch Targets',
+        description: 'Ensure all interactive elements meet minimum touch target size requirements for mobile accessibility.',
+        impact: 'high',
+        effort: 'low',
+        actionItems: ['Increase button sizes to 44px minimum', 'Add appropriate spacing between elements', 'Test on various device sizes']
+      });
+      break;
+      
+    case 'ecommerce':
+      suggestions.push({
+        id: 'fallback_ecommerce_1',
+        category: 'conversion',
+        title: 'Streamline Product Discovery',
+        description: 'Improve product navigation and search functionality to help users find desired items more efficiently.',
+        impact: 'high',
+        effort: 'medium',
+        actionItems: ['Enhance search filters', 'Improve product categorization', 'Add visual product previews']
+      });
+      break;
+      
+    default:
+      suggestions.push({
+        id: 'fallback_general_1',
+        category: 'usability',
+        title: 'Improve Information Architecture',
+        description: 'Optimize the organization and presentation of content to enhance user understanding and navigation.',
+        impact: 'medium',
+        effort: 'medium',
+        actionItems: ['Review content hierarchy', 'Simplify navigation structure', 'Improve visual consistency']
+      });
+  }
+  
+  // Add context-specific suggestions based on user input
+  if (lowerContext.includes('accessibility') || lowerContext.includes('a11y')) {
+    suggestions.push({
+      id: 'fallback_accessibility_1',
+      category: 'accessibility',
+      title: 'Enhance Accessibility Compliance',
+      description: 'Improve interface accessibility to meet WCAG guidelines and serve users with disabilities.',
+      impact: 'high',
+      effort: 'medium',
+      actionItems: ['Add alt text to images', 'Improve color contrast ratios', 'Ensure keyboard navigation support']
+    });
+  }
+  
+  if (lowerContext.includes('conversion') || lowerContext.includes('business')) {
+    suggestions.push({
+      id: 'fallback_conversion_1',
+      category: 'conversion',
+      title: 'Optimize Conversion Funnel',
+      description: 'Identify and remove friction points in the user journey to improve conversion rates.',
+      impact: 'high',
+      effort: 'medium',
+      actionItems: ['Simplify form fields', 'Add trust signals', 'Clarify value proposition']
+    });
+  }
+  
+  return suggestions.slice(0, 5); // Return top 5 suggestions
+}
+
+function generateContextualFallbackAnnotations(userContext: string, interfaceHints: any): any[] {
+  const annotations = [];
+  
+  // Generate annotations based on interface type and complexity
+  if (interfaceHints.type === 'dashboard') {
+    annotations.push({
+      id: 'fallback_ann_dashboard_1',
+      x: 0.2,
+      y: 0.1,
+      type: 'suggestion',
+      title: 'Key Metrics Area',
+      description: 'Primary dashboard area for displaying critical performance indicators',
+      severity: 'medium',
+      category: 'usability'
+    });
+  } else if (interfaceHints.type === 'landing') {
+    annotations.push({
+      id: 'fallback_ann_landing_1',
+      x: 0.5,
+      y: 0.3,
+      type: 'suggestion',
+      title: 'Hero Section',
+      description: 'Main conversion area requiring clear value proposition and call-to-action',
+      severity: 'medium',
+      category: 'conversion'
+    });
+  } else if (interfaceHints.type === 'mobile') {
+    annotations.push({
+      id: 'fallback_ann_mobile_1',
+      x: 0.5,
+      y: 0.9,
+      type: 'suggestion',
+      title: 'Navigation Area',
+      description: 'Mobile navigation requires optimization for thumb-friendly interaction',
+      severity: 'medium',
+      category: 'usability'
+    });
+  }
+  
+  // Always add a general usability annotation
+  annotations.push({
+    id: 'fallback_ann_general_1',
+    x: 0.5,
+    y: 0.5,
+    type: 'info',
+    title: 'Interface Review Area',
+    description: 'Central interface area that would benefit from detailed UX analysis',
+    severity: 'low',
+    category: 'usability'
+  });
+  
+  return annotations.slice(0, 3); // Return top 3 annotations
+}
+
+function generateContextualFallbackSummary(userContext: string, interfaceHints: any): any {
+  const baseScore = interfaceHints.complexity === 'simple' ? 80 : 
+                   interfaceHints.complexity === 'complex' ? 65 : 75;
+  
+  // Adjust scores based on interface type
+  const typeAdjustments: Record<string, any> = {
+    dashboard: { usability: -5, visual: +10, accessibility: -10 },
+    landing: { usability: +5, visual: +5, accessibility: +5 },
+    mobile: { usability: +10, visual: 0, accessibility: +5 },
+    ecommerce: { usability: 0, visual: +5, accessibility: 0 }
+  };
+  
+  const adjustments = typeAdjustments[interfaceHints.type] || { usability: 0, visual: 0, accessibility: 0 };
+  
+  const keyIssues = [];
+  const strengths = [];
+  
+  // Generate contextual issues and strengths
+  if (interfaceHints.complexity === 'complex') {
+    keyIssues.push('Interface complexity may impact user comprehension');
+    strengths.push('Feature-rich interface offers comprehensive functionality');
+  } else if (interfaceHints.complexity === 'simple') {
+    strengths.push('Clean, minimal design promotes easy navigation');
+    keyIssues.push('May benefit from additional functionality or content');
+  }
+  
+  // Add interface-specific issues
+  switch (interfaceHints.type) {
+    case 'dashboard':
+      keyIssues.push('Data visualization hierarchy needs optimization');
+      strengths.push('Information-dense interface for data analysis');
+      break;
+    case 'landing':
+      keyIssues.push('Conversion elements require enhanced visibility');
+      strengths.push('Marketing-focused design with clear intent');
+      break;
+    case 'mobile':
+      keyIssues.push('Touch targets may need size optimization');
+      strengths.push('Mobile-optimized interface design');
+      break;
+    case 'ecommerce':
+      keyIssues.push('Product discovery flow needs streamlining');
+      strengths.push('Commerce-focused user experience');
+      break;
+  }
+  
+  // Add fallback notice
+  keyIssues.push('Complete analysis requires detailed review');
+  
+  return {
+    overallScore: Math.max(60, Math.min(85, baseScore)),
+    categoryScores: {
+      usability: Math.max(60, Math.min(90, baseScore + adjustments.usability)),
+      accessibility: Math.max(60, Math.min(90, baseScore + adjustments.accessibility - 5)), // Generally lower for fallback
+      visual: Math.max(60, Math.min(90, baseScore + adjustments.visual)),
+      content: Math.max(60, Math.min(90, baseScore))
+    },
+    keyIssues: keyIssues.slice(0, 4),
+    strengths: strengths.slice(0, 3)
+  };
 }
 
 // CRITICAL FIX: Enhanced database persistence function

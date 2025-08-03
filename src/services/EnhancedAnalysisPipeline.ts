@@ -113,18 +113,18 @@ export class EnhancedAnalysisPipeline {
       // Priority 2: Save initial progress
       this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext || '', 'initialization', 5);
       // Phase 1: Extract Google Vision metadata for context-specific progress
-      this.updateProgress('google-vision', 10, 'Extracting visual metadata...', {});
+      this.updateProgress('google-vision', 10, 'Extracting visual metadata and detecting interface type...', {});
       
       const visionMetadata = await this.extractGoogleVisionMetadata(imageId, imageUrl);
       const interfaceType = this.inferInterfaceTypeFromMetadata(visionMetadata);
       
-      this.updateProgress('google-vision', 20, `Analyzing ${interfaceType} interface...`, {
+      this.updateProgress('google-vision', 20, `Successfully identified ${interfaceType} interface with ${this.extractKeyElements(visionMetadata).length} key elements`, {
         interfaceType,
         detectedElements: this.extractKeyElements(visionMetadata)
       });
 
       // Phase 2: Enhanced context detection with optimized pipeline
-      this.updateProgress('context-detection', 35, `Understanding ${interfaceType} context and user needs...`, {
+      this.updateProgress('context-detection', 35, `Analyzing ${interfaceType} interface and understanding user context...`, {
         interfaceType
       });
       
@@ -142,6 +142,13 @@ export class EnhancedAnalysisPipeline {
           confidence: analysisContext.confidence,
           clarificationNeeded: analysisContext.clarificationNeeded
         });
+        
+        this.updateProgress('context-detection', 42, `Context identified: ${analysisContext.image.primaryType} interface for ${analysisContext.user.inferredRole || 'user'} (${Math.round(analysisContext.confidence * 100)}% confidence)`, {
+          interfaceType: analysisContext.image.primaryType,
+          userRole: analysisContext.user.inferredRole,
+          contextConfidence: analysisContext.confidence,
+          domain: analysisContext.image.domain
+        });
       } catch (contextError) {
         console.warn('[EnhancedAnalysisPipeline] Optimized context detection failed, using fallback:', contextError);
         
@@ -153,7 +160,7 @@ export class EnhancedAnalysisPipeline {
 
       // Phase 3: Check if clarification is needed
       if (analysisContext.clarificationNeeded || analysisContext.confidence < 0.7) {
-        this.updateProgress('clarification-needed', 40, 'Additional context needed for optimal analysis', {
+        this.updateProgress('clarification-needed', 40, `Context confidence low (${Math.round(analysisContext.confidence * 100)}%) - additional information would improve analysis quality`, {
           interfaceType: analysisContext.image.primaryType,
           contextConfidence: analysisContext.confidence,
           requiresClarification: true
