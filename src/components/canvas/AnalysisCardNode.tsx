@@ -99,7 +99,11 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
   const handleViewFullAnalysis = useCallback(() => {
-    data.onOpenAnalysisPanel?.(safeAnalysis.id);
+    if (!data.onOpenAnalysisPanel) {
+      console.warn('[AnalysisCardNode] onOpenAnalysisPanel callback is missing');
+      return;
+    }
+    data.onOpenAnalysisPanel(safeAnalysis.id);
   }, [data.onOpenAnalysisPanel, safeAnalysis.id]);
   
   const getScoreColor = (score: number) => {
@@ -115,7 +119,11 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   };
 
   const handleGenerateConcept = useCallback(async () => {
-    if (!onGenerateConcept || isGeneratingConcept) return;
+    if (!onGenerateConcept) {
+      console.warn('[AnalysisCardNode] onGenerateConcept callback is missing');
+      return;
+    }
+    if (isGeneratingConcept) return;
     
     try {
       await onGenerateConcept(safeAnalysis.id);

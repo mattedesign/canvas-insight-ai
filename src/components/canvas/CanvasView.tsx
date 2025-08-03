@@ -154,14 +154,21 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   // AI Integration - Use the new pipeline
   const { analyzeImageWithAI } = useAI();
 
+  // Handle analysis panel opening
+  const handleAnalysisExpansion = useCallback((analysisId: string) => {
+    onOpenAnalysisPanel?.(analysisId);
+  }, [onOpenAnalysisPanel]);
+
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
     onToggleSelection: multiSelection.toggleSelection,
     isSelected: multiSelection.isSelected,
     onViewChange,
     onImageSelect,
-    onGenerateConcept
-  }), [multiSelection.toggleSelection, multiSelection.isSelected, onViewChange, onImageSelect, onGenerateConcept]);
+    onGenerateConcept,
+    onOpenAnalysisPanel: onOpenAnalysisPanel,
+    onExpandedChange: handleAnalysisExpansion
+  }), [multiSelection.toggleSelection, multiSelection.isSelected, onViewChange, onImageSelect, onGenerateConcept, onOpenAnalysisPanel, handleAnalysisExpansion]);
 
   // Group management handlers
   const handleDeleteGroup = useCallback((groupId: string) => {
@@ -205,10 +212,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, [onCreateFork, toast]);
 
-  // Handle analysis panel opening
-  const handleAnalysisExpansion = useCallback((analysisId: string) => {
-    onOpenAnalysisPanel?.(analysisId);
-  }, [onOpenAnalysisPanel]);
 
   // Analysis workflow handlers
   const handleCreateAnalysisRequest = useCallback(async (imageId: string) => {
@@ -620,13 +623,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               imageName: analysis.imageName,
               status: analysis.status!,
               error: analysis.status === 'error' ? 'Analysis failed' : undefined
-            } : { 
-              analysis,
-              onGenerateConcept: stableCallbacks.onGenerateConcept,
-              onOpenAnalysisPanel: onOpenAnalysisPanel,
-              isGeneratingConcept,
-              onExpandedChange: handleAnalysisExpansion
-            },
+              } : { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
+                isGeneratingConcept,
+                onExpandedChange: stableCallbacks.onExpandedChange
+              },
           };
         nodes.push(cardNode);
 
@@ -940,9 +943,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               } : { 
                 analysis,
                 onGenerateConcept: stableCallbacks.onGenerateConcept,
-                onOpenAnalysisPanel: onOpenAnalysisPanel,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
                 isGeneratingConcept,
-                onExpandedChange: handleAnalysisExpansion
+                onExpandedChange: stableCallbacks.onExpandedChange
               },
             };
             nodes.push(analysisNode);
@@ -1133,9 +1136,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
               data: { 
                 analysis,
                 onGenerateConcept: stableCallbacks.onGenerateConcept,
-                onOpenAnalysisPanel: onOpenAnalysisPanel,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
                 isGeneratingConcept,
-                onExpandedChange: handleAnalysisExpansion
+                onExpandedChange: stableCallbacks.onExpandedChange
               },
             };
             nodes.push(analysisNode);
