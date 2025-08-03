@@ -7,6 +7,7 @@ import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
+import { AnalysisFlowDebugger } from '@/components/AnalysisFlowDebugger';
 
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
@@ -298,7 +299,7 @@ const Canvas = () => {
   }, []);
 
   const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
-    console.log('Analysis complete:', imageId, analysis);
+    console.log('[Canvas] Analysis complete handler called:', { imageId, hasAnalysis: !!analysis });
     
     // Store the analysis in app state
     if (analysis) {
@@ -310,6 +311,7 @@ const Canvas = () => {
         createdAt: analysis.createdAt || new Date().toISOString()
       };
       
+      console.log('[Canvas] Dispatching ADD_ANALYSIS:', analysisWithId.id);
       dispatch({ 
         type: 'ADD_ANALYSIS', 
         payload: analysisWithId
@@ -518,6 +520,11 @@ const Canvas = () => {
           isOpen={isCleanupDialogOpen}
           onClose={() => setIsCleanupDialogOpen(false)}
           onConfirmCleanup={handleConfirmCleanup}
+        />
+        
+        {/* Analysis Flow Debugger - Only in development */}
+        <AnalysisFlowDebugger 
+          visible={window.location.hostname.includes('localhost') || window.location.hostname.includes('lovable')}
         />
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useAI } from '@/context/AIContext';
 import { ContextClarification } from '@/components/ContextClarification';
+import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 
 export interface AnalysisRequestNodeData extends Record<string, unknown> {
   imageId: string;
@@ -20,7 +21,11 @@ interface AnalysisRequestNodeProps extends NodeProps {
 }
 
 export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps) => {
-  console.log('[AnalysisRequestNode] Component mounted with data:', data);
+  AnalysisDebugger.log('AnalysisRequestNode', 'COMPONENT_MOUNTED', { 
+    imageId: data.imageId, 
+    imageName: data.imageName, 
+    nodeId: id 
+  });
   
   const { imageId, imageName, imageUrl, userContext, onAnalysisComplete, onError } = data;
   const [showClarification, setShowClarification] = useState(false);
@@ -45,7 +50,10 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
     // Only execute once per imageId and if not already executed
     if (!hasExecutedRef.current && imageId && !isAnalyzing && !error && !isComplete) {
       hasExecutedRef.current = true;
-      console.log('[AnalysisRequestNode] Starting analysis for:', imageName);
+      AnalysisDebugger.log('AnalysisRequestNode', AnalysisLifecycle.ANALYSIS_STARTED, { 
+        imageId, 
+        imageName 
+      });
       
       analyzeImageWithAI(imageId, imageUrl, imageName, userContext)
         .then((result) => {
@@ -53,15 +61,26 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           
           console.log('[AnalysisRequestNode] Analysis result:', result);
           
-          // Validate result before marking complete
-          if (result && (result.data || result.suggestions || result.visualAnnotations)) {
+          // Validate result structure before marking complete
+          const analysisData = result?.data || result;
+          const validation = AnalysisDebugger.validateAnalysisStructure(analysisData);
+          
+          if (validation.valid) {
+            AnalysisDebugger.log('AnalysisRequestNode', AnalysisLifecycle.ANALYSIS_COMPLETED, { 
+              imageId, 
+              imageName,
+              analysisId: analysisData.id 
+            });
             setIsComplete(true);
             if (onAnalysisComplete) {
               onAnalysisComplete(result);
             }
           } else {
-            console.warn('[AnalysisRequestNode] Invalid analysis result:', result);
-            setError('Analysis returned invalid data');
+            AnalysisDebugger.log('AnalysisRequestNode', 'VALIDATION_FAILED', { 
+              imageId, 
+              issues: validation.issues 
+            });
+            setError('Analysis returned invalid or incomplete data');
           }
         })
         .catch((err) => {

@@ -38,6 +38,7 @@ import { AICanvasToolbar } from './AICanvasToolbar';
 import { AIContextMenu } from './AIContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
+import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 
 
 import { Button } from '@/components/ui/button';
@@ -429,17 +430,20 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
   }, [toast]);
 
-  // Memoize the node generation to prevent unnecessary recalculations
+  // Enhanced memoization with proper dependency tracking for analysis changes
   const initialElements = useMemo(() => {
-  console.log('[CanvasView] === CANVAS RENDERING START ===');
-  console.log('[CanvasView] Input data summary:', {
+  AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING START ===');
+  const renderStats = {
     uploadedImages: (uploadedImages || []).length,
     analyses: (analyses || []).length,
+    analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
     imageGroups: (imageGroups || []).length,
     showAnalysis,
     currentTool,
-    analysisRequestsCount: analysisRequests.size
-  });
+    analysisRequestsCount: analysisRequests.size,
+    analysisRequestIds: Array.from(analysisRequests.keys())
+  };
+  AnalysisDebugger.log('CanvasView', 'Input data summary', renderStats);
     
     if ((uploadedImages || []).length === 0) {
       console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
@@ -509,9 +513,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
       let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
 
-      // Check for analysis request node
+      // Check for analysis request node - only show if no analysis exists yet
       const analysisRequest = analysisRequests.get(image.id);
-      if (analysisRequest && !isImageLoading) {
+      const hasAnalysis = !!(analyses || []).find(a => a.imageId === image.id);
+      if (analysisRequest && !isImageLoading && !hasAnalysis) {
         const requestNode: Node = {
           id: `analysis-request-${image.id}`,
           type: 'analysisRequest',
@@ -523,18 +528,37 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             userContext: '',
             onAnalysisComplete: (result: any) => {
               // Handle successful analysis completion
-              console.log('[CanvasView] Analysis completed:', result);
+              AnalysisDebugger.log('CanvasView', AnalysisLifecycle.ANALYSIS_COMPLETED, { imageId: image.id, hasResult: !!result });
               
-              // Remove the analysis request
+              // Validate analysis result structure
+              const analysisData = result?.data || result;
+              const validation = AnalysisDebugger.validateAnalysisStructure(analysisData);
+              
+              if (!validation.valid) {
+                AnalysisDebugger.log('CanvasView', 'VALIDATION_FAILED', { imageId: image.id, issues: validation.issues });
+                console.error('[CanvasView] Invalid analysis result structure:', validation.issues);
+                return;
+              }
+              
+              // Remove the analysis request immediately
               setAnalysisRequests(prev => {
                 const newMap = new Map(prev);
                 newMap.delete(image.id);
+                AnalysisDebugger.log('CanvasView', AnalysisLifecycle.REQUEST_REMOVED, { imageId: image.id });
                 return newMap;
               });
               
-              // Call the parent analysis complete handler
-              if (onAnalysisComplete && result.data) {
-                onAnalysisComplete(image.id, result.data);
+              // Call the parent analysis complete handler with validated data
+              if (onAnalysisComplete) {
+                const finalAnalysis = {
+                  ...analysisData,
+                  imageId: image.id,
+                  imageName: image.name,
+                  imageUrl: image.url,
+                  createdAt: new Date().toISOString()
+                };
+                AnalysisDebugger.log('CanvasView', 'CALLING_PARENT_HANDLER', { imageId: image.id, analysisId: finalAnalysis.id });
+                onAnalysisComplete(image.id, finalAnalysis);
               }
             },
             onError: (error: string) => {
@@ -574,8 +598,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       }
 
 
-        // Create analysis card node if analysis exists and showAnalysis is true
-        if (analysis && showAnalysis && !isImageLoading) {
+        // Create analysis card node if analysis exists, showAnalysis is true, and no request is pending
+        if (analysis && showAnalysis && !isImageLoading && !analysisRequests.has(image.id)) {
+          AnalysisDebugger.log('CanvasView', AnalysisLifecycle.CARD_CREATED, { 
+            analysisId: analysis.id, 
+            imageId: analysis.imageId, 
+            hasRequest: analysisRequests.has(image.id) 
+          });
           const cardXPosition = rightmostXPosition;
           const analysisCardWidth = 400; // Standard width
           
@@ -1410,7 +1439,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     groupAnalysesWithPrompts, 
     groupDisplayModes, 
     showAnnotations, 
-    showAnalysis, 
+    showAnalysis,
+    // Enhanced dependency tracking for analysis changes
+    (analyses || []).map(a => `${a.id}:${a.imageId}`).join(','),
+    analysisRequests.size,
     currentTool, 
     isGeneratingConcept,
     analysisRequests
