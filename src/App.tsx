@@ -68,9 +68,9 @@ const App = () => {
                   </RouteErrorBoundary>
                 } />
                 <Route path="/canvas" element={
-                  <RouteErrorBoundary routeName="Canvas" fallbackRoute="/dashboard">
+                  <RouteErrorBoundary routeName="Projects" fallbackRoute="/dashboard">
                     <ProtectedRoute>
-                      <Canvas />
+                      <Projects />
                     </ProtectedRoute>
                   </RouteErrorBoundary>
                 } />
