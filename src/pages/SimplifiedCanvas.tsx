@@ -137,7 +137,7 @@ const SimplifiedCanvas = () => {
     if (files.length === 0) return;
     
     try {
-      // Simple upload handling - delegate to service
+      // Create images with blob URLs first for immediate display
       const { loadImageDimensions } = await import('@/utils/imageUtils');
       const uploadPromises = files.map(async (file) => {
         console.log('[SimplifiedCanvas] Processing file:', file.name);
@@ -154,7 +154,20 @@ const SimplifiedCanvas = () => {
       
       const results = await Promise.all(uploadPromises);
       console.log('[SimplifiedCanvas] Upload results:', results.length);
+      
+      // Add to local state immediately for instant feedback
       dispatch({ type: 'ADD_IMAGES', payload: results });
+      
+      // Persist to database in background
+      const { ImageMigrationService } = await import('@/services/DataMigrationService');
+      for (const image of results) {
+        try {
+          await ImageMigrationService.migrateImageToDatabase(image);
+          console.log('[SimplifiedCanvas] Successfully persisted image:', image.name);
+        } catch (persistError) {
+          console.error('[SimplifiedCanvas] Failed to persist image:', image.name, persistError);
+        }
+      }
     } catch (error) {
       console.error('[SimplifiedCanvas] Upload failed:', error);
     }
