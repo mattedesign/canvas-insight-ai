@@ -223,37 +223,42 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     
     console.log('[CanvasView] Creating analysis request for image:', image.name);
     
-    // Get the proper Supabase storage URL instead of using blob URL
-    try {
-      const { data: imageData, error } = await supabase
-        .from('images')
-        .select('storage_path')
-        .eq('id', imageId)
-        .single();
-      
-      if (error || !imageData) {
-        console.error('[CanvasView] Failed to get image storage path:', error);
-        return;
+    let imageUrl = image.url;
+    
+    // Only try to get Supabase storage URL if this is not a blob URL (locally uploaded image)
+    if (!image.url.startsWith('blob:')) {
+      try {
+        const { data: imageData, error } = await supabase
+          .from('images')
+          .select('storage_path')
+          .eq('id', imageId)
+          .single();
+        
+        if (error || !imageData) {
+          console.error('[CanvasView] Failed to get image storage path:', error);
+          console.log('[CanvasView] Using original image URL instead');
+        } else {
+          const publicUrl = supabase.storage.from('images').getPublicUrl(imageData.storage_path).data.publicUrl;
+          imageUrl = publicUrl;
+        }
+      } catch (err) {
+        console.error('[CanvasView] Error getting Supabase storage URL:', err);
+        console.log('[CanvasView] Using original image URL instead');
       }
-      
-      const publicUrl = supabase.storage.from('images').getPublicUrl(imageData.storage_path).data.publicUrl;
-      
-      setAnalysisRequests(prev => new Map(prev.set(imageId, { 
-        imageId, 
-        imageName: image.name, 
-        imageUrl: publicUrl 
-      })));
-    } catch (err) {
-      console.error('[CanvasView] Error getting Supabase storage URL:', err);
+    } else {
+      console.log('[CanvasView] Using local blob URL for analysis');
     }
     
-    // COMMENTED OUT: Repetitive analysis request toast
-    // toast({
-    //   title: "Analysis Request Created",
-    //   description: `Created analysis request for ${image.name}`,
-    //   category: "success"
-    // });
-  }, [uploadedImages, toast]);
+    console.log('[CanvasView] Setting analysis request with URL:', imageUrl.substring(0, 50) + '...');
+    
+    setAnalysisRequests(prev => new Map(prev.set(imageId, { 
+      imageId, 
+      imageName: image.name, 
+      imageUrl: imageUrl 
+    })));
+    
+    console.log('[CanvasView] Analysis request created successfully');
+  }, [uploadedImages]);
 
 
   // Helper to store partial context for clarification
