@@ -31,34 +31,49 @@ export class OptimizedContextDetectionPipeline {
     this.performanceMetrics.totalRequests++;
 
     try {
-      console.log('[OptimizedPipeline] Starting optimized context detection');
+      console.log('[OptimizedPipeline] Starting optimized context detection with:', {
+        hasUrl: !!imageData.url,
+        hasBase64: !!imageData.base64,
+        hasMetadata: !!imageData.metadata,
+        userInput: userInput?.substring(0, 100)
+      });
 
       // Phase 1: Quick metadata-based detection if available
       let imageContext: ImageContext;
       
       if (imageData.metadata && this.hasUsefulMetadata(imageData.metadata)) {
         console.log('[OptimizedPipeline] Using metadata-based detection');
-        imageContext = await this.metadataService.detectImageContextFromMetadata(
-          imageData.metadata,
-          imageData.url,
-          imageData.base64
-        );
-        this.performanceMetrics.metadataHits++;
+        try {
+          imageContext = await this.metadataService.detectImageContextFromMetadata(
+            imageData.metadata,
+            imageData.url,
+            imageData.base64
+          );
+          this.performanceMetrics.metadataHits++;
+        } catch (metadataError) {
+          console.warn('[OptimizedPipeline] Metadata detection failed, falling back to vision:', metadataError);
+          imageContext = await this.fallbackToVisionDetection(imageData);
+        }
       } else {
         console.log('[OptimizedPipeline] Falling back to vision-based detection');
-        imageContext = await this.contextService.detectImageContext(
-          imageData.url || '',
-          imageData.base64
-        );
-        this.performanceMetrics.visionFallbacks++;
+        imageContext = await this.fallbackToVisionDetection(imageData);
       }
 
-      // Phase 2: Process user context (fast)
+      // Phase 2: Enhanced user context inference
       const userContext = userInput ? 
         this.contextService.inferUserContext(userInput) : 
         this.createDefaultUserContext();
 
-      // Phase 3: Create unified analysis context
+      // Phase 3: Enhance domain detection based on user context
+      if (imageContext.domain === 'general' && userInput) {
+        const enhancedDomain = this.enhanceDomainFromUserInput(userInput);
+        if (enhancedDomain !== 'general') {
+          imageContext.domain = enhancedDomain;
+          console.log('[OptimizedPipeline] Enhanced domain from user input:', enhancedDomain);
+        }
+      }
+
+      // Phase 4: Create unified analysis context
       const analysisContext = this.contextService.createAnalysisContext(
         imageContext,
         userContext
@@ -68,7 +83,14 @@ export class OptimizedContextDetectionPipeline {
       const duration = Date.now() - startTime;
       this.updatePerformanceMetrics(duration);
 
-      console.log(`[OptimizedPipeline] Context detection completed in ${duration}ms`);
+      console.log(`[OptimizedPipeline] Context detection completed in ${duration}ms:`, {
+        primaryType: analysisContext.image.primaryType,
+        domain: analysisContext.image.domain,
+        userRole: analysisContext.user.inferredRole,
+        confidence: analysisContext.confidence,
+        focusAreas: analysisContext.focusAreas
+      });
+      
       return analysisContext;
 
     } catch (error) {
@@ -81,6 +103,56 @@ export class OptimizedContextDetectionPipeline {
       
       return fallbackContext;
     }
+  }
+
+  private async fallbackToVisionDetection(
+    imageData: { url?: string; base64?: string; metadata?: any }
+  ): Promise<ImageContext> {
+    try {
+      const imageContext = await this.contextService.detectImageContext(
+        imageData.url || '',
+        imageData.base64
+      );
+      this.performanceMetrics.visionFallbacks++;
+      return imageContext;
+    } catch (error) {
+      console.warn('[OptimizedPipeline] Vision detection failed:', error);
+      this.performanceMetrics.visionFallbacks++;
+      // Return basic fallback context
+      return {
+        primaryType: 'app',
+        subTypes: ['fallback'],
+        domain: 'general',
+        complexity: 'moderate',
+        userIntent: ['general analysis'],
+        platform: 'web',
+        designSystem: {
+          detected: false,
+          consistency: 0.5
+        }
+      };
+    }
+  }
+
+  private enhanceDomainFromUserInput(userInput: string): string {
+    const domainPatterns = {
+      finance: /bank|finance|financial|investment|trading|money|currency|payment|credit|loan|insurance|portfolio|stock|crypto/i,
+      healthcare: /health|medical|doctor|patient|clinic|hospital|medicine|treatment|diagnosis|therapy|pharmaceutical|wellness/i,
+      education: /education|school|university|college|student|teacher|learning|course|lesson|academic|training|curriculum/i,
+      ecommerce: /shop|store|buy|sell|product|cart|checkout|retail|marketplace|commerce|price|order|shipping/i,
+      real_estate: /property|real estate|house|home|apartment|rent|mortgage|listing|agent|broker|realty/i,
+      technology: /software|app|tech|development|coding|programming|digital|platform|saas|api|cloud/i,
+      travel: /travel|flight|hotel|booking|vacation|trip|tourism|airline|resort|destination/i,
+      food: /restaurant|food|recipe|cooking|menu|kitchen|dining|chef|culinary|meal/i
+    };
+
+    for (const [domain, pattern] of Object.entries(domainPatterns)) {
+      if (pattern.test(userInput)) {
+        return domain;
+      }
+    }
+
+    return 'general';
   }
 
   /**

@@ -1767,7 +1767,14 @@ Google Vision Metadata Available:
 Use this metadata to enhance your analysis accuracy and provide specific coordinate-based annotations.
 ` : '';
 
-  return `CRITICAL INSTRUCTION: You MUST provide a complete UX analysis with ALL required fields populated. Do not return empty arrays or placeholder data.
+  // Critical: Different models need different instruction styles for JSON output
+  const jsonInstruction = targetModel === 'claude' ? 
+    `You MUST respond with ONLY valid JSON. No markdown, no explanations, JUST the JSON object.` :
+    `Return your response as a valid JSON object following the exact structure specified below.`;
+
+  return `${jsonInstruction}
+
+CRITICAL INSTRUCTION: You MUST provide a complete UX analysis with ALL required fields populated. Do not return empty arrays or placeholder data.
 
 Analyze this application interface for usability, navigation patterns, and feature discoverability using the provided Google Vision metadata.
 
@@ -1808,21 +1815,21 @@ REQUIRED JSON STRUCTURE (you must populate ALL fields with real data):
       "id": "annotation_1",
       "x": 0.1,
       "y": 0.2,
-      "type": "issue|suggestion|positive",
+      "type": "issue",
       "title": "Specific Issue Title (NOT generic)",
       "description": "Detailed description of actual observation",
-      "severity": "critical|high|medium|low",
-      "category": "usability|accessibility|visual|content"
+      "severity": "medium",
+      "category": "usability"
     }
   ],
   "suggestions": [
     {
       "id": "suggestion_1",
-      "category": "usability|accessibility|visual|content|performance",
+      "category": "usability",
       "title": "Actionable recommendation (NOT placeholder)",
       "description": "Detailed explanation based on actual interface analysis",
-      "impact": "high|medium|low",
-      "effort": "high|medium|low",
+      "impact": "medium",
+      "effort": "medium",
       "actionItems": ["Specific step 1", "Specific step 2"]
     }
   ],
@@ -1854,7 +1861,7 @@ VALIDATION CHECKLIST (verify before responding):
 
 ${contextPart}
 
-Remember: Empty arrays or generic placeholders will be rejected. Provide comprehensive, specific analysis based on the actual interface shown.`;
+FINAL REMINDER: Respond with ONLY the JSON object. No explanations, no markdown formatting, just valid JSON.`;
 }
 
 async function synthesizeMultiModelResults(
@@ -1885,21 +1892,79 @@ async function synthesizeMultiModelResults(
     
     // CRITICAL FIX: Handle different response formats and field names
     const extractDataFromResult = (analysisResult: any) => {
-      if (!analysisResult?.result) return { suggestions: [], visualAnnotations: [], summary: null };
+      if (!analysisResult?.result) {
+        console.log('🔍 SYNTHESIS DEBUG - No result found in analysis:', analysisResult);
+        return { suggestions: [], visualAnnotations: [], summary: null };
+      }
       
       const result = analysisResult.result;
+      console.log('🔍 SYNTHESIS DEBUG - Raw result keys:', Object.keys(result));
       
-      // Handle different field naming conventions
-      const suggestions = result.suggestions || result.recommendations || [];
-      const visualAnnotations = result.visualAnnotations || result.visual_annotations || result.annotations || [];
-      const summary = result.summary || result.executiveSummary || null;
+      // Handle different field naming conventions and nested structures
+      let suggestions = result.suggestions || result.recommendations || [];
+      let visualAnnotations = result.visualAnnotations || result.visual_annotations || result.annotations || [];
+      let summary = result.summary || result.executiveSummary || null;
+      
+      // CRITICAL: Handle domain-specific analysis results that don't follow standard structure
+      // If we get domain-specific keys like 'data_visualization_clarity', try to convert them
+      if (suggestions.length === 0 && visualAnnotations.length === 0) {
+        console.log('🔍 SYNTHESIS DEBUG - Standard fields empty, checking for domain-specific content');
+        
+        // Try to extract from domain-specific analysis
+        const domainKeys = Object.keys(result).filter(key => 
+          !['metadata', 'summary', 'confidence'].includes(key)
+        );
+        
+        if (domainKeys.length > 0) {
+          console.log('🔍 SYNTHESIS DEBUG - Found domain-specific keys:', domainKeys);
+          
+          // Convert domain analysis to standard format
+          const convertedSuggestions = [];
+          const convertedAnnotations = [];
+          
+          domainKeys.forEach((key, index) => {
+            const domainData = result[key];
+            if (domainData && typeof domainData === 'object') {
+              // Create suggestion from domain analysis
+              convertedSuggestions.push({
+                id: `converted_${index + 1}`,
+                category: 'usability',
+                title: `${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Improvement`,
+                description: `Analysis findings for ${key}: ${JSON.stringify(domainData).substring(0, 200)}...`,
+                impact: 'medium',
+                effort: 'medium',
+                actionItems: ['Review analysis findings', 'Implement recommended changes']
+              });
+              
+              // Create annotation from domain analysis
+              convertedAnnotations.push({
+                id: `converted_ann_${index + 1}`,
+                x: 0.5,
+                y: 0.3 + (index * 0.1),
+                type: 'suggestion',
+                title: `${key.replace(/_/g, ' ')} Area`,
+                description: `Focus area identified for ${key} improvements`,
+                severity: 'medium',
+                category: 'usability'
+              });
+            }
+          });
+          
+          if (convertedSuggestions.length > 0) {
+            suggestions = convertedSuggestions;
+            visualAnnotations = convertedAnnotations;
+            console.log('🔍 SYNTHESIS DEBUG - Converted domain analysis to standard format');
+          }
+        }
+      }
       
       console.log('🔍 SYNTHESIS DEBUG - Extracted from result:', {
         model: analysisResult.model,
         suggestionsCount: suggestions.length,
         annotationsCount: visualAnnotations.length,
         hasSummary: !!summary,
-        originalKeys: Object.keys(result)
+        originalKeys: Object.keys(result),
+        converted: suggestions.length > 0 && suggestions[0]?.id?.startsWith('converted')
       });
       
       return { suggestions, visualAnnotations, summary };

@@ -463,26 +463,78 @@ export class EnhancedAnalysisPipeline {
    */
   private getContextSpecificMessage(context: AnalysisContext, metadata: any): string {
     const interfaceType = context.image.primaryType;
-    const elements = this.extractKeyElements(metadata);
     const domain = context.image.domain !== 'general' ? ` for ${context.image.domain}` : '';
-
-    if (elements.length > 0) {
-      return `Analyzing ${interfaceType}${domain} with ${elements.join(', ')}...`;
+    const userRole = context.user.inferredRole;
+    const focusAreas = context.focusAreas || [];
+    
+    // Generate role-specific messaging
+    let roleContext = '';
+    if (userRole) {
+      switch (userRole) {
+        case 'designer':
+          roleContext = ' focusing on visual hierarchy and design consistency';
+          break;
+        case 'developer':
+          roleContext = ' examining implementation patterns and technical usability';
+          break;
+        case 'business':
+          roleContext = ' evaluating conversion potential and business impact';
+          break;
+        case 'product':
+          roleContext = ' analyzing user workflows and feature discoverability';
+          break;
+        case 'marketing':
+          roleContext = ' reviewing messaging effectiveness and brand alignment';
+          break;
+      }
     }
 
+    // Generate focus-specific messaging
+    let focusContext = '';
+    if (focusAreas.length > 0) {
+      const primaryFocus = focusAreas[0];
+      switch (primaryFocus) {
+        case 'accessibility':
+          focusContext = ' with special attention to accessibility standards';
+          break;
+        case 'mobile':
+          focusContext = ' optimizing for mobile user experience';
+          break;
+        case 'conversion':
+          focusContext = ' targeting conversion optimization opportunities';
+          break;
+        case 'performance':
+          focusContext = ' analyzing performance impact on user experience';
+          break;
+        case 'data-visualization':
+          focusContext = ' examining data presentation and clarity';
+          break;
+      }
+    }
+
+    // Get detected elements for richer context
+    const elements = this.extractKeyElements(metadata);
+    let elementContext = '';
+    if (elements.length > 0) {
+      elementContext = ` including ${elements.slice(0, 2).join(' and ')}`;
+    }
+
+    // Build comprehensive message
     switch (interfaceType) {
       case 'dashboard':
-        return `Analyzing dashboard layout and data visualization patterns${domain}...`;
+        return `Analyzing ${domain || 'data'} dashboard layout and visualization patterns${elementContext}${roleContext}${focusContext}...`;
       case 'landing':
-        return `Analyzing landing page conversion elements and messaging${domain}...`;
+        return `Analyzing landing page conversion elements and messaging${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
       case 'mobile':
-        return `Analyzing mobile interface touch targets and gesture patterns${domain}...`;
+        return `Analyzing mobile interface touch targets and gesture patterns${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
       case 'ecommerce':
-        return `Analyzing e-commerce user journey and trust signals${domain}...`;
+        return `Analyzing e-commerce user journey and trust signals${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
       case 'form':
-        return `Analyzing form usability and completion flow${domain}...`;
+        return `Analyzing form usability and completion flow${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
+      case 'saas':
+        return `Analyzing SaaS interface workflows and feature adoption${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
       default:
-        return `Analyzing ${interfaceType} usability and design patterns${domain}...`;
+        return `Analyzing ${interfaceType} interface usability and design patterns${domain ? ` for ${domain}` : ''}${elementContext}${roleContext}${focusContext}...`;
     }
   }
 

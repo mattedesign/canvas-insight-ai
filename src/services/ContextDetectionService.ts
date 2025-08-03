@@ -9,19 +9,55 @@ export class ContextDetectionService {
     try {
       console.log('[ContextDetection] Starting image context detection...');
       
-      const contextPrompt = `Analyze this UI/UX interface image and determine:
-      1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
-      2. Sub-types or specific patterns
-      3. Domain/industry (finance/healthcare/education/retail/etc)
-      4. Complexity level (simple/moderate/complex)
-      5. Likely user intents based on UI elements
-      6. Business model indicators
-      7. Target audience indicators
-      8. Product maturity stage
-      9. Platform type (web/mobile/desktop/responsive)
-      10. Design system presence and consistency
+      const contextPrompt = `Analyze this UI/UX interface image and provide detailed context detection. Focus on identifying specific patterns, domain indicators, and user characteristics.
 
-      Please return your analysis as a valid JSON object with confidence scores for each determination.`;
+CRITICAL: You must return a complete JSON object with all fields populated based on visual analysis.
+
+Analyze these key aspects:
+1. **Interface Type**: What type of interface is this? Look for visual cues:
+   - Dashboard: Charts, graphs, KPIs, data tables, metrics
+   - Landing Page: Hero sections, CTAs, marketing copy, testimonials
+   - Mobile App: Touch-friendly elements, mobile navigation patterns
+   - E-commerce: Product listings, shopping carts, payment flows
+   - Form: Input fields, validation, submission buttons
+   - SaaS: Feature-rich interfaces, complex workflows, settings
+
+2. **Domain Detection**: Look for industry-specific elements:
+   - Finance: Currency symbols, charts, trading interfaces, bank layouts
+   - Healthcare: Medical terminology, patient info, clinical workflows
+   - Education: Learning modules, progress tracking, gradebooks
+   - Retail: Product catalogs, inventory, pricing
+   - Real Estate: Property listings, maps, search filters
+
+3. **Platform & Design System**: 
+   - Web vs Mobile indicators
+   - Design framework patterns (Material, Bootstrap, custom)
+   - Consistency in spacing, colors, typography
+
+4. **User Experience Maturity**:
+   - Prototype: Basic layouts, placeholder content
+   - MVP: Core functionality, simple design
+   - Growth: Feature-rich, polished interface
+   - Mature: Complex workflows, advanced features
+
+Required JSON format:
+{
+  "primaryType": "dashboard|landing|app|form|ecommerce|content|portfolio|saas|mobile",
+  "subTypes": ["specific_patterns"],
+  "domain": "finance|healthcare|education|retail|technology|general",
+  "complexity": "simple|moderate|complex",
+  "userIntent": ["primary_user_goals"],
+  "businessModel": "saas|ecommerce|marketplace|content|enterprise",
+  "targetAudience": "consumers|professionals|enterprise|developers",
+  "maturityStage": "prototype|mvp|growth|mature",
+  "platform": "web|mobile|desktop|responsive",
+  "designSystem": {
+    "detected": true/false,
+    "type": "material|bootstrap|custom|unknown",
+    "consistency": 0.0-1.0
+  },
+  "confidence": 0.0-1.0
+}`;
 
       console.log('[ContextDetection] Calling edge function with:', { imageUrl, prompt: contextPrompt });
       
@@ -127,52 +163,84 @@ export class ContextDetectionService {
     explicitContext: string,
     previousInteractions?: any[]
   ): UserContext {
+    console.log('[ContextDetection] Inferring user context from:', explicitContext);
+    
     const context: UserContext = {
       technicalLevel: 'some-technical',
       expertise: 'intermediate'
     };
 
-    // Analyze explicit context for role indicators
+    // Enhanced role indicators with more patterns
     const roleIndicators = {
-      designer: /design|ui|ux|visual|aesthetic|color|typography/i,
-      developer: /code|component|api|implement|technical|architecture/i,
-      business: /revenue|conversion|roi|metrics|growth|acquisition/i,
-      product: /feature|roadmap|user story|backlog|priorit/i,
-      marketing: /campaign|messaging|brand|seo|content|copy/i
+      designer: /design|ui|ux|visual|aesthetic|color|typography|figma|sketch|adobe|wireframe|mockup|prototype|user interface|user experience|brand|layout|style|creative/i,
+      developer: /code|component|api|implement|technical|architecture|react|vue|angular|javascript|typescript|frontend|backend|development|programming|software engineer|dev/i,
+      business: /revenue|conversion|roi|metrics|growth|acquisition|sales|marketing|business|profit|kpi|analytics|stakeholder|ceo|founder|manager|strategy|market/i,
+      product: /feature|roadmap|user story|backlog|priorit|product manager|product owner|pm|scrum|agile|requirements|specs|mvp|sprint/i,
+      marketing: /campaign|messaging|brand|seo|content|copy|lead|funnel|engagement|social media|email marketing|advertising|cta|traffic/i
     };
 
+    let roleFound = false;
     for (const [role, pattern] of Object.entries(roleIndicators)) {
       if (pattern.test(explicitContext)) {
         context.inferredRole = role as any;
+        roleFound = true;
+        console.log('[ContextDetection] Detected user role:', role);
         break;
       }
     }
 
-    // Detect expertise level
-    if (/beginner|new to|help me understand|basic/i.test(explicitContext)) {
+    // If no role detected, try to infer from general language patterns
+    if (!roleFound) {
+      if (/improve|enhance|better|optimize|fix|problem|issue|analysis/i.test(explicitContext)) {
+        context.inferredRole = 'product'; // Default to product perspective for improvement-focused users
+      }
+    }
+
+    // Enhanced expertise level detection
+    if (/beginner|new to|help me understand|basic|novice|learning|first time/i.test(explicitContext)) {
       context.expertise = 'beginner';
       context.technicalLevel = 'non-technical';
-    } else if (/advanced|expert|deep dive|comprehensive/i.test(explicitContext)) {
+    } else if (/advanced|expert|deep dive|comprehensive|professional|senior|experienced|detailed analysis/i.test(explicitContext)) {
       context.expertise = 'expert';
       context.technicalLevel = 'technical';
     }
 
-    // Extract goals
-    const goalMatches = explicitContext.match(/(?:want to|need to|help me|looking to|trying to)\s+([^.!?]+)/gi);
-    if (goalMatches) {
-      context.goals = goalMatches.map(match => 
-        match.replace(/(?:want to|need to|help me|looking to|trying to)\s+/i, '').trim()
-      );
+    // Enhanced goal extraction with more patterns
+    const goalPatterns = [
+      /(?:want to|need to|help me|looking to|trying to|hoping to|planning to)\s+([^.!?]+)/gi,
+      /(?:improve|enhance|optimize|fix|analyze|review|assess)\s+([^.!?]+)/gi,
+      /(?:make|create|build|develop)\s+([^.!?]+)/gi
+    ];
+
+    context.goals = [];
+    goalPatterns.forEach(pattern => {
+      const matches = explicitContext.matchAll(pattern);
+      for (const match of matches) {
+        const goal = match[1].trim();
+        if (goal && goal.length > 3) { // Filter out very short matches
+          context.goals!.push(goal);
+        }
+      }
+    });
+
+    // If no goals detected, try to infer from action words
+    if (!context.goals || context.goals.length === 0) {
+      const actionWords = explicitContext.match(/\b(improve|enhance|optimize|analyze|review|assess|fix|increase|reduce|boost|streamline)\b/gi);
+      if (actionWords) {
+        context.goals = [`${actionWords[0].toLowerCase()} user experience`];
+      }
     }
 
-    // Detect focus areas
+    // Enhanced focus area detection
     const focusPatterns = {
-      conversion: /conversion|convert|cta|action|purchase/i,
-      accessibility: /accessible|a11y|wcag|screen reader|disability/i,
-      performance: /performance|speed|fast|load|optimize/i,
-      mobile: /mobile|responsive|touch|gesture|small screen/i,
-      'data-visualization': /chart|graph|data|metrics|dashboard|visualiz/i,
-      'trust-signals': /trust|security|credibility|testimonial|social proof/i
+      conversion: /conversion|convert|cta|call to action|purchase|buy|checkout|funnel|signup|lead generation/i,
+      accessibility: /accessible|a11y|wcag|screen reader|disability|inclusive|compliance|keyboard navigation/i,
+      performance: /performance|speed|fast|load|optimize|slow|lag|responsive|quick/i,
+      mobile: /mobile|responsive|touch|gesture|small screen|tablet|phone|ios|android/i,
+      'data-visualization': /chart|graph|data|metrics|dashboard|visualiz|analytics|report|insights|kpi/i,
+      'trust-signals': /trust|security|credibility|testimonial|social proof|reviews|badges|certification/i,
+      usability: /usability|user friendly|intuitive|easy to use|navigation|flow|experience|confusion|clarity/i,
+      design: /design|visual|appearance|layout|styling|color|font|spacing|alignment|hierarchy/i
     };
 
     context.focusAreas = [];
@@ -182,12 +250,27 @@ export class ContextDetectionService {
       }
     }
 
-    // Set output preferences based on role and expertise
+    // Add default focus areas if none detected
+    if (context.focusAreas.length === 0) {
+      context.focusAreas = ['usability']; // Default to usability focus
+    }
+
+    // Enhanced output preferences based on detected context
     context.outputPreferences = {
-      detailLevel: context.expertise === 'expert' ? 'comprehensive' : 'detailed',
-      jargonLevel: context.technicalLevel === 'technical' ? 'technical' : 'minimal',
-      prioritization: context.inferredRole === 'business' ? 'impact' : 'effort'
+      detailLevel: context.expertise === 'expert' ? 'comprehensive' : 
+                  context.expertise === 'beginner' ? 'concise' : 'detailed',
+      jargonLevel: context.technicalLevel === 'technical' ? 'technical' : 
+                  context.technicalLevel === 'non-technical' ? 'avoid' : 'minimal',
+      prioritization: context.inferredRole === 'business' ? 'impact' : 
+                     context.inferredRole === 'developer' ? 'effort' : 'quick-wins'
     };
+
+    console.log('[ContextDetection] Final user context:', {
+      inferredRole: context.inferredRole,
+      expertise: context.expertise,
+      focusAreas: context.focusAreas,
+      goalsCount: context.goals?.length || 0
+    });
 
     return context;
   }
