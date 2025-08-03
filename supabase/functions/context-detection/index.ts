@@ -11,9 +11,25 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, prompt, model = 'gpt-4o', maxTokens = 1000 } = await req.json();
+    const { imageUrl, imageBase64, prompt, model = 'gpt-4o', maxTokens = 1000 } = await req.json();
 
-    // Quick context detection using GPT-4.1
+    // Handle image data - prioritize base64 from frontend over URL fetching
+    let processedImageUrl = null;
+    
+    if (imageBase64) {
+      console.log('Using provided base64 image data for context detection, length:', imageBase64.length);
+      processedImageUrl = `data:image/jpeg;base64,${imageBase64}`;
+    } else if (imageUrl && imageUrl.startsWith('data:')) {
+      console.log('Using existing data URL for context detection');
+      processedImageUrl = imageUrl;
+    } else if (imageUrl && !imageUrl.startsWith('blob:')) {
+      console.log('Using provided image URL for context detection');
+      processedImageUrl = imageUrl;
+    } else {
+      throw new Error('No valid image data provided. Blob URLs cannot be accessed from edge functions.');
+    }
+
+    // Quick context detection using OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -31,7 +47,7 @@ serve(async (req) => {
             },
             {
               type: 'image_url',
-              image_url: { url: imageUrl }
+              image_url: { url: processedImageUrl }
             }
           ]
         }],

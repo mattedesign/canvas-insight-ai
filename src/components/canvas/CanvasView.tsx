@@ -1493,42 +1493,40 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
 
     try {
-      console.log('[CanvasView] Executing pipeline for image:', image.url);
+      console.log('[CanvasView] Executing AI analysis for image:', image.url);
       
-      // Create a new pipeline instance
-      const pipeline = new BoundaryPushingPipeline();
+      // Update node to show progress
+      updateAnalysisNode(analysisNodeId, {
+        progress: 10,
+        stage: 'Starting analysis...',
+        status: 'loading'
+      });
       
-      // Execute with progress callback
-      const result = await pipeline.execute(
+      // Use AIContext which handles blob URL conversion
+      const result = await analyzeImageWithAI(
+        image.id,
         image.url,
-        context || 'General UX analysis',
-        (progress, stage) => {
-          console.log('[CanvasView] Pipeline progress:', progress, stage);
-          updateAnalysisNode(analysisNodeId, {
-            progress,
-            stage,
-            status: 'loading'
-          });
-        }
+        image.name,
+        context || 'General UX analysis'
       );
       
-      console.log('[CanvasView] Pipeline result:', result);
+      console.log('[CanvasView] AI analysis result:', result);
       
-      // Handle results
+      // Handle results - AIContext returns data directly
       if (result?.requiresClarification) {
         updateAnalysisNode(analysisNodeId, {
           status: 'clarification',
           clarificationQuestions: result.questions || ['Please provide more context for analysis']
         });
-      } else if (result?.data) {
-        // Success - create analysis card
-        onAnalysisComplete?.(imageId, result.data);
+      } else if (result) {
+        // Success - create analysis card with the direct result
+        onAnalysisComplete?.(imageId, result);
         
         // Remove request node
         setNodes(currentNodes => currentNodes.filter(n => n.id !== analysisNodeId));
         setEdges(currentEdges => currentEdges.filter(e => e.target !== analysisNodeId));
       } else {
-        throw new Error('No data returned from pipeline');
+        throw new Error('No data returned from AI analysis');
       }
       
     } catch (error) {

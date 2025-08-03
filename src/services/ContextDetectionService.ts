@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PipelineError } from '@/types/pipelineErrors';
 
 export class ContextDetectionService {
-  async detectImageContext(imageUrl: string): Promise<ImageContext> {
+  async detectImageContext(imageUrl: string, imageBase64?: string): Promise<ImageContext> {
     const timeoutMs = 30000; // 30 second timeout
     
     try {
@@ -21,7 +21,7 @@ export class ContextDetectionService {
       9. Platform type (web/mobile/desktop/responsive)
       10. Design system presence and consistency
 
-      Return as JSON with confidence scores for each determination.`;
+      Please return your analysis as a valid JSON object with confidence scores for each determination.`;
 
       console.log('[ContextDetection] Calling edge function with:', { imageUrl, prompt: contextPrompt });
       
@@ -33,6 +33,7 @@ export class ContextDetectionService {
       const analysisPromise = supabase.functions.invoke('context-detection', {
         body: {
           imageUrl,
+          imageBase64,
           prompt: contextPrompt,
           model: 'gpt-4o',
           maxTokens: 1000
