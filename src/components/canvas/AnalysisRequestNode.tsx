@@ -52,9 +52,16 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
           if (!isMountedRef.current) return; // Check if still mounted
           
           console.log('[AnalysisRequestNode] Analysis result:', result);
-          setIsComplete(true);
-          if (onAnalysisComplete) {
-            onAnalysisComplete(result);
+          
+          // Validate result before marking complete
+          if (result && (result.data || result.suggestions || result.visualAnnotations)) {
+            setIsComplete(true);
+            if (onAnalysisComplete) {
+              onAnalysisComplete(result);
+            }
+          } else {
+            console.warn('[AnalysisRequestNode] Invalid analysis result:', result);
+            setError('Analysis returned invalid data');
           }
         })
         .catch((err) => {

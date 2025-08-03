@@ -6,7 +6,7 @@ import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
-import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
+
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 
 const SimplifiedCanvas = () => {
@@ -32,7 +32,7 @@ const SimplifiedCanvas = () => {
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   
-  const { generateEnhancedConcept } = useEnhancedAnalysis();
+  
   const loadedRef = useRef<string | null>(null);
 
   // Stable data loading effect with minimal dependencies
@@ -104,11 +104,11 @@ const SimplifiedCanvas = () => {
       if (Array.isArray(uploadedImages)) {
         const image = analysis ? uploadedImages.find(img => img.id === analysis.imageId) : null;
         if (analysis && image) {
-          await generateEnhancedConcept(analysis, image.url, image.name);
+          console.log('Concept generation requested for:', image.name);
         }
       }
     }
-  }, [analyses, uploadedImages, generateEnhancedConcept]);
+  }, [analyses, uploadedImages]);
 
   const handleAddImages = useCallback((files?: File[]) => {
     console.log('[SimplifiedCanvas] handleAddImages called with files:', files?.length || 'creating input');

@@ -5,7 +5,7 @@ import { AnnotationComment } from './AnnotationComment';
 import { DrawingOverlay } from './DrawingOverlay';
 import { GalleryFloatingToolbar } from './GalleryFloatingToolbar';
 import { ImageAnalysisDialog } from './ImageAnalysisDialog';
-import OptimizedAnalysisDialog from './OptimizedAnalysisDialog';
+
 import { Button } from './ui/button';
 import { Brain, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +44,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState({ x: 0, y: 0 });
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-  const [showOptimizedDialog, setShowOptimizedDialog] = useState(false);
+  
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   // Remove useImageTransform hook that was interfering with TransformWrapper
@@ -248,14 +248,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           <Brain className="h-4 w-4 mr-2" />
           Standard Analysis
         </Button>
-        <Button
-          onClick={() => setShowOptimizedDialog(true)}
-          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
-          size="sm"
-        >
-          <Zap className="h-4 w-4 mr-2" />
-          Optimized Pipeline
-        </Button>
       </div>
 
       {/* Gallery Floating Toolbar */}
@@ -295,21 +287,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
         />
       )}
       
-      {showOptimizedDialog && (
-        <OptimizedAnalysisDialog
-          isOpen={showOptimizedDialog}
-          onClose={() => setShowOptimizedDialog(false)}
-          imageUrl={analysis.imageUrl}
-          imageName={analysis.imageName}
-          imageId={analysis.imageId}
-          onAnalysisComplete={(newAnalysis) => {
-            setShowOptimizedDialog(false);
-            if (onAnalysisComplete) {
-              onAnalysisComplete(newAnalysis);
-            }
-          }}
-        />
-      )}
     </>
   ), [
     analysis,

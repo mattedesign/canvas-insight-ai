@@ -38,8 +38,6 @@ import { AICanvasToolbar } from './AICanvasToolbar';
 import { AIContextMenu } from './AIContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
-import { useOptimizedPipeline } from '@/hooks/useOptimizedPipeline';
 
 
 import { Button } from '@/components/ui/button';
@@ -154,8 +152,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   // AI Integration - Use the new pipeline
   const { analyzeImageWithAI } = useAI();
-  const { performEnhancedAnalysis, isAnalyzing, progress, stage, error } = useEnhancedAnalysis();
-  const pipeline = useOptimizedPipeline();
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
@@ -393,27 +389,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     if (!image) return;
 
     try {
-      const result = await performEnhancedAnalysis(image.url, image.name, image.id);
-      if (result.success && result.data) {
-        onAnalysisComplete?.(image.id, result.data);
-        // COMMENTED OUT: Repetitive enhanced analysis completion toast
-        // toast({
-        //   title: "Enhanced Analysis Complete",
-        //   description: `Enhanced AI analysis completed for ${image.name}`,
-        //   category: "success",
-        // });
-      } else {
-        throw new Error(result.error || 'Enhanced analysis failed');
+      const result = await analyzeImageWithAI(imageId, image.url, image.name);
+      if (result) {
+        onAnalysisComplete?.(image.id, result);
+        toast({
+          title: "Analysis Complete",
+          description: `AI analysis completed for ${image.name}`,
+          category: "success",
+        });
       }
     } catch (error) {
-      console.error('Enhanced analysis failed:', error);
+      console.error('Analysis failed:', error);
       toast({
-        title: "Enhanced Analysis Failed",
-        description: "Failed to perform enhanced analysis. Please try again.",
+        title: "Analysis Failed",
+        description: "Failed to perform analysis. Please try again.",
         category: "error",
       });
     }
-  }, [uploadedImages, performEnhancedAnalysis, onAnalysisComplete, toast]);
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleViewAnalysis = useCallback((imageId: string) => {
     const analysis = (analyses || []).find(a => a.imageId === imageId);

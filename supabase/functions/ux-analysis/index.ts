@@ -945,6 +945,11 @@ function mapModelName(requestedModel: string): string {
 
 // Find best model match for suggestions
 function findBestModelMatch(requestedModel: string, availableModels: string[]): string {
+  // Handle "auto" model selection
+  if (requestedModel === 'auto') {
+    return 'gpt-4o'
+  }
+  
   // Simple fuzzy matching
   if (requestedModel.includes('gpt') || requestedModel.includes('openai')) {
     return availableModels.find(m => m.includes('gpt')) || 'gpt-4o'
@@ -955,7 +960,7 @@ function findBestModelMatch(requestedModel: string, availableModels: string[]): 
   if (requestedModel.includes('gemini') || requestedModel.includes('google')) {
     return availableModels.find(m => m.includes('gemini')) || 'gemini-2.5-pro'
   }
-  return availableModels[0] || 'gpt-4o'
+  return 'gpt-4o'
 }
 
 // Image format detection function

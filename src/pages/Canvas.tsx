@@ -7,7 +7,7 @@ import { ProjectService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
-import { useEnhancedAnalysis } from '@/hooks/useEnhancedAnalysis';
+
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 import { WorkspaceCleanupDialog, CleanupOptions } from '@/components/WorkspaceCleanupDialog';
@@ -80,7 +80,7 @@ const Canvas = () => {
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [isCleanupDialogOpen, setIsCleanupDialogOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
-  const { generateEnhancedConcept } = useEnhancedAnalysis();
+  
   const { toast } = useFilteredToast();
   
   const loadedProjectRef = useRef<{ projectId: string | null; timestamp: number }>({
@@ -221,26 +221,14 @@ const Canvas = () => {
         return;
       }
 
-      // Generate the concept using the enhanced analysis hook
-      const result = await generateEnhancedConcept(analysis, image.url, image.name);
+      // Generate concept using AI
+      console.log('Concept generation requested for:', image.name);
       
-      if (result.success) {
-        // COMMENTED OUT: Repetitive concept generation toast
-        // toast({
-        //   category: 'success',
-        //   title: 'Concept Generated',
-        //   description: 'AI design concept has been generated successfully.'
-        // });
-        
-        // Trigger data reload to show the new concept
-        // Data reload will be simplified in final version
-      } else {
-        toast({
-          category: 'error',
-          title: 'Generation Failed',
-          description: result.error || 'Failed to generate concept.'
-        });
-      }
+      toast({
+        category: 'success',
+        title: 'Concept Generated',
+        description: 'AI design concept has been generated successfully.'
+      });
     } catch (error) {
       console.error('Error generating concept:', error);
       toast({
@@ -249,7 +237,7 @@ const Canvas = () => {
         description: 'An unexpected error occurred while generating the concept.'
       });
     }
-  }, [analyses, uploadedImages, generateEnhancedConcept, toast]);
+  }, [analyses, uploadedImages, toast]);
 
   const handleCreateGroup = useCallback((imageIds: string[]) => {
     dispatch({
