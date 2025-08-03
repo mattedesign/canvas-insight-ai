@@ -11,6 +11,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { ProjectDeletionDialog } from '@/components/ProjectDeletionDialog';
+import { useLongPress } from '@/hooks/useLongPress';
+import { ProjectContextMenu } from '@/components/ProjectContextMenu';
 
 interface Project {
   id: string;
@@ -32,6 +34,11 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ 
+    open: boolean; 
+    project: Project | null; 
+    selectedCount: number; 
+  }>({ open: false, project: null, selectedCount: 0 });
   const multiSelection = useMultiSelection();
 
   const loadProjects = async () => {
@@ -174,7 +181,33 @@ const Projects = () => {
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
       multiSelection.clearSelection();
+      setContextMenu({ open: false, project: null, selectedCount: 0 });
     }
+  };
+
+  const handleLongPress = (project: Project) => {
+    const selectedCount = multiSelection.state.selectedIds.length > 0 
+      ? multiSelection.state.selectedIds.length 
+      : 1;
+    
+    // If project isn't selected and we have a selection, add it to selection
+    if (!multiSelection.isSelected(project.id) && multiSelection.state.selectedIds.length > 0) {
+      multiSelection.toggleSelection(project.id, true);
+    }
+    
+    setContextMenu({ 
+      open: true, 
+      project, 
+      selectedCount: multiSelection.isSelected(project.id) ? selectedCount : 1 
+    });
+  };
+
+  const createLongPressHandler = (project: Project) => {
+    return useLongPress({
+      onLongPress: () => handleLongPress(project),
+      duration: 500,
+      hapticFeedback: true,
+    });
   };
 
   if (loading) {
@@ -256,14 +289,16 @@ const Projects = () => {
               const imageCount = project.images?.[0]?.count || 0;
               const analysisCount = project.ux_analyses?.[0]?.count || 0;
               const isSelected = multiSelection.isSelected(project.id);
+              const longPressHandlers = createLongPressHandler(project);
               
               return (
                 <Card 
                   key={project.id} 
-                  className={`relative hover:shadow-lg transition-all cursor-pointer ${
+                  className={`relative hover:shadow-lg transition-all cursor-pointer select-none ${
                     isSelected ? 'ring-2 ring-primary shadow-lg' : ''
                   }`}
                   onClick={(e) => handleProjectClick(project, e)}
+                  {...longPressHandlers}
                 >
                   {isSelected && (
                     <div className="absolute top-3 right-3 z-10 bg-primary text-primary-foreground rounded-full p-1">
@@ -340,6 +375,16 @@ const Projects = () => {
         onConfirm={handleDeleteProjects}
         projectCount={multiSelection.state.selectedIds.length}
         isDeleting={isDeleting}
+      />
+
+      <ProjectContextMenu
+        open={contextMenu.open}
+        onOpenChange={(open) => setContextMenu(prev => ({ ...prev, open }))}
+        projectName={contextMenu.project?.name || ''}
+        projectId={contextMenu.project?.id || ''}
+        selectedCount={contextMenu.selectedCount}
+        onOpen={() => contextMenu.project && handleSwitchProject(contextMenu.project)}
+        onDelete={() => setShowDeleteDialog(true)}
       />
     </div>
   );
