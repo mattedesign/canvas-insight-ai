@@ -1145,7 +1145,8 @@ async function storeAnalysisResults(pipelineResults: any) {
       executionTime: pipelineResults.executionTime,
       confidence: visionResults.confidence,
       pipelineVersion: '2.0',
-      stagesCompleted: ['context', 'vision', 'analysis', 'synthesis']
+      stagesCompleted: ['context', 'vision', 'analysis', 'synthesis'],
+      aiGenerated: true // CRITICAL: Mark as real AI analysis
     },
     
     // CRITICAL: Include analysis context for display
@@ -1184,6 +1185,25 @@ async function executeMultiModelPipeline(params: {
   const { imageUrl, imageBase64, userContext, imageName, imageId } = params;
   
   try {
+    // Step 0: Context Detection (CRITICAL - was missing!)
+    console.log('🔍 Step 0: Detecting context and checking for clarification needs...');
+    const contextResult = await detectImageContextAndClarification(imageUrl, imageBase64, userContext);
+    
+    // If clarification is needed, return early
+    if (contextResult.requiresClarification) {
+      console.log('❓ Context clarification needed, returning early');
+      return {
+        success: true,
+        data: {
+          requiresClarification: true,
+          questions: contextResult.questions,
+          partialContext: contextResult.analysisContext
+        }
+      };
+    }
+    
+    console.log('✅ Context detection complete, proceeding with analysis');
+    
     // Step 1: Extract metadata with Google Vision
     console.log('📊 Step 1: Extracting metadata with Google Vision...');
     const visionMetadata = await extractGoogleVisionMetadata(imageUrl, imageBase64);
@@ -1216,6 +1236,192 @@ async function executeMultiModelPipeline(params: {
     console.error('❌ Multi-model pipeline error:', error);
     throw error;
   }
+}
+
+// CRITICAL: Context Detection Function that was missing
+async function detectImageContextAndClarification(imageUrl: string, imageBase64?: string, userContext?: string): Promise<any> {
+  console.log('[ContextDetection] Starting image context detection...');
+  
+  try {
+    const contextPrompt = `Analyze this UI/UX interface image and determine:
+    1. Primary interface type (dashboard/landing/app/form/ecommerce/content/portfolio/saas/mobile)
+    2. Sub-types or specific patterns
+    3. Domain/industry (finance/healthcare/education/retail/etc)
+    4. Complexity level (simple/moderate/complex)
+    5. Likely user intents based on UI elements
+    6. Business model indicators
+    7. Target audience indicators
+    8. Product maturity stage
+    9. Platform type (web/mobile/desktop/responsive)
+    10. Design system presence and consistency
+
+    Please return your analysis as a valid JSON object with confidence scores for each determination.`;
+
+    const payload = {
+      model: 'gpt-4o',
+      imageUrl,
+      imageBase64,
+      prompt: contextPrompt,
+      maxTokens: 1000
+    };
+
+    console.log('[ContextDetection] Calling OpenAI for context detection...');
+    const response = await executeOpenAI(MODEL_CONFIGS['gpt-4o'], Deno.env.get('OPENAI_API_KEY')!, payload);
+    const responseText = await response.text();
+    const contextData = JSON.parse(responseText);
+
+    console.log('[ContextDetection] Successfully received context data:', contextData);
+    
+    // Parse context and create analysis context
+    const imageContext = parseImageContext(contextData);
+    const userContextParsed = inferUserContext(userContext || '');
+    const analysisContext = createAnalysisContext(imageContext, userContextParsed);
+    
+    console.log('[ContextDetection] Analysis context created:', {
+      confidence: analysisContext.confidence,
+      clarificationNeeded: analysisContext.clarificationNeeded
+    });
+    
+    // Check if clarification is needed
+    if (analysisContext.clarificationNeeded && analysisContext.confidence < 0.7) {
+      const questions = generateClarificationQuestions(imageContext, userContextParsed);
+      return {
+        requiresClarification: true,
+        questions,
+        analysisContext
+      };
+    }
+    
+    return {
+      requiresClarification: false,
+      analysisContext
+    };
+    
+  } catch (error) {
+    console.error('[ContextDetection] Failed to detect context:', error);
+    
+    // Create fallback context instead of failing
+    const fallbackContext = {
+      image: {
+        primaryType: 'app',
+        domain: 'general',
+        complexity: 'moderate',
+        platform: 'web'
+      },
+      user: {
+        expertise: 'intermediate',
+        inferredRole: null
+      },
+      confidence: 0.5,
+      clarificationNeeded: false
+    };
+    
+    return {
+      requiresClarification: false,
+      analysisContext: fallbackContext
+    };
+  }
+}
+
+// Helper functions for context detection
+function parseImageContext(data: any): any {
+  const responseData = data.data || data.result || data;
+  
+  let primaryType = responseData.primaryType || responseData.interface_type || responseData.type || 'unknown';
+  
+  if (primaryType === 'unknown' || !primaryType) {
+    primaryType = 'app'; // Default fallback
+  }
+  
+  return {
+    primaryType,
+    subTypes: responseData.subTypes || responseData.sub_types || [],
+    domain: responseData.domain || responseData.industry || 'general',
+    complexity: responseData.complexity || 'moderate',
+    userIntent: responseData.userIntent || responseData.user_intent || [],
+    platform: responseData.platform || 'web'
+  };
+}
+
+function inferUserContext(explicitContext: string): any {
+  const context = {
+    technicalLevel: 'some-technical',
+    expertise: 'intermediate',
+    inferredRole: null,
+    goals: [],
+    focusAreas: []
+  };
+
+  // Analyze explicit context for role indicators
+  const roleIndicators = {
+    designer: /design|ui|ux|visual|aesthetic|color|typography/i,
+    developer: /code|component|api|implement|technical|architecture/i,
+    business: /revenue|conversion|roi|metrics|growth|acquisition/i,
+    product: /feature|roadmap|user story|backlog|priorit/i,
+  };
+
+  for (const [role, pattern] of Object.entries(roleIndicators)) {
+    if (pattern.test(explicitContext)) {
+      context.inferredRole = role;
+      break;
+    }
+  }
+
+  return context;
+}
+
+function createAnalysisContext(imageContext: any, userContext: any): any {
+  const confidence = calculateContextConfidence(imageContext, userContext);
+  
+  return {
+    image: imageContext,
+    user: userContext,
+    confidence,
+    clarificationNeeded: confidence < 0.7,
+    focusAreas: [],
+    analysisDepth: 'standard'
+  };
+}
+
+function calculateContextConfidence(imageContext: any, userContext: any): number {
+  let confidence = 0.5; // Base confidence
+
+  // Image context factors
+  if (imageContext.primaryType !== 'unknown') confidence += 0.2;
+  if (imageContext.domain && imageContext.domain !== 'general') confidence += 0.15;
+
+  // User context factors
+  if (userContext.inferredRole) confidence += 0.1;
+  if (userContext.goals && userContext.goals.length > 0) confidence += 0.1;
+
+  return Math.min(confidence, 1.0);
+}
+
+function generateClarificationQuestions(imageContext: any, userContext: any): string[] {
+  const questions: string[] = [];
+
+  // Clarify interface type if uncertain
+  if (imageContext.primaryType === 'unknown') {
+    questions.push(
+      "What type of interface is this? (e.g., dashboard, landing page, mobile app, form, etc.)"
+    );
+  }
+
+  // Clarify user role if not detected
+  if (!userContext.inferredRole) {
+    questions.push(
+      "What's your role? (designer, developer, product manager, business owner, etc.)"
+    );
+  }
+
+  // Always have at least one question if confidence is low
+  if (questions.length === 0) {
+    questions.push(
+      "Could you tell me more about this interface and what kind of analysis would be most helpful?"
+    );
+  }
+
+  return questions;
 }
 
 async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: string): Promise<any> {
@@ -1517,7 +1723,10 @@ async function synthesizeMultiModelResults(
       visualAnnotations: allAnnotations.slice(0, 10), // Top 10 annotations
       suggestions: allSuggestions.slice(0, 8), // Top 8 suggestions
       summary: synthesizedSummary,
-      metadata: enhancedMetadata,
+      metadata: {
+        ...enhancedMetadata,
+        aiGenerated: true // CRITICAL: Mark as real AI analysis
+      },
       createdAt: new Date(),
       modelUsed: 'multi-model-synthesis',
       status: 'completed'
@@ -1537,7 +1746,8 @@ async function synthesizeMultiModelResults(
       metadata: {
         ...visionMetadata,
         fallbackUsed: true,
-        synthesisError: error.message
+        synthesisError: error.message,
+        aiGenerated: true // CRITICAL: Mark as real AI analysis even for fallback
       },
       createdAt: new Date(),
       modelUsed: 'fallback-single-model',
