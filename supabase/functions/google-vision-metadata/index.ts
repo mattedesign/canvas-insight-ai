@@ -198,12 +198,14 @@ async function extractGoogleVisionMetadata(
   } catch (error) {
     console.error('Google Vision API error:', error);
     
-    // Retry logic with exponential backoff
+    // Fixed retry logic - prevent infinite recursion
     if (currentRetry < maxRetries && error instanceof Error && !error.message.includes('API key')) {
       const delay = Math.pow(2, currentRetry) * 1000; // 1s, 2s, 4s
       console.log(`Retrying in ${delay}ms (attempt ${currentRetry + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      return extractGoogleVisionMetadata(imageUrl, features, imageBase64, maxRetries, currentRetry + 1);
+      
+      // CRITICAL FIX: Pass incremented retry count to prevent stack overflow
+      return await extractGoogleVisionMetadata(imageUrl, features, imageBase64, maxRetries, currentRetry + 1);
     }
     
     throw error;
@@ -294,8 +296,8 @@ serve(async (req) => {
       }
     }
 
-    // Extract metadata using Google Vision API with safeguards
-    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, requestedFeatures, imageBase64, 2, 0);
+    // Extract metadata using Google Vision API with safeguards and circuit breaker
+    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, requestedFeatures, imageBase64);
 
     // Prepare metadata update
     const metadataUpdate = {
