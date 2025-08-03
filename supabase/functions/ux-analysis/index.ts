@@ -1238,8 +1238,8 @@ async function executeMultiModelPipeline(params: {
       
       console.log('✅ Context detection complete, proceeding with analysis');
       
-      // Step 1: Extract metadata with Google Vision if not using enhanced context
-      console.log('📊 Step 1: Extracting metadata with Google Vision...');
+      // Step 1: Extract metadata with Google Vision service
+      console.log('📊 Step 1: Extracting metadata with Google Vision service...');
       visionMetadata = await extractGoogleVisionMetadata(imageUrl, imageBase64);
     }
     
@@ -1483,65 +1483,45 @@ function generateClarificationQuestions(imageContext: any, userContext: any): st
 }
 
 async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: string): Promise<any> {
-  const googleVisionKey = Deno.env.get('GOOGLE_VISION_API_KEY');
-  if (!googleVisionKey) {
-    console.warn('⚠️ Google Vision API key not available, using mock metadata');
-    return createMockVisionMetadata();
-  }
-  
   try {
-    console.log('🔍 Calling Google Vision API for metadata extraction...');
+    console.log('🔍 Calling dedicated Google Vision metadata service...');
     
-    // Prepare image data for Google Vision
-    let base64Image = imageBase64;
-    if (!base64Image && imageUrl) {
-      base64Image = await fetchImageAsBase64(imageUrl);
-    }
-    
-    const visionRequest = {
-      requests: [{
-        image: { content: base64Image },
-        features: [
-          { type: 'OBJECT_LOCALIZATION', maxResults: 20 },
-          { type: 'TEXT_DETECTION', maxResults: 50 },
-          { type: 'IMAGE_PROPERTIES' },
-          { type: 'FACE_DETECTION', maxResults: 10 },
-          { type: 'LOGO_DETECTION', maxResults: 10 },
-          { type: 'LABEL_DETECTION', maxResults: 20 }
-        ]
-      }]
-    };
-    
-    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${googleVisionKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(visionRequest)
+    // Call the dedicated Google Vision metadata edge function
+    const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
+      body: {
+        imageId: 'temp-' + Date.now(), // Temporary ID for pipeline usage
+        imageUrl: imageUrl,
+        imageBase64: imageBase64,
+        features: ['labels', 'text', 'objects', 'faces', 'properties']
+      }
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Google Vision API error:', errorText);
+    if (error) {
+      console.error('Google Vision service error:', error);
+      console.warn('⚠️ Falling back to mock metadata');
       return createMockVisionMetadata();
     }
     
-    const visionResult = await response.json();
-    const annotation = visionResult.responses[0];
-    
-    console.log('✅ Google Vision metadata extracted successfully');
-    
-    return {
-      objects: annotation.localizedObjectAnnotations || [],
-      text: annotation.textAnnotations || [],
-      colors: annotation.imagePropertiesAnnotation?.dominantColors?.colors || [],
-      faces: annotation.faceAnnotations?.length || 0,
-      labels: annotation.labelAnnotations || [],
-      logos: annotation.logoAnnotations || [],
-      confidence: 0.95,
-      timestamp: new Date().toISOString()
-    };
+    if (data?.success && data?.metadata) {
+      console.log('✅ Google Vision metadata extracted via dedicated service');
+      return {
+        objects: data.metadata.objects || [],
+        text: data.metadata.text || [],
+        colors: data.metadata.imageProperties?.dominantColors || [],
+        faces: data.metadata.faces?.length || 0,
+        labels: data.metadata.labels || [],
+        logos: [], // Not included in current service
+        confidence: 0.95,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      console.warn('⚠️ Google Vision service returned no metadata, using fallback');
+      return createMockVisionMetadata();
+    }
     
   } catch (error) {
-    console.error('Error in Google Vision extraction:', error);
+    console.error('Error calling Google Vision service:', error);
+    console.warn('⚠️ Falling back to mock metadata');
     return createMockVisionMetadata();
   }
 }
@@ -1761,7 +1741,7 @@ async function synthesizeMultiModelResults(
     // Enhanced metadata with multi-model consensus
     const enhancedMetadata = {
       ...(visionMetadata || {}),
-      modelsUsed: ['gpt-4o', 'claude-opus-4-20250514', 'google-vision'],
+      modelsUsed: ['gpt-4o', 'claude-opus-4-20250514', 'google-vision-service'],
       consensus: {
         openaiConfidence: openaiAnalysis.confidence,
         claudeConfidence: claudeAnalysis.confidence,

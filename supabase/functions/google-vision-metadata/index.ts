@@ -30,11 +30,13 @@ interface VisionMetadata {
   };
 }
 
-// Google Vision metadata extraction function
+// Google Vision metadata extraction function with safeguards
 async function extractGoogleVisionMetadata(
   imageUrl: string, 
   features: string[], 
-  imageBase64?: string
+  imageBase64?: string,
+  maxRetries: number = 2,
+  currentRetry: number = 0
 ): Promise<VisionMetadata> {
   const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
   if (!apiKey) {
@@ -96,21 +98,36 @@ async function extractGoogleVisionMetadata(
       ]
     };
 
-    // Call Google Vision API
-    const visionResponse = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(visionRequest)
-      }
-    );
+    // Call Google Vision API with timeout and proper error handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    let visionResponse: Response;
+    try {
+      visionResponse = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(visionRequest),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
 
-    if (!visionResponse.ok) {
-      const errorText = await visionResponse.text();
-      throw new Error(`Google Vision API error: ${visionResponse.status} - ${errorText}`);
+      if (!visionResponse.ok) {
+        const errorText = await visionResponse.text();
+        throw new Error(`Google Vision API error: ${visionResponse.status} - ${errorText}`);
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Google Vision API request timed out after 30 seconds');
+      }
+      throw fetchError;
     }
 
     const visionData = await visionResponse.json();
@@ -180,6 +197,15 @@ async function extractGoogleVisionMetadata(
 
   } catch (error) {
     console.error('Google Vision API error:', error);
+    
+    // Retry logic with exponential backoff
+    if (currentRetry < maxRetries && error instanceof Error && !error.message.includes('API key')) {
+      const delay = Math.pow(2, currentRetry) * 1000; // 1s, 2s, 4s
+      console.log(`Retrying in ${delay}ms (attempt ${currentRetry + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return extractGoogleVisionMetadata(imageUrl, features, imageBase64, maxRetries, currentRetry + 1);
+    }
+    
     throw error;
   }
 }
@@ -211,7 +237,30 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing Google Vision metadata for image ${imageId}`);
+    // Validate URL format to prevent SSRF
+    try {
+      const url = new URL(imageUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('Invalid protocol');
+      }
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid image URL format' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Validate features array
+    const validFeatures = ['labels', 'faces', 'text', 'objects', 'safesearch', 'properties'];
+    const requestedFeatures = features.filter(f => validFeatures.includes(f.toLowerCase()));
+    if (requestedFeatures.length === 0) {
+      requestedFeatures.push('labels'); // Default fallback
+    }
+
+    console.log(`Processing Google Vision metadata for image ${imageId} with features: ${requestedFeatures.join(', ')}`);
 
     // Check if metadata already exists and is recent
     const { data: existingImage, error: fetchError } = await supabase
@@ -245,8 +294,8 @@ serve(async (req) => {
       }
     }
 
-    // Extract metadata using Google Vision API
-    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, features, imageBase64);
+    // Extract metadata using Google Vision API with safeguards
+    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, requestedFeatures, imageBase64, 2, 0);
 
     // Prepare metadata update
     const metadataUpdate = {
@@ -281,12 +330,20 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Successfully extracted Google Vision metadata for image ${imageId}`);
+    console.log(`Successfully extracted Google Vision metadata for image ${imageId}`, {
+      featuresExtracted: Object.keys(visionMetadata).filter(key => key !== 'extractedAt'),
+      labelCount: visionMetadata.labels?.length || 0,
+      textCount: visionMetadata.text?.length || 0,
+      objectCount: visionMetadata.objects?.length || 0
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
-        metadata: visionMetadata
+        cached: false,
+        metadata: visionMetadata,
+        featuresProcessed: requestedFeatures,
+        extractedAt: new Date().toISOString()
       }),
       { 
         status: 200, 
