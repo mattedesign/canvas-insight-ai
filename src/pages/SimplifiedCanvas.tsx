@@ -110,33 +110,54 @@ const SimplifiedCanvas = () => {
     }
   }, [analyses, uploadedImages, generateEnhancedConcept]);
 
-  const handleAddImages = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-      const files = Array.from((e.target as HTMLInputElement).files || []);
-      if (files.length > 0) {
-        // Simple upload handling - delegate to service
-        const { loadImageDimensions } = await import('@/utils/imageUtils');
-        const uploadPromises = files.map(async (file) => {
-          const dimensions = await loadImageDimensions(file);
-          return {
-            id: crypto.randomUUID(),
-            name: file.name,
-            url: URL.createObjectURL(file),
-            file,
-            dimensions,
-            status: 'completed' as const
-          };
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        dispatch({ type: 'ADD_IMAGES', payload: results });
-      }
-    };
-    input.click();
+  const handleAddImages = useCallback((files?: File[]) => {
+    console.log('[SimplifiedCanvas] handleAddImages called with files:', files?.length || 'creating input');
+    
+    if (files) {
+      // Called from CanvasView with files
+      handleFilesUpload(files);
+    } else {
+      // Called from sidebar - create file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const selectedFiles = Array.from((e.target as HTMLInputElement).files || []);
+        console.log('[SimplifiedCanvas] Files selected from input:', selectedFiles.length);
+        handleFilesUpload(selectedFiles);
+      };
+      input.click();
+    }
+  }, []);
+
+  const handleFilesUpload = useCallback(async (files: File[]) => {
+    console.log('[SimplifiedCanvas] Processing files:', files.length);
+    
+    if (files.length === 0) return;
+    
+    try {
+      // Simple upload handling - delegate to service
+      const { loadImageDimensions } = await import('@/utils/imageUtils');
+      const uploadPromises = files.map(async (file) => {
+        console.log('[SimplifiedCanvas] Processing file:', file.name);
+        const dimensions = await loadImageDimensions(file);
+        return {
+          id: crypto.randomUUID(),
+          name: file.name,
+          url: URL.createObjectURL(file),
+          file,
+          dimensions,
+          status: 'completed' as const
+        };
+      });
+      
+      const results = await Promise.all(uploadPromises);
+      console.log('[SimplifiedCanvas] Upload results:', results.length);
+      dispatch({ type: 'ADD_IMAGES', payload: results });
+    } catch (error) {
+      console.error('[SimplifiedCanvas] Upload failed:', error);
+    }
   }, [dispatch]);
 
   if (isLoading) {
