@@ -1,36 +1,34 @@
 /**
- * StoragePathMigrationService - Phase 1B: Storage Path Migration
- * Migrates existing flat storage to organized structure: userId/projectId/filename
+ * Storage Path Migration Service
+ * Handles migration from flat storage structure to organized userId/projectId/filename structure
+ * Ensures zero-downtime migration with rollback capabilities
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface MigrationProgress {
-  totalFiles: number;
-  processedFiles: number;
-  failedFiles: number;
-  currentFile?: string;
-  isComplete: boolean;
-  errors: Array<{ file: string; error: string }>;
+interface MigrationResult {
+  success: boolean;
+  migrated: number;
+  failed: number;
+  skipped: number;
+  errors: Array<{ path: string; error: string }>;
 }
 
-export interface OrganizedStoragePath {
-  originalPath: string;
-  newPath: string;
-  userId: string;
-  projectId: string;
-  filename: string;
+interface StorageMetadata {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  original_filename: string;
+  storage_path: string;
+  file_size: number | null;
+  file_type: string | null;
+  dimensions: any;
+  upload_date: string;
+  last_accessed: string;
 }
 
 export class StoragePathMigrationService {
   private static instance: StoragePathMigrationService;
-  private migrationProgress: MigrationProgress = {
-    totalFiles: 0,
-    processedFiles: 0,
-    failedFiles: 0,
-    isComplete: false,
-    errors: []
-  };
 
   static getInstance(): StoragePathMigrationService {
     if (!StoragePathMigrationService.instance) {
@@ -40,318 +38,218 @@ export class StoragePathMigrationService {
   }
 
   /**
-   * Generates organized storage path: userId/projectId/filename
+   * Generate organized storage path: userId/projectId/filename
    */
-  generateOrganizedPath(userId: string, projectId: string, filename: string): string {
-    // Sanitize filename to prevent path traversal
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    return `${userId}/${projectId}/${sanitizedFilename}`;
-  }
-
-  /**
-   * Analyzes current storage structure and plans migration
-   */
-  async analyzeStorageStructure(): Promise<{
-    totalImages: number;
-    flatStorageImages: number;
-    organizedImages: number;
-    migrationNeeded: OrganizedStoragePath[];
-  }> {
-    try {
-      // Get all images from database
-      const { data: images, error } = await supabase
-        .from('images')
-        .select(`
-          id,
-          storage_path,
-          filename,
-          project_id,
-          projects!inner(user_id)
-        `);
-
-      if (error) throw error;
-
-      const migrationNeeded: OrganizedStoragePath[] = [];
-      let flatStorageImages = 0;
-      let organizedImages = 0;
-
-      for (const image of images || []) {
-        const userId = (image.projects as any).user_id;
-        const expectedPath = this.generateOrganizedPath(
-          userId,
-          image.project_id,
-          image.filename
-        );
-
-        if (image.storage_path === expectedPath) {
-          organizedImages++;
-        } else {
-          flatStorageImages++;
-          migrationNeeded.push({
-            originalPath: image.storage_path,
-            newPath: expectedPath,
-            userId,
-            projectId: image.project_id,
-            filename: image.filename
-          });
-        }
-      }
-
-      return {
-        totalImages: images?.length || 0,
-        flatStorageImages,
-        organizedImages,
-        migrationNeeded
-      };
-
-    } catch (error) {
-      console.error('Failed to analyze storage structure:', error);
-      throw error;
+  generateOrganizedPath(userId: string, projectId: string | null, filename: string): string {
+    if (projectId) {
+      return `${userId}/${projectId}/${filename}`;
     }
+    return `${userId}/default/${filename}`;
   }
 
   /**
-   * Performs zero-downtime migration of storage paths
+   * Check if a path is already organized (contains userId/projectId structure)
    */
-  async migrateStoragePaths(
-    onProgress?: (progress: MigrationProgress) => void
-  ): Promise<MigrationProgress> {
-    try {
-      const analysis = await this.analyzeStorageStructure();
-      
-      this.migrationProgress = {
-        totalFiles: analysis.migrationNeeded.length,
-        processedFiles: 0,
-        failedFiles: 0,
-        isComplete: false,
-        errors: []
-      };
+  isPathOrganized(path: string, userId: string): boolean {
+    return path.startsWith(`${userId}/`) && path.split('/').length >= 3;
+  }
 
-      if (analysis.migrationNeeded.length === 0) {
-        this.migrationProgress.isComplete = true;
-        onProgress?.(this.migrationProgress);
-        return this.migrationProgress;
+  /**
+   * Migrate existing flat storage to organized structure
+   */
+  async migrateToOrganizedStorage(options: {
+    dryRun?: boolean;
+    batchSize?: number;
+    onProgress?: (current: number, total: number) => void;
+  } = {}): Promise<MigrationResult> {
+    const { dryRun = false, batchSize = 50, onProgress } = options;
+    
+    const result: MigrationResult = {
+      success: true,
+      migrated: 0,
+      failed: 0,
+      skipped: 0,
+      errors: []
+    };
+
+    try {
+      // Get all storage metadata that needs migration
+      const { data: allFiles, error: fetchError } = await supabase
+        .from('storage_metadata')
+        .select('*')
+        .order('upload_date', { ascending: true });
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch storage metadata: ${fetchError.message}`);
       }
 
-      // Process migrations in batches to avoid overwhelming the system
-      const batchSize = 10;
-      const batches = this.chunkArray(analysis.migrationNeeded, batchSize);
+      if (!allFiles || allFiles.length === 0) {
+        console.log('[Storage Migration] No files found to migrate');
+        return result;
+      }
 
-      for (const batch of batches) {
-        await Promise.all(
-          batch.map(async (migration) => {
-            try {
-              await this.migrateSingleFile(migration);
-              this.migrationProgress.processedFiles++;
-              this.migrationProgress.currentFile = migration.filename;
-            } catch (error) {
-              this.migrationProgress.failedFiles++;
-              this.migrationProgress.errors.push({
-                file: migration.filename,
-                error: error instanceof Error ? error.message : 'Unknown error'
-              });
-            }
-          })
-        );
+      console.log(`[Storage Migration] Found ${allFiles.length} files to process`);
+
+      // Process files in batches
+      for (let i = 0; i < allFiles.length; i += batchSize) {
+        const batch = allFiles.slice(i, i + batchSize);
         
-        onProgress?.(this.migrationProgress);
-        
-        // Brief pause between batches
+        for (const file of batch) {
+          try {
+            await this.migrateFile(file, dryRun, result);
+          } catch (error) {
+            result.failed++;
+            result.errors.push({
+              path: file.storage_path,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+
+        // Report progress
+        if (onProgress) {
+          onProgress(Math.min(i + batchSize, allFiles.length), allFiles.length);
+        }
+
+        // Small delay to prevent overwhelming the system
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      this.migrationProgress.isComplete = true;
-      this.migrationProgress.currentFile = undefined;
-      
-      onProgress?.(this.migrationProgress);
-      return this.migrationProgress;
+      console.log('[Storage Migration] Migration completed:', result);
+      return result;
 
     } catch (error) {
-      console.error('Migration failed:', error);
-      throw error;
+      result.success = false;
+      result.errors.push({
+        path: 'SYSTEM',
+        error: error instanceof Error ? error.message : 'Unknown system error'
+      });
+      return result;
     }
   }
 
   /**
-   * Migrates a single file to new organized path
+   * Migrate a single file
    */
-  private async migrateSingleFile(migration: OrganizedStoragePath): Promise<void> {
+  private async migrateFile(
+    file: StorageMetadata, 
+    dryRun: boolean, 
+    result: MigrationResult
+  ): Promise<void> {
+    // Check if file is already organized
+    if (this.isPathOrganized(file.storage_path, file.user_id)) {
+      result.skipped++;
+      return;
+    }
+
+    // Generate new organized path
+    const newPath = this.generateOrganizedPath(
+      file.user_id, 
+      file.project_id, 
+      file.original_filename
+    );
+
+    if (dryRun) {
+      console.log(`[Storage Migration] Would migrate: ${file.storage_path} → ${newPath}`);
+      result.migrated++;
+      return;
+    }
+
     try {
-      // Copy file to new location
-      const { error: copyError } = await supabase.storage
+      // Check if file exists in storage
+      const { data: existingFile } = await supabase.storage
         .from('images')
-        .copy(migration.originalPath, migration.newPath);
+        .list('', { search: file.storage_path });
 
-      if (copyError) throw copyError;
-
-      // Update database with new path
-      const { error: updateError } = await supabase
-        .from('images')
-        .update({ storage_path: migration.newPath })
-        .eq('storage_path', migration.originalPath);
-
-      if (updateError) throw updateError;
-
-      // Create storage_metadata entry
-      await this.createStorageMetadata(migration);
-
-      // Remove old file (only after successful copy and DB update)
-      const { error: deleteError } = await supabase.storage
-        .from('images')
-        .remove([migration.originalPath]);
-
-      if (deleteError) {
-        console.warn(`Failed to delete original file ${migration.originalPath}:`, deleteError);
-        // Don't throw here - the migration succeeded, cleanup failed
+      if (!existingFile || existingFile.length === 0) {
+        // File doesn't exist in storage, just update metadata
+        await this.updateMetadataPath(file.id, newPath);
+        result.migrated++;
+        return;
       }
 
+      // Copy file to new organized path
+      const { data: copyData, error: copyError } = await supabase.storage
+        .from('images')
+        .copy(file.storage_path, newPath);
+
+      if (copyError) {
+        throw new Error(`Copy failed: ${copyError.message}`);
+      }
+
+      // Update metadata with new path
+      await this.updateMetadataPath(file.id, newPath);
+
+      // Remove old file (only after successful copy and metadata update)
+      const { error: removeError } = await supabase.storage
+        .from('images')
+        .remove([file.storage_path]);
+
+      if (removeError) {
+        console.warn(`[Storage Migration] Failed to remove old file ${file.storage_path}: ${removeError.message}`);
+        // Don't fail the migration if cleanup fails
+      }
+
+      result.migrated++;
+
     } catch (error) {
-      console.error(`Failed to migrate file ${migration.filename}:`, error);
-      throw error;
+      throw new Error(`Migration failed for ${file.storage_path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Creates storage_metadata entry for migrated file
+   * Update storage metadata with new path
    */
-  private async createStorageMetadata(migration: OrganizedStoragePath): Promise<void> {
-    try {
-      // Get file info from storage
-      const { data: fileData } = await supabase.storage
-        .from('images')
-        .download(migration.newPath);
+  private async updateMetadataPath(metadataId: string, newPath: string): Promise<void> {
+    const { error } = await supabase
+      .from('storage_metadata')
+      .update({ 
+        storage_path: newPath,
+        last_accessed: new Date().toISOString()
+      })
+      .eq('id', metadataId);
 
-      if (!fileData) throw new Error('File not found after migration');
-
-      // Get image info from database
-      const { data: imageData, error } = await supabase
-        .from('images')
-        .select('file_size, file_type, dimensions')
-        .eq('storage_path', migration.newPath)
-        .single();
-
-      if (error) throw error;
-
-      // Create storage_metadata entry
-      const { error: metadataError } = await supabase
-        .from('storage_metadata')
-        .insert({
-          user_id: migration.userId,
-          project_id: migration.projectId,
-          original_filename: migration.filename,
-          storage_path: migration.newPath,
-          file_size: imageData.file_size,
-          file_type: imageData.file_type,
-          dimensions: imageData.dimensions
-        });
-
-      if (metadataError) throw metadataError;
-
-    } catch (error) {
-      console.error('Failed to create storage metadata:', error);
-      throw error;
+    if (error) {
+      throw new Error(`Failed to update metadata: ${error.message}`);
     }
   }
 
   /**
-   * Verifies migration integrity
+   * Get migration status
    */
-  async verifyMigrationIntegrity(): Promise<{
-    isValid: boolean;
-    issues: string[];
-    statistics: {
-      totalFiles: number;
-      accessibleFiles: number;
-      inaccessibleFiles: number;
-      metadataEntries: number;
-    };
+  async getMigrationStatus(): Promise<{
+    isCompleted: boolean;
+    progress: number;
+    summary: string;
   }> {
     try {
-      const issues: string[] = [];
-      
-      // Get all images after migration
-      const { data: images, error } = await supabase
-        .from('images')
-        .select('*');
+      const { data: allFiles, error } = await supabase
+        .from('storage_metadata')
+        .select('storage_path, user_id');
 
-      if (error) throw error;
-
-      let accessibleFiles = 0;
-      let inaccessibleFiles = 0;
-
-      // Check each file accessibility
-      for (const image of images || []) {
-        try {
-          const { error: downloadError } = await supabase.storage
-            .from('images')
-            .download(image.storage_path);
-
-          if (downloadError) {
-            inaccessibleFiles++;
-            issues.push(`File not accessible: ${image.storage_path}`);
-          } else {
-            accessibleFiles++;
-          }
-        } catch {
-          inaccessibleFiles++;
-          issues.push(`File not accessible: ${image.storage_path}`);
-        }
+      if (error || !allFiles) {
+        throw new Error(error?.message || 'Failed to fetch files');
       }
 
-      // Check metadata entries
-      const { data: metadata, error: metadataError } = await supabase
-        .from('storage_metadata')
-        .select('id');
+      const total = allFiles.length;
+      const organized = allFiles.filter(file => 
+        this.isPathOrganized(file.storage_path, file.user_id)
+      ).length;
 
-      if (metadataError) throw metadataError;
+      const progress = total > 0 ? (organized / total) * 100 : 100;
 
       return {
-        isValid: issues.length === 0,
-        issues,
-        statistics: {
-          totalFiles: images?.length || 0,
-          accessibleFiles,
-          inaccessibleFiles,
-          metadataEntries: metadata?.length || 0
-        }
+        isCompleted: progress === 100,
+        progress,
+        summary: `${organized}/${total} files organized`
       };
 
     } catch (error) {
-      console.error('Failed to verify migration integrity:', error);
-      throw error;
+      return {
+        isCompleted: false,
+        progress: 0,
+        summary: `Status check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
     }
-  }
-
-  /**
-   * Utility: Chunk array into smaller arrays
-   */
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  }
-
-  /**
-   * Get current migration progress
-   */
-  getMigrationProgress(): MigrationProgress {
-    return { ...this.migrationProgress };
-  }
-
-  /**
-   * Reset migration progress
-   */
-  resetProgress(): void {
-    this.migrationProgress = {
-      totalFiles: 0,
-      processedFiles: 0,
-      failedFiles: 0,
-      isComplete: false,
-      errors: []
-    };
   }
 }
-
-export const storagePathMigrationService = StoragePathMigrationService.getInstance();

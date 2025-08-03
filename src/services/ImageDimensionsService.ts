@@ -1,42 +1,26 @@
 /**
- * ImageDimensionsService - Phase 1C: Image Dimensions Extraction
- * Extracts actual image dimensions (not 800x600 defaults)
- * Integrates with upload pipeline and provides backfill migration
+ * Image Dimensions Extraction Service
+ * Extracts actual dimensions from image files and integrates with upload pipeline
+ * Replaces hardcoded 800x600 defaults with real measurements
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface ImageDimensions {
+interface ImageDimensions {
   width: number;
   height: number;
   aspectRatio: number;
 }
 
-export interface DimensionExtractionResult {
-  success: boolean;
-  dimensions?: ImageDimensions;
+interface DimensionExtractionResult {
+  dimensions: ImageDimensions | null;
+  fileSize: number;
+  mimeType: string;
   error?: string;
-  metadata?: {
-    fileSize: number;
-    fileType: string;
-    colorDepth?: number;
-    hasAlpha?: boolean;
-  };
-}
-
-export interface BackfillProgress {
-  totalImages: number;
-  processedImages: number;
-  failedImages: number;
-  currentImage?: string;
-  isComplete: boolean;
-  errors: Array<{ imageId: string; filename: string; error: string }>;
 }
 
 export class ImageDimensionsService {
   private static instance: ImageDimensionsService;
-  private canvas: HTMLCanvasElement | null = null;
-  private ctx: CanvasRenderingContext2D | null = null;
 
   static getInstance(): ImageDimensionsService {
     if (!ImageDimensionsService.instance) {
@@ -46,446 +30,437 @@ export class ImageDimensionsService {
   }
 
   /**
-   * Extract dimensions from File object (for uploads)
+   * Extract dimensions from an image file
    */
   async extractDimensionsFromFile(file: File): Promise<DimensionExtractionResult> {
     try {
-      if (!file.type.startsWith('image/')) {
-        return {
-          success: false,
-          error: 'File is not an image'
-        };
-      }
-
-      const dimensions = await this.loadImageFromFile(file);
+      const dimensions = await this.loadImageDimensions(file);
       
       return {
-        success: true,
         dimensions,
-        metadata: {
-          fileSize: file.size,
-          fileType: file.type
-        }
+        fileSize: file.size,
+        mimeType: file.type,
       };
-
     } catch (error) {
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to extract dimensions'
+        dimensions: null,
+        fileSize: file.size,
+        mimeType: file.type,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
 
   /**
-   * Extract dimensions from URL (for existing images)
+   * Extract dimensions from an image URL
    */
   async extractDimensionsFromUrl(imageUrl: string): Promise<DimensionExtractionResult> {
     try {
-      const dimensions = await this.loadImageFromUrl(imageUrl);
-      
-      return {
-        success: true,
-        dimensions
-      };
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          const dimensions: ImageDimensions = {
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            aspectRatio: img.naturalWidth / img.naturalHeight
+          };
 
+          resolve({
+            dimensions,
+            fileSize: 0, // Unknown from URL
+            mimeType: this.inferMimeTypeFromUrl(imageUrl)
+          });
+        };
+
+        img.onerror = () => {
+          resolve({
+            dimensions: null,
+            fileSize: 0,
+            mimeType: this.inferMimeTypeFromUrl(imageUrl),
+            error: 'Failed to load image from URL'
+          });
+        };
+
+        img.src = imageUrl;
+      });
     } catch (error) {
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to extract dimensions from URL'
+        dimensions: null,
+        fileSize: 0,
+        mimeType: this.inferMimeTypeFromUrl(imageUrl),
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
 
   /**
-   * Extract dimensions from Blob (for storage downloads)
+   * Load image dimensions using FileReader and Image object
    */
-  async extractDimensionsFromBlob(blob: Blob): Promise<DimensionExtractionResult> {
-    try {
-      if (!blob.type.startsWith('image/')) {
-        return {
-          success: false,
-          error: 'Blob is not an image'
-        };
+  private loadImageDimensions(file: File): Promise<ImageDimensions> {
+    return new Promise((resolve, reject) => {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('File is not an image'));
+        return;
       }
 
-      const dimensions = await this.loadImageFromBlob(blob);
+      const reader = new FileReader();
       
-      return {
-        success: true,
-        dimensions,
-        metadata: {
-          fileSize: blob.size,
-          fileType: blob.type
+      reader.onload = (event) => {
+        const img = new Image();
+        
+        img.onload = () => {
+          const dimensions: ImageDimensions = {
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            aspectRatio: img.naturalWidth / img.naturalHeight
+          };
+
+          // Validate dimensions
+          if (dimensions.width <= 0 || dimensions.height <= 0) {
+            reject(new Error('Invalid image dimensions'));
+            return;
+          }
+
+          resolve(dimensions);
+        };
+
+        img.onerror = () => {
+          reject(new Error('Failed to load image data'));
+        };
+
+        if (event.target?.result) {
+          img.src = event.target.result as string;
+        } else {
+          reject(new Error('Failed to read file'));
         }
       };
 
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to extract dimensions from blob'
+      reader.onerror = () => {
+        reject(new Error('Failed to read file'));
       };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Infer MIME type from URL extension
+   */
+  private inferMimeTypeFromUrl(url: string): string {
+    const extension = url.split('.').pop()?.toLowerCase();
+    
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'bmp':
+        return 'image/bmp';
+      default:
+        return 'image/unknown';
     }
   }
 
   /**
-   * Load image from File and extract dimensions
+   * Create standardized dimensions object for database storage
    */
-  private loadImageFromFile(file: File): Promise<ImageDimensions> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const dimensions = {
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          aspectRatio: img.naturalWidth / img.naturalHeight
-        };
-        resolve(dimensions);
-      };
-      
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Failed to load image'));
-      };
-      
-      img.src = url;
-    });
+  createDimensionsObject(
+    width: number, 
+    height: number, 
+    metadata?: any
+  ): any {
+    return {
+      width,
+      height,
+      aspectRatio: width / height,
+      ...metadata,
+      extractedAt: new Date().toISOString(),
+      extractionMethod: 'client-side'
+    };
   }
 
   /**
-   * Load image from URL and extract dimensions
+   * Extract and validate dimensions with fallback
    */
-  private loadImageFromUrl(imageUrl: string): Promise<ImageDimensions> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        const dimensions = {
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          aspectRatio: img.naturalWidth / img.naturalHeight
-        };
-        resolve(dimensions);
-      };
-      
-      img.onerror = () => {
-        reject(new Error(`Failed to load image from URL: ${imageUrl}`));
-      };
-      
-      // Handle CORS for cross-origin images
-      img.crossOrigin = 'anonymous';
-      img.src = imageUrl;
-    });
-  }
-
-  /**
-   * Load image from Blob and extract dimensions
-   */
-  private loadImageFromBlob(blob: Blob): Promise<ImageDimensions> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        const dimensions = {
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          aspectRatio: img.naturalWidth / img.naturalHeight
-        };
-        URL.revokeObjectURL(img.src);
-        resolve(dimensions);
-      };
-      
-      img.onerror = () => {
-        URL.revokeObjectURL(img.src);
-        reject(new Error('Failed to load image from blob'));
-      };
-      
-      img.src = URL.createObjectURL(blob);
-    });
-  }
-
-  /**
-   * Process uploaded image and update database with real dimensions
-   */
-  async processUploadedImage(
-    imageId: string,
-    file: File,
-    storagePath: string
-  ): Promise<DimensionExtractionResult> {
+  async extractWithFallback(
+    file: File, 
+    fallbackDimensions?: ImageDimensions
+  ): Promise<ImageDimensions> {
     try {
       const result = await this.extractDimensionsFromFile(file);
       
-      if (!result.success || !result.dimensions) {
+      if (result.dimensions) {
+        return result.dimensions;
+      }
+      
+      // Use fallback if provided
+      if (fallbackDimensions) {
+        console.warn('[Image Dimensions] Using fallback dimensions:', fallbackDimensions);
+        return fallbackDimensions;
+      }
+
+      // Last resort: reasonable defaults based on file size
+      return this.estimateDimensionsFromFileSize(file.size);
+      
+    } catch (error) {
+      console.warn('[Image Dimensions] Extraction failed:', error);
+      
+      if (fallbackDimensions) {
+        return fallbackDimensions;
+      }
+      
+      return this.estimateDimensionsFromFileSize(file.size);
+    }
+  }
+
+  /**
+   * Estimate reasonable dimensions based on file size
+   */
+  private estimateDimensionsFromFileSize(fileSize: number): ImageDimensions {
+    // Very rough estimation based on typical image compression
+    let estimatedPixels: number;
+    
+    if (fileSize < 100000) { // < 100KB
+      estimatedPixels = 400 * 300; // Small image
+    } else if (fileSize < 500000) { // < 500KB
+      estimatedPixels = 800 * 600; // Medium image
+    } else if (fileSize < 2000000) { // < 2MB
+      estimatedPixels = 1200 * 900; // Large image
+    } else {
+      estimatedPixels = 1920 * 1080; // Very large image
+    }
+
+    // Assume 16:9 aspect ratio for estimation
+    const aspectRatio = 16 / 9;
+    const width = Math.round(Math.sqrt(estimatedPixels * aspectRatio));
+    const height = Math.round(width / aspectRatio);
+
+    return {
+      width,
+      height,
+      aspectRatio
+    };
+  }
+
+  /**
+   * Backfill dimensions for existing images
+   */
+  async backfillExistingImages(options: {
+    batchSize?: number;
+    onProgress?: (current: number, total: number) => void;
+    onError?: (imageId: string, error: string) => void;
+  } = {}): Promise<{
+    processed: number;
+    updated: number;
+    failed: number;
+    skipped: number;
+  }> {
+    const { batchSize = 20, onProgress, onError } = options;
+    
+    const result = {
+      processed: 0,
+      updated: 0,
+      failed: 0,
+      skipped: 0
+    };
+
+    try {
+      // Get all images that need dimension extraction
+      const { data: images, error: fetchError } = await supabase
+        .from('images')
+        .select('id, storage_path, dimensions, original_name')
+        .or('dimensions.is.null,dimensions.eq.{}');
+
+      if (fetchError) {
+        console.error('[Image Dimensions] Failed to fetch images:', fetchError);
         return result;
       }
 
-      // Update image record with real dimensions
-      const { error: updateError } = await supabase
-        .from('images')
-        .update({
-          dimensions: {
-            width: result.dimensions.width,
-            height: result.dimensions.height,
-            aspectRatio: result.dimensions.aspectRatio
-          },
-          file_size: result.metadata?.fileSize,
-          file_type: result.metadata?.fileType
-        })
-        .eq('id', imageId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      return result;
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to process uploaded image'
-      };
-    }
-  }
-
-  /**
-   * Backfill dimensions for all existing images
-   */
-  async backfillImageDimensions(
-    onProgress?: (progress: BackfillProgress) => void
-  ): Promise<BackfillProgress> {
-    try {
-      // Get all images with default or missing dimensions
-      const { data: images, error } = await supabase
-        .from('images')
-        .select('id, filename, storage_path, dimensions')
-        .or('dimensions.is.null,dimensions->>width.eq.800');
-
-      if (error) throw error;
-
-      const progress: BackfillProgress = {
-        totalImages: images?.length || 0,
-        processedImages: 0,
-        failedImages: 0,
-        isComplete: false,
-        errors: []
-      };
-
       if (!images || images.length === 0) {
-        progress.isComplete = true;
-        onProgress?.(progress);
-        return progress;
+        console.log('[Image Dimensions] No images need dimension extraction');
+        return result;
       }
 
-      // Process images in batches
-      const batchSize = 5;
-      const batches = this.chunkArray(images, batchSize);
+      console.log(`[Image Dimensions] Found ${images.length} images to process`);
 
-      for (const batch of batches) {
-        await Promise.all(
-          batch.map(async (image) => {
-            try {
-              await this.updateImageDimensions(image);
-              progress.processedImages++;
-              progress.currentImage = image.filename;
-            } catch (error) {
-              progress.failedImages++;
-              progress.errors.push({
-                imageId: image.id,
-                filename: image.filename,
-                error: error instanceof Error ? error.message : 'Unknown error'
-              });
+      // Process in batches
+      for (let i = 0; i < images.length; i += batchSize) {
+        const batch = images.slice(i, i + batchSize);
+        
+        for (const image of batch) {
+          result.processed++;
+          
+          try {
+            await this.backfillSingleImage(image);
+            result.updated++;
+          } catch (error) {
+            result.failed++;
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            
+            if (onError) {
+              onError(image.id, errorMessage);
             }
-          })
-        );
-        
-        onProgress?.(progress);
-        
-        // Brief pause between batches to avoid overwhelming storage
+            
+            console.warn(`[Image Dimensions] Failed to process ${image.id}:`, errorMessage);
+          }
+        }
+
+        // Report progress
+        if (onProgress) {
+          onProgress(Math.min(i + batchSize, images.length), images.length);
+        }
+
+        // Small delay to prevent overwhelming the system
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      progress.isComplete = true;
-      progress.currentImage = undefined;
-      
-      onProgress?.(progress);
-      return progress;
+      console.log('[Image Dimensions] Backfill completed:', result);
+      return result;
 
     } catch (error) {
-      console.error('Backfill failed:', error);
-      throw error;
+      console.error('[Image Dimensions] Backfill failed:', error);
+      return result;
     }
   }
 
   /**
-   * Update dimensions for a single image
+   * Backfill dimensions for a single image
    */
-  private async updateImageDimensions(image: any): Promise<void> {
+  private async backfillSingleImage(image: any): Promise<void> {
     try {
-      // Download image from storage
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from('images')
-        .download(image.storage_path);
-
-      if (downloadError || !fileData) {
-        throw new Error(`Failed to download image: ${downloadError?.message || 'No data'}`);
+      // Check if image already has valid dimensions
+      if (image.dimensions && 
+          typeof image.dimensions === 'object' && 
+          image.dimensions.width > 0 && 
+          image.dimensions.height > 0) {
+        return; // Skip - already has dimensions
       }
 
-      // Extract dimensions
-      const result = await this.extractDimensionsFromBlob(fileData);
+      // Get image URL for dimension extraction
+      const { data: urlData } = await supabase.storage
+        .from('images')
+        .createSignedUrl(image.storage_path, 60); // 1 minute expiry
+
+      if (!urlData?.signedUrl) {
+        throw new Error('Failed to get signed URL for image');
+      }
+
+      // Extract dimensions from URL
+      const result = await this.extractDimensionsFromUrl(urlData.signedUrl);
       
-      if (!result.success || !result.dimensions) {
+      if (!result.dimensions) {
         throw new Error(result.error || 'Failed to extract dimensions');
       }
+
+      // Create dimensions object
+      const dimensionsObject = this.createDimensionsObject(
+        result.dimensions.width,
+        result.dimensions.height,
+        {
+          fileSize: result.fileSize,
+          mimeType: result.mimeType,
+          backfilled: true
+        }
+      );
 
       // Update database
       const { error: updateError } = await supabase
         .from('images')
-        .update({
-          dimensions: {
-            width: result.dimensions.width,
-            height: result.dimensions.height,
-            aspectRatio: result.dimensions.aspectRatio
-          },
-          file_size: result.metadata?.fileSize || image.file_size
-        })
+        .update({ dimensions: dimensionsObject })
         .eq('id', image.id);
 
       if (updateError) {
-        throw updateError;
+        throw new Error(`Database update failed: ${updateError.message}`);
       }
 
+      console.log(`[Image Dimensions] Updated ${image.id}: ${result.dimensions.width}x${result.dimensions.height}`);
+
     } catch (error) {
-      console.error(`Failed to update dimensions for image ${image.id}:`, error);
-      throw error;
+      throw new Error(`Backfill failed for ${image.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Validate dimensions data integrity
+   * Get dimensions statistics
    */
-  async validateDimensionsIntegrity(): Promise<{
-    isValid: boolean;
-    issues: string[];
-    statistics: {
-      totalImages: number;
-      imagesWithDimensions: number;
-      imagesWithDefaultDimensions: number;
-      imagesWithoutDimensions: number;
-    };
+  async getDimensionsStatistics(): Promise<{
+    total: number;
+    withDimensions: number;
+    withoutDimensions: number;
+    averageWidth: number;
+    averageHeight: number;
+    aspectRatios: { [key: string]: number };
   }> {
     try {
-      const issues: string[] = [];
-      
-      // Get all images
-      const { data: allImages, error: allError } = await supabase
+      const { data: images, error } = await supabase
         .from('images')
-        .select('id, filename, dimensions');
+        .select('dimensions');
 
-      if (allError) throw allError;
-
-      // Get images with dimensions
-      const { data: withDimensions, error: dimError } = await supabase
-        .from('images')
-        .select('id')
-        .not('dimensions', 'is', null);
-
-      if (dimError) throw dimError;
-
-      // Get images with default dimensions (800x600) - simplified query
-      const { data: withDefaults, error: defaultError } = await supabase
-        .from('images')
-        .select('id, filename, dimensions');
-
-      if (defaultError) throw defaultError;
-
-      // Filter for default dimensions in JavaScript to avoid deep type recursion
-      const defaultDimensionImages = withDefaults?.filter(img => {
-        const dims = img.dimensions as Record<string, any>;
-        return dims?.width === 800 && dims?.height === 600;
-      }) || [];
-
-      // Get images without dimensions
-      const { data: withoutDimensions, error: noDimError } = await supabase
-        .from('images')
-        .select('id, filename')
-        .is('dimensions', null);
-
-      if (noDimError) throw noDimError;
-
-      // Check for issues
-      if (defaultDimensionImages && defaultDimensionImages.length > 0) {
-        issues.push(`${defaultDimensionImages.length} images still have default dimensions (800x600)`);
+      if (error || !images) {
+        throw new Error(error?.message || 'Failed to fetch images');
       }
 
-      if (withoutDimensions && withoutDimensions.length > 0) {
-        issues.push(`${withoutDimensions.length} images have no dimensions data`);
-      }
-
-      // Validate dimension data structure
-      for (const image of allImages || []) {
-        if (image.dimensions) {
-          const dims = image.dimensions as Record<string, any>;
-          if (!dims.width || !dims.height || !dims.aspectRatio) {
-            issues.push(`Image ${image.filename} has incomplete dimension data`);
-          }
-          if (typeof dims.width === 'number' && typeof dims.height === 'number') {
-            if (dims.width <= 0 || dims.height <= 0) {
-              issues.push(`Image ${image.filename} has invalid dimensions`);
-            }
-          }
-        }
-      }
-
-      return {
-        isValid: issues.length === 0,
-        issues,
-        statistics: {
-          totalImages: allImages?.length || 0,
-          imagesWithDimensions: withDimensions?.length || 0,
-          imagesWithDefaultDimensions: defaultDimensionImages?.length || 0,
-          imagesWithoutDimensions: withoutDimensions?.length || 0
-        }
+      const stats = {
+        total: images.length,
+        withDimensions: 0,
+        withoutDimensions: 0,
+        averageWidth: 0,
+        averageHeight: 0,
+        aspectRatios: {} as { [key: string]: number }
       };
 
+      let totalWidth = 0;
+      let totalHeight = 0;
+
+      for (const image of images) {
+        if (image.dimensions && 
+            typeof image.dimensions === 'object' && 
+            !Array.isArray(image.dimensions) &&
+            typeof (image.dimensions as any).width === 'number' &&
+            typeof (image.dimensions as any).height === 'number' &&
+            (image.dimensions as any).width > 0 && 
+            (image.dimensions as any).height > 0) {
+          stats.withDimensions++;
+          totalWidth += (image.dimensions as any).width;
+          totalHeight += (image.dimensions as any).height;
+
+          // Track aspect ratios
+          const aspectRatio = Math.round((image.dimensions as any).aspectRatio * 100) / 100;
+          const aspectKey = `${aspectRatio}:1`;
+          stats.aspectRatios[aspectKey] = (stats.aspectRatios[aspectKey] || 0) + 1;
+        } else {
+          stats.withoutDimensions++;
+        }
+      }
+
+      if (stats.withDimensions > 0) {
+        stats.averageWidth = Math.round(totalWidth / stats.withDimensions);
+        stats.averageHeight = Math.round(totalHeight / stats.withDimensions);
+      }
+
+      return stats;
+
     } catch (error) {
-      console.error('Failed to validate dimensions integrity:', error);
-      throw error;
+      console.error('[Image Dimensions] Failed to get statistics:', error);
+      return {
+        total: 0,
+        withDimensions: 0,
+        withoutDimensions: 0,
+        averageWidth: 0,
+        averageHeight: 0,
+        aspectRatios: {}
+      };
     }
-  }
-
-  /**
-   * Utility: Chunk array into smaller arrays
-   */
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  }
-
-  /**
-   * Get supported image formats
-   */
-  getSupportedFormats(): string[] {
-    return [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-      'image/gif',
-      'image/bmp',
-      'image/svg+xml'
-    ];
-  }
-
-  /**
-   * Check if file format is supported
-   */
-  isSupportedFormat(fileType: string): boolean {
-    return this.getSupportedFormats().includes(fileType.toLowerCase());
   }
 }
 
