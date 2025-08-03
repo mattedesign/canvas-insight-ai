@@ -107,7 +107,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
-          type: 'ANALYZE_IMAGE',
+          action: 'ANALYZE_IMAGE',
           payload,
           aiModel: selectedAIModel === 'auto' ? 'auto' : selectedAIModel
         }

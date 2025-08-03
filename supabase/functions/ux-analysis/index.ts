@@ -990,6 +990,42 @@ function detectImageFormat(imageUrl: string, base64Data?: string): string {
   return 'image/jpeg'
 }
 
+function buildAnalysisPrompt(userContext?: string): string {
+  const contextPart = userContext ? `Context: ${userContext}` : 'General UX analysis';
+  
+  return `Analyze this application interface for usability, navigation patterns, and feature discoverability. Document the interaction model, state management, and user workflows.
+
+Designer Perspective:
+- Evaluate visual hierarchy and gestalt principles
+- Analyze color theory application and accessibility
+- Assess typography system and readability
+- Review spacing consistency and visual rhythm
+- Consider emotional design impact
+- Identify design system opportunities
+
+Perform comprehensive UX analysis of this interface, identifying its purpose, user flows, and optimization opportunities.
+
+Return analysis as structured JSON with:
+{
+  "elements": { /* UI elements detected */ },
+  "layout": { /* Grid, spacing, hierarchy */ },
+  "colors": { /* Color palette and usage */ },
+  "content": { /* Text content and headings */ },
+  "interactions": { /* Buttons, links, forms */ },
+  "confidence": { /* Detection confidence scores */ }
+}
+
+Quality Requirements:
+- Provide specific, measurable recommendations
+- Include confidence scores for all assessments
+- Reference established UX principles and guidelines
+- Consider both user needs and business objectives
+- Ensure compliance with WCAG-AA standards
+- Prioritize recommendations by effort
+
+${contextPart}`;
+}
+
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
   console.log('Fetching image from URL:', imageUrl);
   
@@ -1021,18 +1057,41 @@ async function handleCanvasRequest(action: string, payload: any) {
   // Convert old Canvas format to new pipeline format
   switch (action) {
     case 'ANALYZE_IMAGE':
-      // Map Canvas format to pipeline format
-      const convertedPayload = {
-        model: 'gpt-4o', // Default model for Canvas requests
-        stage: 'vision', // Start with vision stage
-        imageUrl: payload.payload?.imageUrl,
-        imageBase64: payload.payload?.imageBase64, // Handle base64 images
-        prompt: `Analyze this ${payload.payload?.imageName || 'image'} for UX/UI insights. Context: ${payload.payload?.userContext || 'General analysis'}`,
-        systemPrompt: 'You are an expert UX/UI analyst providing detailed insights.'
+      try {
+        // Map Canvas format to pipeline format
+        const convertedPayload = {
+          model: payload.aiModel || 'gpt-4o', // Use selected model
+          stage: 'vision', // Start with vision stage
+          imageUrl: payload.payload?.imageUrl,
+          imageBase64: payload.payload?.imageBase64, // Handle base64 images
+          prompt: buildAnalysisPrompt(payload.payload?.userContext),
+          systemPrompt: 'You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems. You are analyzing a app interface in the general domain. \n    Adapt your communication style to some-technical technical level.\n    Focus on effort-based prioritization.\n    \n    Always provide your responses in valid JSON format as specified in the user prompt.'
+        }
+        
+        console.log('Converted Canvas payload:', convertedPayload)
+        const modelResult = await executeModel(convertedPayload)
+        
+        // Wrap result in Canvas-expected format
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: modelResult
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('Error in Canvas request:', error)
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: error.message
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
       }
-      
-      console.log('Converted Canvas payload:', convertedPayload)
-      return await executeModel(convertedPayload)
       
     default:
       throw new Error(`Unknown Canvas action: ${action}`)
