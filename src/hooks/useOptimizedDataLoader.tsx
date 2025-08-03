@@ -15,16 +15,22 @@ export const useOptimizedDataLoader = () => {
   ) => {
     // Check if this exact load is already in progress
     if (activeLoadsRef.current.has(key)) {
-      console.log(`[OptimizedDataLoader] Deduplicating load for key: ${key}`);
+      if (import.meta.env.DEV) {
+        console.log(`[OptimizedDataLoader] Deduplicating load for key: ${key}`);
+      }
       return activeLoadsRef.current.get(key);
     }
 
     const loadPromise = new Promise(async (resolve, reject) => {
       const debouncedLoad = debounce(async () => {
         try {
-          console.log(`[OptimizedDataLoader] Starting load for key: ${key}`);
+          if (import.meta.env.DEV) {
+            console.log(`[OptimizedDataLoader] Starting load for key: ${key}`);
+          }
           const result = await loadFunction();
-          console.log(`[OptimizedDataLoader] Completed load for key: ${key}`);
+          if (import.meta.env.DEV) {
+            console.log(`[OptimizedDataLoader] Completed load for key: ${key}`);
+          }
           resolve(result);
         } catch (error) {
           reject(error);

@@ -7,12 +7,15 @@ export const useRenderMonitor = (componentName: string) => {
   renderCount.current += 1;
   
   useEffect(() => {
-    if (renderCount.current > 5) {
-      console.warn(`⚠️ ${componentName} rendered ${renderCount.current} times`);
-    }
-    
-    if (renderCount.current === 1) {
-      console.log(`✅ ${componentName} mounted`);
+    // Only log in development mode
+    if (import.meta.env.DEV) {
+      if (renderCount.current > 5) {
+        console.warn(`⚠️ ${componentName} rendered ${renderCount.current} times`);
+      }
+      
+      if (renderCount.current === 1) {
+        console.log(`✅ ${componentName} mounted`);
+      }
     }
   });
   

@@ -1,4 +1,5 @@
 import { SmartCacheService } from './SmartCacheService';
+import { Logger } from '@/utils/logging';
 
 interface CanvasMetrics {
   nodeRenderTime: number;
@@ -25,7 +26,7 @@ export class EnhancedPerformanceService {
   private static memoryMonitorInterval: number | null = null;
   
   static startCanvasPerformanceTracking(): void {
-    console.log('[Performance] Starting canvas performance tracking');
+    Logger.info('performance', 'Starting canvas performance tracking');
     
     // Track canvas-specific metrics
     if (typeof PerformanceObserver !== 'undefined') {
@@ -39,9 +40,9 @@ export class EnhancedPerformanceService {
             this.canvasMetrics.dataLoadTime = entry.duration;
           }
           
-          // Log performance entries for debugging
-          if (entry.duration > 100) {
-            console.warn(`[Performance] Slow operation: ${entry.name} took ${entry.duration.toFixed(2)}ms`);
+          // Log slow operations only
+          if (entry.duration > 500) {
+            Logger.warn('performance', `Slow operation: ${entry.name} took ${entry.duration.toFixed(2)}ms`);
           }
         });
       });
@@ -62,7 +63,7 @@ export class EnhancedPerformanceService {
         
         // Alert if memory usage is too high
         if (this.canvasMetrics.memoryUsage > 200) {
-          console.warn(`[Performance] High memory usage: ${this.canvasMetrics.memoryUsage.toFixed(1)}MB`);
+          Logger.warn('performance', `High memory usage: ${this.canvasMetrics.memoryUsage.toFixed(1)}MB`);
           this.triggerMemoryCleanup();
         }
       }
@@ -97,12 +98,12 @@ export class EnhancedPerformanceService {
       const duration = performance.now() - startTime;
       
       if (duration > 1000) {
-        console.warn(`[Performance] Slow canvas operation: ${operationName} took ${duration.toFixed(2)}ms`);
+        Logger.warn('performance', `Slow canvas operation: ${operationName} took ${duration.toFixed(2)}ms`);
       }
       
       return result;
     } catch (error) {
-      console.error(`[Performance] Failed canvas operation: ${operationName}`, error);
+      Logger.error('performance', `Failed canvas operation: ${operationName}`, error);
       throw error;
     }
   }

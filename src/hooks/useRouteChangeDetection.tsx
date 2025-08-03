@@ -7,11 +7,14 @@ export const useRouteChangeDetection = (componentName: string) => {
   
   useEffect(() => {
     if (previousPathRef.current !== location.pathname) {
-      console.log(`[${componentName}] Route changed:`, {
-        from: previousPathRef.current,
-        to: location.pathname,
-        timestamp: Date.now()
-      });
+      // Only log route changes in development mode
+      if (import.meta.env.DEV) {
+        console.log(`[${componentName}] Route changed:`, {
+          from: previousPathRef.current,
+          to: location.pathname,
+          timestamp: Date.now()
+        });
+      }
       previousPathRef.current = location.pathname;
     }
   }, [location.pathname, componentName]);

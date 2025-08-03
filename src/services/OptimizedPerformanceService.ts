@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Logger } from '@/utils/logging';
 
 export interface PerformanceMetrics {
   pageLoadTime: number;
@@ -74,16 +75,15 @@ export class OptimizedPerformanceService {
     
     // ✅ FIX: Special handling for empty query detection
     if (isEmptyQuery) {
-      console.warn(`🚨 EMPTY QUERY DETECTED: ${entry.name} took ${entry.duration}ms`);
-      console.warn('This query should be skipped when no images exist');
+      Logger.warn('performance', `Empty query detected: ${entry.name} took ${entry.duration}ms - should be skipped`);
       return;
     }
     
     // Only log truly slow operations for Supabase queries
     if (isSupabaseQuery && entry.duration > 1500) {
-      console.warn(`Slow Supabase query: ${entry.name} took ${entry.duration}ms`);
+      Logger.warn('performance', `Slow Supabase query: ${entry.name} took ${entry.duration}ms`);
     } else if (!isSupabaseQuery && isSlowOperation) {
-      console.warn(`Slow operation detected: ${entry.name} took ${entry.duration}ms`);
+      Logger.warn('performance', `Slow operation detected: ${entry.name} took ${entry.duration}ms`);
     }
     
     // Track for metrics but don't spam console
@@ -120,7 +120,7 @@ export class OptimizedPerformanceService {
       
       // Only warn at higher threshold
       if (usagePercent > this.MEMORY_WARNING_THRESHOLD) {
-        console.warn(`High memory usage detected: ${usagePercent.toFixed(1)}%`);
+        Logger.warn('performance', `High memory usage detected: ${usagePercent.toFixed(1)}%`);
         this.triggerMemoryCleanup();
       }
     }
@@ -144,10 +144,10 @@ export class OptimizedPerformanceService {
   private static setupNetworkMonitoring(): void {
     if ('connection' in navigator) {
       const connection = (navigator as any).connection;
-      console.info('Network type:', connection.effectiveType);
+      Logger.info('performance', `Network type: ${connection.effectiveType}`);
       
       connection.addEventListener('change', () => {
-        console.info('Network changed:', connection.effectiveType);
+        Logger.info('performance', `Network changed: ${connection.effectiveType}`);
         this.adaptToNetworkConditions(connection.effectiveType);
       });
     }
@@ -157,14 +157,14 @@ export class OptimizedPerformanceService {
     switch (effectiveType) {
       case 'slow-2g':
       case '2g':
-        console.info('Enabling low bandwidth mode');
+        Logger.debug('performance', 'Enabling low bandwidth mode');
         break;
       case '3g':
-        console.info('Enabling moderate bandwidth mode');
+        Logger.debug('performance', 'Enabling moderate bandwidth mode');
         break;
       case '4g':
       default:
-        console.info('Enabling high bandwidth mode');
+        Logger.debug('performance', 'Enabling high bandwidth mode');
         break;
     }
   }

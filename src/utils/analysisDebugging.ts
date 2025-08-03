@@ -10,12 +10,15 @@ export class AnalysisDebugger {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const logEntry = `[${timestamp}] ${component}: ${event}`;
     
-    if (data) {
-      console.log(logEntry, data);
-      this.logs.push(`${logEntry} ${JSON.stringify(data)}`);
-    } else {
-      console.log(logEntry);
-      this.logs.push(logEntry);
+    // Only log in development or when debug is enabled
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_LOGGING === 'true') {
+      if (data) {
+        console.log(logEntry, data);
+        this.logs.push(`${logEntry} ${JSON.stringify(data)}`);
+      } else {
+        console.log(logEntry);
+        this.logs.push(logEntry);
+      }
     }
 
     // Keep only recent logs
@@ -70,11 +73,14 @@ export class AnalysisDebugger {
   }
 
   static trackNodeState(nodeType: string, nodeId: string, state: any) {
-    this.log('NodeTracker', `${nodeType}:${nodeId}`, {
-      visible: !!state.visible,
-      dataKeys: Object.keys(state.data || {}),
-      position: state.position
-    });
+    // Only track in development mode
+    if (import.meta.env.DEV) {
+      this.log('NodeTracker', `${nodeType}:${nodeId}`, {
+        visible: !!state.visible,
+        dataKeys: Object.keys(state.data || {}),
+        position: state.position
+      });
+    }
   }
 
   static trackCanvasRender(stats: {
@@ -84,7 +90,10 @@ export class AnalysisDebugger {
     requestNodes: number;
     totalEdges: number;
   }) {
-    this.log('CanvasRender', 'Stats', stats);
+    // Only track in development mode
+    if (import.meta.env.DEV) {
+      this.log('CanvasRender', 'Stats', stats);
+    }
   }
 
   static clearLogs() {
