@@ -1074,13 +1074,23 @@ async function handleCanvasRequest(action: string, payload: any) {
         }
         
         console.log('Converted Canvas payload:', convertedPayload)
-        const modelResult = await executeModel(convertedPayload)
+        const modelResultResponse = await executeModel(convertedPayload)
         
-        // Wrap result in Canvas-expected format
+        // Extract the actual JSON data from the response
+        const modelResultText = await modelResultResponse.text()
+        const modelResultData = JSON.parse(modelResultText)
+        
+        console.log('✅ Canvas analysis result extracted:', { 
+          hasData: !!modelResultData,
+          dataKeys: Object.keys(modelResultData || {}),
+          dataType: typeof modelResultData
+        })
+        
+        // Wrap result in Canvas-expected format with actual analysis data
         return new Response(
           JSON.stringify({
             success: true,
-            data: modelResult
+            data: modelResultData
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
