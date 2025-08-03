@@ -2,12 +2,20 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionLogger } from '@/services/EdgeFunctionLogger';
+import { EnhancedAnalysisPipeline, AnalysisProgress, EnhancedAnalysisResult } from '@/services/EnhancedAnalysisPipeline';
+import { AnalysisContext } from '@/types/contextTypes';
 
 interface AIContextType {
   selectedAIModel: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o';
   setSelectedAIModel: (model: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o') => void;
   isAnalyzing: boolean;
+  analysisProgress: AnalysisProgress | null;
+  requiresClarification: boolean;
+  clarificationQuestions: string[];
+  analysisContext: AnalysisContext | null;
   analyzeImageWithAI: (imageId: string, imageUrl: string, imageName: string, userContext?: string) => Promise<any>;
+  provideClarificationAndContinue: (responses: Record<string, string>) => Promise<any>;
+  cancelAnalysis: () => void;
   availableModels: {
     'claude-opus-4-20250514': boolean;
     'stability-ai': boolean;
@@ -28,6 +36,16 @@ export const useAI = () => {
 export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedAIModel, setSelectedAIModel] = useState<'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o'>('auto');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  const [requiresClarification, setRequiresClarification] = useState(false);
+  const [clarificationQuestions, setClarificationQuestions] = useState<string[]>([]);
+  const [analysisContext, setAnalysisContext] = useState<AnalysisContext | null>(null);
+  const [currentAnalysisParams, setCurrentAnalysisParams] = useState<{
+    imageId: string;
+    imageUrl: string;
+    imageName: string;
+    userContext?: string;
+  } | null>(null);
   const [availableModels, setAvailableModels] = useState({
     'claude-opus-4-20250514': true, // Assume available, will be checked by backend
     'stability-ai': true,
@@ -66,95 +84,86 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     userContext?: string
   ) => {
     setIsAnalyzing(true);
+    setAnalysisProgress(null);
+    setRequiresClarification(false);
+    setClarificationQuestions([]);
+    setAnalysisContext(null);
     
-    // Map "auto" to a specific model for the edge function
-    const actualModel = selectedAIModel === 'auto' ? 'gpt-4o' : selectedAIModel;
+    // Store current analysis parameters for potential clarification
+    setCurrentAnalysisParams({ imageId, imageUrl, imageName, userContext });
     
     const modelName = selectedAIModel === 'auto' ? 'Smart Selection' : 
                      selectedAIModel === 'claude-opus-4-20250514' ? 'Claude Opus 4' :
                      selectedAIModel === 'stability-ai' ? 'Stability AI' : 'GPT 4o';
 
     toast({
-      title: "AI Analysis Started",
-      description: `${modelName} is analyzing your image...`,
+      title: "Enhanced AI Analysis Started",
+      description: `${modelName} is analyzing your interface with context awareness...`,
     });
 
     try {
-      console.log('Starting AI analysis with model:', selectedAIModel, '(mapped to:', actualModel, ')');
-      console.log('Analysis payload:', { imageId, imageUrl: imageUrl.substring(0, 50) + '...', imageName, userContext });
+      console.log('Starting enhanced AI analysis for:', { imageId, imageName });
       
-      // Log edge function start
-      const requestId = await edgeFunctionLogger.logFunctionStart('ux-analysis', {
-        type: 'ANALYZE_IMAGE',
-        imageId,
-        imageName,
-        aiModel: selectedAIModel
+      // Create enhanced analysis pipeline with progress tracking
+      const pipeline = new EnhancedAnalysisPipeline((progress: AnalysisProgress) => {
+        setAnalysisProgress(progress);
+        console.log('Analysis progress:', progress);
       });
-      
-      // Prepare the payload - convert blob URL to base64 if needed
-      let payload: any = {
+
+      const result: EnhancedAnalysisResult = await pipeline.executeContextAwareAnalysis(
         imageId,
+        imageUrl,
         imageName,
         userContext
-      };
+      );
 
-      if (imageUrl.startsWith('blob:')) {
-        console.log('Converting blob URL to base64 for edge function...');
-        const base64Data = await blobUrlToBase64(imageUrl);
-        payload.imageBase64 = base64Data;
-        console.log('Blob URL converted to base64, length:', base64Data.length);
-      } else {
-        payload.imageUrl = imageUrl;
-        console.log('Using direct image URL for analysis');
-      }
-      
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: {
-          action: 'ANALYZE_IMAGE',
-          payload,
-          aiModel: actualModel
-        }
-      });
-      
-      // Log edge function completion
-      if (error) {
-        await edgeFunctionLogger.logFunctionEnd(requestId, null, new Error(error.message || 'Edge function error'));
-      } else {
-        await edgeFunctionLogger.logFunctionEnd(requestId, data);
-      }
-      
-      console.log('Edge function response:', { data, error });
-
-      if (error) {
-        console.error('AI analysis error:', error);
-        throw error;
+      if (result.requiresClarification) {
+        // Handle clarification needed
+        setRequiresClarification(true);
+        setClarificationQuestions(result.clarificationQuestions || []);
+        setAnalysisContext(result.analysisContext || null);
+        
+        toast({
+          title: "Additional Context Needed",
+          description: "Please provide some details to optimize the analysis for your needs.",
+        });
+        
+        return result; // Return partial result for clarification
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Analysis failed');
+      if (!result.success) {
+        throw new Error(result.error || 'Enhanced analysis failed');
       }
 
-      console.log('AI analysis completed successfully');
-      console.log('Analysis result metadata:', data.data?.metadata);
+      console.log('Enhanced AI analysis completed successfully');
       
-      const isRealAI = data.data?.metadata?.aiGenerated === true;
-      const analysisType = isRealAI ? 'Real AI Analysis' : 'Mock Analysis';
+      const interfaceType = result.analysisContext?.image.primaryType || 'interface';
+      const confidence = result.analysisContext?.confidence || 0;
       
       toast({
-        title: "Analysis Complete",
-        description: `${modelName} analysis complete (${analysisType})`,
+        title: "Enhanced Analysis Complete",
+        description: `${interfaceType} analysis completed with ${Math.round(confidence * 100)}% confidence`,
       });
 
-      return data.data;
+      // Clear progress and clarification state on success
+      setAnalysisProgress(null);
+      setRequiresClarification(false);
+      setCurrentAnalysisParams(null);
+
+      return result.data;
 
     } catch (error) {
-      console.error('AI analysis failed:', error);
+      console.error('Enhanced AI analysis failed:', error);
       
       toast({
-        title: "Analysis Failed",
-        description: `${modelName} analysis failed. Please try again.`,
+        title: "Enhanced Analysis Failed",
+        description: `Context-aware analysis failed. Please try again.`,
         variant: "destructive",
       });
+      
+      setAnalysisProgress(null);
+      setRequiresClarification(false);
+      setCurrentAnalysisParams(null);
       
       throw error;
     } finally {
@@ -162,11 +171,94 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, [selectedAIModel, toast]);
 
+  const provideClarificationAndContinue = useCallback(async (responses: Record<string, string>) => {
+    if (!currentAnalysisParams || !analysisContext) {
+      throw new Error('No analysis in progress');
+    }
+
+    setIsAnalyzing(true);
+    setRequiresClarification(false);
+    
+    toast({
+      title: "Continuing Analysis",
+      description: "Processing your feedback to provide optimized insights...",
+    });
+
+    try {
+      const pipeline = new EnhancedAnalysisPipeline((progress: AnalysisProgress) => {
+        setAnalysisProgress(progress);
+      });
+
+      const result = await pipeline.processClarificationAndContinue(
+        currentAnalysisParams.imageId,
+        currentAnalysisParams.imageUrl,
+        currentAnalysisParams.imageName,
+        analysisContext,
+        responses,
+        currentAnalysisParams.userContext
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Enhanced analysis with clarification failed');
+      }
+
+      const interfaceType = result.analysisContext?.image.primaryType || 'interface';
+      const confidence = (result.analysisContext as any)?.enhancedConfidence || result.analysisContext?.confidence || 0;
+      
+      toast({
+        title: "Enhanced Analysis Complete",
+        description: `${interfaceType} analysis completed with ${Math.round(confidence * 100)}% confidence`,
+      });
+
+      // Clear all state
+      setAnalysisProgress(null);
+      setRequiresClarification(false);
+      setClarificationQuestions([]);
+      setAnalysisContext(null);
+      setCurrentAnalysisParams(null);
+
+      return result.data;
+
+    } catch (error) {
+      console.error('Enhanced analysis with clarification failed:', error);
+      
+      toast({
+        title: "Enhanced Analysis Failed",
+        description: "Failed to complete analysis with provided context.",
+        variant: "destructive",
+      });
+      
+      throw error;
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [currentAnalysisParams, analysisContext, toast]);
+
+  const cancelAnalysis = useCallback(() => {
+    setIsAnalyzing(false);
+    setAnalysisProgress(null);
+    setRequiresClarification(false);
+    setClarificationQuestions([]);
+    setAnalysisContext(null);
+    setCurrentAnalysisParams(null);
+    
+    toast({
+      title: "Analysis Cancelled",
+      description: "The analysis has been cancelled.",
+    });
+  }, [toast]);
+
   const value: AIContextType = {
     selectedAIModel,
     setSelectedAIModel,
     isAnalyzing,
+    analysisProgress,
+    requiresClarification,
+    clarificationQuestions,
+    analysisContext,
     analyzeImageWithAI,
+    provideClarificationAndContinue,
+    cancelAnalysis,
     availableModels
   };
 
