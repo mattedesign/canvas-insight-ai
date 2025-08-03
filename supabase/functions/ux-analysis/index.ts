@@ -2071,7 +2071,10 @@ async function handleEnhancedContextAnalysis(body: any) {
     }
 
     return new Response(
-      JSON.stringify(enhancedResult),
+      JSON.stringify({
+        success: true,
+        data: enhancedResult
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
@@ -2082,7 +2085,8 @@ async function handleEnhancedContextAnalysis(body: any) {
     console.error('❌ Enhanced context analysis failed:', error);
     
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
+        success: false,
         error: error.message,
         stage: 'enhanced-context-analysis',
         details: error.stack,
