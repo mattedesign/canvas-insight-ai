@@ -146,16 +146,39 @@ export class EnhancedAnalysisPipeline {
   }
 
   /**
-   * Extract Google Vision metadata with caching
+   * Extract Google Vision metadata with enhanced URL handling
    */
   private async extractGoogleVisionMetadata(imageId: string, imageUrl: string): Promise<any> {
     try {
-      const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
-        body: {
-          imageId,
-          imageUrl,
-          features: ['labels', 'objects', 'text', 'faces', 'properties']
+      // PHASE 2: Enhanced URL processing for edge functions
+      let processedImageUrl = imageUrl;
+      let imageBase64: string | undefined;
+
+      // Handle blob URLs - convert to base64 for edge function compatibility
+      if (imageUrl.startsWith('blob:')) {
+        try {
+          const { BlobUrlReplacementService } = await import('./BlobUrlReplacementService');
+          imageBase64 = await BlobUrlReplacementService.blobUrlToBase64(imageUrl);
+          console.log('[EnhancedAnalysisPipeline] Converted blob URL to base64 for edge function');
+        } catch (conversionError) {
+          console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64:', conversionError);
+          return this.createFallbackMetadata();
         }
+      }
+
+      const requestBody: any = {
+        imageId,
+        imageUrl: processedImageUrl,
+        features: ['labels', 'objects', 'text', 'faces', 'properties']
+      };
+
+      // Include base64 data if available
+      if (imageBase64) {
+        requestBody.imageBase64 = imageBase64;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
+        body: requestBody
       });
 
       if (error) {
@@ -266,7 +289,7 @@ export class EnhancedAnalysisPipeline {
   }
 
   /**
-   * Perform context-aware AI analysis
+   * Perform context-aware AI analysis with enhanced URL handling
    */
   private async performContextAwareAnalysis(
     imageUrl: string,
@@ -276,21 +299,44 @@ export class EnhancedAnalysisPipeline {
     metadata: any,
     userContext?: string
   ): Promise<any> {
+    // PHASE 2: Enhanced URL processing for edge functions
+    let processedImageUrl = imageUrl;
+    let imageBase64: string | undefined;
+
+    // Handle blob URLs - convert to base64 for edge function compatibility
+    if (imageUrl.startsWith('blob:')) {
+      try {
+        const { BlobUrlReplacementService } = await import('./BlobUrlReplacementService');
+        imageBase64 = await BlobUrlReplacementService.blobUrlToBase64(imageUrl);
+        console.log('[EnhancedAnalysisPipeline] Converted blob URL to base64 for analysis');
+      } catch (conversionError) {
+        console.warn('[EnhancedAnalysisPipeline] Failed to convert blob URL to base64:', conversionError);
+        throw new PipelineError('Failed to process image URL for analysis', 'url-processing', { stage: 'blob-conversion' });
+      }
+    }
+
     // Create context-enhanced prompt
     const enhancedPrompt = this.buildContextEnhancedPrompt(context, metadata, userContext);
+
+    const requestPayload: any = {
+      imageId,
+      imageUrl: processedImageUrl,
+      imageName,
+      analysisContext: context,
+      metadata,
+      prompt: enhancedPrompt,
+      userContext
+    };
+
+    // Include base64 data if available
+    if (imageBase64) {
+      requestPayload.imageBase64 = imageBase64;
+    }
 
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
       body: {
         action: 'ENHANCED_CONTEXT_ANALYSIS',
-        payload: {
-          imageId,
-          imageUrl,
-          imageName,
-          analysisContext: context,
-          metadata,
-          prompt: enhancedPrompt,
-          userContext
-        }
+        payload: requestPayload
       }
     });
 

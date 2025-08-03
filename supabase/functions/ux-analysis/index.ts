@@ -1886,14 +1886,17 @@ async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
 // Enhanced Context Analysis Handler
 async function handleEnhancedContextAnalysis(body: any) {
   console.log('🔍 Enhanced Context Analysis - Processing request:', {
-    hasAnalysisContext: !!body.analysisContext,
-    hasMetadata: !!body.metadata,
-    hasPrompt: !!body.prompt,
-    imageId: body.imageId,
-    imageName: body.imageName
+    hasPayload: !!body.payload,
+    hasAnalysisContext: !!(body.payload?.analysisContext || body.analysisContext),
+    hasMetadata: !!(body.payload?.metadata || body.metadata),
+    hasPrompt: !!(body.payload?.prompt || body.prompt),
+    imageId: body.payload?.imageId || body.imageId,
+    imageName: body.payload?.imageName || body.imageName
   });
 
   try {
+    // PHASE 1: Fix data extraction to handle body.payload structure
+    const payload = body.payload || body;
     const { 
       imageId, 
       imageUrl, 
@@ -1902,7 +1905,7 @@ async function handleEnhancedContextAnalysis(body: any) {
       analysisContext,
       metadata,
       prompt 
-    } = body;
+    } = payload;
 
     // Validate required fields
     if (!imageId || !imageUrl) {

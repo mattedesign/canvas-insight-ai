@@ -137,19 +137,34 @@ const SimplifiedCanvas = () => {
     if (files.length === 0) return;
     
     try {
-      // Create images with blob URLs first for immediate display
+      // PHASE 2: Immediate storage upload and blob URL replacement
       const { loadImageDimensions } = await import('@/utils/imageUtils');
+      const { BlobUrlReplacementService } = await import('@/services/BlobUrlReplacementService');
+      
       const uploadPromises = files.map(async (file) => {
         console.log('[SimplifiedCanvas] Processing file:', file.name);
         const dimensions = await loadImageDimensions(file);
-        return {
-          id: crypto.randomUUID(),
+        const imageId = crypto.randomUUID();
+        
+        // Create initial image with blob URL for immediate display
+        const tempImage = {
+          id: imageId,
           name: file.name,
           url: URL.createObjectURL(file),
           file,
           dimensions,
           status: 'completed' as const
         };
+
+        // Immediately upload to storage and replace blob URL
+        try {
+          const processedImage = await BlobUrlReplacementService.processUploadedImage(tempImage);
+          console.log('[SimplifiedCanvas] Image uploaded to storage:', processedImage.url);
+          return processedImage;
+        } catch (storageError) {
+          console.warn('[SimplifiedCanvas] Storage upload failed, using blob URL:', storageError);
+          return tempImage; // Fallback to blob URL
+        }
       });
       
       const results = await Promise.all(uploadPromises);

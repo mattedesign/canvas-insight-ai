@@ -54,26 +54,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   
   const { toast } = useToast();
 
-  // Helper function to convert blob URL to base64
-  const blobUrlToBase64 = useCallback(async (blobUrl: string): Promise<string> => {
+  // PHASE 2: Enhanced image URL handling with storage resolution
+  const getValidImageData = useCallback(async (image: any): Promise<{ url: string; base64?: string }> => {
     try {
-      const response = await fetch(blobUrl);
-      const blob = await response.blob();
-      
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result as string;
-          // Remove the data:image/jpeg;base64, prefix to get just the base64 data
-          const base64Data = base64.split(',')[1];
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      const { BlobUrlReplacementService } = await import('@/services/BlobUrlReplacementService');
+      return await BlobUrlReplacementService.getValidImageUrl(image);
     } catch (error) {
-      console.error('Failed to convert blob URL to base64:', error);
-      throw error;
+      console.error('Failed to get valid image data:', error);
+      return { url: image.url || '' };
     }
   }, []);
 
@@ -110,9 +98,12 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         console.log('Analysis progress:', progress);
       });
 
+      // PHASE 2: Use enhanced image data handling
+      const imageData = await getValidImageData({ id: imageId, url: imageUrl, name: imageName });
+      
       const result: EnhancedAnalysisResult = await pipeline.executeContextAwareAnalysis(
         imageId,
-        imageUrl,
+        imageData.url,
         imageName,
         userContext
       );

@@ -31,27 +31,39 @@ interface VisionMetadata {
 }
 
 // Google Vision metadata extraction function
-async function extractGoogleVisionMetadata(imageUrl: string, features: string[]): Promise<VisionMetadata> {
+async function extractGoogleVisionMetadata(
+  imageUrl: string, 
+  features: string[], 
+  imageBase64?: string
+): Promise<VisionMetadata> {
   const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
   if (!apiKey) {
     throw new Error('Google Vision API key not configured');
   }
 
   try {
-    // Fetch image and convert to base64
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
+    let base64Content: string;
     
-    // Check file size (limit to 10MB for Vision API)
-    if (imageBuffer.byteLength > 10 * 1024 * 1024) {
-      throw new Error('Image too large for Google Vision API (max 10MB)');
-    }
+    // PHASE 2: Use provided base64 data if available (for blob URLs)
+    if (imageBase64) {
+      console.log('Using provided base64 data for Google Vision API');
+      base64Content = imageBase64;
+    } else {
+      // Fetch image and convert to base64 for regular URLs
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+      }
 
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      const imageBuffer = await imageResponse.arrayBuffer();
+      
+      // Check file size (limit to 10MB for Vision API)
+      if (imageBuffer.byteLength > 10 * 1024 * 1024) {
+        throw new Error('Image too large for Google Vision API (max 10MB)');
+      }
+
+      base64Content = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    }
 
     // Prepare Vision API request
     const visionFeatures = features.map(feature => {
@@ -77,7 +89,7 @@ async function extractGoogleVisionMetadata(imageUrl: string, features: string[])
       requests: [
         {
           image: {
-            content: base64Image
+            content: base64Content
           },
           features: visionFeatures
         }
@@ -186,7 +198,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    const { imageId, imageUrl, features = ['labels', 'faces', 'text'] }: GoogleVisionMetadataRequest = await req.json();
+    const { imageId, imageUrl, features = ['labels', 'faces', 'text'], imageBase64 } = await req.json();
 
     // Validate required parameters
     if (!imageId || !imageUrl) {
@@ -234,7 +246,7 @@ serve(async (req) => {
     }
 
     // Extract metadata using Google Vision API
-    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, features);
+    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, features, imageBase64);
 
     // Prepare metadata update
     const metadataUpdate = {
