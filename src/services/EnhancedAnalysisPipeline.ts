@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ContextDetectionService } from './ContextDetectionService';
 import { AnalysisContext, ImageContext } from '@/types/contextTypes';
 import { PipelineError } from '@/types/pipelineErrors';
+import { imageUrlToBase64Safe } from '@/utils/base64Utils';
 
 export interface AnalysisProgress {
   stage: string;
@@ -171,17 +172,11 @@ export class EnhancedAnalysisPipeline {
         }
       }
 
-      // For non-blob URLs, fetch image and convert to base64
+      // For non-blob URLs, fetch image and convert to base64 using safe chunked conversion
       if (!imageBase64) {
         try {
-          const response = await fetch(imageUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.status}`);
-          }
-          const arrayBuffer = await response.arrayBuffer();
-          const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-          imageBase64 = base64String;
-          console.log('[EnhancedAnalysisPipeline] Converted image URL to base64');
+          imageBase64 = await imageUrlToBase64Safe(imageUrl);
+          console.log('[EnhancedAnalysisPipeline] Converted image URL to base64 using safe chunked method');
         } catch (fetchError) {
           console.warn('[EnhancedAnalysisPipeline] Failed to fetch and convert image:', fetchError);
           return this.createFallbackMetadata();
