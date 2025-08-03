@@ -3,12 +3,6 @@ project_id = "sdcmbfdtafkzpimwjpij"
 [functions.ux-analysis]
 verify_jwt = true
 
-[functions.google-vision-metadata]
-verify_jwt = false
-
-[functions.inpainting-service]
-verify_jwt = true
-
 [functions.check-subscription]
 verify_jwt = false
 
