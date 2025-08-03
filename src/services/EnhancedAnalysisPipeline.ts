@@ -3,6 +3,16 @@ import { ContextDetectionService } from './ContextDetectionService';
 import { AnalysisContext, ImageContext } from '@/types/contextTypes';
 import { PipelineError } from '@/types/pipelineErrors';
 import { imageUrlToBase64Safe } from '@/utils/base64Utils';
+// Priority 1: Safety & Validation
+import { ValidationService } from './ValidationService';
+import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
+// Priority 2: Performance & Reliability
+import { ProgressPersistenceService } from './ProgressPersistenceService';
+import { ModelSelectionOptimizer } from './ModelSelectionOptimizer';
+import { PipelineRecoveryService } from './PipelineRecoveryService';
+import { OptimizedContextDetectionPipeline } from './OptimizedContextDetectionPipeline';
+// Priority 3: Analysis Quality
+import { SummaryGenerator } from './SummaryGenerator';
 
 export interface AnalysisProgress {
   stage: string;
@@ -29,13 +39,44 @@ export interface EnhancedAnalysisResult {
 export class EnhancedAnalysisPipeline {
   private contextService = new ContextDetectionService();
   private progressCallback?: (progress: AnalysisProgress) => void;
+  
+  // Priority 1: Safety & Validation Services
+  private validationService: ValidationService;
+  private arraySafety: ArrayNumericSafety;
+  
+  // Priority 2: Performance & Reliability Services
+  private progressService: ProgressPersistenceService;
+  private modelOptimizer: ModelSelectionOptimizer;
+  private recoveryService: PipelineRecoveryService;
+  private optimizedContextPipeline: OptimizedContextDetectionPipeline;
+  private currentRequestId: string | null = null;
+  
+  // Priority 3: Analysis Quality Services
+  private summaryGenerator: SummaryGenerator;
+  
+  // Internal state tracking
+  private analysisContext: AnalysisContext | null = null;
 
   constructor(onProgress?: (progress: AnalysisProgress) => void) {
     this.progressCallback = onProgress;
+    
+    // Initialize Priority 1: Safety & Validation Services
+    this.validationService = ValidationService.getInstance();
+    this.arraySafety = ArrayNumericSafety.getInstance();
+    
+    // Initialize Priority 2: Performance & Reliability Services
+    this.progressService = ProgressPersistenceService.getInstance();
+    this.modelOptimizer = ModelSelectionOptimizer.getInstance();
+    this.recoveryService = PipelineRecoveryService.getInstance();
+    this.optimizedContextPipeline = new OptimizedContextDetectionPipeline();
+    
+    // Initialize Priority 3: Analysis Quality Services
+    this.summaryGenerator = SummaryGenerator.getInstance();
   }
 
   /**
    * Execute context-aware analysis pipeline with Google Vision metadata
+   * Enhanced with validation, recovery, and optimized context detection
    */
   async executeContextAwareAnalysis(
     imageId: string,
@@ -43,7 +84,34 @@ export class EnhancedAnalysisPipeline {
     imageName: string,
     userContext?: string
   ): Promise<EnhancedAnalysisResult> {
+    // Priority 2: Generate request ID and check for resumption
+    this.currentRequestId = this.progressService.generateRequestId(imageUrl, userContext || '');
+    const resumption = this.progressService.checkResumption(this.currentRequestId);
+    
+    console.log('🚀 EnhancedAnalysisPipeline.executeContextAwareAnalysis() called with:', {
+      imageId: imageId ? 'provided' : 'missing',
+      imageUrl: imageUrl ? 'provided' : 'missing',
+      userContext: userContext ? `"${userContext.substring(0, 50)}..."` : 'empty',
+      hasProgressCallback: !!this.progressCallback,
+      requestId: this.currentRequestId,
+      canResume: resumption.canResume,
+      lastStage: resumption.lastStage,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
+      // Priority 1: Validate inputs before processing
+      if (!imageUrl || !this.isValidImageUrl(imageUrl)) {
+        throw new PipelineError(
+          'Invalid image URL provided',
+          'validation',
+          { imageUrl },
+          false
+        );
+      }
+      
+      // Priority 2: Save initial progress
+      this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext || '', 'initialization', 5);
       // Phase 1: Extract Google Vision metadata for context-specific progress
       this.updateProgress('google-vision', 10, 'Extracting visual metadata...', {});
       
@@ -55,14 +123,33 @@ export class EnhancedAnalysisPipeline {
         detectedElements: this.extractKeyElements(visionMetadata)
       });
 
-      // Phase 2: Context detection with metadata-informed prompts
+      // Phase 2: Enhanced context detection with optimized pipeline
       this.updateProgress('context-detection', 35, `Understanding ${interfaceType} context and user needs...`, {
         interfaceType
       });
-
-      const imageContext = await this.contextService.detectImageContext(imageUrl);
-      const userContextData = this.contextService.inferUserContext(userContext || '');
-      const analysisContext = this.contextService.createAnalysisContext(imageContext, userContextData);
+      
+      // Priority 3: Use optimized context detection pipeline for better accuracy
+      let analysisContext: AnalysisContext;
+      try {
+        analysisContext = await this.optimizedContextPipeline.detectContextWithConfidenceRouting(
+          { url: imageUrl },
+          userContext || '',
+          0.7 // Minimum confidence threshold
+        );
+        
+        console.log('[EnhancedAnalysisPipeline] Optimized context detection successful:', {
+          type: analysisContext.image.primaryType,
+          confidence: analysisContext.confidence,
+          clarificationNeeded: analysisContext.clarificationNeeded
+        });
+      } catch (contextError) {
+        console.warn('[EnhancedAnalysisPipeline] Optimized context detection failed, using fallback:', contextError);
+        
+        // Fallback to original context detection
+        const imageContext = await this.contextService.detectImageContext(imageUrl);
+        const userContextData = this.contextService.inferUserContext(userContext || '');
+        analysisContext = this.contextService.createAnalysisContext(imageContext, userContextData);
+      }
 
       // Phase 3: Check if clarification is needed
       if (analysisContext.clarificationNeeded || analysisContext.confidence < 0.7) {
@@ -107,12 +194,46 @@ export class EnhancedAnalysisPipeline {
         userContext
       );
 
-      // Phase 5: Final processing and storage
+      // Priority 1: Validate analysis result before processing
+      const validationResult = this.validationService.validateAnalysisResult(analysisResult);
+      if (!validationResult.isValid) {
+        console.warn('Analysis validation failed:', validationResult.errors);
+        // Use fixed data if available, otherwise proceed with warnings
+        const finalResult = validationResult.fixedData || analysisResult;
+        
+        // Log validation warnings but don't fail the analysis
+        validationResult.warnings.forEach(warning => {
+          console.warn('Analysis validation warning:', warning.message, warning.suggestion);
+        });
+      }
+
+      // Phase 5: Final processing and storage with enhanced summary generation
       this.updateProgress('finalizing', 90, 'Finalizing analysis and generating insights...', {
         interfaceType: analysisContext.image.primaryType
       });
+      
+      // Priority 3: Generate enhanced summary using SummaryGenerator
+      let finalAnalysisResult = validationResult.fixedData || analysisResult;
+      try {
+        const enhancedSummary = await this.summaryGenerator.generateValidSummary(
+          finalAnalysisResult,
+          analysisContext
+        );
+        
+        if (enhancedSummary && enhancedSummary.overallScore) {
+          finalAnalysisResult = {
+            ...finalAnalysisResult,
+            summary: enhancedSummary
+          };
+        }
+      } catch (summaryError) {
+        console.warn('Enhanced summary generation failed, using original:', summaryError);
+      }
 
-      await this.storeEnhancedAnalysis(imageId, analysisResult, analysisContext);
+      await this.storeEnhancedAnalysis(imageId, finalAnalysisResult, analysisContext);
+
+      // Priority 2: Mark progress as complete and save final state
+      this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext || '', 'complete', 100, finalAnalysisResult);
 
       this.updateProgress('complete', 100, `${analysisContext.image.primaryType} analysis completed`, {
         interfaceType: analysisContext.image.primaryType,
@@ -121,7 +242,7 @@ export class EnhancedAnalysisPipeline {
 
       return {
         success: true,
-        data: analysisResult,
+        data: finalAnalysisResult,
         analysisContext,
         progress: {
           stage: 'complete',
@@ -135,7 +256,38 @@ export class EnhancedAnalysisPipeline {
       };
 
     } catch (error) {
-      console.error('Enhanced analysis pipeline failed:', error);
+      // Priority 2: Enhanced error handling with recovery attempts
+      console.error('❌ Enhanced analysis pipeline failed:', error);
+      
+      // Priority 2: Mark request as failed
+      if (this.currentRequestId) {
+        this.progressService.failRequest(this.currentRequestId, error.message);
+      }
+      
+      // Priority 2: Attempt recovery if error is recoverable
+      if (this.recoveryService.isTransientError(error as Error)) {
+        console.log('🔄 Attempting pipeline recovery...');
+        
+        try {
+          const recoveryResult = await this.recoveryService.retryWithBackoff(
+            () => this.executeRetryableOperation(imageId, imageUrl, imageName, userContext),
+            3,
+            2000,
+            'enhanced-pipeline-execution'
+          );
+          
+          if (recoveryResult.success && recoveryResult.result) {
+            console.log('✅ Enhanced pipeline recovery successful');
+            return {
+              success: true,
+              data: recoveryResult.result,
+              analysisContext: this.analysisContext || undefined
+            };
+          }
+        } catch (recoveryError) {
+          console.warn('⚠️ Enhanced pipeline recovery failed:', recoveryError);
+        }
+      }
       
       this.updateProgress('error', 0, `Analysis failed: ${error.message}`, {});
       
@@ -144,6 +296,20 @@ export class EnhancedAnalysisPipeline {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Priority 2: Retryable operation for recovery service
+   */
+  private async executeRetryableOperation(
+    imageId: string,
+    imageUrl: string,
+    imageName: string,
+    userContext?: string
+  ): Promise<EnhancedAnalysisResult> {
+    // This is a simplified retry operation - in practice, you might want to skip
+    // certain expensive operations like context detection if they already completed
+    return this.executeContextAwareAnalysis(imageId, imageUrl, imageName, userContext);
   }
 
   /**
@@ -535,7 +701,7 @@ Focus on:
   }
 
   /**
-   * PHASE 3: Enhanced utility methods for URL validation and retry logic
+   * Priority 1: Enhanced utility methods for URL validation and retry logic
    */
   private isValidImageUrl(url: string): boolean {
     if (!url || typeof url !== 'string') return false;
@@ -665,4 +831,5 @@ Focus on:
       };
     }
   }
+
 }

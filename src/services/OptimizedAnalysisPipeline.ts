@@ -43,6 +43,11 @@ interface PipelineProgress {
   tokenBudget?: { used: number; remaining: number };
 }
 
+/**
+ * @deprecated This pipeline is deprecated and should not be used in new code.
+ * Use EnhancedAnalysisPipeline instead, which includes all the improvements
+ * from this pipeline with better integration and performance.
+ */
 export class OptimizedAnalysisPipeline {
   private tokenBudgets: Record<string, TokenBudget> = {
     'claude-opus-4-20250514': {

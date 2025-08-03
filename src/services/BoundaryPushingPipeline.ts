@@ -1,3 +1,11 @@
+/**
+ * @deprecated This pipeline is deprecated and should not be used in new code.
+ * Use EnhancedAnalysisPipeline instead, which includes all the improvements
+ * from this pipeline with better integration and performance.
+ * 
+ * This file will be removed in a future version.
+ */
+
 import { supabase } from '@/integrations/supabase/client';
 import { pipelineConfig } from '@/config/pipelineConfig';
 import { PipelineError, ModelExecutionError } from '@/types/pipelineErrors';
@@ -32,6 +40,9 @@ interface StageResult {
   confidence: number;
 }
 
+/**
+ * @deprecated Use EnhancedAnalysisPipeline instead
+ */
 export class BoundaryPushingPipeline {
   private abortController: AbortController | null = null;
   private contextDetector: ContextDetectionService;
@@ -52,6 +63,7 @@ export class BoundaryPushingPipeline {
   private recoveryService: PipelineRecoveryService;
 
   constructor() {
+    console.warn('⚠️ BoundaryPushingPipeline is deprecated. Use EnhancedAnalysisPipeline instead.');
     this.contextDetector = new ContextDetectionService();
     this.optimizedContextPipeline = new OptimizedContextDetectionPipeline();
     this.promptBuilder = new DynamicPromptBuilder();

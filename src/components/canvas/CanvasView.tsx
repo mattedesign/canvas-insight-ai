@@ -10,7 +10,7 @@ import {
   Node,
   Background,
 } from '@xyflow/react';
-import { BoundaryPushingPipeline } from '@/services/BoundaryPushingPipeline';
+import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { getSafeDimensions } from '@/utils/imageUtils';
