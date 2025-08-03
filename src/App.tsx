@@ -5,10 +5,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AppProvider } from "./context/SimplifiedAppContext";
+import { MinimalAppProvider } from "./context/MinimalAppContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
-import { PerformanceMonitor } from "./components/PerformanceMonitor";
+// Performance monitoring disabled for production
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -16,7 +16,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 // Lazy load pages for better performance and reduced initial bundle size
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Canvas = lazy(() => import("./pages/Canvas"));
+const Canvas = lazy(() => import("./pages/SimplifiedCanvas"));
 const Projects = lazy(() => import("./pages/Projects"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Subscription = lazy(() => import("./pages/Subscription"));
@@ -29,45 +29,9 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
-// Emergency render count monitor - stops infinite loops
-const useEmergencyLoopStopper = (componentName: string) => {
-  const renderCount = useRef(0);
-  const lastRenderTime = useRef(Date.now());
-  
-  useEffect(() => {
-    renderCount.current++;
-    const currentTime = Date.now();
-    const timeSinceLastRender = currentTime - lastRenderTime.current;
-    
-    // If more than 50 renders in 1 second, throw error to stop the app
-    if (renderCount.current > 50 && timeSinceLastRender < 1000) {
-      console.error(`🚨 INFINITE LOOP DETECTED in ${componentName}!`);
-      console.error(`Render count: ${renderCount.current} in ${timeSinceLastRender}ms`);
-      
-      // Nuclear option - reload the page after 2 seconds
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      
-      throw new Error(`STOPPED: Infinite loop in ${componentName} - ${renderCount.current} renders`);
-    }
-    
-    // Reset counter every second
-    if (timeSinceLastRender > 1000) {
-      renderCount.current = 0;
-      lastRenderTime.current = currentTime;
-    }
-  });
-  
-  // Log excessive renders as warning
-  if (renderCount.current > 10) {
-    console.warn(`⚠️ High render count in ${componentName}: ${renderCount.current}`);
-  }
-};
+// Emergency render monitoring removed - performance optimized
 
 const App = () => {
-  useEmergencyLoopStopper('App');
-  
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -76,7 +40,7 @@ const App = () => {
       <BrowserRouter>
       <AuthProvider>
         <AIProvider>
-          <AppProvider>
+          <MinimalAppProvider>
             
             <Suspense fallback={
               <div className="min-h-screen flex items-center justify-center bg-background">
@@ -167,7 +131,7 @@ const App = () => {
                 } />
               </Routes>
             </Suspense>
-          </AppProvider>
+          </MinimalAppProvider>
         </AIProvider>
       </AuthProvider>
       </BrowserRouter>
