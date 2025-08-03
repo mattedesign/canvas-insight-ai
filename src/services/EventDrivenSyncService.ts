@@ -16,6 +16,9 @@ export type SyncEventType =
   | 'analysis_deleted'
   | 'data_invalidated'
   | 'project_changed'
+  | 'project_created'
+  | 'project_deleted'
+  | 'project_switched'
   | 'workspace_cleaned';
 
 interface SyncEvent {

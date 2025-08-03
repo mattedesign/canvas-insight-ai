@@ -53,6 +53,16 @@ export interface StrictStableHelpers {
   readonly deleteGroup: (id: string) => Promise<void>;
   readonly cleanWorkspace: (options: { clearImages: boolean; clearAnalyses: boolean; clearGroups: boolean; }) => Promise<void>;
   readonly resetAll: () => void;
+  // Project management functions
+  readonly addProject: (project: { name: string; description?: string }) => Promise<void>;
+  readonly removeProject: (projectId: string) => Promise<void>;
+  readonly updateProject: (projectId: string, updates: { name?: string; description?: string }) => Promise<void>;
+  readonly setCurrentProject: (projectId: string) => Promise<void>;
+  // Image management functions  
+  readonly addImage: (image: unknown) => void;
+  readonly removeImage: (imageId: string) => Promise<void>;
+  readonly updateImage: (imageId: string, updates: unknown) => Promise<void>;
+  readonly clearImages: () => Promise<void>;
 }
 
 // ✅ PHASE 4.1: Strict initialization types
