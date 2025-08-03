@@ -36,6 +36,7 @@ interface FloatingToolbarProps {
   showAnalysis: boolean;
   currentTool: ToolMode;
   hasMultiSelection?: boolean;
+  selectedCount?: number;
 }
 
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
@@ -48,7 +49,8 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   showAnnotations,
   showAnalysis,
   currentTool,
-  hasMultiSelection = false
+  hasMultiSelection = false,
+  selectedCount = 0
 }) => {
   const { zoomIn, zoomOut, zoomTo, fitView, getZoom } = useReactFlow();
   const { toast } = useFilteredToast();
@@ -267,17 +269,17 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           <Separator orientation="vertical" className="h-6" />
 
           {/* Group Creation Button */}
-          {onCreateGroup && (
+          {onCreateGroup && selectedCount >= 2 && (
             <>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 w-8 p-0"
+                className="h-8 px-2 gap-1"
                 onClick={onCreateGroup}
-                disabled={!hasMultiSelection}
-                title="Create group from selected images"
+                title={`Create group from ${selectedCount} selected items`}
               >
                 <Group className="h-4 w-4" />
+                <span className="text-xs">{selectedCount}</span>
               </Button>
               
               <Separator orientation="vertical" className="h-6" />

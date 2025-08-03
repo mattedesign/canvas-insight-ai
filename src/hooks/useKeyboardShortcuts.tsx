@@ -4,6 +4,8 @@ export const useKeyboardShortcuts = (handlers: {
   onGroup?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onSelectAll?: () => void;
+  onDelete?: () => void;
 }) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -39,6 +41,22 @@ export const useKeyboardShortcuts = (handlers: {
         event.preventDefault();
         event.stopPropagation();
         handlers.onRedo?.();
+        return;
+      }
+
+      // Handle Cmd/Ctrl + A for select all
+      if (modifierKey && event.key.toLowerCase() === 'a') {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onSelectAll?.();
+        return;
+      }
+
+      // Handle Delete/Backspace for delete
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onDelete?.();
         return;
       }
     };

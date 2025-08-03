@@ -171,7 +171,7 @@ const Projects = () => {
     if (isCtrlOrCmd || multiSelection.state.isMultiSelectMode) {
       // Multi-select mode
       event.preventDefault();
-      multiSelection.toggleSelection(project.id, isCtrlOrCmd);
+      multiSelection.toggleSelection(project.id, isCtrlOrCmd ? 'ctrl' : 'none');
     } else {
       // Regular navigation
       handleSwitchProject(project);
@@ -195,7 +195,7 @@ const Projects = () => {
     
     // If project isn't selected and we have a selection, add it to selection
     if (!multiSelection.isSelected(project.id) && multiSelection.state.selectedIds.length > 0) {
-      multiSelection.toggleSelection(project.id, true);
+      multiSelection.toggleSelection(project.id, 'ctrl');
     }
     
     setContextMenu({ 
