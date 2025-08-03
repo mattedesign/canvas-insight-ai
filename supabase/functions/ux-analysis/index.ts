@@ -1483,50 +1483,6 @@ function generateClarificationQuestions(imageContext: any, userContext: any): st
 }
 
 async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: string): Promise<any> {
-  try {
-    console.log('🔍 Calling dedicated Google Vision metadata service...');
-    
-    // Call the dedicated Google Vision metadata edge function
-    const { data, error } = await supabase.functions.invoke('google-vision-metadata', {
-      body: {
-        imageId: 'temp-' + Date.now(), // Temporary ID for pipeline usage
-        imageUrl: imageUrl,
-        imageBase64: imageBase64,
-        features: ['labels', 'text', 'objects', 'faces', 'properties']
-      }
-    });
-    
-    if (error) {
-      console.error('Google Vision service error:', error);
-      console.log('🔧 Attempting direct Google Vision API call as fallback...');
-      return await performDirectVisionAPICall(imageUrl, imageBase64);
-    }
-    
-    if (data?.success && data?.metadata) {
-      console.log('✅ Google Vision metadata extracted via dedicated service');
-      return {
-        objects: data.metadata.objects || [],
-        text: data.metadata.text || [],
-        colors: data.metadata.imageProperties?.dominantColors || [],
-        faces: data.metadata.faces?.length || 0,
-        labels: data.metadata.labels || [],
-        logos: [], // Not included in current service
-        confidence: 0.95,
-        timestamp: new Date().toISOString()
-      };
-    } else {
-      console.warn('⚠️ Google Vision service returned no metadata, trying direct API call...');
-      return await performDirectVisionAPICall(imageUrl, imageBase64);
-    }
-    
-  } catch (error) {
-    console.error('Error calling Google Vision service:', error);
-    console.log('🔧 Attempting direct Google Vision API call as final fallback...');
-    return await performDirectVisionAPICall(imageUrl, imageBase64);
-  }
-}
-
-async function performDirectVisionAPICall(imageUrl: string, imageBase64?: string): Promise<any> {
   const googleApiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
   
   if (!googleApiKey) {
@@ -1535,12 +1491,12 @@ async function performDirectVisionAPICall(imageUrl: string, imageBase64?: string
   }
   
   try {
-    console.log('🔧 Performing direct Google Vision API call...');
+    console.log('🔧 Performing Google Vision API call...');
     
     // Convert image to base64 if we have a URL
     let base64Image = imageBase64;
     if (!base64Image && imageUrl) {
-      console.log('📥 Fetching image from URL for direct Vision API call...');
+      console.log('📥 Fetching image from URL for Vision API call...');
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
         throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
@@ -1615,19 +1571,19 @@ async function performDirectVisionAPICall(imageUrl: string, imageBase64?: string
       })),
       logos: [],
       confidence: 0.9,
-      timestamp: new Date().toISOString(),
-      source: 'direct-api'
+      timestamp: new Date().toISOString()
     };
     
-    console.log('✅ Direct Google Vision API call successful');
+    console.log('✅ Google Vision API call successful');
     return transformedMetadata;
     
   } catch (error) {
-    console.error('❌ Direct Google Vision API call failed:', error);
-    console.warn('⚠️ Falling back to mock metadata as final option');
+    console.error('❌ Google Vision API call failed:', error);
+    console.warn('⚠️ Falling back to mock metadata');
     return createMockVisionMetadata();
   }
 }
+
 
 function createMockVisionMetadata(): any {
   return {
