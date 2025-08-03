@@ -296,6 +296,11 @@ serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         
+        case 'ENHANCED_CONTEXT_ANALYSIS':
+          // Handle enhanced context-aware analysis from EnhancedAnalysisPipeline
+          console.log('🚀 Processing ENHANCED_CONTEXT_ANALYSIS request')
+          return await handleEnhancedContextAnalysis(body)
+        
         default:
           throw new Error(`Unknown action: ${body.action}`)
       }
@@ -1192,42 +1197,59 @@ async function executeMultiModelPipeline(params: {
   userContext?: string;
   imageName?: string;
   imageId?: string;
+  enhancedContext?: {
+    analysisContext?: any;
+    metadata?: any;
+    contextualPrompt?: string;
+  };
 }): Promise<any> {
   console.log('🚀 Starting multi-model pipeline with Google Vision + OpenAI + Claude');
   
-  const { imageUrl, imageBase64, userContext, imageName, imageId } = params;
+  const { imageUrl, imageBase64, userContext, imageName, imageId, enhancedContext } = params;
   
   try {
-    // Step 0: Context Detection (CRITICAL - was missing!)
-    console.log('🔍 Step 0: Detecting context and checking for clarification needs...');
-    const contextResult = await detectImageContextAndClarification(imageUrl, imageBase64, userContext);
+    // Step 0: Context Detection - use enhanced context if available
+    let contextResult;
+    let visionMetadata;
     
-    // If clarification is needed, return early
-    if (contextResult.requiresClarification) {
-      console.log('❓ Context clarification needed, returning early');
-      return {
-        success: true,
-        data: {
-          requiresClarification: true,
-          questions: contextResult.questions,
-          partialContext: contextResult.analysisContext
-        }
+    if (enhancedContext?.analysisContext) {
+      console.log('🎯 Using enhanced context from EnhancedAnalysisPipeline');
+      contextResult = {
+        analysisContext: enhancedContext.analysisContext,
+        requiresClarification: false
       };
+      visionMetadata = enhancedContext.metadata || {};
+    } else {
+      console.log('🔍 Step 0: Detecting context and checking for clarification needs...');
+      contextResult = await detectImageContextAndClarification(imageUrl, imageBase64, userContext);
+      
+      // If clarification is needed, return early
+      if (contextResult.requiresClarification) {
+        console.log('❓ Context clarification needed, returning early');
+        return {
+          success: true,
+          data: {
+            requiresClarification: true,
+            questions: contextResult.questions,
+            partialContext: contextResult.analysisContext
+          }
+        };
+      }
+      
+      console.log('✅ Context detection complete, proceeding with analysis');
+      
+      // Step 1: Extract metadata with Google Vision if not using enhanced context
+      console.log('📊 Step 1: Extracting metadata with Google Vision...');
+      visionMetadata = await extractGoogleVisionMetadata(imageUrl, imageBase64);
     }
-    
-    console.log('✅ Context detection complete, proceeding with analysis');
-    
-    // Step 1: Extract metadata with Google Vision
-    console.log('📊 Step 1: Extracting metadata with Google Vision...');
-    const visionMetadata = await extractGoogleVisionMetadata(imageUrl, imageBase64);
     
     // Step 2: Run parallel analysis with OpenAI and Claude, passing vision metadata
     console.log('🤖 Step 2: Running parallel analysis with OpenAI + Claude...');
     
     // Use Promise.allSettled to handle partial failures gracefully
     const results = await Promise.allSettled([
-      runOpenAIAnalysis(imageUrl, imageBase64, userContext, visionMetadata),
-      runClaudeAnalysis(imageUrl, imageBase64, userContext, visionMetadata)
+      runOpenAIAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext),
+      runClaudeAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext)
     ]);
     
     const openaiAnalysis = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -1548,10 +1570,11 @@ function createMockVisionMetadata(): any {
   };
 }
 
-async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any): Promise<any> {
+async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any): Promise<any> {
   console.log('🤖 Running OpenAI analysis with vision metadata...');
   
-  const enhancedPrompt = buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'openai');
+  // Use enhanced prompt if available, otherwise build standard prompt
+  const enhancedPrompt = enhancedContext?.contextualPrompt || buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'openai');
   
   const payload = {
     model: 'gpt-4o',
@@ -1573,10 +1596,11 @@ async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userCon
   return { model: 'gpt-4o', result, confidence: 0.9 };
 }
 
-async function runClaudeAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any): Promise<any> {
+async function runClaudeAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any): Promise<any> {
   console.log('🤖 Running Claude analysis with vision metadata...');
   
-  const enhancedPrompt = buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'claude');
+  // Use enhanced prompt if available, otherwise build standard prompt
+  const enhancedPrompt = enhancedContext?.contextualPrompt || buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'claude');
   
   const payload = {
     model: 'claude-opus-4-20250514',
@@ -1856,5 +1880,94 @@ async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
   } catch (error) {
     console.error('Failed to save analysis to database:', error);
     throw error;
+  }
+}
+
+// Enhanced Context Analysis Handler
+async function handleEnhancedContextAnalysis(body: any) {
+  console.log('🔍 Enhanced Context Analysis - Processing request:', {
+    hasAnalysisContext: !!body.analysisContext,
+    hasMetadata: !!body.metadata,
+    hasPrompt: !!body.prompt,
+    imageId: body.imageId,
+    imageName: body.imageName
+  });
+
+  try {
+    const { 
+      imageId, 
+      imageUrl, 
+      imageName, 
+      userContext,
+      analysisContext,
+      metadata,
+      prompt 
+    } = body;
+
+    // Validate required fields
+    if (!imageId || !imageUrl) {
+      throw new Error('Missing required fields: imageId and imageUrl are required');
+    }
+
+    console.log('🎯 Context detected:', {
+      interfaceType: analysisContext?.image?.primaryType,
+      domain: analysisContext?.image?.domain,
+      userRole: analysisContext?.user?.inferredRole,
+      confidence: analysisContext?.confidence
+    });
+
+    // Use the existing multi-model pipeline with enhanced context
+    const pipelineResult = await executeMultiModelPipeline({
+      imageId,
+      imageUrl,
+      imageName: imageName || 'Enhanced Analysis',
+      userContext: userContext || '',
+      enhancedContext: {
+        analysisContext,
+        metadata,
+        contextualPrompt: prompt
+      }
+    });
+
+    // Enhance the results with context information
+    const enhancedResult = {
+      ...pipelineResult,
+      analysisContext,
+      contextMetadata: metadata,
+      enhancedPrompt: prompt,
+      contextualInsights: {
+        interfaceType: analysisContext?.image?.primaryType,
+        detectedDomain: analysisContext?.image?.domain,
+        adaptedForRole: analysisContext?.user?.inferredRole,
+        confidenceScore: analysisContext?.confidence,
+        clarificationProvided: !analysisContext?.clarificationNeeded
+      }
+    };
+
+    console.log('✅ Enhanced context analysis completed');
+
+    return new Response(
+      JSON.stringify(enhancedResult),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    );
+
+  } catch (error) {
+    console.error('❌ Enhanced context analysis failed:', error);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        stage: 'enhanced-context-analysis',
+        details: error.stack,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 }
