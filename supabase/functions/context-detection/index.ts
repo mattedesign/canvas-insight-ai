@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, imageBase64, prompt, model = 'gpt-4o', maxTokens = 1000 } = await req.json();
+    const { imageUrl, imageBase64, prompt, model = 'gpt-4o', maxTokens = 1000, useMetadataMode = false } = await req.json();
 
     // Handle image data - prioritize base64 from frontend over URL fetching
     let processedImageUrl = null;
@@ -29,7 +29,14 @@ serve(async (req) => {
       throw new Error('No valid image data provided. Blob URLs cannot be accessed from edge functions.');
     }
 
-    // Quick context detection using OpenAI
+    // Optimize for metadata mode with faster processing
+    const optimizedModel = useMetadataMode ? 'gpt-4o-mini' : model;
+    const optimizedTemperature = useMetadataMode ? 0.1 : 0.3;
+    const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
+    
+    console.log(`Using ${useMetadataMode ? 'optimized metadata' : 'full vision'} mode with model ${optimizedModel}`);
+
+    // Context detection using OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -37,22 +44,27 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model,
+        model: optimizedModel,
         messages: [{
+          role: useMetadataMode ? 'system' : 'user',
+          content: useMetadataMode ? 
+            'You are a fast UI analyzer. Return only the requested JSON fields with no explanation.' :
+            [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'image_url',
+                image_url: { url: processedImageUrl }
+              }
+            ]
+        }, ...(useMetadataMode ? [{
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: prompt
-            },
-            {
-              type: 'image_url',
-              image_url: { url: processedImageUrl }
-            }
-          ]
-        }],
-        max_tokens: maxTokens,
-        temperature: 0.3, // Lower temperature for consistent classification
+          content: prompt
+        }] : [])],
+        max_tokens: optimizedMaxTokens,
+        temperature: optimizedTemperature,
         response_format: { type: 'json_object' }
       })
     });

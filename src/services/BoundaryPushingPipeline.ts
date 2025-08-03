@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { pipelineConfig } from '@/config/pipelineConfig';
 import { PipelineError, ModelExecutionError } from '@/types/pipelineErrors';
 import { ContextDetectionService } from './ContextDetectionService';
+import { OptimizedContextDetectionPipeline } from './OptimizedContextDetectionPipeline';
 import { DynamicPromptBuilder } from './DynamicPromptBuilder';
 import { AnalysisContext } from '@/types/contextTypes';
 import { AdaptiveTimeoutCalculator, ImageComplexity } from '@/config/adaptiveTimeoutConfig';
@@ -34,6 +35,7 @@ interface StageResult {
 export class BoundaryPushingPipeline {
   private abortController: AbortController | null = null;
   private contextDetector: ContextDetectionService;
+  private optimizedContextPipeline: OptimizedContextDetectionPipeline;
   private promptBuilder: DynamicPromptBuilder;
   private analysisContext: AnalysisContext | null = null;
   // PHASE 3: Performance Enhancement Services
@@ -51,6 +53,7 @@ export class BoundaryPushingPipeline {
 
   constructor() {
     this.contextDetector = new ContextDetectionService();
+    this.optimizedContextPipeline = new OptimizedContextDetectionPipeline();
     this.promptBuilder = new DynamicPromptBuilder();
     // PHASE 3: Initialize performance enhancement services
     this.progressService = ProgressPersistenceService.getInstance();
@@ -102,32 +105,31 @@ export class BoundaryPushingPipeline {
       this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext, 'context-detection', 5);
       onProgress?.(2, 'Analyzing image context...');
       
-      let imageContext: any;
+      // Use optimized context detection pipeline
       try {
-        imageContext = await this.contextDetector.detectImageContext(imageUrl);
+        onProgress?.(3, 'Detecting context with optimized pipeline...');
+        this.analysisContext = await this.optimizedContextPipeline.detectContextWithConfidenceRouting(
+          { url: imageUrl },
+          userContext,
+          0.7 // Minimum confidence threshold
+        );
+        
+        console.log('[Pipeline] Optimized context detection successful:', {
+          type: this.analysisContext.image.primaryType,
+          confidence: this.analysisContext.confidence,
+          clarificationNeeded: this.analysisContext.clarificationNeeded
+        });
+        
       } catch (contextError) {
-        console.error('[Pipeline] Context detection failed, using fallback:', contextError);
+        console.error('[Pipeline] Optimized context detection failed, using fallback:', contextError);
         onProgress?.(4, 'Context detection failed, continuing with fallback...');
         
-        // Create a minimal fallback context to continue analysis
-        imageContext = {
-          primaryType: 'app',
-          subTypes: ['fallback'],
-          domain: 'general',
-          complexity: 'moderate',
-          userIntent: ['general analysis'],
-          platform: 'web'
-        };
+        // Use fallback from optimized pipeline
+        this.analysisContext = await this.optimizedContextPipeline.detectContext(
+          { url: imageUrl },
+          userContext
+        );
       }
-      
-      onProgress?.(5, 'Understanding user needs...');
-      const userContextParsed = this.contextDetector.inferUserContext(userContext);
-      
-      // Create unified analysis context
-      this.analysisContext = this.contextDetector.createAnalysisContext(
-        imageContext,
-        userContextParsed
-      );
       
       console.log('📊 Analysis Context Created:', {
         imageType: this.analysisContext.image.primaryType,
@@ -163,7 +165,7 @@ export class BoundaryPushingPipeline {
         };
       } else {
         // Stage 1: Vision Extraction with Context (30% progress)
-        onProgress?.(10, `Initializing vision models for ${imageContext.primaryType} analysis...`);
+        onProgress?.(10, `Initializing vision models for ${this.analysisContext.image.primaryType} analysis...`);
         visionResults = await this.executeVisionStage(imageUrl);
         onProgress?.(30, 'Vision analysis complete');
         
@@ -1472,23 +1474,20 @@ export class BoundaryPushingPipeline {
     this.currentRequestId = this.progressService.generateRequestId(imageUrl, userContext);
     onProgress?.(2, 'Retrying analysis...');
     
-    // Continue with pipeline execution...
-    let imageContext: any;
+    // Continue with pipeline execution using optimized context detection
     try {
-      imageContext = await this.contextDetector.detectImageContext(imageUrl);
+      this.analysisContext = await this.optimizedContextPipeline.detectContext(
+        { url: imageUrl },
+        userContext
+      );
     } catch (contextError) {
-      imageContext = {
-        primaryType: 'app',
-        subTypes: ['fallback'],
-        domain: 'general',
-        complexity: 'moderate',
-        userIntent: ['general analysis'],
-        platform: 'web'
-      };
+      console.error('[Pipeline] Retry context detection failed:', contextError);
+      // Create minimal fallback if all else fails
+      this.analysisContext = await this.optimizedContextPipeline.detectContext(
+        { url: imageUrl },
+        userContext
+      );
     }
-    
-    const userContextParsed = this.contextDetector.inferUserContext(userContext);
-    this.analysisContext = this.contextDetector.createAnalysisContext(imageContext, userContextParsed);
     
     if (this.analysisContext.clarificationNeeded && this.analysisContext.clarificationQuestions) {
       return {
