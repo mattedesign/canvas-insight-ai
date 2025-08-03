@@ -1390,7 +1390,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           imageUrl: imageUrl || '',
           userContext: '',
           onAnalysisComplete: (result: any) => {
-            console.log('[CanvasView] Gallery analysis completed:', result);
+            console.log('[CanvasView] Gallery analysis completed for:', imageId, result);
+            AnalysisDebugger.log('CanvasView', `Analysis completed for ${imageId}`, {
+              hasResult: !!result,
+              resultKeys: result ? Object.keys(result) : [],
+              hasId: !!result?.id,
+              hasSuggestions: !!result?.suggestions
+            });
             setAnalysisRequests(prev => {
               const newMap = new Map(prev);
               newMap.delete(imageId);

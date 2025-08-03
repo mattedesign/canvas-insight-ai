@@ -1210,10 +1210,33 @@ async function executeMultiModelPipeline(params: {
     
     // Step 2: Run parallel analysis with OpenAI and Claude, passing vision metadata
     console.log('🤖 Step 2: Running parallel analysis with OpenAI + Claude...');
-    const [openaiAnalysis, claudeAnalysis] = await Promise.all([
+    
+    // Use Promise.allSettled to handle partial failures gracefully
+    const results = await Promise.allSettled([
       runOpenAIAnalysis(imageUrl, imageBase64, userContext, visionMetadata),
       runClaudeAnalysis(imageUrl, imageBase64, userContext, visionMetadata)
     ]);
+    
+    const openaiAnalysis = results[0].status === 'fulfilled' ? results[0].value : null;
+    const claudeAnalysis = results[1].status === 'fulfilled' ? results[1].value : null;
+    
+    // Log any failures for debugging
+    if (results[0].status === 'rejected') {
+      console.error('OpenAI analysis failed:', results[0].reason);
+    }
+    if (results[1].status === 'rejected') {
+      console.error('Claude analysis failed:', results[1].reason);
+    }
+    
+    // Ensure we have at least one successful analysis
+    if (!openaiAnalysis && !claudeAnalysis) {
+      throw new Error('Both OpenAI and Claude analysis failed');
+    }
+    
+    console.log('✅ Analysis results:', {
+      openaiSuccess: !!openaiAnalysis,
+      claudeSuccess: !!claudeAnalysis
+    });
     
     // Step 3: Synthesize results from both models
     console.log('🔮 Step 3: Synthesizing multi-model results...');
