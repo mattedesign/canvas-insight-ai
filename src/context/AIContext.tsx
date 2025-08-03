@@ -36,6 +36,29 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   
   const { toast } = useToast();
 
+  // Helper function to convert blob URL to base64
+  const blobUrlToBase64 = useCallback(async (blobUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result as string;
+          // Remove the data:image/jpeg;base64, prefix to get just the base64 data
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Failed to convert blob URL to base64:', error);
+      throw error;
+    }
+  }, []);
+
   const analyzeImageWithAI = useCallback(async (
     imageId: string, 
     imageUrl: string, 
@@ -55,7 +78,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     try {
       console.log('Starting AI analysis with model:', selectedAIModel);
-      console.log('Analysis payload:', { imageId, imageUrl, imageName, userContext });
+      console.log('Analysis payload:', { imageId, imageUrl: imageUrl.substring(0, 50) + '...', imageName, userContext });
       
       // Log edge function start
       const requestId = await edgeFunctionLogger.logFunctionStart('ux-analysis', {
@@ -65,15 +88,27 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         aiModel: selectedAIModel
       });
       
+      // Prepare the payload - convert blob URL to base64 if needed
+      let payload: any = {
+        imageId,
+        imageName,
+        userContext
+      };
+
+      if (imageUrl.startsWith('blob:')) {
+        console.log('Converting blob URL to base64 for edge function...');
+        const base64Data = await blobUrlToBase64(imageUrl);
+        payload.imageBase64 = base64Data;
+        console.log('Blob URL converted to base64, length:', base64Data.length);
+      } else {
+        payload.imageUrl = imageUrl;
+        console.log('Using direct image URL for analysis');
+      }
+      
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
           type: 'ANALYZE_IMAGE',
-          payload: {
-            imageId,
-            imageUrl,
-            imageName,
-            userContext
-          },
+          payload,
           aiModel: selectedAIModel === 'auto' ? 'auto' : selectedAIModel
         }
       });

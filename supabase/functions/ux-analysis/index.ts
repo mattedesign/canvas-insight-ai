@@ -330,12 +330,13 @@ serve(async (req) => {
 async function executeModel(payload: any) {
   console.log('executeModel - Full payload received:', JSON.stringify(payload, null, 2))
   
-  const { model, stage, imageUrl, prompt, systemPrompt, visionData, analysisData } = payload
+  const { model, stage, imageUrl, imageBase64, prompt, systemPrompt, visionData, analysisData } = payload
   
   console.log('executeModel - Extracted fields:', { 
     model, 
     stage, 
     hasImageUrl: !!imageUrl, 
+    hasImageBase64: !!imageBase64,
     hasPrompt: !!prompt, 
     hasSystemPrompt: !!systemPrompt,
     hasVisionData: !!visionData,
@@ -587,13 +588,13 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
   console.log('Executing OpenAI with payload:', { 
     model: config.model || payload.model,
     stage: payload.stage,
-    hasImage: !!payload.imageUrl,
+    hasImage: !!(payload.imageUrl || payload.imageBase64),
     promptLength: payload.prompt?.length || 0
   });
   
   
   try {
-    const { imageUrl, systemPrompt } = payload;
+    const { imageUrl, imageBase64, systemPrompt } = payload;
     
     // PHASE 2.1: Pre-flight validation with auto-fixing
     const validation = validateJsonPromptRequirement(payload);
@@ -611,12 +612,20 @@ async function executeOpenAI(config: any, apiKey: string, payload: any) {
       validationPassed: validation.isValid
     });
     
-    let processedImageUrl = imageUrl;
-    if (imageUrl && !imageUrl.startsWith('data:')) {
-      console.log('Converting image to base64 for OpenAI...');
+    let processedImageUrl = null;
+    
+    // Handle image data - prioritize base64 from frontend over URL fetching
+    if (imageBase64) {
+      console.log('Using provided base64 image data, length:', imageBase64.length);
+      processedImageUrl = `data:image/jpeg;base64,${imageBase64}`;
+    } else if (imageUrl && !imageUrl.startsWith('data:')) {
+      console.log('Converting image URL to base64 for OpenAI...');
       const base64Data = await fetchImageAsBase64(imageUrl);
       processedImageUrl = `data:image/jpeg;base64,${base64Data}`;
       console.log('Image converted successfully');
+    } else if (imageUrl && imageUrl.startsWith('data:')) {
+      console.log('Using existing data URL');
+      processedImageUrl = imageUrl;
     }
     
     const messages = [
@@ -720,18 +729,30 @@ async function executeAnthropic(config: any, apiKey: string, payload: any) {
   console.log('Executing Anthropic with payload:', { 
     model: config.model || payload.model,
     stage: payload.stage,
-    hasImage: !!payload.imageUrl,
+    hasImage: !!(payload.imageUrl || payload.imageBase64),
     promptLength: payload.prompt?.length || 0
   });
   
   try {
-    const { imageUrl, prompt, systemPrompt } = payload;
+    const { imageUrl, imageBase64, prompt, systemPrompt } = payload;
     
     let base64Data = '';
-    if (imageUrl && !imageUrl.startsWith('data:')) {
-      console.log('Converting image to base64 for Anthropic...');
+    let mediaType = 'image/jpeg';
+    
+    // Handle image data - prioritize base64 from frontend over URL fetching
+    if (imageBase64) {
+      console.log('Using provided base64 image data, length:', imageBase64.length);
+      base64Data = imageBase64;
+      mediaType = 'image/jpeg'; // Default, could be enhanced to detect format
+    } else if (imageUrl && !imageUrl.startsWith('data:')) {
+      console.log('Converting image URL to base64 for Anthropic...');
       base64Data = await fetchImageAsBase64(imageUrl);
+      mediaType = detectImageFormat(imageUrl, base64Data);
       console.log('Image converted successfully for Anthropic');
+    } else if (imageUrl && imageUrl.startsWith('data:')) {
+      console.log('Using existing data URL for Anthropic');
+      base64Data = imageUrl.split(',')[1];
+      mediaType = detectImageFormat(imageUrl);
     }
     
     const messages = [{
@@ -1005,6 +1026,7 @@ async function handleCanvasRequest(action: string, payload: any) {
         model: 'gpt-4o', // Default model for Canvas requests
         stage: 'vision', // Start with vision stage
         imageUrl: payload.payload?.imageUrl,
+        imageBase64: payload.payload?.imageBase64, // Handle base64 images
         prompt: `Analyze this ${payload.payload?.imageName || 'image'} for UX/UI insights. Context: ${payload.payload?.userContext || 'General analysis'}`,
         systemPrompt: 'You are an expert UX/UI analyst providing detailed insights.'
       }
