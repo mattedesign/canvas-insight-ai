@@ -888,6 +888,53 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_metadata: {
+        Row: {
+          dimensions: Json | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          last_accessed: string | null
+          original_filename: string
+          project_id: string | null
+          storage_path: string
+          upload_date: string | null
+          user_id: string
+        }
+        Insert: {
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          last_accessed?: string | null
+          original_filename: string
+          project_id?: string | null
+          storage_path: string
+          upload_date?: string | null
+          user_id: string
+        }
+        Update: {
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          last_accessed?: string | null
+          original_filename?: string
+          project_id?: string | null
+          storage_path?: string
+          upload_date?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_metadata_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscribers: {
         Row: {
           analysis_count: number | null
