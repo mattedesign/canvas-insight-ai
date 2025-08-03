@@ -1090,7 +1090,11 @@ async function handleCanvasRequest(action: string, payload: any) {
         try {
           if (payload.payload?.imageId && analysisResult.synthesizedResult) {
             console.log('💾 Saving analysis to database...');
-            await saveAnalysisToDatabase(payload.payload.imageId, analysisResult.synthesizedResult);
+            const analysisDataWithMetadata = {
+              ...analysisResult.synthesizedResult,
+              visionMetadata: analysisResult.visionMetadata
+            };
+            await saveAnalysisToDatabase(payload.payload.imageId, analysisDataWithMetadata);
             console.log('✅ Analysis saved to database successfully');
           }
         } catch (saveError) {
@@ -1482,6 +1486,34 @@ function generateClarificationQuestions(imageContext: any, userContext: any): st
   return questions;
 }
 
+// Safe base64 conversion for large files using chunked approach
+async function convertToBase64Chunked(arrayBuffer: ArrayBuffer): Promise<string> {
+  try {
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const chunkSize = 8192; // 8KB chunks to avoid call stack overflow
+    let binaryString = '';
+    
+    console.log(`📊 Converting ${uint8Array.length} bytes to base64 using ${chunkSize} byte chunks`);
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+      
+      // Log progress for very large files
+      if (i % (chunkSize * 100) === 0) {
+        const progress = Math.round((i / uint8Array.length) * 100);
+        console.log(`📊 Base64 conversion progress: ${progress}%`);
+      }
+    }
+    
+    console.log('✅ Binary string conversion complete, applying base64 encoding');
+    return btoa(binaryString);
+  } catch (error) {
+    console.error('❌ Base64 conversion failed:', error);
+    throw new Error(`Base64 conversion failed: ${error.message}`);
+  }
+}
+
 async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: string): Promise<any> {
   const googleApiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
   
@@ -1502,7 +1534,7 @@ async function extractGoogleVisionMetadata(imageUrl: string, imageBase64?: strin
         throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
       }
       const imageBuffer = await imageResponse.arrayBuffer();
-      base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      base64Image = await convertToBase64Chunked(imageBuffer);
       console.log('✅ Image converted to base64 for Vision API');
     }
     
@@ -1914,11 +1946,43 @@ async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
     }
 
     console.log('✅ Analysis saved successfully with ID:', data.id);
+    
+    // Also save Vision metadata to the images table if available
+    if (analysisData.visionMetadata) {
+      await saveVisionMetadataToImage(supabaseClient, imageId, analysisData.visionMetadata);
+    }
+    
     return data;
 
   } catch (error) {
     console.error('Failed to save analysis to database:', error);
     throw error;
+  }
+}
+
+// Save Vision metadata to the images table
+async function saveVisionMetadataToImage(supabaseClient: any, imageId: string, visionMetadata: any) {
+  try {
+    console.log('💾 Saving Vision metadata to images table for image:', imageId);
+    
+    const { error } = await supabaseClient
+      .from('images')
+      .update({
+        metadata: {
+          vision: visionMetadata,
+          lastAnalyzed: new Date().toISOString(),
+          source: 'google-vision-api'
+        }
+      })
+      .eq('id', imageId);
+
+    if (error) {
+      console.error('Failed to save Vision metadata to images table:', error);
+    } else {
+      console.log('✅ Vision metadata saved to images table');
+    }
+  } catch (error) {
+    console.error('Error saving Vision metadata to images table:', error);
   }
 }
 
@@ -1987,6 +2051,24 @@ async function handleEnhancedContextAnalysis(body: any) {
     };
 
     console.log('✅ Enhanced context analysis completed');
+
+    // Save analysis to database if we have an imageId
+    if (imageId && pipelineResult.synthesizedResult) {
+      try {
+        console.log('💾 Saving enhanced analysis to database...');
+        const analysisDataWithMetadata = {
+          ...pipelineResult.synthesizedResult,
+          visionMetadata: pipelineResult.visionMetadata,
+          analysisContext,
+          enhancedPrompt: prompt
+        };
+        await saveAnalysisToDatabase(imageId, analysisDataWithMetadata);
+        console.log('✅ Enhanced analysis saved to database successfully');
+      } catch (saveError) {
+        console.error('⚠️ Failed to save enhanced analysis to database:', saveError);
+        // Don't fail the request if database save fails
+      }
+    }
 
     return new Response(
       JSON.stringify(enhancedResult),
