@@ -216,6 +216,7 @@ const SimplifiedCanvas = () => {
             onGroupDisplayModeChange={() => {}}
             onSubmitGroupPrompt={async () => {}}
             onAnalysisComplete={handleAnalysisComplete}
+            onImageUpload={handleAddImages}
           />
         </div>
       </div>
