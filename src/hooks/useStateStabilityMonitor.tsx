@@ -214,7 +214,7 @@ export function useStateStabilityMonitor(
   state: AppState,
   enabled: boolean = process.env.NODE_ENV === 'development'
 ) {
-  const previousState = useRef<AppState>();
+  const previousState = useRef<AppState | undefined>(undefined);
 
   useEffect(() => {
     if (!enabled) return;

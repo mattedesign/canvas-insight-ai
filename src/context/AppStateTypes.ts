@@ -78,6 +78,7 @@ export type AppAction =
   | { type: 'UPDATE_IMAGE'; payload: { id: string; updates: Partial<UploadedImage> } }
   | { type: 'SET_SELECTED_IMAGE'; payload: string | null }
   | { type: 'ADD_ANALYSIS'; payload: LegacyUXAnalysis }
+  | { type: 'SET_ANALYSES'; payload: LegacyUXAnalysis[] }
   | { type: 'UPDATE_ANALYSIS'; payload: { imageId: string; analysis: LegacyUXAnalysis } }
   | { type: 'REMOVE_ANALYSIS'; payload: string }
   | { type: 'ADD_GROUP'; payload: LegacyImageGroup }

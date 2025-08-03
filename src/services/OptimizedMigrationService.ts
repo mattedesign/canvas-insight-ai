@@ -154,12 +154,14 @@ export class OptimizedAnalysisMigrationService extends AnalysisMigrationService 
     if (imageIds.length === 0) return [];
     
     const { limit, status } = options;
+    console.log('🔍 Loading analyses for images:', imageIds.length, 'images');
     
     let query = supabase
       .from('ux_analyses')
       .select(`
         id,
         image_id,
+        project_id,
         visual_annotations,
         suggestions,
         summary,
@@ -167,7 +169,11 @@ export class OptimizedAnalysisMigrationService extends AnalysisMigrationService 
         user_context,
         analysis_type,
         status,
-        created_at
+        created_at,
+        images:image_id (
+          filename,
+          storage_path
+        )
       `)
       .in('image_id', imageIds)
       .order('created_at', { ascending: false });
@@ -182,23 +188,34 @@ export class OptimizedAnalysisMigrationService extends AnalysisMigrationService 
 
     const { data: analyses, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error loading analyses:', error);
+      throw error;
+    }
     if (!analyses) return [];
 
-    return analyses.map(analysis => ({
-      id: analysis.id,
-      imageId: analysis.image_id,
-      imageName: '', // Will be populated when needed
-      imageUrl: '', // Will be populated when needed
-      visualAnnotations: analysis.visual_annotations as any || [],
-      suggestions: analysis.suggestions as any || [],
-      summary: analysis.summary as any || {},
-      metadata: analysis.metadata as any || {},
-      userContext: analysis.user_context || '',
-      analysisType: analysis.analysis_type as 'full_analysis' | 'quick_scan' || 'full_analysis',
-      status: analysis.status as 'completed' | 'processing' | 'error' || 'completed',
-      createdAt: new Date(analysis.created_at)
-    }));
+    console.log('✅ Loaded', analyses.length, 'analyses from database');
+
+    return analyses.map(analysis => {
+      const imageData = analysis.images as any;
+      return {
+        id: analysis.id,
+        imageId: analysis.image_id,
+        imageName: imageData?.filename || '',
+        imageUrl: imageData?.storage_path ? `https://sdcmbfdtafkzpimwjpij.supabase.co/storage/v1/object/public/images/${imageData.storage_path}` : '',
+        visualAnnotations: analysis.visual_annotations as any || [],
+        suggestions: analysis.suggestions as any || [],
+        summary: analysis.summary as any || {},
+        metadata: {
+          ...analysis.metadata as any || {},
+          projectId: analysis.project_id
+        },
+        userContext: analysis.user_context || '',
+        analysisType: analysis.analysis_type as 'full_analysis' | 'quick_scan' || 'full_analysis',
+        status: analysis.status as 'completed' | 'processing' | 'error' || 'completed',
+        createdAt: new Date(analysis.created_at)
+      };
+    });
   }
 
   static async getAnalysisCount(projectId: string): Promise<number> {

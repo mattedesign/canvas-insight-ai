@@ -10,7 +10,7 @@ const globalRenderCounts = new Map<string, number>();
 const globalRenderTimes = new Map<string, number[]>();
 
 export const RenderDiagnostic: React.FC = () => {
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [renderData, setRenderData] = React.useState<Array<{component: string, count: number, avgTime: number}>>([]);
   const [isActive, setIsActive] = React.useState(true);

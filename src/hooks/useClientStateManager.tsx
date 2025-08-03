@@ -55,7 +55,7 @@ export const useClientStateManager = (
   });
   
   const lastStateRef = useRef<AppState>(state);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout>();
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isOnlineRef = useRef(navigator.onLine);
   const { debounce } = useDebounce();
 

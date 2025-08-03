@@ -40,6 +40,12 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
         ...state,
         analyses: [...state.analyses, action.payload]
       };
+
+    case 'SET_ANALYSES':
+      return {
+        ...state,
+        analyses: action.payload
+      };
     
     case 'CLEAR_ANALYSES':
       return { ...state, analyses: [] };

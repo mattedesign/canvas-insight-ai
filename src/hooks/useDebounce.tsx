@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react';
  * Hook for debouncing functions to prevent excessive API calls
  */
 export const useDebounce = () => {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const debounce = useCallback(<T extends (...args: any[]) => any>(
     func: T,

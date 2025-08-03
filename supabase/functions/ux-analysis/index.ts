@@ -1,5 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1079,6 +1080,18 @@ async function handleCanvasRequest(action: string, payload: any) {
           hasClaude: !!analysisResult.claudeAnalysis,
           hasSynthesis: !!analysisResult.synthesizedResult
         })
+
+        // CRITICAL FIX: Save analysis to database
+        try {
+          if (payload.payload?.imageId && analysisResult.synthesizedResult) {
+            console.log('💾 Saving analysis to database...');
+            await saveAnalysisToDatabase(payload.payload.imageId, analysisResult.synthesizedResult);
+            console.log('✅ Analysis saved to database successfully');
+          }
+        } catch (saveError) {
+          console.error('⚠️ Failed to save analysis to database:', saveError);
+          // Don't fail the request if database save fails
+        }
         
         // Return synthesized analysis in Canvas-expected format
         return new Response(
@@ -1776,5 +1789,72 @@ async function synthesizeMultiModelResults(
       modelUsed: 'fallback-single-model',
       status: 'completed'
     };
+  }
+}
+
+// CRITICAL FIX: Add database persistence function
+async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
+  console.log('💾 Saving analysis to ux_analyses table for image:', imageId);
+  
+  // Create Supabase client for database operations
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+
+  try {
+    // Get the project_id for this image to ensure proper association
+    const { data: imageData, error: imageError } = await supabaseClient
+      .from('images')
+      .select('project_id')
+      .eq('id', imageId)
+      .single();
+
+    if (imageError || !imageData) {
+      console.error('Failed to get image project_id:', imageError);
+      throw new Error(`Failed to get project for image ${imageId}`);
+    }
+
+    const projectId = imageData.project_id;
+    console.log('Found project_id for image:', projectId);
+
+    // Save analysis to ux_analyses table
+    const { data, error } = await supabaseClient
+      .from('ux_analyses')
+      .insert({
+        image_id: imageId,
+        project_id: projectId,
+        visual_annotations: analysisData.visualAnnotations || [],
+        suggestions: analysisData.suggestions || [],
+        summary: analysisData.summary || {},
+        metadata: {
+          ...analysisData.metadata,
+          aiGenerated: true,
+          savedAt: new Date().toISOString()
+        },
+        user_context: analysisData.userContext || '',
+        analysis_type: 'full_analysis',
+        status: 'completed'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Database save error:', error);
+      throw error;
+    }
+
+    console.log('✅ Analysis saved successfully with ID:', data.id);
+    return data;
+
+  } catch (error) {
+    console.error('Failed to save analysis to database:', error);
+    throw error;
   }
 }

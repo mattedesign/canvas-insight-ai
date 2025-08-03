@@ -25,7 +25,7 @@ export function useSystemIntegrationTests(): UseSystemIntegrationTestsReturn {
     currentTest: ''
   });
   
-  const testerRef = useRef<SystemIntegrationTester>();
+  const testerRef = useRef<SystemIntegrationTester | undefined>(undefined);
 
   const getTester = useCallback(() => {
     if (!testerRef.current) {
