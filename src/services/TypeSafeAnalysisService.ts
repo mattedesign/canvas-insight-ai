@@ -77,9 +77,26 @@ class TypeSafeAnalysisService {
         throw new Error('No analysis data received');
       }
 
+      // Handle both old and new response formats
+      let analysisData = data;
+      if (data.success === true && data.data) {
+        // New format: { success: true, data: actualAnalysis }
+        analysisData = data.data;
+        console.log('🔧 TypeSafeAnalysisService: Using new response format');
+      } else if (data.success === false) {
+        // Error format: { success: false, error: ... }
+        throw new Error(data.error || 'Analysis failed');
+      }
+      // Otherwise assume it's the old direct format
+
       // Apply robust validation and normalization
-      console.log('🔍 TypeSafeAnalysisService: Validating analysis data...');
-      const validationResult = AnalysisValidator.validateAndNormalize(data);
+      console.log('🔍 TypeSafeAnalysisService: Validating analysis data...', {
+        hasVisualAnnotations: Array.isArray(analysisData?.visualAnnotations),
+        hasSuggestions: Array.isArray(analysisData?.suggestions),
+        annotationsLength: analysisData?.visualAnnotations?.length || 0,
+        suggestionsLength: analysisData?.suggestions?.length || 0
+      });
+      const validationResult = AnalysisValidator.validateAndNormalize(analysisData);
       
       if (validationResult.warnings.length > 0) {
         console.warn('TypeSafeAnalysisService validation warnings:', validationResult.warnings);
@@ -153,8 +170,16 @@ class TypeSafeAnalysisService {
         throw new Error('No group analysis data received');
       }
 
+      // Handle both old and new response formats
+      let analysisData = data;
+      if (data.success === true && data.data) {
+        analysisData = data.data;
+      } else if (data.success === false) {
+        throw new Error(data.error || 'Group analysis failed');
+      }
+
       // Apply validation for group analysis results
-      const validationResult = AnalysisValidator.validateAndNormalize(data);
+      const validationResult = AnalysisValidator.validateAndNormalize(analysisData);
       
       if (validationResult.warnings.length > 0) {
         console.warn('TypeSafeAnalysisService group analysis warnings:', validationResult.warnings);
@@ -198,9 +223,17 @@ class TypeSafeAnalysisService {
         throw new Error(`Concept generation failed: ${error.message}`);
       }
       
+      // Handle response format
+      let analysisData = data;
+      if (data.success === true && data.data) {
+        analysisData = data.data;
+      } else if (data.success === false) {
+        throw new Error(data.error || 'Concept generation failed');
+      }
+      
       return {
         success: true,
-        analysis: data,
+        analysis: analysisData,
         processingTime: performance.now() - startTime,
       };
     } catch (error) {

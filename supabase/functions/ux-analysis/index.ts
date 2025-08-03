@@ -1795,17 +1795,29 @@ async function synthesizeMultiModelResults(
   console.log('🔮 Synthesizing results from OpenAI, Claude, and Google Vision...');
   
   try {
+    // Debug input data structure
+    console.log('🔍 SYNTHESIS DEBUG - Input structure:', {
+      openaiHasResult: !!openaiAnalysis?.result,
+      claudeHasResult: !!claudeAnalysis?.result,
+      openaiAnnotations: openaiAnalysis?.result?.visualAnnotations?.length || 0,
+      claudeAnnotations: claudeAnalysis?.result?.visualAnnotations?.length || 0,
+      openaiSuggestions: openaiAnalysis?.result?.suggestions?.length || 0,
+      claudeSuggestions: claudeAnalysis?.result?.suggestions?.length || 0
+    });
+    
     // Combine and deduplicate visual annotations
-    const allAnnotations = [
-      ...(openaiAnalysis.result.visualAnnotations || []),
-      ...(claudeAnalysis.result.visualAnnotations || [])
-    ];
+    const openaiAnnotations = openaiAnalysis?.result?.visualAnnotations || [];
+    const claudeAnnotations = claudeAnalysis?.result?.visualAnnotations || [];
+    const allAnnotations = [...openaiAnnotations, ...claudeAnnotations];
+    
+    console.log('🔍 SYNTHESIS DEBUG - Combined annotations:', allAnnotations.length);
     
     // Combine and rank suggestions by consensus
-    const allSuggestions = [
-      ...(openaiAnalysis.result.suggestions || []),
-      ...(claudeAnalysis.result.suggestions || [])
-    ];
+    const openaiSuggestions = openaiAnalysis?.result?.suggestions || [];
+    const claudeSuggestions = claudeAnalysis?.result?.suggestions || [];
+    const allSuggestions = [...openaiSuggestions, ...claudeSuggestions];
+    
+    console.log('🔍 SYNTHESIS DEBUG - Combined suggestions:', allSuggestions.length);
     
     // Calculate consensus scores
     const openaiSummary = openaiAnalysis.result.summary || {};
@@ -1845,7 +1857,7 @@ async function synthesizeMultiModelResults(
     
     console.log('✅ Multi-model synthesis complete');
     
-    return {
+    const finalResult = {
       id: `analysis_${Date.now()}`,
       imageId: context.imageId || '',
       imageName: context.imageName || 'Untitled Image',
@@ -1862,6 +1874,16 @@ async function synthesizeMultiModelResults(
       modelUsed: 'multi-model-synthesis',
       status: 'completed'
     };
+    
+    console.log('🔍 SYNTHESIS FINAL - Result structure:', {
+      id: finalResult.id,
+      visualAnnotationsCount: finalResult.visualAnnotations.length,
+      suggestionsCount: finalResult.suggestions.length,
+      hasSummary: !!finalResult.summary,
+      overallScore: finalResult.summary?.overallScore
+    });
+    
+    return finalResult;
     
   } catch (error) {
     console.error('Error in multi-model synthesis:', error);

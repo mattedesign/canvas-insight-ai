@@ -299,7 +299,16 @@ const Canvas = () => {
   }, []);
 
   const handleAnalysisComplete = useCallback((imageId: string, analysis: any) => {
-    console.log('[Canvas] Analysis complete handler called:', { imageId, hasAnalysis: !!analysis });
+    console.log('[Canvas] Analysis complete handler called:', { 
+      imageId, 
+      hasAnalysis: !!analysis,
+      analysisStructure: analysis ? {
+        id: analysis.id,
+        visualAnnotations: analysis.visualAnnotations?.length || 0,
+        suggestions: analysis.suggestions?.length || 0,
+        hasSummary: !!analysis.summary
+      } : null
+    });
     
     // Store the analysis in app state
     if (analysis) {
@@ -311,7 +320,12 @@ const Canvas = () => {
         createdAt: analysis.createdAt || new Date().toISOString()
       };
       
-      console.log('[Canvas] Dispatching ADD_ANALYSIS:', analysisWithId.id);
+      console.log('[Canvas] Dispatching ADD_ANALYSIS:', {
+        id: analysisWithId.id,
+        visualAnnotationsCount: analysisWithId.visualAnnotations?.length || 0,
+        suggestionsCount: analysisWithId.suggestions?.length || 0
+      });
+      
       dispatch({ 
         type: 'ADD_ANALYSIS', 
         payload: analysisWithId
@@ -321,12 +335,11 @@ const Canvas = () => {
       setSelectedAnalysisId(analysisWithId.id);
       setIsAnalysisPanelOpen(true);
       
-      // COMMENTED OUT: Repetitive analysis storage toast
-      // toast({
-      //   category: "success",
-      //   title: "Analysis Stored",
-      //   description: "Analysis has been saved and opened for viewing",
-      // });
+      toast({
+        category: "success",
+        title: "Analysis Complete",
+        description: `Found ${analysisWithId.suggestions?.length || 0} suggestions and ${analysisWithId.visualAnnotations?.length || 0} annotations`,
+      });
     } else {
       console.error('No analysis data received');
       toast({
