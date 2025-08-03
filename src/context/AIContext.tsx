@@ -67,6 +67,9 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   ) => {
     setIsAnalyzing(true);
     
+    // Map "auto" to a specific model for the edge function
+    const actualModel = selectedAIModel === 'auto' ? 'gpt-4o' : selectedAIModel;
+    
     const modelName = selectedAIModel === 'auto' ? 'Smart Selection' : 
                      selectedAIModel === 'claude-opus-4-20250514' ? 'Claude Opus 4' :
                      selectedAIModel === 'stability-ai' ? 'Stability AI' : 'GPT 4o';
@@ -77,7 +80,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     });
 
     try {
-      console.log('Starting AI analysis with model:', selectedAIModel);
+      console.log('Starting AI analysis with model:', selectedAIModel, '(mapped to:', actualModel, ')');
       console.log('Analysis payload:', { imageId, imageUrl: imageUrl.substring(0, 50) + '...', imageName, userContext });
       
       // Log edge function start
@@ -109,7 +112,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         body: {
           action: 'ANALYZE_IMAGE',
           payload,
-          aiModel: selectedAIModel === 'auto' ? 'auto' : selectedAIModel
+          aiModel: actualModel
         }
       });
       
