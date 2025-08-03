@@ -405,4 +405,22 @@ export class OptimizedProjectService {
   static clearAllCache() {
     ProjectStatsCache.clear();
   }
+
+  /**
+   * Delete a project and all associated data
+   */
+  static async deleteProject(projectId: string): Promise<void> {
+    const { ProjectDeletionService } = await import('./ProjectDeletionService');
+    await ProjectDeletionService.deleteProject(projectId);
+    this.invalidateProjectCache(projectId);
+  }
+
+  /**
+   * Delete multiple projects and all associated data
+   */
+  static async deleteMultipleProjects(projectIds: string[]): Promise<void> {
+    const { ProjectDeletionService } = await import('./ProjectDeletionService');
+    await ProjectDeletionService.deleteMultipleProjects(projectIds);
+    projectIds.forEach(id => this.invalidateProjectCache(id));
+  }
 }

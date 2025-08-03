@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileImage, Clock, Users, Plus } from 'lucide-react';
+import { FileImage, Clock, Users, Plus, Trash2, CheckIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRouterStateManager } from '@/services/RouterStateManager';
 import { Sidebar } from '@/components/Sidebar';
@@ -9,6 +9,8 @@ import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { CanvasStateService } from '@/services/CanvasStateService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useMultiSelection } from '@/hooks/useMultiSelection';
+import { ProjectDeletionDialog } from '@/components/ProjectDeletionDialog';
 
 interface Project {
   id: string;
@@ -28,6 +30,9 @@ const Projects = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const multiSelection = useMultiSelection();
 
   const loadProjects = async () => {
     if (!user) return;
@@ -118,6 +123,60 @@ const Projects = () => {
     // Already on projects page
   };
 
+  const handleDeleteProjects = async () => {
+    if (multiSelection.state.selectedIds.length === 0) return;
+    
+    setIsDeleting(true);
+    try {
+      if (multiSelection.state.selectedIds.length === 1) {
+        await OptimizedProjectService.deleteProject(multiSelection.state.selectedIds[0]);
+      } else {
+        await OptimizedProjectService.deleteMultipleProjects(multiSelection.state.selectedIds);
+      }
+      
+      // Remove deleted projects from state
+      setProjects(prevProjects => 
+        prevProjects.filter(p => !multiSelection.state.selectedIds.includes(p.id))
+      );
+      
+      multiSelection.clearSelection();
+      setShowDeleteDialog(false);
+      
+      toast({
+        title: "Projects deleted",
+        description: `Successfully deleted ${multiSelection.state.selectedIds.length} project${multiSelection.state.selectedIds.length > 1 ? 's' : ''}`,
+      });
+    } catch (error) {
+      console.error('Error deleting projects:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete projects. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleProjectClick = (project: Project, event: React.MouseEvent) => {
+    const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+    
+    if (isCtrlOrCmd || multiSelection.state.isMultiSelectMode) {
+      // Multi-select mode
+      event.preventDefault();
+      multiSelection.toggleSelection(project.id, isCtrlOrCmd);
+    } else {
+      // Regular navigation
+      handleSwitchProject(project);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      multiSelection.clearSelection();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-background">
@@ -160,18 +219,35 @@ const Projects = () => {
         onNavigateToPreviousAnalyses={handleNavigateToPreviousAnalyses}
       />
       
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-6 overflow-auto" onKeyDown={handleKeyDown} tabIndex={0}>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Projects</h1>
-              <p className="text-muted-foreground">View and manage your UX analysis projects</p>
+              <p className="text-muted-foreground">
+                View and manage your UX analysis projects
+                {multiSelection.state.isMultiSelectMode && 
+                  ` • ${multiSelection.state.selectedIds.length} selected`
+                }
+              </p>
             </div>
-            <Button onClick={handleCreateProject}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
+            <div className="flex gap-2">
+              {multiSelection.state.selectedIds.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete ({multiSelection.state.selectedIds.length})
+                </Button>
+              )}
+              <Button onClick={handleCreateProject}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+            </div>
           </div>
 
           {/* Projects Grid */}
@@ -179,13 +255,21 @@ const Projects = () => {
             {projects.map((project) => {
               const imageCount = project.images?.[0]?.count || 0;
               const analysisCount = project.ux_analyses?.[0]?.count || 0;
+              const isSelected = multiSelection.isSelected(project.id);
               
               return (
                 <Card 
                   key={project.id} 
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => handleSwitchProject(project)}
+                  className={`relative hover:shadow-lg transition-all cursor-pointer ${
+                    isSelected ? 'ring-2 ring-primary shadow-lg' : ''
+                  }`}
+                  onClick={(e) => handleProjectClick(project, e)}
                 >
+                  {isSelected && (
+                    <div className="absolute top-3 right-3 z-10 bg-primary text-primary-foreground rounded-full p-1">
+                      <CheckIcon className="w-4 h-4" />
+                    </div>
+                  )}
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
@@ -215,7 +299,14 @@ const Projects = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="flex-1">
+                        <Button 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSwitchProject(project);
+                          }}
+                        >
                           Open Project
                         </Button>
                       </div>
@@ -243,6 +334,13 @@ const Projects = () => {
         </div>
       </div>
 
+      <ProjectDeletionDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteProjects}
+        projectCount={multiSelection.state.selectedIds.length}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };
