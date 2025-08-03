@@ -98,17 +98,50 @@ const SimplifiedCanvas = () => {
     }
   }, [dispatch]);
 
+  // PHASE 2: Implement concept generation handler
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
-    if (Array.isArray(analyses)) {
-      const analysis = analyses.find(a => a.id === analysisId);
-      if (Array.isArray(uploadedImages)) {
-        const image = analysis ? uploadedImages.find(img => img.id === analysis.imageId) : null;
-        if (analysis && image) {
-          console.log('Concept generation requested for:', image.name);
+    if (!Array.isArray(analyses)) return;
+    
+    const analysis = analyses.find(a => a.id === analysisId);
+    if (!analysis || !Array.isArray(uploadedImages)) return;
+    
+    const image = uploadedImages.find(img => img.id === analysis.imageId);
+    if (!analysis || !image) return;
+    
+    try {
+      console.log('🎨 Generating concept for:', image.name);
+      
+      // Create a simple concept based on analysis insights
+      const concept = {
+        id: crypto.randomUUID(),
+        title: `Improved ${image.name}`,
+        description: `AI-generated UI concept addressing: ${analysis.summary?.keyIssues?.join(', ') || 'identified improvement areas'}`,
+        imageUrl: image.url, // For now, use original image
+        improvements: analysis.suggestions?.map(s => s.title) || ['Enhanced usability', 'Better accessibility'],
+        analysisId: analysisId,
+        imageId: image.id,
+        userId: user?.id || '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        metadata: {
+          generatedFrom: 'analysis',
+          basedOnSuggestions: analysis.suggestions?.length || 0
         }
-      }
+      };
+      
+      dispatch({ type: 'ADD_GENERATED_CONCEPT', payload: concept });
+      console.log('✅ Concept generated successfully');
+    } catch (error) {
+      console.error('❌ Concept generation failed:', error);
     }
-  }, [analyses, uploadedImages]);
+  }, [analyses, uploadedImages, dispatch, user?.id]);
+
+  // PHASE 2: Add missing "View Full Analysis" handler
+  const handleOpenAnalysisPanel = useCallback((analysisId: string) => {
+    console.log('📊 Opening analysis panel for:', analysisId);
+    setSelectedAnalysisId(analysisId);
+    setIsAnalysisPanelOpen(true);
+  }, []);
 
   const handleAddImages = useCallback((files?: File[]) => {
     console.log('[SimplifiedCanvas] handleAddImages called with files:', files?.length || 'creating input');
@@ -258,6 +291,7 @@ const SimplifiedCanvas = () => {
             onToggleAnnotations={handleToggleAnnotations}
             onImageSelect={handleImageSelect}
             onGenerateConcept={handleGenerateConcept}
+            onOpenAnalysisPanel={handleOpenAnalysisPanel}
             onCreateGroup={() => {}}
             onUngroup={() => {}}
             onDeleteGroup={() => {}}
@@ -273,7 +307,12 @@ const SimplifiedCanvas = () => {
       {isAnalysisPanelOpen && selectedAnalysisId && Array.isArray(analyses) && (
         <AnalysisPanel
           analysis={analyses.find(a => a.id === selectedAnalysisId) || null}
-          image={null}
+          image={(() => {
+            const analysis = analyses.find(a => a.id === selectedAnalysisId);
+            return analysis && Array.isArray(uploadedImages) 
+              ? uploadedImages.find(img => img.id === analysis.imageId) || null
+              : null;
+          })()}
           isOpen={true}
           onClose={() => {
             setIsAnalysisPanelOpen(false);
