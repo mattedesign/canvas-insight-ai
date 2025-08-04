@@ -5,6 +5,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisValidator } from '@/utils/analysisValidator';
+import { AnalysisDataMapper } from './AnalysisDataMapper';
+import { AnalysisFieldMappingDebug } from '@/utils/analysisFieldMappingDebug';
 import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
@@ -89,14 +91,24 @@ class TypeSafeAnalysisService {
       }
       // Otherwise assume it's the old direct format
 
+      // Apply field mapping to handle backend/frontend differences
+      const mappedData = AnalysisDataMapper.mapBackendToFrontend(analysisData);
+      
+      // Debug field mapping in development
+      AnalysisFieldMappingDebug.logFieldMapping(analysisData, mappedData, 'TypeSafeAnalysisService');
+      const mappingValidation = AnalysisFieldMappingDebug.validateFieldMapping(analysisData, mappedData);
+      if (!mappingValidation.valid) {
+        console.warn('🔧 Field mapping issues detected:', mappingValidation.issues);
+      }
+
       // Apply robust validation and normalization
       console.log('🔍 TypeSafeAnalysisService: Validating analysis data...', {
-        hasVisualAnnotations: Array.isArray(analysisData?.visualAnnotations),
-        hasSuggestions: Array.isArray(analysisData?.suggestions),
-        annotationsLength: analysisData?.visualAnnotations?.length || 0,
-        suggestionsLength: analysisData?.suggestions?.length || 0
+        hasVisualAnnotations: Array.isArray(mappedData?.visualAnnotations),
+        hasSuggestions: Array.isArray(mappedData?.suggestions),
+        annotationsLength: mappedData?.visualAnnotations?.length || 0,
+        suggestionsLength: mappedData?.suggestions?.length || 0
       });
-      const validationResult = AnalysisValidator.validateAndNormalize(analysisData);
+      const validationResult = AnalysisValidator.validateAndNormalize(mappedData);
       
       if (validationResult.warnings.length > 0) {
         console.warn('TypeSafeAnalysisService validation warnings:', validationResult.warnings);
@@ -178,8 +190,11 @@ class TypeSafeAnalysisService {
         throw new Error(data.error || 'Group analysis failed');
       }
 
+      // Apply field mapping for group analysis
+      const mappedData = AnalysisDataMapper.mapBackendToFrontend(analysisData);
+      
       // Apply validation for group analysis results
-      const validationResult = AnalysisValidator.validateAndNormalize(analysisData);
+      const validationResult = AnalysisValidator.validateAndNormalize(mappedData);
       
       if (validationResult.warnings.length > 0) {
         console.warn('TypeSafeAnalysisService group analysis warnings:', validationResult.warnings);

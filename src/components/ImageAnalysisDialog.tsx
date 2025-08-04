@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Brain, Wand2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AnalysisDataMapper } from '@/services/AnalysisDataMapper';
 
 interface ImageAnalysisDialogProps {
   imageId: string;
@@ -56,9 +57,11 @@ export function ImageAnalysisDialog({
         throw new Error(data.error || 'Analysis failed');
       }
 
+      // Apply field mapping for consistent data structure
+      const mappedData = AnalysisDataMapper.extractAnalysisData(data.data);
       // COMMENTED OUT: Repetitive analysis completion toast
       // toast.success('AI analysis completed successfully!');
-      onAnalysisComplete(data.data);
+      onAnalysisComplete(mappedData);
       onClose();
     } catch (error) {
       console.error('Analysis failed:', error);

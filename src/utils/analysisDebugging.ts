@@ -51,22 +51,43 @@ export class AnalysisDebugger {
       issues.push('Missing analysis.id');
     }
 
-    if (!analysis.imageId) {
-      issues.push('Missing analysis.imageId');
+    // Handle both image_id and imageId formats from backend
+    const imageId = analysis.image_id || analysis.imageId;
+    if (!imageId) {
+      issues.push('Missing analysis.imageId (checked both image_id and imageId)');
     }
 
-    // Check for at least one content field
+    // Check for at least one content field - be more flexible
     const hasContent = !!(
       analysis.suggestions || 
       analysis.visualAnnotations || 
+      analysis.visual_annotations ||
       analysis.summary ||
       analysis.data?.suggestions ||
       analysis.data?.visualAnnotations ||
+      analysis.data?.visual_annotations ||
       analysis.data?.summary
     );
 
     if (!hasContent) {
       issues.push('Analysis missing content (suggestions, visualAnnotations, or summary)');
+    }
+
+    // Validate summary structure if present
+    const summary = analysis.summary || analysis.data?.summary;
+    if (summary) {
+      if (typeof summary.overallScore !== 'number' && typeof summary.overall_score !== 'number') {
+        issues.push('Summary missing valid overallScore');
+      } else {
+        const score = summary.overallScore || summary.overall_score;
+        if (isNaN(score) || !isFinite(score)) {
+          issues.push('Summary overallScore is not a valid number');
+        }
+      }
+      
+      if (!summary.categoryScores && !summary.category_scores) {
+        issues.push('Summary missing categoryScores');
+      }
     }
 
     return { valid: issues.length === 0, issues };

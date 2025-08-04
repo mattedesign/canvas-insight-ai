@@ -20,6 +20,7 @@ import { ValidationService } from './ValidationService';
 import { SummaryGenerator } from './SummaryGenerator';
 import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
 import { PipelineRecoveryService } from './PipelineRecoveryService';
+import { AnalysisDataMapper } from './AnalysisDataMapper';
 
 interface ModelResult {
   model: string;
@@ -1104,10 +1105,15 @@ export class BoundaryPushingPipeline {
       }
     }
 
+    // Apply field mapping to analysis data for consistent frontend format
+    const rawAnalysisData = this.safeGetProperty(data, 'synthesisResults.fusedData', {});
+    const mappedAnalysisData = AnalysisDataMapper.mapBackendToFrontend(rawAnalysisData);
+
     // Build result with safe property access
     const result = {
       success: true,
       data: {
+        ...mappedAnalysisData, // Use mapped analysis data as the primary structure
         executiveSummary: this.safeGetProperty(data, 'synthesisResults.fusedData.executiveSummary', 'Analysis completed successfully.'),
         vision: this.safeGetProperty(data, 'visionResults.fusedData', {}),
         analysis: this.safeGetProperty(data, 'analysisResults.fusedData', {}),
@@ -1121,7 +1127,8 @@ export class BoundaryPushingPipeline {
             visionConfidence: this.safeGetProperty(data, 'visionResults.confidence', 0),
             analysisConfidence: this.safeGetProperty(data, 'analysisResults.confidence', 0),
             synthesisConfidence: this.safeGetProperty(data, 'synthesisResults.confidence', 0)
-          }
+          },
+          ...mappedAnalysisData.metadata // Include any metadata from the mapped analysis
         }
       }
     };
