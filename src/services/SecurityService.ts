@@ -213,14 +213,28 @@ export class SecurityService {
    * Sanitize user input to prevent injection attacks
    */
   static sanitizeInput(input: string): string {
-    if (typeof input !== 'string') return '';
+    if (typeof input !== 'string') {
+      return '';
+    }
     
     return input
-      .replace(/[<>]/g, '') // Remove potential HTML tags
-      .replace(/['"]/g, '') // Remove quotes
-      .replace(/[;\\]/g, '') // Remove SQL injection chars
-      .trim()
-      .substring(0, 1000); // Limit length
+      // Remove potential XSS vectors
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[^>]*>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      // Remove SQL injection patterns
+      .replace(/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)/gi, '')
+      // Remove directory traversal
+      .replace(/\.\.\//g, '')
+      .replace(/\.\.\\/g, '')
+      // Remove quotes and semicolons
+      .replace(/['"`;\\]/g, '')
+      // Limit length and trim
+      .substring(0, 10000)
+      .trim();
   }
 
   /**
