@@ -205,14 +205,42 @@ export class EnhancedAnalysisPipeline {
       // Priority 1: Validate analysis result before processing
       const validationResult = this.validationService.validateAnalysisResult(analysisResult);
       if (!validationResult.isValid) {
-        console.warn('Analysis validation failed:', validationResult.errors);
+        // Enhanced error logging with detailed validation failure information
+        console.error('Analysis validation failed:', JSON.stringify(validationResult.errors, null, 2));
+        
+        // Log diagnostic information about the raw analysis result
+        console.error('Raw analysis result structure:', {
+          hasResult: !!analysisResult,
+          keys: analysisResult ? Object.keys(analysisResult) : [],
+          summaryKeys: analysisResult?.summary ? Object.keys(analysisResult.summary) : [],
+          annotationsLength: analysisResult?.annotations?.length || 0,
+          suggestionsLength: analysisResult?.suggestions?.length || 0,
+          metadataKeys: analysisResult?.metadata ? Object.keys(analysisResult.metadata) : []
+        });
+        
+        // Log a sample of the actual data to help identify structure issues
+        console.error('Analysis result sample:', JSON.stringify({
+          summary: analysisResult?.summary,
+          annotationsCount: analysisResult?.annotations?.length,
+          suggestionsCount: analysisResult?.suggestions?.length,
+          metadata: analysisResult?.metadata
+        }, null, 2));
+        
         // Use fixed data if available, otherwise proceed with warnings
         const finalResult = validationResult.fixedData || analysisResult;
         
-        // Log validation warnings but don't fail the analysis
-        validationResult.warnings.forEach(warning => {
-          console.warn('Analysis validation warning:', warning.message, warning.suggestion);
-        });
+        // Enhanced warning logging with more context
+        if (validationResult.warnings.length > 0) {
+          console.warn('Analysis validation warnings detected:', validationResult.warnings.length);
+          validationResult.warnings.forEach((warning, index) => {
+            console.warn(`Warning ${index + 1}:`, {
+              code: warning.code,
+              message: warning.message,
+              suggestion: warning.suggestion,
+              path: warning.path || 'unknown'
+            });
+          });
+        }
       }
 
       // Phase 5: Final processing and storage with enhanced summary generation
