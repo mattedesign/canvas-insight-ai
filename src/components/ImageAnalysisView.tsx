@@ -1,6 +1,7 @@
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
 import { ContextDetectionErrorBoundary } from './ContextDetectionErrorBoundary';
 import { AnalysisVersionManager } from './AnalysisVersionManager';
+import { AnalysisConstraintErrorBoundary } from './AnalysisConstraintErrorBoundary';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Info, Code, Palette, Briefcase, TrendingUp } from 'lucide-react';
@@ -24,12 +25,18 @@ export function ImageAnalysisView({
     <div className="space-y-6">
       {/* Version Management - Show first if imageId is available */}
       {imageId && (
-        <AnalysisVersionManager
+        <AnalysisConstraintErrorBoundary 
           imageId={imageId}
-          currentAnalysisId={currentAnalysisId}
-          onAnalysisSelected={onAnalysisSelected}
-          onNewAnalysis={onNewAnalysis}
-        />
+          onAnalysisConflict={(id, type) => console.log('Analysis conflict:', id, type)}
+          onRetryRequested={onNewAnalysis}
+        >
+          <AnalysisVersionManager
+            imageId={imageId}
+            currentAnalysisId={currentAnalysisId}
+            onAnalysisSelected={onAnalysisSelected}
+            onNewAnalysis={onNewAnalysis}
+          />
+        </AnalysisConstraintErrorBoundary>
       )}
 
       {/* Context Information - PRIORITY DISPLAY */}

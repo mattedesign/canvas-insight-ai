@@ -13,7 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertCircle, Clock, RotateCcw, Trash2, Eye } from 'lucide-react';
 import { enhancedAnalysisStorage } from '@/services/EnhancedAnalysisStorage';
 import { analysisService } from '@/services/TypeSafeAnalysisService';
-import { toast } from 'sonner';
+import { useAnalysisNotifications } from '@/hooks/useAnalysisNotifications';
+import { toast } from '@/hooks/use-toast';
 
 interface AnalysisVersionManagerProps {
   imageId: string;
@@ -54,7 +55,11 @@ export const AnalysisVersionManager: React.FC<AnalysisVersionManagerProps> = ({
       setHistory(historyData);
     } catch (error) {
       console.error('Failed to load analysis history:', error);
-      toast.error('Failed to load analysis history');
+      toast({
+        title: "Error",
+        description: "Failed to load analysis history",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -84,15 +89,26 @@ export const AnalysisVersionManager: React.FC<AnalysisVersionManagerProps> = ({
       });
 
       if (response.success) {
-        toast.success('New analysis created successfully');
+        toast({
+          title: "Success",
+          description: "New analysis created successfully"
+        });
         await loadAnalysisHistory();
         onNewAnalysis?.();
       } else {
-        toast.error(`Analysis failed: ${response.error}`);
+        toast({
+          title: "Error", 
+          description: `Analysis failed: ${response.error}`,
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Re-analysis failed:', error);
-      toast.error('Failed to create new analysis');
+      toast({
+        title: "Error",
+        description: "Failed to create new analysis", 
+        variant: "destructive"
+      });
     } finally {
       setReAnalyzing(false);
     }
@@ -107,14 +123,25 @@ export const AnalysisVersionManager: React.FC<AnalysisVersionManagerProps> = ({
       const success = await enhancedAnalysisStorage.deleteAnalysisVersion(analysisId);
       
       if (success) {
-        toast.success('Analysis version deleted');
+        toast({
+          title: "Success",
+          description: "Analysis version deleted"
+        });
         await loadAnalysisHistory();
       } else {
-        toast.error('Failed to delete analysis version');
+        toast({
+          title: "Error",
+          description: "Failed to delete analysis version",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Delete failed:', error);
-      toast.error('Failed to delete analysis version');
+      toast({
+        title: "Error", 
+        description: "Failed to delete analysis version",
+        variant: "destructive"
+      });
     }
   };
 
