@@ -152,13 +152,6 @@ export type Database = {
             foreignKeyName: "analysis_insights_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "analysis_job_status"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "analysis_insights_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
             referencedRelation: "analysis_jobs"
             referencedColumns: ["id"]
           },
@@ -1194,13 +1187,6 @@ export type Database = {
             foreignKeyName: "worker_ant_results_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "analysis_job_status"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "worker_ant_results_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
             referencedRelation: "analysis_jobs"
             referencedColumns: ["id"]
           },
@@ -1208,20 +1194,7 @@ export type Database = {
       }
     }
     Views: {
-      analysis_job_status: {
-        Row: {
-          completed_ants: number | null
-          created_at: string | null
-          error: string | null
-          id: string | null
-          image_id: string | null
-          progress: number | null
-          status: string | null
-          total_ants: number | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       check_rate_limit: {
@@ -1257,6 +1230,20 @@ export type Database = {
         Returns: {
           name: string
           slug: string
+        }[]
+      }
+      get_analysis_job_status: {
+        Args: { p_job_id?: string }
+        Returns: {
+          id: string
+          user_id: string
+          image_id: string
+          status: string
+          progress: number
+          created_at: string
+          error: string
+          completed_ants: number
+          total_ants: number
         }[]
       }
       get_cached_analysis: {
