@@ -10,8 +10,6 @@ interface ImageNodeProps {
     analysis: UXAnalysis;
     onAnnotationClick: (annotationId: string) => void;
     onAnalysisComplete?: (analysis: UXAnalysis) => void;
-    onToggleSelection?: (id: string, event?: React.MouseEvent) => void;
-    isSelected?: (id: string) => boolean;
   };
 }
 
@@ -68,7 +66,7 @@ const AnnotationMarker: React.FC<{
 };
 
 export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
-  const { image, analysis, onAnnotationClick, onAnalysisComplete, onToggleSelection, isSelected } = data;
+  const { image, analysis, onAnnotationClick, onAnalysisComplete } = data;
   const [isHovered, setIsHovered] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
@@ -110,23 +108,12 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
   
   const nodeSize = calculateNodeSize();
 
-  const handleClick = (event: React.MouseEvent) => {
-    if (onToggleSelection) {
-      onToggleSelection(image.id, event);
-    }
-  };
-
-  const nodeIsSelected = isSelected?.(image.id) || false;
-
   return (
     <div 
-      className={`bg-card border rounded-lg shadow-card overflow-hidden cursor-pointer transition-colors ${
-        nodeIsSelected ? 'border-primary ring-2 ring-primary/20' : 'border-border'
-      }`}
+      className="bg-card border border-border rounded-lg shadow-card overflow-hidden"
       style={{ width: nodeSize.width }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={handleClick}
     >
       {/* Header */}
       <div className="p-3 border-b border-border bg-muted/30">

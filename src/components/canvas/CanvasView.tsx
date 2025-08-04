@@ -125,16 +125,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
   
   const { toast } = useFilteredToast();
-  // Initialize multi-selection with all node IDs
-  const allNodeIds = useMemo(() => {
-    const ids: string[] = [];
-    (uploadedImages || []).forEach(img => ids.push(img.id));
-    (generatedConcepts || []).forEach(concept => ids.push(concept.id));
-    (imageGroups || []).forEach(group => ids.push(group.id));
-    return ids;
-  }, [uploadedImages, generatedConcepts, imageGroups]);
-  
-  const multiSelection = useMultiSelection(allNodeIds);
+  const multiSelection = useMultiSelection();
   const isMobile = useIsMobile();
   
   // Show helpful hint on first load for images without analysis
@@ -172,11 +163,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
-    onToggleSelection: (id: string, event?: React.MouseEvent) => {
-      const modifierKey = event?.ctrlKey || event?.metaKey ? 'ctrl' : 
-                          event?.shiftKey ? 'shift' : 'none';
-      multiSelection.toggleSelection(id, modifierKey);
-    },
+    onToggleSelection: multiSelection.toggleSelection,
     isSelected: multiSelection.isSelected,
     onViewChange,
     onImageSelect,
@@ -519,7 +506,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onViewChange: stableCallbacks.onViewChange,
           onImageSelect: stableCallbacks.onImageSelect,
           onToggleSelection: stableCallbacks.onToggleSelection,
-          isSelected: stableCallbacks.isSelected,
+          isSelected: stableCallbacks.isSelected(image.id),
           onAnnotationClick: () => {},
           onAnalysisComplete: (newAnalysis: UXAnalysis) => {
             onAnalysisComplete?.(image.id, newAnalysis);
@@ -1857,15 +1844,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         minZoom={0.1}
         maxZoom={4}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        onSelectionChange={(params) => {
-          // Sync React Flow selection with our custom multi-selection hook
-          const selectedNodeIds = params.nodes.map(node => node.id);
-          if (selectedNodeIds.length > 0) {
-            multiSelection.selectMultiple(selectedNodeIds);
-          } else {
-            multiSelection.clearSelection();
-          }
-        }}
       >
         
         <Background 

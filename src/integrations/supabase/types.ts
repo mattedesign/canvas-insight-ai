@@ -119,86 +119,6 @@ export type Database = {
         }
         Relationships: []
       }
-      analysis_insights: {
-        Row: {
-          created_at: string | null
-          id: string
-          image_id: string
-          insights: Json
-          job_id: string | null
-          quality_score: number | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          image_id: string
-          insights: Json
-          job_id?: string | null
-          quality_score?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          image_id?: string
-          insights?: Json
-          job_id?: string | null
-          quality_score?: number | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "analysis_insights_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "analysis_jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      analysis_jobs: {
-        Row: {
-          completed_at: string | null
-          created_at: string | null
-          error: string | null
-          id: string
-          image_id: string
-          image_url: string
-          metadata: Json | null
-          progress: number | null
-          status: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          error?: string | null
-          id?: string
-          image_id: string
-          image_url: string
-          metadata?: Json | null
-          progress?: number | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          error?: string | null
-          id?: string
-          image_id?: string
-          image_url?: string
-          metadata?: Json | null
-          progress?: number | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       analysis_metrics: {
         Row: {
           analysis_id: string | null
@@ -968,41 +888,6 @@ export type Database = {
         }
         Relationships: []
       }
-      strategic_insights: {
-        Row: {
-          analysis_id: string | null
-          created_at: string | null
-          data: Json
-          id: string
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          analysis_id?: string | null
-          created_at?: string | null
-          data: Json
-          id?: string
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          analysis_id?: string | null
-          created_at?: string | null
-          data?: Json
-          id?: string
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "strategic_insights_analysis_id_fkey"
-            columns: ["analysis_id"]
-            isOneToOne: false
-            referencedRelation: "ux_analyses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       subscribers: {
         Row: {
           analysis_count: number | null
@@ -1083,13 +968,11 @@ export type Database = {
           analysis_type: string | null
           counted_towards_limit: boolean | null
           created_at: string | null
-          has_strategic_insights: boolean | null
           id: string
           image_id: string | null
           metadata: Json
           project_id: string | null
           status: string | null
-          strategic_summary: Json | null
           suggestions: Json
           summary: Json
           user_context: string | null
@@ -1099,13 +982,11 @@ export type Database = {
           analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
-          has_strategic_insights?: boolean | null
           id?: string
           image_id?: string | null
           metadata?: Json
           project_id?: string | null
           status?: string | null
-          strategic_summary?: Json | null
           suggestions?: Json
           summary?: Json
           user_context?: string | null
@@ -1115,13 +996,11 @@ export type Database = {
           analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
-          has_strategic_insights?: boolean | null
           id?: string
           image_id?: string | null
           metadata?: Json
           project_id?: string | null
           status?: string | null
-          strategic_summary?: Json | null
           suggestions?: Json
           summary?: Json
           user_context?: string | null
@@ -1147,47 +1026,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      worker_ant_results: {
-        Row: {
-          ant_type: string
-          completed_at: string | null
-          error: string | null
-          id: string
-          job_id: string | null
-          result: Json | null
-          started_at: string | null
-          status: string | null
-        }
-        Insert: {
-          ant_type: string
-          completed_at?: string | null
-          error?: string | null
-          id?: string
-          job_id?: string | null
-          result?: Json | null
-          started_at?: string | null
-          status?: string | null
-        }
-        Update: {
-          ant_type?: string
-          completed_at?: string | null
-          error?: string | null
-          id?: string
-          job_id?: string | null
-          result?: Json | null
-          started_at?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "worker_ant_results_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "analysis_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -1230,20 +1068,6 @@ export type Database = {
         Returns: {
           name: string
           slug: string
-        }[]
-      }
-      get_analysis_job_status: {
-        Args: { p_job_id?: string }
-        Returns: {
-          id: string
-          user_id: string
-          image_id: string
-          status: string
-          progress: number
-          created_at: string
-          error: string
-          completed_ants: number
-          total_ants: number
         }[]
       }
       get_cached_analysis: {
