@@ -57,6 +57,7 @@ export interface GeneratedConcept {
 
 export interface ImageGroup {
   id: string;
+  projectId: string;
   name: string;
   description: string;
   imageIds: string[];
@@ -67,6 +68,7 @@ export interface ImageGroup {
 
 export interface UXAnalysis {
   id: string;
+  projectId: string;
   imageId: string;
   imageName: string;
   imageUrl: string;
@@ -80,6 +82,7 @@ export interface UXAnalysis {
 
 export interface UploadedImage {
   id: string;
+  projectId: string;
   name: string;
   url: string;
   file: File;
@@ -87,4 +90,12 @@ export interface UploadedImage {
     width: number;
     height: number;
   };
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

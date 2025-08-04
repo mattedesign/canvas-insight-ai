@@ -1,6 +1,6 @@
 import { UXAnalysis, AnnotationPoint, Suggestion } from '@/types/ux-analysis';
 
-export const generateMockAnalysis = (imageId: string, imageName: string, imageUrl: string): UXAnalysis => {
+export const generateMockAnalysis = (imageId: string, imageName: string, imageUrl: string, projectId: string = 'default'): UXAnalysis => {
   const mockAnnotations: AnnotationPoint[] = [
     {
       id: `${imageId}-ann-1`,
@@ -105,6 +105,7 @@ export const generateMockAnalysis = (imageId: string, imageName: string, imageUr
 
   return {
     id: `analysis-${imageId}`,
+    projectId,
     imageId,
     imageName,
     imageUrl,

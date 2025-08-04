@@ -12,10 +12,14 @@ import { CanvasView } from './canvas/CanvasView';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { generateTitleFromPrompt } from '@/utils/promptGenerator';
 import { toast } from 'sonner';
+import { useProject } from '@/contexts/ProjectContext';
+import { imageService } from '@/services/imageService';
+import { analysisService } from '@/services/analysisService';
 
 
 export const UXAnalysisTool: React.FC = () => {
   const navigate = useNavigate();
+  const { currentProject } = useProject();
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
@@ -28,46 +32,69 @@ export const UXAnalysisTool: React.FC = () => {
   const { state: viewerState, toggleAnnotation, clearAnnotations } = useImageViewer();
 
   const handleImageUpload = useCallback(async (files: File[]) => {
+    if (!currentProject) {
+      toast.error('Please select a project first');
+      return;
+    }
+
     const newImages: UploadedImage[] = [];
     const newAnalyses: UXAnalysis[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const imageId = `img-${Date.now()}-${i}`;
-      const imageUrl = URL.createObjectURL(file);
+      
+      try {
+        // Upload to Supabase Storage
+        const imageUrl = await imageService.uploadImageFile(file, currentProject.id);
+        
+        // Get actual image dimensions
+        const img = new Image();
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = imageUrl;
+        });
 
-      // Get actual image dimensions
-      const img = new Image();
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = imageUrl;
-      });
+        // Create image record in database
+        const uploadedImage = await imageService.createImage({
+          projectId: currentProject.id,
+          name: file.name,
+          url: imageUrl,
+          file,
+          dimensions,
+        });
 
-      // Create uploaded image record with full resolution
-      const uploadedImage: UploadedImage = {
-        id: imageId,
-        name: file.name,
-        url: imageUrl,
-        file,
-        dimensions,
-      };
+        // Generate mock analysis (in production, this would call your AI service)
+        const mockAnalysis = generateMockAnalysis(
+          uploadedImage.id, 
+          file.name, 
+          imageUrl, 
+          currentProject.id
+        );
+        
+        // Save analysis to database
+        const savedAnalysis = await analysisService.createAnalysis(mockAnalysis);
 
-      // Generate mock analysis
-      const analysis = generateMockAnalysis(imageId, file.name, imageUrl);
-
-      newImages.push(uploadedImage);
-      newAnalyses.push(analysis);
+        newImages.push(uploadedImage);
+        newAnalyses.push(savedAnalysis);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast.error(`Failed to upload ${file.name}`);
+      }
     }
 
-    setUploadedImages(prev => [...prev, ...newImages]);
-    setAnalyses(prev => [...prev, ...newAnalyses]);
-    
-    // Auto-select first image if none selected
-    if (!selectedImageId && newImages.length > 0) {
-      setSelectedImageId(newImages[0].id);
+    if (newImages.length > 0) {
+      setUploadedImages(prev => [...prev, ...newImages]);
+      setAnalyses(prev => [...prev, ...newAnalyses]);
+      
+      // Auto-select first image if none selected
+      if (!selectedImageId && newImages.length > 0) {
+        setSelectedImageId(newImages[0].id);
+      }
+      
+      toast.success(`Successfully uploaded ${newImages.length} image(s)`);
     }
-  }, [selectedImageId]);
+  }, [selectedImageId, currentProject]);
 
   const handleGenerateConcept = useCallback(async (analysisId: string) => {
     setIsGeneratingConcept(true);
@@ -187,6 +214,7 @@ export const UXAnalysisTool: React.FC = () => {
         showAnnotations={showAnnotations}
         onToggleAnnotations={handleToggleAnnotations}
         onNavigateToPreviousAnalyses={handleNavigateToPreviousAnalyses}
+        currentProject={currentProject}
       />
       
       <div className="flex-1 relative">
