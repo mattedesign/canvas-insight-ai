@@ -17,14 +17,24 @@ import { imageService } from '@/services/imageService';
 import { analysisService } from '@/services/analysisService';
 
 
-export const UXAnalysisTool: React.FC = () => {
+interface UXAnalysisToolProps {
+  initialImages?: UploadedImage[];
+  initialAnalyses?: UXAnalysis[];
+  initialView?: 'gallery' | 'canvas' | 'summary';
+}
+
+export const UXAnalysisTool: React.FC<UXAnalysisToolProps> = ({ 
+  initialImages = [],
+  initialAnalyses = [],
+  initialView = 'summary'
+}) => {
   const navigate = useNavigate();
   const { currentProject } = useProject();
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>(initialImages);
+  const [analyses, setAnalyses] = useState<UXAnalysis[]>(initialAnalyses);
   const [generatedConcepts, setGeneratedConcepts] = useState<GeneratedConcept[]>([]);
-  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>('summary');
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState<'gallery' | 'canvas' | 'summary'>(initialView);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(initialImages.length > 0 ? initialImages[0].id : null);
   const [showAnnotations, setShowAnnotations] = useState<boolean>(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   const [galleryTool, setGalleryTool] = useState<'cursor' | 'draw'>('cursor');
