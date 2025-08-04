@@ -438,54 +438,23 @@ export class ImageMigrationService {
 // Analysis data migration service  
 export class AnalysisMigrationService {
   static async migrateAnalysisToDatabase(analysis: UXAnalysis): Promise<string> {
-    // Check if analysis already exists
-    const { data: existing } = await supabase
-      .from('ux_analyses')
-      .select('id')
-      .eq('image_id', analysis.imageId)
-      .single();
+    // Import the enhanced storage here to avoid circular dependencies
+    const { enhancedAnalysisStorage } = await import('./EnhancedAnalysisStorage');
+    
+    // Use the enhanced storage service for better constraint handling
+    const result = await enhancedAnalysisStorage.storeAnalysis({
+      imageId: analysis.imageId,
+      analysisData: analysis,
+      userContext: analysis.userContext,
+      analysisType: 'full_analysis',
+      forceNew: false // Allow reuse of recent analyses
+    });
 
-    if (existing) {
-      // Update existing analysis
-      const { data, error } = await supabase
-        .from('ux_analyses')
-        .update({
-          user_context: analysis.userContext,
-          visual_annotations: analysis.visualAnnotations as any,
-          suggestions: analysis.suggestions as any,
-          summary: analysis.summary as any,
-          metadata: analysis.metadata as any
-        })
-        .eq('id', existing.id)
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      return data.id;
-    } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Create new analysis
-      const { data, error } = await supabase
-        .from('ux_analyses')
-        .insert({
-          id: analysis.id,
-          image_id: analysis.imageId,
-          user_id: user.id,
-          user_context: analysis.userContext,
-          visual_annotations: analysis.visualAnnotations as any,
-          suggestions: analysis.suggestions as any,
-          summary: analysis.summary as any,
-          metadata: analysis.metadata as any,
-          status: 'completed'
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      return data.id;
+    if (!result.success) {
+      throw new Error(`Failed to migrate analysis: ${result.error}`);
     }
+
+    return result.analysisId!;
   }
 
   static async loadAnalysesFromDatabase(): Promise<UXAnalysis[]> {
