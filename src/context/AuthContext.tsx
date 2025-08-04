@@ -1,9 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthRecovery } from '@/hooks/useAuthRecovery';
-import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 interface SubscriptionInfo {
   subscribed: boolean;
@@ -40,23 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
   
   const { toast } = useToast();
-  const { handleAuthError } = useAuthErrorHandler();
-  const { 
-    recoveryState, 
-    validateSession, 
-    startSessionMonitoring, 
-    stopSessionMonitoring,
-    resetRecovery 
-  } = useAuthRecovery({
-    sessionCheckInterval: 5,
-    maxRetryAttempts: 3,
-    enableSessionValidation: true
-  });
-  
-  const initializationRef = useRef(false);
 
   const checkSubscription = async () => {
     if (!session) return;
@@ -82,97 +65,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Prevent double initialization
-    if (initializationRef.current) return;
-    initializationRef.current = true;
-
     console.log('[AuthProvider] Initializing authentication...');
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log(`[AuthProvider] Auth state change: ${event}`, { session: !!session });
         
-        // Update state synchronously first
         setSession(session);
         setUser(session?.user ?? null);
-        
-        if (!isInitialized) {
-          setIsInitialized(true);
-          setLoading(false);
+        setLoading(false);
+
+        // Handle sign out cleanup
+        if (event === 'SIGNED_OUT') {
+          setSubscription(null);
         }
 
-        try {
-          // Handle session validation for existing sessions
-          if (session && event === 'SIGNED_IN') {
-            const isValid = await validateSession(session);
-            if (isValid) {
-              startSessionMonitoring(session);
-              // Delay subscription check to avoid race conditions
-              setTimeout(() => {
-                checkSubscription();
-              }, 1000);
-            }
-          }
-
-          // Handle sign out cleanup
-          if (event === 'SIGNED_OUT') {
-            setSubscription(null);
-            stopSessionMonitoring();
-            resetRecovery();
-          }
-
-          // Handle token refresh
-          if (event === 'TOKEN_REFRESHED' && session) {
-            console.log('[AuthProvider] Token refreshed successfully');
-            startSessionMonitoring(session);
-          }
-        } catch (error) {
-          console.error('[AuthProvider] Error in auth state change handler:', error);
-          handleAuthError(error, 'Auth State Change');
+        // Check subscription for signed in users
+        if (session && event === 'SIGNED_IN') {
+          setTimeout(() => {
+            checkSubscription();
+          }, 1000);
         }
       }
     );
 
     // Initialize session
-    const initializeSession = async () => {
-      try {
-        console.log('[AuthProvider] Checking for existing session...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('[AuthProvider] Session check error:', error);
-          handleAuthError(error, 'Session Initialization');
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
 
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsInitialized(true);
-        setLoading(false);
-
-        if (session?.user) {
-          const isValid = await validateSession(session);
-          if (isValid) {
-            startSessionMonitoring(session);
-            setTimeout(() => {
-              checkSubscription();
-            }, 1000);
-          }
-        }
-      } catch (error) {
-        console.error('[AuthProvider] Failed to initialize session:', error);
-        handleAuthError(error, 'Initialization');
-        setIsInitialized(true);
-        setLoading(false);
+      if (session) {
+        setTimeout(() => {
+          checkSubscription();
+        }, 1000);
       }
-    };
-
-    initializeSession();
+    });
 
     return () => {
       subscription.unsubscribe();
-      stopSessionMonitoring();
     };
-  }, [isInitialized, validateSession, startSessionMonitoring, stopSessionMonitoring, resetRecovery, handleAuthError]);
+  }, []);
 
   const signUp = async (email: string, password: string) => {
     try {
@@ -187,7 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (error) {
-        handleAuthError(error, 'Sign Up');
+        toast({
+          title: "Sign Up Error",
+          description: error.message,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Check your email",
@@ -197,7 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error };
     } catch (error: any) {
-      handleAuthError(error, 'Sign Up');
+      toast({
+        title: "Sign Up Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
       return { error };
     } finally {
       setLoading(false);
@@ -210,12 +151,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        handleAuthError(error, 'Sign In');
+        toast({
+          title: "Sign In Error",
+          description: error.message,
+          variant: "destructive",
+        });
       }
 
       return { error };
     } catch (error: any) {
-      handleAuthError(error, 'Sign In');
+      toast({
+        title: "Sign In Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
       return { error };
     } finally {
       setLoading(false);
@@ -228,15 +177,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        handleAuthError(error, 'Sign Out');
-      } else {
-        stopSessionMonitoring();
-        resetRecovery();
+        toast({
+          title: "Sign Out Error",
+          description: error.message,
+          variant: "destructive",
+        });
       }
 
       return { error };
     } catch (error: any) {
-      handleAuthError(error, 'Sign Out');
+      toast({
+        title: "Sign Out Error", 
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
       return { error };
     } finally {
       setLoading(false);
@@ -251,7 +205,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        handleAuthError(error, 'Password Reset');
+        toast({
+          title: "Password Reset Error",
+          description: error.message,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Check your email",
@@ -261,7 +219,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error };
     } catch (error: any) {
-      handleAuthError(error, 'Password Reset');
+      toast({
+        title: "Password Reset Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
       return { error };
     }
   };
@@ -269,14 +231,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = React.useMemo(() => ({
     user,
     session,
-    loading: loading || !isInitialized || recoveryState.isRecovering,
+    loading,
     subscription,
     signUp,
     signIn,
     signOut,
     resetPassword,
     checkSubscription,
-  }), [user, session, loading, isInitialized, recoveryState.isRecovering, subscription]);
+  }), [user, session, loading, subscription]);
 
   return (
     <AuthContext.Provider value={value}>
