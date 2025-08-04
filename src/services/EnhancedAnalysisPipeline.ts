@@ -85,6 +85,41 @@ export class EnhancedAnalysisPipeline {
     imageName: string,
     userContext?: string
   ): Promise<EnhancedAnalysisResult> {
+    // Phase 1: Check if this should use the natural pipeline instead
+    const shouldUseNaturalPipeline = userContext && (
+      userContext.includes('useNaturalPipeline: true') || 
+      userContext.includes('_isNaturalAnalysis: true') ||
+      userContext.includes('naturalMode: true')
+    );
+
+    if (shouldUseNaturalPipeline) {
+      console.log('🎯 EnhancedAnalysisPipeline: Routing to Natural Analysis Pipeline');
+      return {
+        success: true,
+        data: { 
+          _isNaturalAnalysis: true,
+          _skipEnhancedPipeline: true,
+          message: 'Routed to natural analysis pipeline'
+        },
+        analysisContext: { 
+          image: { 
+            primaryType: 'unknown', 
+            subTypes: [], 
+            domain: 'general',
+            complexity: 'moderate',
+            userIntent: ['analysis']
+          },
+          user: {},
+          focusAreas: ['usability'],
+          analysisDepth: 'standard',
+          outputStyle: 'balanced',
+          confidence: 1.0,
+          detectedAt: new Date().toISOString()
+        },
+        progress: { stage: 'Routing to natural analysis', progress: 100, message: 'Routing completed' }
+      };
+    }
+
     // Priority 2: Generate request ID and check for resumption
     this.currentRequestId = this.progressService.generateRequestId(imageUrl, userContext || '');
     const resumption = this.progressService.checkResumption(this.currentRequestId);
@@ -202,45 +237,68 @@ export class EnhancedAnalysisPipeline {
         userContext
       );
 
-      // Priority 1: Validate analysis result before processing
-      // Skip validation if this is a natural analysis result (already validated by edge function)
-      const validationResult = this.validationService.validateAnalysisResult(analysisResult);
-      if (!validationResult.isValid) {
-        // Enhanced error logging with detailed validation failure information
-        console.error('Analysis validation failed:', JSON.stringify(validationResult.errors, null, 2));
-        
-        // Log diagnostic information about the raw analysis result
-        console.error('Raw analysis result structure:', {
-          hasResult: !!analysisResult,
-          keys: analysisResult ? Object.keys(analysisResult) : [],
-          summaryKeys: analysisResult?.summary ? Object.keys(analysisResult.summary) : [],
-          annotationsLength: analysisResult?.annotations?.length || 0,
-          suggestionsLength: analysisResult?.suggestions?.length || 0,
-          metadataKeys: analysisResult?.metadata ? Object.keys(analysisResult.metadata) : []
-        });
-        
-        // Log a sample of the actual data to help identify structure issues
-        console.error('Analysis result sample:', JSON.stringify({
-          summary: analysisResult?.summary,
-          annotationsCount: analysisResult?.annotations?.length,
-          suggestionsCount: analysisResult?.suggestions?.length,
-          metadata: analysisResult?.metadata
-        }, null, 2));
-        
-        // Use fixed data if available, otherwise proceed with warnings
-        const finalResult = validationResult.fixedData || analysisResult;
-        
-        // Enhanced warning logging with more context
-        if (validationResult.warnings.length > 0) {
-          console.warn('Analysis validation warnings detected:', validationResult.warnings.length);
-          validationResult.warnings.forEach((warning, index) => {
-            console.warn(`Warning ${index + 1}:`, {
-              code: warning.code,
-              message: warning.message,
-              suggestion: warning.suggestion,
-              path: warning.path || 'unknown'
-            });
+      // Phase 2: Skip validation if this is a natural analysis result (already validated by edge function)
+      const isNaturalAnalysis = analysisResult && (
+        analysisResult._isNaturalAnalysis === true ||
+        userContext?.includes('_isNaturalAnalysis: true') ||
+        userContext?.includes('naturalMode: true')
+      );
+
+      let validationResult: any;
+      let finalResult = analysisResult;
+
+      if (isNaturalAnalysis) {
+        console.log('🎯 Skipping validation for natural analysis result');
+        // Skip validation - natural analysis is already validated by the edge function
+        // Create a mock validation result for consistency
+        validationResult = {
+          isValid: true,
+          errors: [],
+          warnings: [],
+          fixedData: analysisResult
+        };
+      } else {
+        // Priority 1: Validate analysis result before processing
+        validationResult = this.validationService.validateAnalysisResult(analysisResult);
+        if (!validationResult.isValid) {
+          // Enhanced error logging with detailed validation failure information
+          console.error('Analysis validation failed:', JSON.stringify(validationResult.errors, null, 2));
+          
+          // Log diagnostic information about the raw analysis result
+          console.error('Raw analysis result structure:', {
+            hasResult: !!analysisResult,
+            keys: analysisResult ? Object.keys(analysisResult) : [],
+            summaryKeys: analysisResult?.summary ? Object.keys(analysisResult.summary) : [],
+            annotationsLength: analysisResult?.annotations?.length || 0,
+            suggestionsLength: analysisResult?.suggestions?.length || 0,
+            metadataKeys: analysisResult?.metadata ? Object.keys(analysisResult.metadata) : []
           });
+          
+          // Log a sample of the actual data to help identify structure issues
+          console.error('Analysis result sample:', JSON.stringify({
+            summary: analysisResult?.summary,
+            annotationsCount: analysisResult?.annotations?.length,
+            suggestionsCount: analysisResult?.suggestions?.length,
+            metadata: analysisResult?.metadata
+          }, null, 2));
+          
+          // Use fixed data if available, otherwise proceed with warnings
+          finalResult = validationResult.fixedData || analysisResult;
+          
+          // Enhanced warning logging with more context
+          if (validationResult.warnings.length > 0) {
+            console.warn('Analysis validation warnings detected:', validationResult.warnings.length);
+            validationResult.warnings.forEach((warning, index) => {
+              console.warn(`Warning ${index + 1}:`, {
+                code: warning.code,
+                message: warning.message,
+                suggestion: warning.suggestion,
+                path: warning.path || 'unknown'
+              });
+            });
+          }
+        } else {
+          finalResult = validationResult.fixedData || analysisResult;
         }
       }
 

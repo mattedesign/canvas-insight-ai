@@ -96,21 +96,27 @@ export class PipelineConsolidationSafety {
       const finalAnalysis = this.buildFinalAnalysis(stageData, imageId, imageName, warnings, fallbacksApplied);
 
       // Phase 4: Validate final result
-      // Skip validation if this is a natural analysis result (already validated by edge function)
-      const validation = this.validationService.validateAnalysisResult(finalAnalysis);
-      if (!validation.isValid) {
-        warnings.push(`Final analysis validation warnings: ${validation.warnings.map(w => w.message).join(', ')}`);
-        
-        if (validation.fixedData) {
-          warnings.push('Applied validation fixes to final analysis');
-          return {
-            success: true,
-            data: validation.fixedData,
-            warnings,
-            errors,
-            usedStages,
-            fallbacksApplied
-          };
+      // Phase 2: Skip validation if this is a natural analysis result (already validated by edge function)
+      const isNaturalAnalysis = finalAnalysis && finalAnalysis._isNaturalAnalysis === true;
+      
+      if (isNaturalAnalysis) {
+        console.log('🎯 PipelineConsolidationSafety: Skipping validation for natural analysis result');
+      } else {
+        const validation = this.validationService.validateAnalysisResult(finalAnalysis);
+        if (!validation.isValid) {
+          warnings.push(`Final analysis validation warnings: ${validation.warnings.map(w => w.message).join(', ')}`);
+          
+          if (validation.fixedData) {
+            warnings.push('Applied validation fixes to final analysis');
+            return {
+              success: true,
+              data: validation.fixedData,
+              warnings,
+              errors,
+              usedStages,
+              fallbacksApplied
+            };
+          }
         }
       }
 

@@ -298,14 +298,20 @@ export class PipelineRecoveryService {
       );
 
       // Validate the partial analysis
-      // Skip validation if this is a natural analysis result (already validated by edge function)
-      const validation = this.validationService.validateAnalysisResult(partialAnalysis);
-      if (!validation.isValid) {
-        warnings.push(`Partial analysis validation warnings: ${validation.warnings?.map(w => w.message).join(', ')}`);
-        
-        if (validation.fixedData) {
-          recoverySteps.push('Applied validation fixes to partial analysis');
-          return { success: true, data: validation.fixedData };
+      // Phase 2: Skip validation if this is a natural analysis result (already validated by edge function)
+      const isNaturalAnalysis = partialAnalysis && partialAnalysis._isNaturalAnalysis === true;
+      
+      if (isNaturalAnalysis) {
+        console.log('🎯 PipelineRecoveryService: Skipping validation for natural analysis result');
+      } else {
+        const validation = this.validationService.validateAnalysisResult(partialAnalysis);
+        if (!validation.isValid) {
+          warnings.push(`Partial analysis validation warnings: ${validation.warnings?.map(w => w.message).join(', ')}`);
+          
+          if (validation.fixedData) {
+            recoverySteps.push('Applied validation fixes to partial analysis');
+            return { success: true, data: validation.fixedData };
+          }
         }
       }
 
