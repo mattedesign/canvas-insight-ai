@@ -9,6 +9,7 @@ import { AnalysisDataMapper } from './AnalysisDataMapper';
 import { AnalysisFieldMappingDebug } from '@/utils/analysisFieldMappingDebug';
 import { simplifiedImageService } from './SimplifiedImageService';
 import { apiStatusService } from './APIStatusService';
+import { enhancedAnalysisStorage } from './EnhancedAnalysisStorage';
 import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
@@ -320,6 +321,115 @@ class TypeSafeAnalysisService {
     };
   }
   
+  // Enhanced Analysis Management with Version Support
+  async checkExistingAnalysis(imageId: string, analysisType: string = 'full_analysis'): Promise<{
+    hasRecent: boolean;
+    latestVersion?: number;
+    latestId?: string;
+    createdAt?: string;
+  }> {
+    try {
+      const existingInfo = await enhancedAnalysisStorage.checkExistingAnalysis(imageId, analysisType);
+      console.log('🔍 Existing analysis check:', existingInfo);
+      return existingInfo;
+    } catch (error) {
+      console.error('Error checking existing analysis:', error);
+      return { hasRecent: false };
+    }
+  }
+
+  async getAnalysisHistory(imageId: string, analysisType?: string): Promise<any[]> {
+    try {
+      const history = await enhancedAnalysisStorage.getAnalysisHistory(imageId, analysisType);
+      console.log('📋 Analysis history retrieved:', history.length, 'versions');
+      return history;
+    } catch (error) {
+      console.error('Error getting analysis history:', error);
+      return [];
+    }
+  }
+
+  async deleteAnalysisVersion(analysisId: string): Promise<boolean> {
+    try {
+      const success = await enhancedAnalysisStorage.deleteAnalysisVersion(analysisId);
+      console.log('🗑️ Analysis version deletion:', success ? 'success' : 'failed');
+      return success;
+    } catch (error) {
+      console.error('Error deleting analysis version:', error);
+      return false;
+    }
+  }
+
+  async forceNewAnalysis(request: AnalysisRequest & { imageId: string }): Promise<AnalysisResponse> {
+    // Same as analyzeImage but with forceNew flag
+    console.log('🔄 Forcing new analysis for image:', request.imageId);
+    
+    // Clear cache for this request to ensure fresh analysis
+    const cacheKey = this.getCacheKey(request);
+    this.analysisCache.delete(cacheKey);
+    
+    // Call the edge function with explicit forceNew flag
+    const startTime = performance.now();
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        body: {
+          action: 'ENHANCED_CONTEXT_ANALYSIS',
+          payload: {
+            imageId: request.imageId,
+            imageUrl: request.imageUrl,
+            userContext: request.userContext || '',
+            priority: request.priority || 'medium',
+            forceNew: true, // Key difference - force new analysis
+            analysisTimestamp: new Date().toISOString(),
+            requestId: `force_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          },
+        },
+      });
+      
+      if (error) {
+        throw new Error(`Forced analysis failed: ${error.message}`);
+      }
+      
+      if (!data) {
+        throw new Error('No analysis data received');
+      }
+
+      // Handle response format
+      let analysisData = data;
+      if (data.success === true && data.data) {
+        analysisData = data.data;
+      } else if (data.success === false) {
+        throw new Error(data.error || 'Forced analysis failed');
+      }
+
+      // Apply field mapping and validation
+      const mappedData = AnalysisDataMapper.mapBackendToFrontend(analysisData);
+      const validationResult = AnalysisValidator.validateAndNormalize(mappedData);
+      
+      if (validationResult.warnings.length > 0) {
+        console.warn('Forced analysis validation warnings:', validationResult.warnings);
+      }
+
+      const response: AnalysisResponse = {
+        success: true,
+        analysis: validationResult.data,
+        processingTime: performance.now() - startTime,
+      };
+      
+      // Update cache with new analysis
+      this.analysisCache.set(cacheKey, response);
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        processingTime: performance.now() - startTime,
+      };
+    }
+  }
+
   // Health check
   async healthCheck(): Promise<{ success: boolean; error?: string }> {
     try {

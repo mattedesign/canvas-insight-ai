@@ -3,6 +3,7 @@ import { ContextDetectionService } from './ContextDetectionService';
 import { AnalysisContext, ImageContext } from '@/types/contextTypes';
 import { PipelineError } from '@/types/pipelineErrors';
 import { imageUrlToBase64Safe } from '@/utils/base64Utils';
+import { enhancedAnalysisStorage } from './EnhancedAnalysisStorage';
 // Priority 1: Safety & Validation
 import { ValidationService } from './ValidationService';
 import { ArrayNumericSafety } from '@/utils/ArrayNumericSafety';
@@ -701,41 +702,55 @@ Focus on:
   }
 
   /**
-   * Store enhanced analysis with context
+   * Store enhanced analysis with context using EnhancedAnalysisStorage
    */
   private async storeEnhancedAnalysis(imageId: string, analysis: any, context: AnalysisContext): Promise<void> {
-    // Add context metadata to analysis
-    const enhancedAnalysis = {
-      ...analysis,
-      analysisContext: context,
-      metadata: {
-        ...analysis.metadata,
-        contextConfidence: context.confidence,
-        interfaceType: context.image.primaryType,
-        domain: context.image.domain,
-        userRole: context.user.inferredRole,
-        focusAreas: context.focusAreas,
-        enhancedAt: new Date().toISOString()
-      }
-    };
+    try {
+      // Add context metadata to analysis
+      const enhancedAnalysis = {
+        ...analysis,
+        analysisContext: context,
+        metadata: {
+          ...analysis.metadata,
+          contextConfidence: context.confidence,
+          interfaceType: context.image.primaryType,
+          domain: context.image.domain,
+          userRole: context.user.inferredRole,
+          focusAreas: context.focusAreas,
+          enhancedAt: new Date().toISOString()
+        },
+        userContext: context.user.goals?.join(', ') || ''
+      };
 
-    const { error } = await supabase
-      .from('ux_analyses')
-      .upsert({
-        id: analysis.id,
-        image_id: imageId,
-        user_context: context.user.goals?.join(', ') || '',
-        visual_annotations: enhancedAnalysis.visualAnnotations,
-        suggestions: enhancedAnalysis.suggestions,
-        summary: enhancedAnalysis.summary,
-        metadata: enhancedAnalysis.metadata,
-        status: 'completed',
-        created_at: new Date().toISOString()
+      // Use the enhanced storage service for better constraint handling
+      const storageResult = await enhancedAnalysisStorage.storeAnalysis({
+        imageId,
+        analysisData: enhancedAnalysis,
+        userContext: enhancedAnalysis.userContext,
+        analysisType: 'full_analysis',
+        forceNew: false // Allow checking for existing analyses
       });
 
-    if (error) {
+      if (!storageResult.success) {
+        console.error('Enhanced analysis storage failed:', storageResult.error);
+        throw new PipelineError('Failed to store analysis results', 'storage', { 
+          stage: 'enhanced-storage',
+          error: storageResult.error 
+        });
+      }
+
+      console.log('✅ Enhanced analysis stored successfully:', {
+        analysisId: storageResult.analysisId,
+        isNew: storageResult.isNew,
+        version: storageResult.existingVersion
+      });
+
+    } catch (error) {
       console.error('Failed to store enhanced analysis:', error);
-      throw new PipelineError('Failed to store analysis results', 'storage', { stage: 'database-storage' });
+      throw new PipelineError('Failed to store analysis results', 'storage', { 
+        stage: 'database-storage',
+        originalError: error.message 
+      });
     }
   }
 
