@@ -6,13 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 const Auth = () => {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, resetPassword, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Redirect authenticated users to dashboard
   if (user) {
@@ -33,13 +36,24 @@ const Auth = () => {
     if (!email || !password || !confirmPassword) return;
     
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     setIsSubmitting(true);
     await signUp(email, password);
     setIsSubmitting(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+
+    setIsSubmitting(true);
+    await resetPassword(resetEmail);
+    setIsSubmitting(false);
+    setShowForgotPassword(false);
+    setResetEmail('');
   };
 
   if (loading) {
@@ -63,11 +77,49 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+          {showForgotPassword ? (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold">Reset Password</h3>
+                <p className="text-sm text-muted-foreground">
+                  Enter your email to receive a password reset link
+                </p>
+              </div>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isSubmitting || !resetEmail}
+                >
+                  {isSubmitting ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="w-full" 
+                  onClick={() => setShowForgotPassword(false)}
+                >
+                  Back to Sign In
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <Tabs defaultValue="signin" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
             
             <TabsContent value="signin" className="space-y-4">
               <form onSubmit={handleSignIn} className="space-y-4">
@@ -99,6 +151,14 @@ const Auth = () => {
                   disabled={isSubmitting || !email || !password}
                 >
                   {isSubmitting ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="w-full text-sm" 
+                  onClick={() => setShowForgotPassword(true)}
+                >
+                  Forgot your password?
                 </Button>
               </form>
             </TabsContent>
@@ -148,6 +208,7 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>
