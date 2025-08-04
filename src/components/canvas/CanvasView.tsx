@@ -10,6 +10,7 @@ import {
   Edge,
   Node,
   Background,
+  BackgroundVariant,
 } from '@xyflow/react';
 import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
@@ -1846,9 +1847,10 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
       >
         
         <Background 
-          color="hsl(var(--muted-foreground) / 0.15)" 
+          variant={BackgroundVariant.Dots}
+          color="hsl(var(--muted-foreground) / 0.2)" 
           size={1} 
-          gap={24}
+          gap={20}
           className="enhanced-canvas-background"
         />
         {/* Custom controls are now in FloatingToolbar */}
