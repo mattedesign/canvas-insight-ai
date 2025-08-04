@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useCanvasEnhancements, useFocusOverlay } from '@/hooks/useCanvasEnhancements';
 import {
   ReactFlow,
   useNodesState,
@@ -1779,6 +1780,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
   
+  // Initialize focus overlay
+  useFocusOverlay();
+  
   // Disable node dragging on mobile/tablet screens (768px and under)
   const isNodeDraggingEnabled = currentTool === 'cursor' && !isPanningDisabled && !isMobile;
 
@@ -1833,7 +1837,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         nodesDraggable={isNodeDraggingEnabled}
         nodesConnectable={currentTool === 'cursor'}
         elementsSelectable={currentTool === 'cursor'}
-        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''}`}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''} canvas-enhanced-flow`}
         proOptions={{ hideAttribution: true }}
         zoomActivationKeyCode={['Meta', 'Control']}
         minZoom={0.1}
@@ -1841,7 +1845,12 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         
-        <Background color="hsl(var(--muted))" />
+        <Background 
+          color="hsl(var(--border) / 0.3)" 
+          size={2} 
+          gap={20}
+          className="enhanced-canvas-background"
+        />
         {/* Custom controls are now in FloatingToolbar */}
         
         {/* Floating Toolbar - Must be inside ReactFlow for useReactFlow hook */}

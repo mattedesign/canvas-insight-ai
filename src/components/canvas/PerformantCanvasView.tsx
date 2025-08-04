@@ -2,6 +2,7 @@ import React from 'react';
 import type { CanvasViewProps } from './CanvasView';
 import { CanvasView } from './CanvasView';
 import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
+import './CanvasVisualEnhancements.css';
 
 // Performance thresholds for virtualization
 const VIRTUALIZATION_THRESHOLDS = {
@@ -53,7 +54,7 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   // Use virtualized view for large datasets
   if (shouldVirtualize) {
     return (
-      <div className="performant-canvas-virtualized">
+      <div className="performant-canvas-virtualized enhanced-canvas-container">
         <VirtualizedCanvasContainer
           uploadedImages={uploadedImages}
           analyses={analyses}
@@ -69,7 +70,7 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   
   // Use standard ReactFlow for smaller datasets (preserves all features)
   return (
-    <div className="performant-canvas-standard">
+    <div className="performant-canvas-standard enhanced-canvas-container">
       <CanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
     </div>
   );

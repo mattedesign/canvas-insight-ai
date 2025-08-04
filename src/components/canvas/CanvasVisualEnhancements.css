@@ -1,0 +1,335 @@
+/* Canvas Visual Enhancements - Route-specific styling */
+
+/* Apply enhanced styling to all nodes and edges in enhanced canvas */
+.canvas-enhanced-flow .react-flow__node {
+  transition: var(--transition-smooth);
+  box-shadow: var(--shadow-card);
+}
+
+.canvas-enhanced-flow .react-flow__node:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 0 1px hsl(var(--primary) / 0.2);
+}
+
+.canvas-enhanced-flow .react-flow__node.selected,
+.canvas-enhanced-flow .react-flow__node:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 0 2px hsl(var(--primary) / 0.4),
+    0 0 20px hsl(var(--primary) / 0.3);
+  border-color: hsl(var(--primary));
+}
+
+.canvas-enhanced-flow .react-flow__edge {
+  opacity: 0.7;
+  transition: var(--transition-smooth);
+}
+
+.canvas-enhanced-flow .react-flow__edge:hover,
+.canvas-enhanced-flow .react-flow__edge.selected {
+  opacity: 1;
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 8px hsl(var(--primary) / 0.3));
+}
+
+/* Canvas background with subtle pattern and radial gradient */
+.enhanced-canvas-container {
+  position: relative;
+  background: 
+    /* Radial gradient overlay for focus effect */
+    radial-gradient(
+      circle at center,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.95) 40%,
+      hsl(var(--muted) / 0.8) 80%,
+      hsl(var(--muted)) 100%
+    ),
+    /* Subtle dot pattern */
+    radial-gradient(
+      circle at 2px 2px,
+      hsl(var(--border) / 0.3) 1px,
+      transparent 1px
+    );
+  background-size: 100% 100%, 24px 24px;
+  background-attachment: fixed, local;
+}
+
+/* Enhanced React Flow background with pattern overlay */
+.enhanced-canvas-background {
+  background: 
+    /* Main canvas color */
+    hsl(var(--canvas-bg)),
+    /* Fine dot pattern for texture */
+    radial-gradient(
+      circle at 1px 1px,
+      hsl(var(--border) / 0.2) 1px,
+      transparent 1px
+    );
+  background-size: 100% 100%, 20px 20px;
+}
+
+/* Enhanced focus and selection effects for canvas nodes */
+.react-flow__node.canvas-enhanced {
+  transition: var(--transition-smooth);
+  box-shadow: var(--shadow-card);
+}
+
+.react-flow__node.canvas-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 0 1px hsl(var(--primary) / 0.2);
+}
+
+.react-flow__node.canvas-enhanced.selected,
+.react-flow__node.canvas-enhanced:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 0 2px hsl(var(--primary) / 0.4),
+    0 0 20px hsl(var(--primary) / 0.3);
+  border-color: hsl(var(--primary));
+}
+
+/* Interactive glow effects for grouped elements */
+.react-flow__node[data-type="group"].canvas-enhanced {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card) / 0.95),
+    hsl(var(--muted) / 0.8)
+  );
+  border: 2px solid hsl(var(--primary) / 0.2);
+  backdrop-filter: blur(8px);
+}
+
+.react-flow__node[data-type="group"].canvas-enhanced:hover {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card)),
+    hsl(var(--muted) / 0.9)
+  );
+  border-color: hsl(var(--primary) / 0.4);
+  box-shadow: 
+    0 8px 32px -8px hsl(var(--primary) / 0.2),
+    0 0 0 1px hsl(var(--primary) / 0.1);
+}
+
+/* Enhanced analysis card styling */
+.react-flow__node[data-type="analysisCard"].canvas-enhanced,
+.react-flow__node[data-type="groupAnalysisCard"].canvas-enhanced {
+  background: linear-gradient(
+    145deg,
+    hsl(var(--card)),
+    hsl(var(--background))
+  );
+  border: 1px solid hsl(var(--border));
+}
+
+.react-flow__node[data-type="analysisCard"].canvas-enhanced:hover,
+.react-flow__node[data-type="groupAnalysisCard"].canvas-enhanced:hover {
+  background: linear-gradient(
+    145deg,
+    hsl(var(--card)),
+    hsl(var(--accent) / 0.05)
+  );
+  border-color: hsl(var(--accent) / 0.3);
+}
+
+/* Image node enhancements with focus glow */
+.react-flow__node[data-type="image"].canvas-enhanced {
+  border: 2px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 2px);
+  overflow: hidden;
+}
+
+.react-flow__node[data-type="image"].canvas-enhanced:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 
+    var(--shadow-card),
+    0 0 15px hsl(var(--primary) / 0.2);
+}
+
+.react-flow__node[data-type="image"].canvas-enhanced.selected {
+  border-color: hsl(var(--primary));
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 25px hsl(var(--primary) / 0.4),
+    inset 0 0 0 2px hsl(var(--primary) / 0.1);
+}
+
+/* Concept node special styling */
+.react-flow__node[data-type="conceptImage"].canvas-enhanced,
+.react-flow__node[data-type="conceptDetails"].canvas-enhanced {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--accent) / 0.1),
+    hsl(var(--primary) / 0.05)
+  );
+  border: 1px solid hsl(var(--accent) / 0.3);
+}
+
+.react-flow__node[data-type="conceptImage"].canvas-enhanced:hover,
+.react-flow__node[data-type="conceptDetails"].canvas-enhanced:hover {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--accent) / 0.2),
+    hsl(var(--primary) / 0.1)
+  );
+  border-color: hsl(var(--accent) / 0.5);
+  box-shadow: 0 4px 20px hsl(var(--accent) / 0.2);
+}
+
+/* Loading state enhancements */
+.react-flow__node[data-type="imageLoading"].canvas-enhanced,
+.react-flow__node[data-type="analysisLoading"].canvas-enhanced {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted) / 0.5),
+    hsl(var(--muted) / 0.8),
+    hsl(var(--muted) / 0.5)
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s ease-in-out infinite;
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+@keyframes loading-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Edge enhancements */
+.react-flow__edge.canvas-enhanced {
+  opacity: 0.7;
+  transition: var(--transition-smooth);
+}
+
+.react-flow__edge.canvas-enhanced:hover,
+.react-flow__edge.canvas-enhanced.selected {
+  opacity: 1;
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 8px hsl(var(--primary) / 0.3));
+}
+
+/* Multi-selection indicator */
+.react-flow__node.canvas-enhanced.multi-selected {
+  box-shadow: 
+    var(--shadow-elegant),
+    0 0 0 3px hsl(var(--accent) / 0.4),
+    0 0 30px hsl(var(--accent) / 0.3);
+  border-color: hsl(var(--accent));
+}
+
+/* Canvas focus blur effect overlay */
+.canvas-focus-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(
+    circle at var(--focus-x, 50%) var(--focus-y, 50%),
+    transparent 0%,
+    transparent 30%,
+    hsl(var(--background) / 0.1) 60%,
+    hsl(var(--background) / 0.3) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+}
+
+.canvas-focus-overlay.active {
+  opacity: 1;
+}
+
+/* Artboard highlight effect */
+.canvas-artboard-highlight {
+  position: absolute;
+  border: 2px solid hsl(var(--primary) / 0.6);
+  border-radius: calc(var(--radius) + 4px);
+  background: hsl(var(--primary) / 0.05);
+  backdrop-filter: blur(2px);
+  box-shadow: 
+    0 0 0 4px hsl(var(--primary) / 0.1),
+    var(--shadow-elegant);
+  animation: artboard-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes artboard-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+/* Performance optimization for large canvases */
+.enhanced-canvas-container .react-flow__renderer {
+  will-change: transform;
+}
+
+.enhanced-canvas-container .react-flow__node {
+  will-change: transform, box-shadow;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .enhanced-canvas-container {
+    background-size: 100% 100%, 16px 16px;
+  }
+  
+  .react-flow__node.canvas-enhanced:hover {
+    transform: none;
+  }
+  
+  .react-flow__node.canvas-enhanced.selected {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .enhanced-canvas-container {
+    background: hsl(var(--background));
+  }
+  
+  .react-flow__node.canvas-enhanced {
+    border-width: 2px;
+  }
+  
+  .react-flow__node.canvas-enhanced:hover,
+  .react-flow__node.canvas-enhanced.selected {
+    border-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.canvas-enhanced,
+  .react-flow__edge.canvas-enhanced,
+  .canvas-focus-overlay,
+  .canvas-artboard-highlight {
+    transition: none;
+    animation: none;
+  }
+  
+  .react-flow__node[data-type="imageLoading"].canvas-enhanced,
+  .react-flow__node[data-type="analysisLoading"].canvas-enhanced {
+    animation: none;
+    background: hsl(var(--muted));
+  }
+}
