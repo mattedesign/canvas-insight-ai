@@ -6,6 +6,7 @@ import React from 'react';
 import { AnalysisPanel } from './AnalysisPanel';
 import { ScreenTypeDetectionDisplay } from './ScreenTypeDetectionDisplay';
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
+import { NaturalAnalysisDisplay } from './NaturalAnalysisDisplay';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { AnalysisContext } from '@/types/contextTypes';
 
@@ -30,6 +31,9 @@ export function AnalysisResultsDisplay({
     return null;
   }
 
+  // Check if this is a natural analysis
+  const isNaturalAnalysis = analysis.metadata.naturalAnalysisMetadata;
+  
   return (
     <div className="space-y-4">
       {/* Context Detection Results */}
@@ -43,13 +47,18 @@ export function AnalysisResultsDisplay({
         </div>
       )}
       
-      {/* Main Analysis Results */}
-      <AnalysisPanel 
-        analysis={analysis}
-        image={image}
-        isOpen={isOpen}
-        onClose={onClose}
-      />
+      {/* Natural Analysis Display (for new pipeline) */}
+      {isNaturalAnalysis ? (
+        <NaturalAnalysisDisplay analysis={analysis} />
+      ) : (
+        /* Traditional Analysis Panel (for backward compatibility) */
+        <AnalysisPanel 
+          analysis={analysis}
+          image={image}
+          isOpen={isOpen}
+          onClose={onClose}
+        />
+      )}
     </div>
   );
 }

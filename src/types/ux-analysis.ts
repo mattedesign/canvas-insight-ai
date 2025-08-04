@@ -31,6 +31,14 @@ export interface VisionMetadata {
     percentage: number;
   }>;
   faces: number;
+  // Natural analysis metadata
+  naturalAnalysisMetadata?: {
+    sourceModels: string[];
+    totalProcessingTime: number;
+    interpretationTime: number;
+    rawResponseCount: number;
+    domainSpecificFindings: Record<string, any>;
+  };
 }
 
 export interface AnalysisSummary {
