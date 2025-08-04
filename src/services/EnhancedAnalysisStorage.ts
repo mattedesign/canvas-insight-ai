@@ -37,10 +37,9 @@ class EnhancedAnalysisStorage {
   }
 
   private generateDeterministicId(imageId: string, analysisType: string, version: number): string {
-    const timestamp = Date.now();
-    const hashInput = `${imageId}-${analysisType}-v${version}-${timestamp}`;
-    // Generate a deterministic ID without external crypto dependencies
-    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    // Use crypto.randomUUID() to generate a proper UUID
+    // This ensures database compatibility with UUID fields
+    return crypto.randomUUID();
   }
 
   async checkExistingAnalysis(
