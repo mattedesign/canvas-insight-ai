@@ -32,7 +32,8 @@ import { ImageLoadingNode } from './ImageLoadingNode';
 import { AnalysisLoadingNode } from './AnalysisLoadingNode';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useMultiSelection } from '@/hooks/useMultiSelection';
-import { FloatingToolbar, ToolMode } from '../FloatingToolbar';
+import { UnifiedToolMode } from '../UnifiedFloatingToolbar';
+import { CanvasFloatingToolbar } from './CanvasFloatingToolbar';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { CanvasUploadZone } from '../CanvasUploadZone';
@@ -116,7 +117,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onImageUpload,
   isGeneratingConcept
 }) => {
-  const [currentTool, setCurrentTool] = useState<ToolMode>('cursor');
+  const [currentTool, setCurrentTool] = useState<UnifiedToolMode>('cursor');
   const [showAnalysis, setShowAnalysis] = useState(true);
   
   const [groups, setGroups] = useState<ImageGroup[]>([]);
@@ -1637,7 +1638,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     [setEdges],
   );
 
-  const handleToolChange = useCallback((tool: ToolMode) => {
+  const handleToolChange = useCallback((tool: UnifiedToolMode) => {
     setCurrentTool(tool);
     const toolMessages = {
       cursor: isMobile ? 'Cursor tool - Select artboards (dragging disabled on mobile)' : 'Cursor tool - Select and move artboards',
@@ -1730,11 +1731,11 @@ interface CanvasContentProps {
   onEdgesChange: any;
   onConnect: any;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
-  currentTool: ToolMode;
+  currentTool: UnifiedToolMode;
   showAnnotations: boolean;
   showAnalysis: boolean;
   isMobile: boolean;
-  handleToolChange: (tool: ToolMode) => void;
+  handleToolChange: (tool: UnifiedToolMode) => void;
   handleToggleAnnotations: () => void;
   handleToggleAnalysis: () => void;
   handleAddComment: () => void;
@@ -1855,8 +1856,8 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         />
         {/* Custom controls are now in FloatingToolbar */}
         
-        {/* Floating Toolbar - Must be inside ReactFlow for useReactFlow hook */}
-        <FloatingToolbar
+        {/* Unified Floating Toolbar - Must be inside ReactFlow for useReactFlow hook */}
+        <CanvasFloatingToolbar
           onToolChange={handleToolChange}
           onToggleAnnotations={handleToggleAnnotations}
           onToggleAnalysis={handleToggleAnalysis}
