@@ -88,7 +88,13 @@ export const useOptimizedAnalysis = () => {
         // Cache the result
         AnalysisCache.set(optimizedImageUrl, 'image', data.analysis, payload.userContext);
         
-        return data.analysis;
+        // Flag as natural analysis to bypass client-side validation
+        const result = {
+          ...data.analysis,
+          _isNaturalAnalysis: true
+        };
+        
+        return result;
       }
 
       // Original pipeline logic

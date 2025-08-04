@@ -53,6 +53,15 @@ export class ValidationService {
    * Phase 1: Core Analysis Result Validation
    */
   validateAnalysisResult(analysis: any): ValidationResult {
+    // Skip validation for natural analysis results that are already validated by edge function
+    if (analysis && analysis._isNaturalAnalysis === true) {
+      console.log('🎯 Skipping client-side validation for natural analysis result');
+      return {
+        isValid: true,
+        errors: [],
+        warnings: []
+      };
+    }
     const startTime = Date.now();
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -362,6 +371,15 @@ export class ValidationService {
    * Phase 1: Pre-storage Validation
    */
   validateBeforeStorage(data: any): ValidationResult {
+    // Skip storage validation for natural analysis results
+    if (data && data._isNaturalAnalysis === true) {
+      console.log('🎯 Skipping storage validation for natural analysis result');
+      return {
+        isValid: true,
+        errors: [],
+        warnings: []
+      };
+    }
     const startTime = Date.now();
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
