@@ -150,33 +150,25 @@ export class ProgressiveAnalysisLoader {
 
       onProgress?.('Sending to AI...', 40);
       
-      const response = await fetch('/functions/v1/ux-analysis', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await this.getSupabaseToken()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestPayload),
-        signal: abortController.signal
+      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        body: requestPayload
       });
-
-      onProgress?.('Processing AI response...', 70);
-
-      if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
+      
+      if (error) {
+        throw new Error(`Analysis failed: ${error.message}`);
       }
 
-      const result = await response.json();
+      onProgress?.('Processing AI response...', 70);
       
       onProgress?.('Caching results...', 90);
       
       // Cache the result
-      if (result.success) {
-        AnalysisCache.set(imageUrl, analysisType, result.data, payload.userContext || payload.prompt);
+      if (data) {
+        AnalysisCache.set(imageUrl, analysisType, data, payload.userContext || payload.prompt);
       }
 
       onProgress?.('Complete!', 100);
-      return result.data;
+      return data;
 
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -206,13 +198,6 @@ export class ProgressiveAnalysisLoader {
     }
   }
 
-  /**
-   * Get Supabase authentication token
-   */
-  private static async getSupabaseToken(): Promise<string> {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token || '';
-  }
 }
 
 export class PerformanceOptimizer {

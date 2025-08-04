@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { ProgressiveAnalysisLoader, AnalysisCache, PerformanceOptimizer } from '@/services/AnalysisOptimizationService';
 import { naturalAnalysisPipeline } from '@/services/NaturalAnalysisPipeline';
 import { AnalysisContext } from '@/types/contextTypes';
@@ -51,17 +52,28 @@ export const useOptimizedAnalysis = () => {
 
       // Check if using natural pipeline
       if (options.useNaturalPipeline) {
-        console.log('🎯 Using Natural Analysis Pipeline');
+        console.log('🎯 Using Natural Analysis Pipeline via ux-analysis function');
         
-        const result = await naturalAnalysisPipeline.execute(
-          optimizedImageUrl,
-          payload.userContext,
-          options.analysisContext,
-          (progress, stage) => setProgress({ stage, progress, isLoading: true })
-        );
-
-        if (!result.success) {
-          throw new Error(result.error || 'Natural analysis failed');
+        setProgress({ stage: 'Starting natural analysis...', progress: 10, isLoading: true });
+        
+        const { data, error } = await supabase.functions.invoke('ux-analysis', {
+          body: {
+            type: 'NATURAL_ANALYSIS',
+            payload: {
+              imageUrl: optimizedImageUrl,
+              userContext: payload.userContext,
+              analysisContext: options.analysisContext,
+              naturalMode: true
+            }
+          }
+        });
+        
+        if (error) {
+          throw new Error(`Natural analysis failed: ${error.message}`);
+        }
+        
+        if (!data || !data.analysis) {
+          throw new Error('Invalid response from natural analysis');
         }
 
         const duration = Date.now() - startTimeRef.current;
@@ -73,7 +85,10 @@ export const useOptimizedAnalysis = () => {
           isLoading: false
         });
 
-        return result.analysis;
+        // Cache the result
+        AnalysisCache.set(optimizedImageUrl, 'image', data.analysis, payload.userContext);
+        
+        return data.analysis;
       }
 
       // Original pipeline logic
