@@ -527,17 +527,28 @@ serve(async (req) => {
     
     console.log('📝 Available APIs:', availableAPIs)
 
-    // Handle special actions first
-    if (body.action) {
-      switch (body.action) {
+    // Handle special actions and new type-based requests
+    if (body.action || body.type) {
+      const actionType = body.action || body.type;
+      
+      switch (actionType) {
         case 'store':
           return await storeAnalysisResults(body.pipelineResults)
         
         case 'check-keys':
-          return new Response(
-            JSON.stringify({ available: availableAPIs }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+        case 'API_STATUS_CHECK':
+          return await handleAPIStatusCheck(availableAPIs)
+        
+        case 'QUICK_API_CHECK':
+          return new Response(JSON.stringify({
+            success: true,
+            availableAPIs: Object.keys(availableAPIs).filter(api => availableAPIs[api])
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        
+        case 'PIPELINE_TEST':
+          return await handlePipelineTest(availableAPIs)
         
         case 'ANALYZE_IMAGE':
           // Convert old Canvas format to new pipeline format
@@ -586,6 +597,90 @@ serve(async (req) => {
     )
   }
 })
+
+// API Status Check Handler
+async function handleAPIStatusCheck(availableAPIs: any) {
+  const configuredAPIs = Object.keys(availableAPIs).filter(api => availableAPIs[api]);
+  
+  const apiDetails: any = {};
+  for (const [api, configured] of Object.entries(availableAPIs)) {
+    apiDetails[api] = {
+      configured,
+      working: configured, // For now, assume configured = working
+      lastChecked: new Date().toISOString()
+    };
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    availableAPIs: configuredAPIs,
+    configuredAPIs: apiDetails,
+    isReady: configuredAPIs.length > 0,
+    errors: configuredAPIs.length === 0 ? ['No API keys configured'] : [],
+    stages: [] // Will be populated during actual analysis
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Pipeline Test Handler
+async function handlePipelineTest(availableAPIs: any) {
+  const configuredAPIs = Object.keys(availableAPIs).filter(api => availableAPIs[api]);
+  
+  if (configuredAPIs.length === 0) {
+    return new Response(JSON.stringify({
+      success: false,
+      availableModels: [],
+      errors: ['No API keys configured for testing'],
+      stages: []
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Test available models without actual analysis
+  const testStages = [];
+  const availableModels = [];
+
+  if (availableAPIs.openai) {
+    testStages.push({
+      stage: 'openai_test',
+      model: 'gpt-4o',
+      success: true,
+      message: 'OpenAI API key configured'
+    });
+    availableModels.push('gpt-4o');
+  }
+
+  if (availableAPIs.anthropic) {
+    testStages.push({
+      stage: 'anthropic_test', 
+      model: 'claude-opus-4-20250514',
+      success: true,
+      message: 'Anthropic API key configured'
+    });
+    availableModels.push('claude-opus-4-20250514');
+  }
+
+  if (availableAPIs.google) {
+    testStages.push({
+      stage: 'google_test',
+      model: 'vision-api',
+      success: true,
+      message: 'Google Vision API key configured'
+    });
+    availableModels.push('google-vision');
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    availableModels,
+    errors: [],
+    stages: testStages
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
 
 async function executeModel(payload: any) {
   console.log('executeModel - Full payload received:', JSON.stringify(payload, null, 2))

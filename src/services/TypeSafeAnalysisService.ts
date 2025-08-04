@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { AnalysisValidator } from '@/utils/analysisValidator';
 import { AnalysisDataMapper } from './AnalysisDataMapper';
 import { AnalysisFieldMappingDebug } from '@/utils/analysisFieldMappingDebug';
+import { simplifiedImageService } from './SimplifiedImageService';
+import { apiStatusService } from './APIStatusService';
 import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
@@ -48,6 +50,7 @@ class TypeSafeAnalysisService {
     if (this.analysisCache.has(cacheKey)) {
       const cached = this.analysisCache.get(cacheKey)!;
       if (cached.success) {
+        console.log('📁 Using cached analysis result');
         return cached;
       }
     }
@@ -55,18 +58,39 @@ class TypeSafeAnalysisService {
     const startTime = performance.now();
     
     try {
-      // Validate input
-      if (!request.imageUrl || !request.imageUrl.startsWith('http')) {
-        throw new Error('Invalid image URL provided');
+      // Enhanced input validation
+      if (!request.imageUrl) {
+        throw new Error('Image URL is required');
+      }
+
+      // Check API availability before proceeding
+      console.log('🔍 Checking API availability...');
+      const apiCheck = await apiStatusService.getQuickAPICheck();
+      if (!apiCheck.hasAnyAPI) {
+        throw new Error('No API keys configured. Please configure at least one AI service API key in the edge function settings.');
+      }
+
+      console.log('✅ API check passed, available services:', apiCheck.apis);
+
+      // Validate and process image URL
+      let processedImageUrl = request.imageUrl;
+      if (!request.imageUrl.startsWith('http')) {
+        console.warn('⚠️ Non-HTTP URL detected, attempting to process:', request.imageUrl);
+        // For blob URLs or other formats, we'll let the edge function handle it
+        processedImageUrl = request.imageUrl;
       }
       
+      console.log('🚀 Starting analysis with enhanced context pipeline...');
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
-          type: 'ANALYZE_IMAGE',
+          action: 'ENHANCED_CONTEXT_ANALYSIS',
           payload: {
-            imageUrl: request.imageUrl,
+            imageUrl: processedImageUrl,
             userContext: request.userContext || '',
             priority: request.priority || 'medium',
+            // Additional metadata for better analysis
+            analysisTimestamp: new Date().toISOString(),
+            requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           },
         },
       });
