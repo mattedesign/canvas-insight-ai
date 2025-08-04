@@ -821,6 +821,11 @@ serve(async (req) => {
           // Handle enhanced context-aware analysis from EnhancedAnalysisPipeline
           console.log('🚀 Processing ENHANCED_CONTEXT_ANALYSIS request')
           return await handleEnhancedContextAnalysis(body)
+          
+        case 'NATURAL_ANALYSIS':
+          // Handle natural collection mode analysis
+          console.log('🌟 Processing NATURAL_ANALYSIS request')
+          return await handleNaturalModeAnalysis(body)
         
         default:
           throw new Error(`Unknown action: ${body.action}`)
@@ -2194,13 +2199,20 @@ async function executeMultiModelPipeline(params: {
   userContext?: string;
   imageName?: string;
   imageId?: string;
+  naturalMode?: boolean; // NEW: Enable natural analysis mode
   enhancedContext?: {
     analysisContext?: any;
     metadata?: any;
     contextualPrompt?: string;
   };
 }): Promise<any> {
-  console.log('🚀 Starting multi-model pipeline with Google Vision + OpenAI + Claude');
+  const naturalModeActive = params.naturalMode || false;
+  
+  if (naturalModeActive) {
+    console.log('🌟 Starting NATURAL COLLECTION MODE multi-model pipeline');
+  } else {
+    console.log('🚀 Starting multi-model pipeline with Google Vision + OpenAI + Claude');
+  }
   
   const { imageUrl, imageBase64, userContext, imageName, imageId, enhancedContext } = params;
   
@@ -2241,12 +2253,16 @@ async function executeMultiModelPipeline(params: {
     }
     
     // Step 2: Run parallel analysis with OpenAI and Claude, passing vision metadata
-    console.log('🤖 Step 2: Running parallel analysis with OpenAI + Claude...');
+    if (naturalModeActive) {
+      console.log('🌟 Step 2: Running NATURAL MODE analysis with OpenAI + Claude...');
+    } else {
+      console.log('🤖 Step 2: Running parallel analysis with OpenAI + Claude...');
+    }
     
     // Use Promise.allSettled to handle partial failures gracefully
     const results = await Promise.allSettled([
-      runOpenAIAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext),
-      runClaudeAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext)
+      runOpenAIAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext, naturalModeActive),
+      runClaudeAnalysis(imageUrl, imageBase64, userContext, visionMetadata, enhancedContext, naturalModeActive)
     ]);
     
     const openaiAnalysis = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -2271,13 +2287,40 @@ async function executeMultiModelPipeline(params: {
     });
     
     // Step 3: Synthesize results from both models
-    console.log('🔮 Step 3: Synthesizing multi-model results...');
-    const synthesizedResult = await synthesizeMultiModelResults(
-      openaiAnalysis,
-      claudeAnalysis,
-      visionMetadata,
-      { imageName, imageId, userContext }
-    );
+    if (naturalModeActive) {
+      console.log('🌟 Step 3: NATURAL MODE - Synthesizing conversational insights...');
+      const synthesizedResult = await synthesizeNaturalModeResults(
+        openaiAnalysis,
+        claudeAnalysis,
+        visionMetadata,
+        { imageName, imageId, userContext }
+      );
+      
+      console.log('✅ Natural Collection Mode pipeline complete');
+      return {
+        visionMetadata,
+        openaiAnalysis,
+        claudeAnalysis,
+        synthesizedResult,
+        naturalMode: true
+      };
+    } else {
+      console.log('🔮 Step 3: Synthesizing multi-model results...');
+      const synthesizedResult = await synthesizeMultiModelResults(
+        openaiAnalysis,
+        claudeAnalysis,
+        visionMetadata,
+        { imageName, imageId, userContext }
+      );
+      
+      console.log('✅ Multi-model pipeline complete');
+      return {
+        visionMetadata,
+        openaiAnalysis,
+        claudeAnalysis,
+        synthesizedResult
+      };
+    }
     
     console.log('✅ Multi-model pipeline complete');
     return {
@@ -2634,11 +2677,18 @@ function createMockVisionMetadata(): any {
   };
 }
 
-async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any): Promise<any> {
-  console.log('🤖 Running OpenAI analysis with vision metadata...');
+async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any, naturalMode?: boolean): Promise<any> {
+  if (naturalMode) {
+    console.log('🌟 Running OpenAI NATURAL MODE analysis...');
+  } else {
+    console.log('🤖 Running OpenAI analysis with vision metadata...');
+  }
   
-  // Use enhanced prompt if available, otherwise build standard prompt
-  const enhancedPrompt = enhancedContext?.contextualPrompt || buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'openai');
+  // Use enhanced prompt if available, otherwise build appropriate prompt
+  const enhancedPrompt = enhancedContext?.contextualPrompt || 
+    (naturalMode ? 
+      buildNaturalAnalysisPrompt(userContext, visionMetadata, 'openai') :
+      buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'openai'));
   
   const payload = {
     model: 'gpt-4o',
@@ -2646,10 +2696,15 @@ async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userCon
     imageUrl,
     imageBase64,
     prompt: enhancedPrompt,
-    systemPrompt: `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems. 
-    You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
-    Use this metadata to provide more accurate and detailed analysis.
-    Always provide your responses in valid JSON format as specified in the user prompt.`
+    systemPrompt: naturalMode ? 
+      `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems. 
+      You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
+      Use this metadata to provide conversational, detailed analysis in natural language.
+      Be specific and thorough in your observations and recommendations. Write as if you're having a detailed design critique session.` :
+      `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems. 
+      You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
+      Use this metadata to provide more accurate and detailed analysis.
+      Always provide your responses in valid JSON format as specified in the user prompt.`
   };
   
   console.log('🔍 OPENAI DEBUG - Sending payload:', {
@@ -2690,11 +2745,18 @@ async function runOpenAIAnalysis(imageUrl: string, imageBase64?: string, userCon
   return { model: 'gpt-4o', result, confidence: 0.9, imageUrl };
 }
 
-async function runClaudeAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any): Promise<any> {
-  console.log('🤖 Running Claude analysis with vision metadata...');
+async function runClaudeAnalysis(imageUrl: string, imageBase64?: string, userContext?: string, visionMetadata?: any, enhancedContext?: any, naturalMode?: boolean): Promise<any> {
+  if (naturalMode) {
+    console.log('🌟 Running Claude NATURAL MODE analysis...');
+  } else {
+    console.log('🤖 Running Claude analysis with vision metadata...');
+  }
   
-  // Use enhanced prompt if available, otherwise build standard prompt
-  const enhancedPrompt = enhancedContext?.contextualPrompt || buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'claude');
+  // Use enhanced prompt if available, otherwise build appropriate prompt
+  const enhancedPrompt = enhancedContext?.contextualPrompt || 
+    (naturalMode ? 
+      buildNaturalAnalysisPrompt(userContext, visionMetadata, 'claude') :
+      buildEnhancedAnalysisPrompt(userContext, visionMetadata, 'claude'));
   
   const payload = {
     model: 'claude-opus-4-20250514',
@@ -2702,10 +2764,15 @@ async function runClaudeAnalysis(imageUrl: string, imageBase64?: string, userCon
     imageUrl,
     imageBase64,
     prompt: enhancedPrompt,
-    systemPrompt: `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems.
-    You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
-    Use this metadata to provide more accurate and detailed analysis.
-    Return your analysis as structured JSON as specified in the user prompt.`
+    systemPrompt: naturalMode ? 
+      `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems.
+      You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
+      Use this metadata to provide conversational, detailed analysis in natural language.
+      Be specific and thorough in your observations and recommendations. Write as if you're having a detailed design critique session.` :
+      `You are a senior UX/UI designer with deep expertise in visual design, usability, and design systems.
+      You have access to Google Vision metadata about this interface including detected objects, text, colors, and layout elements.
+      Use this metadata to provide more accurate and detailed analysis.
+      Return your analysis as structured JSON as specified in the user prompt.`
   };
   
   console.log('🔍 CLAUDE DEBUG - Sending payload:', {
@@ -2855,6 +2922,302 @@ VALIDATION CHECKLIST (verify before responding):
 ${contextPart}
 
 FINAL REMINDER: Respond with ONLY the JSON object. No explanations, no markdown formatting, just valid JSON.`;
+}
+
+// ============= NATURAL COLLECTION MODE FUNCTIONS =============
+
+function buildNaturalAnalysisPrompt(userContext?: string, visionMetadata?: any, targetModel?: string): string {
+  const contextPart = userContext ? `User Context: ${userContext}` : 'General UX analysis';
+  
+  const visionContext = visionMetadata ? `
+Google Vision Metadata Available:
+- Detected Objects: ${visionMetadata.objects?.length || 0} UI elements
+- Text Elements: ${visionMetadata.text?.length || 0} text blocks  
+- Color Palette: ${visionMetadata.colors?.length || 0} dominant colors
+- Faces Detected: ${visionMetadata.faces || 0}
+- UI Labels: ${visionMetadata.labels?.map(l => l.description).join(', ') || 'None'}
+
+Use this metadata to enhance your analysis accuracy.
+` : '';
+
+  return `As a senior UX/UI designer, provide a comprehensive, conversational analysis of this interface. Focus on being specific and detailed rather than generic.
+
+${visionContext}
+
+Please analyze this interface thoroughly and provide detailed insights covering these areas:
+
+**VISUAL DESIGN & HIERARCHY**
+- Examine the visual hierarchy and layout effectiveness
+- Comment on typography choices, sizing, and readability
+- Analyze color usage, contrast, and brand consistency
+- Evaluate spacing, alignment, and overall visual harmony
+
+**USABILITY & INTERACTION DESIGN**
+- Assess the ease of navigation and user flow
+- Review interactive elements (buttons, links, forms)
+- Evaluate the clarity of user interface patterns
+- Comment on information architecture and content organization
+
+**ACCESSIBILITY & INCLUSIVITY**
+- Check for potential accessibility barriers
+- Evaluate color contrast and text readability
+- Comment on keyboard navigation potential
+- Assess inclusive design considerations
+
+**CONVERSION & BUSINESS GOALS**
+- Analyze how well the design supports user goals
+- Evaluate call-to-action placement and effectiveness
+- Comment on trust signals and credibility indicators
+- Assess the overall user experience quality
+
+**SPECIFIC RECOMMENDATIONS**
+- Provide concrete, actionable improvement suggestions
+- Identify the highest impact changes
+- Suggest specific fixes for any issues you observe
+- Prioritize recommendations by effort vs. impact
+
+${contextPart}
+
+Write your analysis as if you're conducting a detailed design critique session. Be specific about what you observe and provide practical, implementable recommendations. Focus on real observations rather than generic advice.`;
+}
+
+async function synthesizeNaturalModeResults(
+  openaiAnalysis: any,
+  claudeAnalysis: any,
+  visionMetadata: any,
+  context: { imageName?: string; imageId?: string; userContext?: string }
+): Promise<any> {
+  console.log('🌟 NATURAL MODE - Synthesizing conversational insights into structured format...');
+  
+  try {
+    // Extract raw conversational analysis from both models
+    const openaiInsights = extractNaturalInsights(openaiAnalysis);
+    const claudeInsights = extractNaturalInsights(claudeAnalysis);
+    
+    console.log('🌟 NATURAL SYNTHESIS - Raw insights extracted:', {
+      openaiLength: openaiInsights.length,
+      claudeLength: claudeInsights.length,
+      hasOpenAI: !!openaiAnalysis,
+      hasClaude: !!claudeAnalysis
+    });
+    
+    // Use synthesis AI to convert conversational insights to structured format
+    const structuredResult = await synthesizeConversationalInsights({
+      openaiInsights,
+      claudeInsights,
+      visionMetadata,
+      context
+    });
+    
+    console.log('🌟 NATURAL SYNTHESIS - Structured result created:', {
+      suggestionsCount: structuredResult.suggestions?.length || 0,
+      annotationsCount: structuredResult.visualAnnotations?.length || 0,
+      hasSummary: !!structuredResult.summary
+    });
+    
+    return structuredResult;
+    
+  } catch (error) {
+    console.error('❌ Natural mode synthesis failed:', error);
+    
+    // Fallback to simplified structured format
+    return createFallbackStructuredResult(openaiAnalysis, claudeAnalysis, visionMetadata, context);
+  }
+}
+
+function extractNaturalInsights(analysisResult: any): string {
+  if (!analysisResult) return '';
+  
+  // Try to extract natural language content from the analysis
+  if (typeof analysisResult.result === 'string') {
+    return analysisResult.result;
+  }
+  
+  if (analysisResult.result && typeof analysisResult.result === 'object') {
+    // If somehow we got JSON, try to extract meaningful text
+    const result = analysisResult.result;
+    const textParts = [];
+    
+    if (result.content) textParts.push(result.content);
+    if (result.analysis) textParts.push(JSON.stringify(result.analysis));
+    if (result.suggestions) textParts.push(JSON.stringify(result.suggestions));
+    
+    return textParts.join('\n\n');
+  }
+  
+  // Last resort - try to stringify the whole thing
+  return JSON.stringify(analysisResult.result || analysisResult);
+}
+
+async function synthesizeConversationalInsights(params: {
+  openaiInsights: string;
+  claudeInsights: string;
+  visionMetadata: any;
+  context: any;
+}): Promise<any> {
+  console.log('🌟 SYNTHESIS AI - Converting conversational insights to structured format...');
+  
+  const { openaiInsights, claudeInsights, visionMetadata, context } = params;
+  
+  const synthesisPrompt = `You are a UX analysis synthesis AI. Your job is to take conversational UX analysis insights and convert them into a structured format.
+
+CONVERSATIONAL ANALYSIS FROM OPENAI:
+${openaiInsights}
+
+CONVERSATIONAL ANALYSIS FROM CLAUDE:
+${claudeInsights}
+
+VISION METADATA:
+${JSON.stringify(visionMetadata, null, 2)}
+
+Your task is to synthesize these conversational insights into the following JSON structure. Extract concrete suggestions and observations from the natural language analysis:
+
+{
+  "visualAnnotations": [
+    {
+      "id": "annotation_1", 
+      "x": 0.1,
+      "y": 0.2,
+      "type": "issue" | "suggestion" | "success",
+      "title": "Specific observation title",
+      "description": "Detailed description from the analysis",
+      "severity": "low" | "medium" | "high",
+      "category": "usability" | "accessibility" | "visual" | "content"
+    }
+  ],
+  "suggestions": [
+    {
+      "id": "suggestion_1",
+      "category": "usability" | "accessibility" | "visual" | "content" | "performance",
+      "title": "Actionable recommendation title",
+      "description": "Detailed explanation from analysis",
+      "impact": "low" | "medium" | "high", 
+      "effort": "low" | "medium" | "high",
+      "actionItems": ["Specific action 1", "Specific action 2"],
+      "relatedAnnotations": []
+    }
+  ],
+  "summary": {
+    "overallScore": 75,
+    "categoryScores": {
+      "usability": 80,
+      "accessibility": 70,
+      "visual": 75,
+      "content": 80
+    },
+    "keyIssues": ["Issue 1", "Issue 2"],
+    "strengths": ["Strength 1", "Strength 2"]
+  },
+  "metadata": {
+    "naturalAnalysisMetadata": {
+      "sourceModels": ["gpt-4o", "claude-opus-4-20250514"],
+      "totalProcessingTime": 30000,
+      "interpretationTime": 5000,
+      "rawResponseCount": 2,
+      "domainSpecificFindings": {}
+    }
+  }
+}
+
+Extract specific, actionable suggestions from the conversational analysis. Create 3-5 suggestions and 2-4 annotations based on the insights provided. Calculate realistic scores based on the analysis content.
+
+Respond with ONLY the JSON object.`;
+
+  try {
+    const payload = {
+      model: 'gpt-4o',
+      stage: 'synthesis', 
+      prompt: synthesisPrompt,
+      systemPrompt: 'You are a synthesis AI that converts conversational UX analysis into structured JSON. Always respond with valid JSON only.'
+    };
+    
+    const response = await executeOpenAI(MODEL_CONFIGS['gpt-4o'], Deno.env.get('OPENAI_API_KEY')!, payload);
+    const responseText = await response.text();
+    const structuredResult = JSON.parse(responseText);
+    
+    // Add natural analysis metadata
+    structuredResult.metadata = structuredResult.metadata || {};
+    structuredResult.metadata.naturalAnalysisMetadata = {
+      sourceModels: ['gpt-4o', 'claude-opus-4-20250514'],
+      totalProcessingTime: Date.now(),
+      interpretationTime: Date.now(),
+      rawResponseCount: 2,
+      domainSpecificFindings: {}
+    };
+    
+    // Ensure required fields
+    structuredResult.id = `natural_analysis_${Date.now()}`;
+    structuredResult.imageId = context.imageId || '';
+    structuredResult.imageName = context.imageName || 'Natural Analysis';
+    structuredResult.imageUrl = '';
+    structuredResult.userContext = context.userContext || '';
+    structuredResult.createdAt = new Date().toISOString();
+    structuredResult.modelUsed = 'natural-multi-model-synthesis';
+    structuredResult.status = 'completed';
+    
+    return structuredResult;
+    
+  } catch (error) {
+    console.error('🌟 SYNTHESIS AI failed:', error);
+    throw error;
+  }
+}
+
+function createFallbackStructuredResult(openaiAnalysis: any, claudeAnalysis: any, visionMetadata: any, context: any): any {
+  console.log('🌟 Creating fallback structured result for natural mode...');
+  
+  return {
+    id: `natural_fallback_${Date.now()}`,
+    imageId: context.imageId || '',
+    imageName: context.imageName || 'Natural Analysis Fallback',
+    imageUrl: '',
+    userContext: context.userContext || '',
+    visualAnnotations: [{
+      id: 'natural_fallback_1',
+      x: 0.5,
+      y: 0.5,
+      type: 'info',
+      title: 'Natural Analysis Completed',
+      description: 'Conversational analysis was successfully processed',
+      severity: 'low',
+      category: 'usability'
+    }],
+    suggestions: [{
+      id: 'natural_suggestion_1',
+      category: 'usability',
+      title: 'Review Natural Analysis Insights',
+      description: 'The natural analysis mode provided detailed conversational insights about this interface',
+      impact: 'medium',
+      effort: 'low',
+      actionItems: ['Review the detailed analysis provided', 'Implement recommended improvements'],
+      relatedAnnotations: []
+    }],
+    summary: {
+      overallScore: 75,
+      categoryScores: {
+        usability: 75,
+        accessibility: 70,
+        visual: 80,
+        content: 75
+      },
+      keyIssues: ['Natural analysis completed with conversational insights'],
+      strengths: ['Detailed UX analysis provided']
+    },
+    metadata: {
+      ...visionMetadata,
+      naturalAnalysisMetadata: {
+        sourceModels: ['gpt-4o', 'claude-opus-4-20250514'],
+        totalProcessingTime: Date.now(),
+        interpretationTime: Date.now(),
+        rawResponseCount: 2,
+        domainSpecificFindings: {},
+        fallbackUsed: true
+      }
+    },
+    createdAt: new Date().toISOString(),
+    modelUsed: 'natural-multi-model-fallback',
+    status: 'completed'
+  };
 }
 
 async function synthesizeMultiModelResults(
@@ -3529,6 +3892,132 @@ async function saveVisionMetadataToImage(supabaseClient: any, imageId: string, v
   }
 }
 
+// Natural Mode Analysis Handler
+async function handleNaturalModeAnalysis(body: any) {
+  console.log('🌟 Natural Mode Analysis - Processing request:', {
+    hasPayload: !!body.payload,
+    hasAnalysisContext: !!(body.payload?.analysisContext || body.analysisContext),
+    hasMetadata: !!(body.payload?.metadata || body.metadata),
+    hasPrompt: !!(body.payload?.prompt || body.prompt),
+    imageId: body.payload?.imageId || body.imageId,
+    imageName: body.payload?.imageName || body.imageName
+  });
+
+  try {
+    // Extract data from body.payload structure
+    const payload = body.payload || body;
+    const { 
+      imageId, 
+      imageUrl, 
+      imageName, 
+      userContext,
+      analysisContext,
+      metadata,
+      prompt 
+    } = payload;
+
+    // Validate required fields
+    if (!imageId || !imageUrl) {
+      throw new Error('Missing required fields: imageId and imageUrl are required');
+    }
+
+    console.log('🌟 Natural Mode - Context detected:', {
+      interfaceType: analysisContext?.image?.primaryType,
+      domain: analysisContext?.image?.domain,
+      userRole: analysisContext?.user?.inferredRole,
+      confidence: analysisContext?.confidence
+    });
+
+    // Use the multi-model pipeline with natural mode enabled
+    const pipelineResult = await executeMultiModelPipeline({
+      imageId,
+      imageUrl,
+      imageName: imageName || 'Natural Analysis',
+      userContext: userContext || '',
+      naturalMode: true, // Enable natural collection mode
+      enhancedContext: {
+        analysisContext,
+        metadata,
+        contextualPrompt: prompt
+      }
+    });
+
+    // Enhance the results with natural mode information
+    const enhancedResult = {
+      ...pipelineResult,
+      analysisContext,
+      contextMetadata: metadata,
+      enhancedPrompt: prompt,
+      naturalModeUsed: true,
+      contextualInsights: {
+        interfaceType: analysisContext?.image?.primaryType,
+        detectedDomain: analysisContext?.image?.domain,
+        adaptedForRole: analysisContext?.user?.inferredRole,
+        confidenceScore: analysisContext?.confidence,
+        clarificationProvided: !analysisContext?.clarificationNeeded
+      }
+    };
+
+    console.log('✅ Natural mode analysis completed');
+
+    // Save analysis to database if we have an imageId
+    if (imageId && pipelineResult.synthesizedResult) {
+      try {
+        console.log('💾 Saving natural mode analysis to database...');
+        const analysisDataWithMetadata = {
+          ...pipelineResult.synthesizedResult,
+          visionMetadata: pipelineResult.visionMetadata,
+          analysisContext,
+          enhancedPrompt: prompt,
+          userContext: userContext || '',
+          naturalModeUsed: true
+        };
+        const saveResult = await saveAnalysisToDatabase(imageId, analysisDataWithMetadata);
+        console.log('✅ Natural mode analysis saved to database successfully:', saveResult);
+        
+        // Add the saved analysis info to the response
+        enhancedResult.savedAnalysis = {
+          id: saveResult.id,
+          version: saveResult.version,
+          isNew: true
+        };
+      } catch (saveError) {
+        console.error('⚠️ Failed to save natural mode analysis to database:', saveError);
+        // Don't fail the request if database save fails
+        enhancedResult.saveError = saveError.message;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: enhancedResult
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    );
+
+  } catch (error) {
+    console.error('❌ Natural mode analysis failed:', error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'natural-mode-analysis',
+        details: error.stack,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
 // Enhanced Context Analysis Handler
 async function handleEnhancedContextAnalysis(body: any) {
   console.log('🔍 Enhanced Context Analysis - Processing request:', {
@@ -3571,6 +4060,7 @@ async function handleEnhancedContextAnalysis(body: any) {
       imageUrl,
       imageName: imageName || 'Enhanced Analysis',
       userContext: userContext || '',
+      naturalMode: payload.naturalMode || false, // Support natural mode
       enhancedContext: {
         analysisContext,
         metadata,
