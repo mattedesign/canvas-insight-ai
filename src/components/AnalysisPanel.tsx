@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AnalysisVersionManager } from './AnalysisVersionManager';
+import { analysisService } from '@/services/TypeSafeAnalysisService';
+import { toast } from '@/hooks/use-toast';
 import { 
   AlertCircle, 
   CheckCircle, 
@@ -15,7 +18,9 @@ import {
   Palette, 
   Type, 
   Users,
-  TrendingUp
+  TrendingUp,
+  RotateCcw,
+  History
 } from 'lucide-react';
 
 interface AnalysisPanelProps {
@@ -23,6 +28,7 @@ interface AnalysisPanelProps {
   image: UploadedImage | null;
   isOpen: boolean;
   onClose: () => void;
+  onAnalysisUpdated?: (analysis: UXAnalysis) => void;
 }
 
 // ✅ PHASE 4.2: MEMOIZED COMPONENT FOR PERFORMANCE
@@ -30,9 +36,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
   analysis, 
   image, 
   isOpen, 
-  onClose 
+  onClose,
+  onAnalysisUpdated
 }) => {
-  if (!analysis || !image) return null;
+  const [currentAnalysis, setCurrentAnalysis] = useState<UXAnalysis | null>(analysis);
+  const [isReAnalyzing, setIsReAnalyzing] = useState(false);
+
+  // Update current analysis when prop changes
+  useEffect(() => {
+    setCurrentAnalysis(analysis);
+  }, [analysis]);
+
+  if (!currentAnalysis || !image) return null;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -64,6 +79,55 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
       case 'content': return <Type className="h-3 w-3" />;
       case 'performance': return <TrendingUp className="h-3 w-3" />;
       default: return <Lightbulb className="h-3 w-3" />;
+    }
+  };
+
+  // Handle version selection
+  const handleAnalysisSelected = async (analysisId: string) => {
+    // Here you would load the selected analysis from the database
+    // For now, we'll just show a toast
+    toast({
+      title: "Analysis Selected",
+      description: `Loading analysis version ${analysisId}`,
+    });
+  };
+
+  // Handle new analysis request
+  const handleNewAnalysis = async () => {
+    if (!image.id) return;
+    
+    setIsReAnalyzing(true);
+    try {
+      const response = await analysisService.forceNewAnalysis({
+        imageId: image.id,
+        imageUrl: image.url,
+        userContext: '',
+        priority: 'high'
+      });
+
+      if (response.success && response.analysis) {
+        setCurrentAnalysis(response.analysis);
+        onAnalysisUpdated?.(response.analysis);
+        toast({
+          title: "New Analysis Complete",
+          description: "A new analysis version has been created successfully.",
+        });
+      } else {
+        toast({
+          title: "Analysis Failed",
+          description: response.error || "Failed to create new analysis",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Re-analysis failed:', error);
+      toast({
+        title: "Analysis Error",
+        description: "An error occurred while creating new analysis",
+        variant: "destructive"
+      });
+    } finally {
+      setIsReAnalyzing(false);
     }
   };
 
@@ -103,13 +167,23 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
             </CardContent>
           </Card>
 
+          {/* Analysis Version Manager */}
+          {image.id && (
+            <AnalysisVersionManager
+              imageId={image.id}
+              currentAnalysisId={currentAnalysis.id}
+              onAnalysisSelected={handleAnalysisSelected}
+              onNewAnalysis={handleNewAnalysis}
+            />
+          )}
+
           {/* Overall Score */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Overall Score</CardTitle>
-                <Badge variant={getScoreVariant(analysis.summary?.overallScore || 0)} className="text-lg px-3 py-1">
-                  {analysis.summary?.overallScore || 'N/A'}/100
+                <Badge variant={getScoreVariant(currentAnalysis.summary?.overallScore || 0)} className="text-lg px-3 py-1">
+                  {currentAnalysis.summary?.overallScore || 'N/A'}/100
                 </Badge>
               </div>
             </CardHeader>
@@ -121,7 +195,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
               <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(analysis.summary?.categoryScores || {}).map(([category, score]) => {
+              {Object.entries(currentAnalysis.summary?.categoryScores || {}).map(([category, score]) => {
                 const safeScore = typeof score === 'number' ? score : 0;
                 return (
                   <div key={category} className="space-y-2">
@@ -136,7 +210,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
                   </div>
                 );
               })}
-              {(!analysis.summary?.categoryScores || Object.keys(analysis.summary.categoryScores).length === 0) && (
+              {(!currentAnalysis.summary?.categoryScores || Object.keys(currentAnalysis.summary.categoryScores).length === 0) && (
                 <div className="text-sm text-muted-foreground">
                   Category scores not available
                 </div>
@@ -145,18 +219,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
           </Card>
 
           {/* Key Issues */}
-          {(analysis.summary?.keyIssues?.length || 0) > 0 && (
+          {(currentAnalysis.summary?.keyIssues?.length || 0) > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-destructive" />
                   <CardTitle>Key Issues</CardTitle>
-                  <Badge variant="outline">{analysis.summary?.keyIssues?.length || 0}</Badge>
+                  <Badge variant="outline">{currentAnalysis.summary?.keyIssues?.length || 0}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(analysis.summary?.keyIssues || []).map((issue, index) => (
+                  {(currentAnalysis.summary?.keyIssues || []).map((issue, index) => (
                     <div key={index} className="p-3 bg-destructive/5 border-l-2 border-destructive/30 rounded-r">
                       <p className="text-sm text-foreground">{issue}</p>
                     </div>
@@ -167,18 +241,18 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
           )}
 
           {/* Strengths */}
-          {(analysis.summary?.strengths?.length || 0) > 0 && (
+          {(currentAnalysis.summary?.strengths?.length || 0) > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <CardTitle>Strengths</CardTitle>
-                  <Badge variant="outline">{analysis.summary?.strengths?.length || 0}</Badge>
+                  <Badge variant="outline">{currentAnalysis.summary?.strengths?.length || 0}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(analysis.summary?.strengths || []).map((strength, index) => (
+                  {(currentAnalysis.summary?.strengths || []).map((strength, index) => (
                     <div key={index} className="p-3 bg-green-50 dark:bg-green-950/20 border-l-2 border-green-600/30 rounded-r">
                       <p className="text-sm text-foreground">{strength}</p>
                     </div>
@@ -194,12 +268,12 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
               <div className="flex items-center gap-2">
                 <Lightbulb className="h-5 w-5 text-primary" />
                 <CardTitle>Detailed Suggestions</CardTitle>
-                <Badge variant="outline">{analysis.suggestions.length}</Badge>
+                <Badge variant="outline">{currentAnalysis.suggestions.length}</Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analysis.suggestions.map((suggestion) => (
+                {currentAnalysis.suggestions.map((suggestion) => (
                   <Card key={suggestion.id} className="p-4 bg-muted/30">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
@@ -251,24 +325,24 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Objects Detected</p>
-                  <p className="font-medium">{analysis.metadata?.objects?.length || 0}</p>
+                  <p className="font-medium">{currentAnalysis.metadata?.objects?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Text Elements</p>
-                  <p className="font-medium">{analysis.metadata?.text?.length || 0}</p>
+                  <p className="font-medium">{currentAnalysis.metadata?.text?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Colors</p>
-                  <p className="font-medium">{analysis.metadata?.colors?.length || 0}</p>
+                  <p className="font-medium">{currentAnalysis.metadata?.colors?.length || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Faces</p>
-                  <p className="font-medium">{analysis.metadata?.faces || 0}</p>
+                  <p className="font-medium">{currentAnalysis.metadata?.faces || 0}</p>
                 </div>
               </div>
               <Separator className="my-4" />
               <p className="text-sm text-muted-foreground">
-                Analyzed on {new Date(analysis.createdAt).toLocaleDateString()}
+                Analyzed on {new Date(currentAnalysis.createdAt).toLocaleDateString()}
               </p>
             </CardContent>
           </Card>

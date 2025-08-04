@@ -1,9 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import type { UploadedImage, UXAnalysis } from '@/types/ux-analysis';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, BarChart3, Image as ImageIcon } from 'lucide-react';
+import { analysisService } from '@/services/TypeSafeAnalysisService';
+import { Eye, BarChart3, Image as ImageIcon, Clock, CheckCircle, AlertCircle, Layers } from 'lucide-react';
 
 interface CanvasImageNodeProps {
   image: UploadedImage;
@@ -24,6 +25,30 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
   showAnnotations = true,
   isSelected = false
 }) => {
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Load analysis history on mount
+  useEffect(() => {
+    if (image.id) {
+      loadAnalysisHistory();
+    }
+  }, [image.id]);
+
+  const loadAnalysisHistory = async () => {
+    if (!image.id) return;
+    
+    setLoadingHistory(true);
+    try {
+      const history = await analysisService.getAnalysisHistory(image.id);
+      setAnalysisHistory(history);
+    } catch (error) {
+      console.error('Failed to load analysis history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleImageClick = () => {
     onImageSelect?.(image.id);
   };
@@ -39,6 +64,21 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
     e.stopPropagation();
     onImageSelect?.(image.id);
   };
+
+  // Get analysis status info
+  const getAnalysisStatusInfo = () => {
+    if (!analysisHistory.length) {
+      return { status: 'no-analysis', icon: AlertCircle, color: 'text-muted-foreground' };
+    }
+    
+    if (analysisHistory.length === 1) {
+      return { status: 'analyzed', icon: CheckCircle, color: 'text-green-600' };
+    }
+    
+    return { status: 'multiple-versions', icon: Layers, color: 'text-blue-600' };
+  };
+
+  const analysisStatusInfo = getAnalysisStatusInfo();
 
   return (
     <Card 
@@ -79,15 +119,18 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
             {image.status}
           </Badge>
           
-          {/* Analysis indicator */}
-          {analysis && (
-            <Badge 
-              variant="outline" 
-              className="absolute bottom-2 left-2 bg-background/80 backdrop-blur-sm"
-            >
-              Analyzed
-            </Badge>
-          )}
+          {/* Analysis Status and Version Indicators */}
+          <div className="absolute bottom-2 left-2 flex gap-1">
+            {analysisHistory.length > 0 && (
+              <Badge 
+                variant="outline" 
+                className={`bg-background/80 backdrop-blur-sm text-xs flex items-center gap-1 ${analysisStatusInfo.color}`}
+              >
+                <analysisStatusInfo.icon className="h-3 w-3" />
+                {analysisHistory.length > 1 ? `${analysisHistory.length} versions` : 'Analyzed'}
+              </Badge>
+            )}
+          </div>
         </div>
         
         {/* Image Info */}

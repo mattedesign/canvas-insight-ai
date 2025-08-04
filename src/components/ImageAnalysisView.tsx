@@ -1,16 +1,37 @@
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
 import { ContextDetectionErrorBoundary } from './ContextDetectionErrorBoundary';
+import { AnalysisVersionManager } from './AnalysisVersionManager';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Info, Code, Palette, Briefcase, TrendingUp } from 'lucide-react';
 
 interface ImageAnalysisViewProps {
   analysis: any;
+  imageId?: string;
+  currentAnalysisId?: string;
+  onAnalysisSelected?: (analysisId: string) => void;
+  onNewAnalysis?: () => void;
 }
 
-export function ImageAnalysisView({ analysis }: ImageAnalysisViewProps) {
+export function ImageAnalysisView({ 
+  analysis, 
+  imageId,
+  currentAnalysisId, 
+  onAnalysisSelected,
+  onNewAnalysis 
+}: ImageAnalysisViewProps) {
   return (
     <div className="space-y-6">
+      {/* Version Management - Show first if imageId is available */}
+      {imageId && (
+        <AnalysisVersionManager
+          imageId={imageId}
+          currentAnalysisId={currentAnalysisId}
+          onAnalysisSelected={onAnalysisSelected}
+          onNewAnalysis={onNewAnalysis}
+        />
+      )}
+
       {/* Context Information - PRIORITY DISPLAY */}
       {analysis.analysisContext && (
         <ContextDetectionErrorBoundary>
