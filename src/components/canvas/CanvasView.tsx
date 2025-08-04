@@ -126,7 +126,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
   
   const { toast } = useFilteredToast();
-  const multiSelection = useMultiSelection();
+  const allImageIds = (uploadedImages || []).map(img => img.id);
+  const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
   
   // Show helpful hint on first load for images without analysis
