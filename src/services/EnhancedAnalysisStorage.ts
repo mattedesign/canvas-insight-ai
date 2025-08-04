@@ -36,11 +36,6 @@ class EnhancedAnalysisStorage {
     return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
   }
 
-  private generateDeterministicId(imageId: string, analysisType: string, version: number): string {
-    // Use crypto.randomUUID() to generate a proper UUID
-    // This ensures database compatibility with UUID fields
-    return crypto.randomUUID();
-  }
 
   async checkExistingAnalysis(
     imageId: string, 
@@ -132,12 +127,8 @@ class EnhancedAnalysisStorage {
         return { success: false, error: 'Failed to get analysis version' };
       }
 
-      // Generate deterministic ID
-      const analysisId = this.generateDeterministicId(imageId, analysisType, nextVersion);
-
-      // Prepare analysis data for storage
+      // Prepare analysis data for storage (let database generate UUID)
       const analysisRecord = {
-        id: analysisId,
         image_id: imageId,
         user_id: user.id,
         analysis_type: analysisType,
