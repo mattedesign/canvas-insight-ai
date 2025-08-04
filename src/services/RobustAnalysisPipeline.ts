@@ -216,7 +216,7 @@ export class RobustAnalysisPipeline {
     try {
       // Handle blob URLs
       if (imageUrl.startsWith('blob:')) {
-        const base64Result = await BlobUrlReplacementService.prototype.blobUrlToBase64(imageUrl);
+        const base64Result = await BlobUrlReplacementService.blobUrlToBase64(imageUrl);
         return { success: true, processedUrl: `data:image/jpeg;base64,${base64Result}` };
       }
 
@@ -253,16 +253,19 @@ export class RobustAnalysisPipeline {
         confidence: 0.8,
         image: {
           primaryType: 'unknown',
-          secondaryTypes: [],
+          subTypes: [],
           domain: 'general',
-          complexity: 'moderate'
+          complexity: 'moderate',
+          userIntent: ['improve_usability']
         },
         user: {
           inferredRole: 'designer',
           goals: userContext ? [userContext] : ['improve_usability']
         },
         focusAreas: ['usability', 'visual_design'],
-        metadata: {}
+        analysisDepth: 'standard',
+        outputStyle: 'balanced',
+        detectedAt: new Date().toISOString()
       };
 
       return context;
@@ -274,19 +277,20 @@ export class RobustAnalysisPipeline {
         confidence: 0.5,
         image: {
           primaryType: 'unknown',
-          secondaryTypes: [],
+          subTypes: [],
           domain: 'general',
-          complexity: 'moderate'
+          complexity: 'moderate',
+          userIntent: ['improve_usability']
         },
         user: {
           inferredRole: 'designer',
           goals: ['improve_usability']
         },
         focusAreas: ['usability', 'visual_design'],
-        metadata: {
-          fallback: true,
-          reason: 'context_detection_failed'
-        }
+        analysisDepth: 'standard',
+        outputStyle: 'balanced',
+        detectedAt: new Date().toISOString(),
+        clarificationNeeded: false
       };
     }
   }
