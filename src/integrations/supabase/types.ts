@@ -1200,6 +1200,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_database_health: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          component: string
+          status: string
+          details: Json
+        }[]
+      }
       check_rate_limit: {
         Args: {
           endpoint_name: string
@@ -1254,6 +1262,15 @@ export type Database = {
         Returns: {
           results: Json
         }[]
+      }
+      store_analysis_result: {
+        Args: {
+          p_image_id: string
+          p_analysis_data: Json
+          p_user_id: string
+          p_status?: string
+        }
+        Returns: string
       }
       upsert_cached_analysis: {
         Args: { p_image_hash: string; p_results: Json }

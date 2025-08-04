@@ -388,33 +388,54 @@ export class RobustAnalysisPipeline {
   }
 
   /**
-   * ROBUST DATA STORAGE
+   * ROBUST DATA STORAGE - Updated to use new schema
    */
   private async storeAnalysisRobustly(imageId: string, analysis: any, context: AnalysisContext): Promise<void> {
-    const analysisData = {
-      id: analysis.id || crypto.randomUUID(),
-      image_id: imageId,
-      user_context: context.user.goals?.join(', ') || '',
-      visual_annotations: analysis.visualAnnotations || [],
-      suggestions: analysis.suggestions || [],
-      summary: analysis.summary || {},
-      metadata: {
-        ...analysis.metadata,
-        contextConfidence: context.confidence,
-        interfaceType: context.image.primaryType,
-        storedAt: new Date().toISOString()
-      },
-      status: 'completed'
-    };
-
-    const { error } = await supabase
-      .from('ux_analyses')
-      .upsert(analysisData, {
-        onConflict: 'image_id'
+    try {
+      // Use the new database function for consistent storage
+      const { data, error } = await supabase.rpc('store_analysis_result', {
+        p_image_id: imageId,
+        p_analysis_data: analysis,
+        p_user_id: (await supabase.auth.getUser()).data.user?.id,
+        p_status: 'completed'
       });
 
-    if (error) {
-      throw new PipelineError('Failed to store analysis', 'storage', { error: error.message });
+      if (error) {
+        throw new PipelineError('Failed to store analysis via database function', 'storage', { error: error.message });
+      }
+
+      console.log('[RobustAnalysisPipeline] Analysis stored successfully:', { analysisId: data });
+    } catch (error) {
+      // Fallback to direct insertion if RPC fails
+      console.warn('[RobustAnalysisPipeline] RPC storage failed, using fallback:', error);
+      
+      const analysisData = {
+        id: analysis.id || crypto.randomUUID(),
+        image_id: imageId,
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_context: context.user.goals?.join(', ') || '',
+        visual_annotations: analysis.visualAnnotations || [],
+        suggestions: analysis.suggestions || [],
+        summary: analysis.summary || {},
+        metadata: {
+          ...analysis.metadata,
+          contextConfidence: context.confidence,
+          interfaceType: context.image.primaryType,
+          storedAt: new Date().toISOString()
+        },
+        status: 'completed',
+        analysis_type: 'full_analysis'
+      };
+
+      const { error: insertError } = await supabase
+        .from('ux_analyses')
+        .upsert(analysisData, {
+          onConflict: 'image_id'
+        });
+
+      if (insertError) {
+        throw new PipelineError('Failed to store analysis via fallback', 'storage', { error: insertError.message });
+      }
     }
   }
 
