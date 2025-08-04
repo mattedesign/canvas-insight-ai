@@ -287,7 +287,12 @@ export const UnifiedFloatingToolbar: React.FC<UnifiedFloatingToolbarProps> = ({
 
   // Render group creation button (canvas only)
   const renderGroupButton = () => {
-    if (context !== 'canvas' || !onCreateGroup || selectedCount < 2) return null;
+    if (context !== 'canvas' || !onCreateGroup) return null;
+
+    const isDisabled = selectedCount < 2;
+    const title = isDisabled 
+      ? 'Select 2 or more items to create a group' 
+      : `Create group from ${selectedCount} selected items`;
 
     return (
       <>
@@ -296,7 +301,8 @@ export const UnifiedFloatingToolbar: React.FC<UnifiedFloatingToolbarProps> = ({
           size="sm" 
           className="h-8 px-2 gap-1"
           onClick={onCreateGroup}
-          title={`Create group from ${selectedCount} selected items`}
+          disabled={isDisabled}
+          title={title}
         >
           <Group className="h-4 w-4" />
           <span className="text-xs">{selectedCount}</span>
