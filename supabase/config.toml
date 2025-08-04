@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.context-detection]
 verify_jwt = true
+
+[functions.natural-ai-analysis]
+verify_jwt = false
+
+[functions.ai-insight-interpreter]
+verify_jwt = false
