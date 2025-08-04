@@ -265,6 +265,229 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+// Enhanced Analysis Storage Service (integrated into edge function)
+interface AnalysisStorageRequest {
+  imageId: string;
+  analysisData: any;
+  userContext?: string;
+  analysisType?: string;
+  forceNew?: boolean;
+}
+
+interface AnalysisStorageResult {
+  success: boolean;
+  analysisId?: string;
+  isNew?: boolean;
+  existingVersion?: number;
+  error?: string;
+}
+
+interface ExistingAnalysisInfo {
+  hasRecent: boolean;
+  latestVersion?: number;
+  latestId?: string;
+  createdAt?: string;
+}
+
+class EnhancedAnalysisStorage {
+  private supabaseClient: any;
+
+  constructor(supabaseClient: any) {
+    this.supabaseClient = supabaseClient;
+  }
+
+  private generateAnalysisHash(imageId: string, analysisType: string, userContext?: string): string {
+    const hashInput = `${imageId}-${analysisType}-${userContext || ''}`;
+    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+  }
+
+  private generateDeterministicId(imageId: string, analysisType: string, version: number): string {
+    const timestamp = Date.now();
+    const hashInput = `${imageId}-${analysisType}-v${version}-${timestamp}`;
+    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+  }
+
+  async checkExistingAnalysis(
+    imageId: string, 
+    analysisType: string = 'full_analysis',
+    hoursThreshold: number = 24
+  ): Promise<ExistingAnalysisInfo> {
+    try {
+      const { data: hasRecent, error: recentError } = await this.supabaseClient
+        .rpc('has_recent_analysis', {
+          p_image_id: imageId,
+          p_analysis_type: analysisType,
+          p_hours: hoursThreshold
+        });
+
+      if (recentError) {
+        console.warn('Error checking recent analysis:', recentError);
+        return { hasRecent: false };
+      }
+
+      if (!hasRecent) {
+        return { hasRecent: false };
+      }
+
+      const { data: latest, error: latestError } = await this.supabaseClient
+        .from('ux_analyses')
+        .select('id, version, created_at')
+        .eq('image_id', imageId)
+        .eq('analysis_type', analysisType)
+        .eq('status', 'completed')
+        .order('version', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestError || !latest) {
+        return { hasRecent: false };
+      }
+
+      return {
+        hasRecent: true,
+        latestVersion: latest.version,
+        latestId: latest.id,
+        createdAt: latest.created_at
+      };
+    } catch (error) {
+      console.error('Error checking existing analysis:', error);
+      return { hasRecent: false };
+    }
+  }
+
+  async storeAnalysis(request: AnalysisStorageRequest): Promise<AnalysisStorageResult> {
+    try {
+      const { imageId, analysisData, userContext, analysisType = 'full_analysis', forceNew = false } = request;
+      
+      // Get project_id for this image first
+      const { data: imageData, error: imageError } = await this.supabaseClient
+        .from('images')
+        .select('project_id')
+        .eq('id', imageId)
+        .single();
+
+      if (imageError || !imageData) {
+        console.error('Failed to get image project_id:', imageError);
+        return { success: false, error: `Failed to get project for image ${imageId}` };
+      }
+
+      const projectId = imageData.project_id;
+
+      // Check for existing analysis if not forcing new
+      if (!forceNew) {
+        const existingInfo = await this.checkExistingAnalysis(imageId, analysisType);
+        
+        if (existingInfo.hasRecent) {
+          return {
+            success: true,
+            analysisId: existingInfo.latestId,
+            isNew: false,
+            existingVersion: existingInfo.latestVersion,
+            error: 'Recent analysis already exists'
+          };
+        }
+      }
+
+      // Generate analysis hash for deduplication
+      const analysisHash = this.generateAnalysisHash(imageId, analysisType, userContext);
+
+      // Get next version number using the database function
+      const { data: nextVersion, error: versionError } = await this.supabaseClient
+        .rpc('get_next_analysis_version', {
+          p_image_id: imageId,
+          p_analysis_type: analysisType
+        });
+
+      if (versionError) {
+        console.error('Error getting next version:', versionError);
+        return { success: false, error: 'Failed to get analysis version' };
+      }
+
+      // Generate deterministic ID
+      const analysisId = this.generateDeterministicId(imageId, analysisType, nextVersion);
+
+      // Prepare analysis data for storage
+      const analysisRecord = {
+        id: analysisId,
+        image_id: imageId,
+        project_id: projectId,
+        analysis_type: analysisType,
+        analysis_hash: analysisHash,
+        version: nextVersion,
+        user_context: userContext || null,
+        visual_annotations: (analysisData.visualAnnotations || []) as any,
+        suggestions: (analysisData.suggestions || []) as any,
+        summary: (analysisData.summary || {}) as any,
+        metadata: {
+          ...((analysisData.metadata as any) || {}),
+          timestamp: new Date().toISOString(),
+          version: nextVersion
+        } as any,
+        status: 'completed',
+        created_by: 'enhanced_pipeline'
+      };
+
+      // Insert new analysis with proper transaction handling
+      const { data: insertedAnalysis, error: insertError } = await this.supabaseClient
+        .from('ux_analyses')
+        .insert(analysisRecord)
+        .select('id, version')
+        .single();
+
+      if (insertError) {
+        // Handle constraint violations gracefully
+        if (insertError.code === '23505') { // Unique constraint violation
+          console.warn('Analysis already exists, attempting to retrieve:', insertError);
+          
+          // Try to get the existing analysis
+          const { data: existing } = await this.supabaseClient
+            .from('ux_analyses')
+            .select('id, version')
+            .eq('image_id', imageId)
+            .eq('analysis_type', analysisType)
+            .eq('status', 'completed')
+            .order('version', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (existing) {
+            return {
+              success: true,
+              analysisId: existing.id,
+              isNew: false,
+              existingVersion: existing.version
+            };
+          }
+        }
+        
+        console.error('Error inserting analysis:', insertError);
+        return { success: false, error: `Failed to store analysis: ${insertError.message}` };
+      }
+
+      console.log('✅ Analysis stored successfully:', {
+        id: insertedAnalysis.id,
+        version: insertedAnalysis.version,
+        imageId,
+        analysisType
+      });
+
+      return {
+        success: true,
+        analysisId: insertedAnalysis.id,
+        isNew: true,
+        existingVersion: insertedAnalysis.version
+      };
+
+    } catch (error) {
+      console.error('Error in storeAnalysis:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown storage error'
+      };
+    }
+  }
+}
+
 // Analysis validation utility for data normalization
 interface ValidationResult {
   isValid: boolean;
@@ -3179,7 +3402,7 @@ function generateContextualFallbackSummary(userContext: string, interfaceHints: 
   };
 }
 
-// ENHANCED: Smart database persistence with constraint handling
+// ENHANCED: Smart database persistence using EnhancedAnalysisStorage
 async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
   console.log('💾 Enhanced analysis saving for image:', imageId);
   console.log('💾 Analysis data structure:', {
@@ -3204,175 +3427,27 @@ async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
   );
 
   try {
-    // Get the project_id for this image to ensure proper association
-    const { data: imageData, error: imageError } = await supabaseClient
-      .from('images')
-      .select('project_id')
-      .eq('id', imageId)
-      .single();
-
-    if (imageError || !imageData) {
-      console.error('Failed to get image project_id:', imageError);
-      throw new Error(`Failed to get project for image ${imageId}`);
-    }
-
-    const projectId = imageData.project_id;
-    console.log('Found project_id for image:', projectId);
-
-    // Check for existing recent analysis using the new database function
-    const { data: hasRecentAnalysis, error: recentError } = await supabaseClient
-      .rpc('has_recent_analysis', {
-        p_image_id: imageId,
-        p_analysis_type: 'full_analysis',
-        p_hours: 1 // Check for analysis in the last hour
-      });
-
-    if (recentError) {
-      console.warn('⚠️ Could not check for recent analysis:', recentError);
-    } else if (hasRecentAnalysis) {
-      console.log('📋 Recent analysis exists, updating instead of creating new...');
-      
-      // Get the most recent analysis to update
-      const { data: recentAnalysis, error: getRecentError } = await supabaseClient
-        .from('ux_analyses')
-        .select('id, version')
-        .eq('image_id', imageId)
-        .eq('analysis_type', 'full_analysis')
-        .eq('status', 'completed')
-        .order('version', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!getRecentError && recentAnalysis) {
-        // Update existing analysis
-        const { data: updatedData, error: updateError } = await supabaseClient
-          .from('ux_analyses')
-          .update({
-            visual_annotations: analysisData.visualAnnotations || [],
-            suggestions: analysisData.suggestions || [],
-            summary: analysisData.summary || {},
-            metadata: {
-              ...analysisData.metadata,
-              aiGenerated: true,
-              updatedAt: new Date().toISOString(),
-              version: recentAnalysis.version
-            },
-            user_context: analysisData.userContext || ''
-          })
-          .eq('id', recentAnalysis.id)
-          .select()
-          .single();
-
-        if (!updateError) {
-          console.log('✅ Analysis updated successfully:', updatedData.id);
-          return updatedData.id;
-        }
-        console.warn('⚠️ Update failed, will create new analysis:', updateError);
-      }
-    }
-
-    // Prepare data for new analysis with enhanced metadata
-    const visualAnnotations = analysisData.visualAnnotations || analysisData.visual_annotations || [];
-    const suggestions = analysisData.suggestions || analysisData.recommendations || [];
-    const summary = analysisData.summary || {};
+    // Use the enhanced storage service
+    const storage = new EnhancedAnalysisStorage(supabaseClient);
     
-    // Generate analysis hash for deduplication
-    const analysisHash = btoa(`${imageId}-full_analysis-${new Date().toISOString()}`).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-    
-    // Get next version number
-    const { data: nextVersion, error: versionError } = await supabaseClient
-      .rpc('get_next_analysis_version', {
-        p_image_id: imageId,
-        p_analysis_type: 'full_analysis'
-      });
-
-    if (versionError) {
-      console.warn('⚠️ Could not get next version, using default:', versionError);
-    }
-
-    const version = nextVersion || 1;
-    console.log('📋 Creating analysis version:', version);
-
-    const metadata = {
-      ...analysisData.metadata,
-      aiGenerated: true,
-      savedAt: new Date().toISOString(),
-      version: version,
-      analysisHash: analysisHash,
-      dataValidation: {
-        suggestionsProvided: suggestions.length,
-        annotationsProvided: visualAnnotations.length,
-        summaryProvided: !!summary.overallScore
-      }
+    const storageRequest: AnalysisStorageRequest = {
+      imageId,
+      analysisData,
+      userContext: analysisData.userContext,
+      analysisType: 'full_analysis',
+      forceNew: false // Allow checking for existing analyses
     };
 
-    console.log('💾 Saving new analysis to database:', {
-      imageId,
-      projectId,
-      version,
-      analysisHash,
-      visualAnnotationsCount: visualAnnotations.length,
-      suggestionsCount: suggestions.length,
-      hasSummary: !!summary.overallScore
-    });
-
-    // Attempt to insert new analysis with enhanced error handling
-    const { data, error } = await supabaseClient
-      .from('ux_analyses')
-      .insert({
-        image_id: imageId,
-        project_id: projectId,
-        analysis_type: 'full_analysis',
-        analysis_hash: analysisHash,
-        version: version,
-        visual_annotations: visualAnnotations,
-        suggestions: suggestions,
-        summary: summary,
-        metadata: metadata,
-        user_context: analysisData.userContext || '',
-        status: analysisData.status || 'completed',
-        created_by: 'enhanced_pipeline'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      // Handle constraint violations gracefully
-      if (error.code === '23505') { // Unique constraint violation
-        console.warn('🔄 Constraint violation detected, attempting recovery:', error.message);
-        
-        // Try to find existing analysis that might conflict
-        const { data: existingAnalysis } = await supabaseClient
-          .from('ux_analyses')
-          .select('id, version, created_at')
-          .eq('image_id', imageId)
-          .eq('analysis_type', 'full_analysis')
-          .order('version', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (existingAnalysis) {
-          console.log('✅ Found existing analysis, returning it:', existingAnalysis.id);
-          return existingAnalysis.id;
-        }
-      }
-      
-      console.error('❌ Database save error:', error);
-      console.error('❌ Data that failed to save:', {
-        visual_annotations: visualAnnotations,
-        suggestions: suggestions,
-        summary: summary
-      });
-      throw error;
+    const result = await storage.storeAnalysis(storageRequest);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to store analysis');
     }
 
-    console.log('✅ Analysis saved successfully with ID:', data.id);
-    console.log('✅ Saved data verification:', {
-      savedId: data.id,
-      version: data.version,
-      savedSuggestionsCount: data.suggestions?.length || 0,
-      savedAnnotationsCount: data.visual_annotations?.length || 0,
-      savedSummaryScore: data.summary?.overallScore
+    console.log('✅ Analysis storage result:', {
+      analysisId: result.analysisId,
+      isNew: result.isNew,
+      version: result.existingVersion
     });
     
     // Also save Vision metadata to the images table if available
@@ -3380,7 +3455,7 @@ async function saveAnalysisToDatabase(imageId: string, analysisData: any) {
       await saveVisionMetadataToImage(supabaseClient, imageId, analysisData.visionMetadata || analysisData.metadata?.vision);
     }
     
-    return data;
+    return { id: result.analysisId, version: result.existingVersion };
 
   } catch (error) {
     console.error('❌ Failed to save analysis to database:', error);
@@ -3489,13 +3564,22 @@ async function handleEnhancedContextAnalysis(body: any) {
           ...pipelineResult.synthesizedResult,
           visionMetadata: pipelineResult.visionMetadata,
           analysisContext,
-          enhancedPrompt: prompt
+          enhancedPrompt: prompt,
+          userContext: userContext || ''
         };
-        await saveAnalysisToDatabase(imageId, analysisDataWithMetadata);
-        console.log('✅ Enhanced analysis saved to database successfully');
+        const saveResult = await saveAnalysisToDatabase(imageId, analysisDataWithMetadata);
+        console.log('✅ Enhanced analysis saved to database successfully:', saveResult);
+        
+        // Add the saved analysis info to the response
+        enhancedResult.savedAnalysis = {
+          id: saveResult.id,
+          version: saveResult.version,
+          isNew: true
+        };
       } catch (saveError) {
         console.error('⚠️ Failed to save enhanced analysis to database:', saveError);
         // Don't fail the request if database save fails
+        enhancedResult.saveError = saveError.message;
       }
     }
 
