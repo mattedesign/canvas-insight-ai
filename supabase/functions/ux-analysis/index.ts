@@ -2,6 +2,260 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
+/**
+ * Smart Text Formatter for Converting JSON Analysis to Human-Readable Text
+ */
+class SmartTextFormatter {
+  static formatAnalysisDescription(data: any): string {
+    if (!data || typeof data !== 'object') {
+      return 'Analysis data not available';
+    }
+
+    // Handle different data structures
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        return data;
+      }
+    }
+
+    // Extract key information
+    const domain = data.domain || data.detectedDomain || 'general';
+    const screenType = data.screen_type || data.screenType || data.interfaceType || 'interface';
+    const findings = data.findings || data.analysis || data;
+
+    let description = '';
+
+    // Start with domain and screen type context
+    description += this.formatContextIntro(domain, screenType);
+
+    // Add main findings
+    if (findings) {
+      description += this.formatFindings(findings, domain);
+    }
+
+    // Add suggestions if available
+    if (data.suggestions && Array.isArray(data.suggestions)) {
+      description += this.formatSuggestions(data.suggestions);
+    }
+
+    return description.trim();
+  }
+
+  private static formatContextIntro(domain: string, screenType: string): string {
+    const domainLabels: Record<string, string> = {
+      ecommerce: 'e-commerce',
+      finance: 'financial',
+      healthcare: 'healthcare',
+      education: 'educational',
+      saas: 'SaaS',
+      portfolio: 'portfolio',
+      blog: 'blog',
+      general: 'web'
+    };
+
+    const screenLabels: Record<string, string> = {
+      landing_page: 'landing page',
+      product_page: 'product page',
+      checkout: 'checkout flow',
+      dashboard: 'dashboard',
+      form: 'form interface',
+      navigation: 'navigation',
+      mobile_app: 'mobile application',
+      desktop_app: 'desktop application'
+    };
+
+    const domainLabel = domainLabels[domain.toLowerCase()] || domain;
+    const screenLabel = screenLabels[screenType.toLowerCase()] || screenType;
+
+    return `This ${domainLabel} ${screenLabel} analysis reveals several key insights. `;
+  }
+
+  private static formatFindings(findings: any, domain: string): string {
+    let result = '';
+
+    // Handle different finding structures
+    if (typeof findings === 'string') {
+      return findings + ' ';
+    }
+
+    // E-commerce specific formatting
+    if (domain.toLowerCase().includes('ecommerce') || domain.toLowerCase().includes('commerce')) {
+      result += this.formatEcommerceFindings(findings);
+    }
+    // Finance specific formatting
+    else if (domain.toLowerCase().includes('finance') || domain.toLowerCase().includes('banking')) {
+      result += this.formatFinanceFindings(findings);
+    }
+    // General formatting
+    else {
+      result += this.formatGeneralFindings(findings);
+    }
+
+    return result;
+  }
+
+  private static formatEcommerceFindings(findings: any): string {
+    let result = '';
+
+    // Common e-commerce patterns
+    if (findings.cart_optimization || findings.checkout_optimization || findings.cart_and_checkout_flow_optimization) {
+      result += 'The shopping experience shows opportunities for cart and checkout optimization. ';
+    }
+
+    if (findings.product_presentation || findings.product_display) {
+      result += 'Product presentation and display elements could be enhanced for better user engagement. ';
+    }
+
+    if (findings.trust_signals || findings.security_indicators) {
+      result += 'Trust signals and security indicators are important for customer confidence. ';
+    }
+
+    if (findings.mobile_experience || findings.responsive_design) {
+      result += 'Mobile shopping experience requires attention for optimal conversion rates. ';
+    }
+
+    // Extract specific insights from the findings object
+    const insights = this.extractInsights(findings);
+    if (insights.length > 0) {
+      result += insights.join(' ') + ' ';
+    }
+
+    return result;
+  }
+
+  private static formatFinanceFindings(findings: any): string {
+    let result = '';
+
+    if (findings.security || findings.compliance) {
+      result += 'Security and compliance considerations are critical for financial interfaces. ';
+    }
+
+    if (findings.data_visualization || findings.dashboard_design) {
+      result += 'Data visualization and dashboard design impact user decision-making. ';
+    }
+
+    const insights = this.extractInsights(findings);
+    if (insights.length > 0) {
+      result += insights.join(' ') + ' ';
+    }
+
+    return result;
+  }
+
+  private static formatGeneralFindings(findings: any): string {
+    let result = '';
+
+    // Common UX patterns
+    if (findings.usability || findings.user_experience) {
+      result += 'Usability and user experience elements show potential for improvement. ';
+    }
+
+    if (findings.accessibility || findings.wcag_compliance) {
+      result += 'Accessibility compliance and inclusive design practices should be considered. ';
+    }
+
+    if (findings.visual_hierarchy || findings.design_consistency) {
+      result += 'Visual hierarchy and design consistency affect user comprehension. ';
+    }
+
+    if (findings.performance || findings.loading_experience) {
+      result += 'Performance and loading experience impact user satisfaction. ';
+    }
+
+    const insights = this.extractInsights(findings);
+    if (insights.length > 0) {
+      result += insights.join(' ') + ' ';
+    }
+
+    return result;
+  }
+
+  private static extractInsights(findings: any): string[] {
+    const insights: string[] = [];
+
+    // Look for specific patterns in the data
+    Object.entries(findings).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.length > 10 && value.length < 200) {
+        // Clean up the insight text
+        const insight = this.cleanInsightText(value);
+        if (insight && !insight.includes('{') && !insight.includes('[')) {
+          insights.push(insight);
+        }
+      } else if (typeof value === 'object' && value && !Array.isArray(value)) {
+        // Recursively extract from nested objects
+        const nestedInsights = this.extractInsights(value);
+        insights.push(...nestedInsights);
+      }
+    });
+
+    return insights.slice(0, 3); // Limit to 3 insights to avoid overwhelming
+  }
+
+  private static cleanInsightText(text: string): string {
+    // Remove common technical prefixes/suffixes
+    let cleaned = text.replace(/^(finding|insight|recommendation|suggestion):\s*/i, '');
+    cleaned = cleaned.replace(/\s*(\.|\,)$/, '');
+    
+    // Ensure proper capitalization
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    
+    // Ensure it ends with proper punctuation
+    if (!/[.!?]$/.test(cleaned)) {
+      cleaned += '.';
+    }
+
+    return cleaned;
+  }
+
+  private static formatSuggestions(suggestions: any[]): string {
+    if (!suggestions || !Array.isArray(suggestions) || suggestions.length === 0) {
+      return '';
+    }
+
+    let result = 'Key recommendations include: ';
+    
+    const formattedSuggestions = suggestions
+      .slice(0, 3) // Limit to top 3 suggestions
+      .map(suggestion => {
+        if (typeof suggestion === 'string') {
+          return this.cleanInsightText(suggestion);
+        } else if (suggestion && suggestion.text) {
+          return this.cleanInsightText(suggestion.text);
+        } else if (suggestion && suggestion.description) {
+          return this.cleanInsightText(suggestion.description);
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    if (formattedSuggestions.length > 0) {
+      result += formattedSuggestions.join(', ') + '.';
+    } else {
+      result = ''; // Remove the intro if no valid suggestions
+    }
+
+    return result;
+  }
+
+  static formatFallback(data: any): string {
+    if (!data) {
+      return 'Analysis data is not available at this time.';
+    }
+
+    if (typeof data === 'string') {
+      // If it's already a string, try to clean it up
+      if (data.includes('{') || data.includes('[')) {
+        return 'Analysis completed with technical findings available for review.';
+      }
+      return data;
+    }
+
+    return 'Analysis completed. Please review the detailed findings in the analysis panel.';
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -2313,25 +2567,27 @@ async function synthesizeMultiModelResults(
           domainKeys.forEach((key, index) => {
             const domainData = result[key];
             if (domainData && typeof domainData === 'object') {
-              // Create suggestion from domain analysis
+              // Create suggestion from domain analysis using Smart Text Formatter
+              const smartDescription = SmartTextFormatter.formatAnalysisDescription(domainData);
               convertedSuggestions.push({
                 id: `converted_${index + 1}`,
                 category: 'usability',
                 title: `${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Improvement`,
-                description: `Analysis findings for ${key}: ${JSON.stringify(domainData).substring(0, 200)}...`,
+                description: smartDescription || SmartTextFormatter.formatFallback(domainData),
                 impact: 'medium',
                 effort: 'medium',
                 actionItems: ['Review analysis findings', 'Implement recommended changes']
               });
               
-              // Create annotation from domain analysis
+              // Create annotation from domain analysis with improved context
+              const annotationDescription = generateContextualAnnotationDescription(key, domainData);
               convertedAnnotations.push({
                 id: `converted_ann_${index + 1}`,
                 x: 0.5,
                 y: 0.3 + (index * 0.1),
                 type: 'suggestion',
                 title: `${key.replace(/_/g, ' ')} Area`,
-                description: `Focus area identified for ${key} improvements`,
+                description: annotationDescription,
                 severity: 'medium',
                 category: 'usability'
               });
@@ -2742,6 +2998,28 @@ function generateContextualFallbackAnnotations(userContext: string, interfaceHin
   });
   
   return annotations.slice(0, 3); // Return top 3 annotations
+}
+
+function generateContextualAnnotationDescription(key: string, domainData: any): string {
+  // Generate contextual descriptions for annotations based on domain analysis key
+  const keyMappings: Record<string, string> = {
+    cart_and_checkout_flow_optimization: 'Shopping cart and checkout process requires optimization for better conversion rates and user experience.',
+    product_presentation: 'Product display and presentation elements need enhancement to improve user engagement and sales conversion.',
+    navigation_usability: 'Navigation structure and usability improvements needed to enhance user flow and findability.',
+    mobile_responsiveness: 'Mobile responsive design elements require attention for optimal cross-device experience.',
+    accessibility_compliance: 'Accessibility features and compliance standards need improvement for inclusive user experience.',
+    page_loading_performance: 'Page loading speed and performance optimization needed to reduce bounce rates.',
+    visual_hierarchy: 'Visual hierarchy and information organization require restructuring for better user comprehension.',
+    trust_signals: 'Trust indicators and security signals need enhancement to improve user confidence.',
+    call_to_action_optimization: 'Call-to-action elements require optimization for better visibility and conversion rates.',
+    form_usability: 'Form design and usability improvements needed to reduce abandonment and increase completion rates.'
+  };
+
+  // Use predefined mapping or generate from key
+  const description = keyMappings[key] || 
+    `${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} area identified for improvement based on analysis findings.`;
+
+  return description;
 }
 
 function generateContextualFallbackSummary(userContext: string, interfaceHints: any): any {
