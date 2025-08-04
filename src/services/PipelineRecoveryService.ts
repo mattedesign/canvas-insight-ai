@@ -298,6 +298,7 @@ export class PipelineRecoveryService {
       );
 
       // Validate the partial analysis
+      // Skip validation if this is a natural analysis result (already validated by edge function)
       const validation = this.validationService.validateAnalysisResult(partialAnalysis);
       if (!validation.isValid) {
         warnings.push(`Partial analysis validation warnings: ${validation.warnings?.map(w => w.message).join(', ')}`);

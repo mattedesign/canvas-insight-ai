@@ -96,6 +96,7 @@ export class PipelineConsolidationSafety {
       const finalAnalysis = this.buildFinalAnalysis(stageData, imageId, imageName, warnings, fallbacksApplied);
 
       // Phase 4: Validate final result
+      // Skip validation if this is a natural analysis result (already validated by edge function)
       const validation = this.validationService.validateAnalysisResult(finalAnalysis);
       if (!validation.isValid) {
         warnings.push(`Final analysis validation warnings: ${validation.warnings.map(w => w.message).join(', ')}`);

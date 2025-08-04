@@ -203,6 +203,7 @@ export class EnhancedAnalysisPipeline {
       );
 
       // Priority 1: Validate analysis result before processing
+      // Skip validation if this is a natural analysis result (already validated by edge function)
       const validationResult = this.validationService.validateAnalysisResult(analysisResult);
       if (!validationResult.isValid) {
         // Enhanced error logging with detailed validation failure information

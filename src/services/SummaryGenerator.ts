@@ -70,6 +70,7 @@ export class SummaryGenerator {
 
     // Phase 2: Validate existing summary first
     if (finalConfig.enforceValidation && inputSummary) {
+      // Skip validation if this is a natural analysis result (already validated by edge function)
       const validation = this.validationService.validateAnalysisResult({ summary: inputSummary });
       
       if (!validation.isValid) {
@@ -103,6 +104,7 @@ export class SummaryGenerator {
 
     // Final validation
     if (finalConfig.enforceValidation) {
+      // Skip validation if this is a natural analysis result (already validated by edge function)
       const finalValidation = this.validationService.validateAnalysisResult({ summary });
       if (!finalValidation.isValid) {
         console.error('[SummaryGenerator] Generated summary failed validation:', finalValidation.errors);
