@@ -1093,6 +1093,7 @@ export type Database = {
           suggestions: Json
           summary: Json
           user_context: string | null
+          user_id: string | null
           visual_annotations: Json
         }
         Insert: {
@@ -1109,6 +1110,7 @@ export type Database = {
           suggestions?: Json
           summary?: Json
           user_context?: string | null
+          user_id?: string | null
           visual_annotations?: Json
         }
         Update: {
@@ -1125,6 +1127,7 @@ export type Database = {
           suggestions?: Json
           summary?: Json
           user_context?: string | null
+          user_id?: string | null
           visual_annotations?: Json
         }
         Relationships: [
