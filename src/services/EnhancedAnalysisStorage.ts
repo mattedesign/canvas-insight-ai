@@ -31,7 +31,9 @@ export interface ExistingAnalysisInfo {
 
 class EnhancedAnalysisStorage {
   private generateAnalysisHash(imageId: string, analysisType: string, userContext?: string): string {
-    const hashInput = `${imageId}-${analysisType}-${userContext || ''}`;
+    // Add timestamp to ensure uniqueness and avoid collisions
+    const timestamp = Date.now();
+    const hashInput = `${imageId}-${analysisType}-${userContext || ''}-${timestamp}`;
     // Simple hash using btoa for deterministic results
     return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
   }

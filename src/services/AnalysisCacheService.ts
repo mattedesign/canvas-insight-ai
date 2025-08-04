@@ -71,4 +71,31 @@ export class AnalysisCacheService {
     console.log(`🧹 Cleared ${deletedCount} expired cache entries`);
     return deletedCount;
   }
+
+  async clearProblematicCache(imageId: string): Promise<void> {
+    try {
+      // Clear all cache entries that might reference this image
+      const imageHashes = [
+        await this.hashImage(imageId),
+        await this.hashImage(`blob:${imageId}`),
+        await this.hashImage(`http://${imageId}`),
+        await this.hashImage(`https://${imageId}`)
+      ];
+
+      for (const hash of imageHashes) {
+        const { error } = await supabase
+          .from('analysis_cache')
+          .delete()
+          .eq('image_hash', hash);
+
+        if (error) {
+          console.warn('Failed to clear cache for hash:', hash, error);
+        } else {
+          console.log('🧹 Cleared problematic cache for hash:', hash);
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing problematic cache:', error);
+    }
+  }
 }
