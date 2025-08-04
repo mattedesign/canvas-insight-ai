@@ -1867,6 +1867,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           showAnalysis={showAnalysis}
           currentTool={currentTool}
           hasMultiSelection={multiSelection.state.isMultiSelectMode}
+          selectedCount={multiSelection.state.selectedIds.length}
         />
       </ReactFlow>
     </div>
