@@ -1846,9 +1846,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
       >
         
         <Background 
-          color="hsl(var(--border) / 0.3)" 
-          size={2} 
-          gap={20}
+          color="hsl(var(--muted-foreground) / 0.15)" 
+          size={1} 
+          gap={24}
           className="enhanced-canvas-background"
         />
         {/* Custom controls are now in FloatingToolbar */}
