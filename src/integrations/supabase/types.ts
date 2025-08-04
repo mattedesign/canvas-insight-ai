@@ -1080,9 +1080,11 @@ export type Database = {
       }
       ux_analyses: {
         Row: {
+          analysis_hash: string | null
           analysis_type: string | null
           counted_towards_limit: boolean | null
           created_at: string | null
+          created_by: string | null
           has_strategic_insights: boolean | null
           id: string
           image_id: string | null
@@ -1094,12 +1096,15 @@ export type Database = {
           summary: Json
           user_context: string | null
           user_id: string | null
+          version: number | null
           visual_annotations: Json
         }
         Insert: {
+          analysis_hash?: string | null
           analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
+          created_by?: string | null
           has_strategic_insights?: boolean | null
           id?: string
           image_id?: string | null
@@ -1111,12 +1116,15 @@ export type Database = {
           summary?: Json
           user_context?: string | null
           user_id?: string | null
+          version?: number | null
           visual_annotations?: Json
         }
         Update: {
+          analysis_hash?: string | null
           analysis_type?: string | null
           counted_towards_limit?: boolean | null
           created_at?: string | null
+          created_by?: string | null
           has_strategic_insights?: boolean | null
           id?: string
           image_id?: string | null
@@ -1128,6 +1136,7 @@ export type Database = {
           summary?: Json
           user_context?: string | null
           user_id?: string | null
+          version?: number | null
           visual_annotations?: Json
         }
         Relationships: [
@@ -1262,6 +1271,14 @@ export type Database = {
         Returns: {
           results: Json
         }[]
+      }
+      get_next_analysis_version: {
+        Args: { p_image_id: string; p_analysis_type: string }
+        Returns: number
+      }
+      has_recent_analysis: {
+        Args: { p_image_id: string; p_analysis_type: string; p_hours?: number }
+        Returns: boolean
       }
       store_analysis_result: {
         Args: {
