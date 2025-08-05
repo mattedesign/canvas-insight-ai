@@ -4527,6 +4527,8 @@ function createMemoryEfficientSynthesis(modelResults: any[], context: any): any 
     modelUsed: `memory-optimized-${modelResults.map(r => r.model).join('+')}`,
     status: 'completed'
   };
+}
+
 // Helper function to convert interpreted results to UXAnalysis format with snake_case fields
 function convertInterpretedToUXAnalysis(interpretedData: any, naturalData: any, imageUrl: string, userContext?: string): any {
   // Generate visual_annotations (snake_case) from insights
