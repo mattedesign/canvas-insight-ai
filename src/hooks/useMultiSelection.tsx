@@ -16,15 +16,16 @@ export const useMultiSelection = (allIds: string[] = []) => {
   const toggleSelection = useCallback((id: string, modifierKey: 'ctrl' | 'shift' | 'none' = 'none') => {
     console.log('[useMultiSelection] toggleSelection called:', {
       id: id.substring(0, 12) + '...',
-      modifierKey,
-      currentState: {
-        selectedIds: state.selectedIds.map(sid => sid.substring(0, 8) + '...'),
-        isMultiSelectMode: state.isMultiSelectMode,
-        lastSelectedId: state.lastSelectedId?.substring(0, 8) + '...'
-      }
+      modifierKey
     });
     
     setState(prev => {
+      console.log('[useMultiSelection] current state:', {
+        selectedIds: prev.selectedIds.map(sid => sid.substring(0, 8) + '...'),
+        isMultiSelectMode: prev.isMultiSelectMode,
+        lastSelectedId: prev.lastSelectedId?.substring(0, 8) + '...'
+      });
+      
       let newState;
       
       if (modifierKey === 'ctrl') {
@@ -77,7 +78,7 @@ export const useMultiSelection = (allIds: string[] = []) => {
       
       return newState;
     });
-  }, [allIds, state.selectedIds, state.isMultiSelectMode, state.lastSelectedId]);
+  }, [allIds]);
 
   const selectMultiple = useCallback((ids: string[]) => {
     setState({
