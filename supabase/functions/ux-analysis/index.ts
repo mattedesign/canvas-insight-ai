@@ -426,13 +426,14 @@ class EnhancedAnalysisStorage {
         visual_annotations: (analysisData.visualAnnotations || []) as any,
         suggestions: (analysisData.suggestions || []) as any,
         summary: (analysisData.summary || {}) as any,
+        strategic_summary: (analysisData.strategicSummary || null) as any,
         metadata: {
           ...((analysisData.metadata as any) || {}),
           timestamp: new Date().toISOString(),
           version: nextVersion
         } as any,
         status: 'completed',
-        created_by: 'enhanced_pipeline'
+        created_by: 'hybrid_enhanced_pipeline'
       };
 
       // Insert new analysis with proper transaction handling
@@ -3242,7 +3243,7 @@ async function synthesizeMultiModelResults(
   visionMetadata: any,
   context: { imageName?: string; imageId?: string; userContext?: string }
 ): Promise<any> {
-  console.log('🔮 Synthesizing results from OpenAI, Claude, and Google Vision...');
+  console.log('🔮 HYBRID SYNTHESIS - Starting multi-model synthesis with strategic insights...');
   
   try {
   // SUPER DETAILED LOGGING - Full AI Response Inspection
@@ -3481,7 +3482,26 @@ async function synthesizeMultiModelResults(
       aiGenerated: true // CRITICAL: Mark as real AI analysis
     };
     
-    console.log('✅ Multi-model synthesis complete');
+    console.log('✅ Multi-model synthesis complete, generating strategic insights...');
+    
+    // HYBRID STEP: Generate strategic insights while preserving existing functionality
+    let strategicSummary = null;
+    try {
+      strategicSummary = await generateStrategicInsights({
+        openaiAnalysis,
+        claudeAnalysis,
+        visionMetadata,
+        context,
+        synthesizedData: {
+          suggestions: allSuggestions,
+          annotations: allAnnotations,
+          summary: synthesizedSummary
+        }
+      });
+      console.log('✅ Strategic insights generated successfully');
+    } catch (error) {
+      console.warn('⚠️ Strategic insights generation failed, continuing with standard synthesis:', error);
+    }
     
     const finalResult = {
       id: `analysis_${Date.now()}`,
@@ -3492,9 +3512,15 @@ async function synthesizeMultiModelResults(
       visualAnnotations: allAnnotations.slice(0, 10), // Top 10 annotations
       suggestions: allSuggestions.slice(0, 8), // Top 8 suggestions
       summary: synthesizedSummary,
-      metadata: enhancedMetadata,
+      metadata: {
+        ...enhancedMetadata,
+        // Add strategic insights to metadata if available
+        ...(strategicSummary && { strategicInsights: strategicSummary })
+      },
+      // Add strategic summary as a separate field if available
+      ...(strategicSummary && { strategicSummary }),
       createdAt: new Date().toISOString(),
-      modelUsed: 'multi-model-synthesis',
+      modelUsed: 'hybrid-multi-model-synthesis',
       status: 'completed'
     };
     
@@ -3559,6 +3585,158 @@ async function synthesizeMultiModelResults(
       status: 'completed_with_errors'
     };
   }
+}
+
+// HYBRID APPROACH: Strategic Insight Generation
+async function generateStrategicInsights(params: {
+  openaiAnalysis: any;
+  claudeAnalysis: any;
+  visionMetadata: any;
+  context: any;
+  synthesizedData: any;
+}): Promise<any> {
+  console.log('🎯 Generating strategic business insights from multi-model synthesis...');
+  
+  const { openaiAnalysis, claudeAnalysis, visionMetadata, context, synthesizedData } = params;
+  
+  // Extract key findings for strategic analysis
+  const keyFindings = extractKeyFindings(synthesizedData);
+  const domainContext = inferDomainFromContext(context.userContext, visionMetadata);
+  
+  // Build strategic prompt
+  const strategicPrompt = buildStrategicPrompt(keyFindings, domainContext, context);
+  
+  try {
+    // Use GPT-4o for strategic insight generation
+    const response = await executeModel({
+      model: 'gpt-4o',
+      stage: 'strategic-insights',
+      prompt: strategicPrompt,
+      systemPrompt: 'You are a senior UX strategist. Provide actionable business insights based on UX analysis. Output structured JSON only.'
+    });
+    
+    const responseText = await response.text();
+    const cleanedResponse = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const strategicData = JSON.parse(cleanedResponse);
+    
+    console.log('✅ Strategic insights generated successfully');
+    return {
+      ...strategicData,
+      generatedAt: new Date().toISOString(),
+      model: 'gpt-4o',
+      confidence: 0.85
+    };
+    
+  } catch (error) {
+    console.error('❌ Strategic insights generation failed:', error);
+    // Return basic strategic fallback
+    return generateStrategicFallback(keyFindings, domainContext);
+  }
+}
+
+function extractKeyFindings(synthesizedData: any): any {
+  const keyFindings = {
+    criticalIssues: [],
+    opportunities: [],
+    strengths: [],
+    userImpact: 'medium'
+  };
+  
+  // Extract from suggestions
+  if (synthesizedData.suggestions && Array.isArray(synthesizedData.suggestions)) {
+    const highImpactSuggestions = synthesizedData.suggestions.filter(s => s.impact === 'high');
+    keyFindings.criticalIssues = highImpactSuggestions.map(s => s.title).slice(0, 3);
+    keyFindings.opportunities = synthesizedData.suggestions.map(s => s.title).slice(0, 5);
+  }
+  
+  // Extract from summary
+  if (synthesizedData.summary) {
+    keyFindings.strengths = synthesizedData.summary.strengths || [];
+    keyFindings.userImpact = synthesizedData.summary.overallScore > 80 ? 'low' : 
+                           synthesizedData.summary.overallScore > 60 ? 'medium' : 'high';
+  }
+  
+  return keyFindings;
+}
+
+function inferDomainFromContext(userContext: string, visionMetadata: any): string {
+  const lowerContext = userContext.toLowerCase();
+  
+  if (lowerContext.includes('ecommerce') || lowerContext.includes('shop') || lowerContext.includes('product')) {
+    return 'ecommerce';
+  } else if (lowerContext.includes('finance') || lowerContext.includes('bank') || lowerContext.includes('trading')) {
+    return 'finance';
+  } else if (lowerContext.includes('healthcare') || lowerContext.includes('medical')) {
+    return 'healthcare';
+  } else if (lowerContext.includes('saas') || lowerContext.includes('software') || lowerContext.includes('app')) {
+    return 'saas';
+  } else if (lowerContext.includes('dashboard') || lowerContext.includes('analytics')) {
+    return 'analytics';
+  }
+  
+  return 'general';
+}
+
+function buildStrategicPrompt(keyFindings: any, domain: string, context: any): string {
+  return `Analyze this UX data for strategic business insights:
+
+DOMAIN: ${domain}
+KEY ISSUES: ${keyFindings.criticalIssues.join(', ') || 'None identified'}
+OPPORTUNITIES: ${keyFindings.opportunities.join(', ') || 'Various improvements available'}
+USER IMPACT: ${keyFindings.userImpact}
+CONTEXT: ${context.userContext || 'General interface analysis'}
+
+Generate strategic insights in this JSON format:
+{
+  "businessImpact": {
+    "revenueRisk": "low|medium|high",
+    "userRetentionRisk": "low|medium|high", 
+    "competitiveDisadvantage": "low|medium|high"
+  },
+  "strategicRecommendations": [
+    {
+      "priority": "critical|high|medium|low",
+      "category": "conversion|retention|growth|compliance",
+      "recommendation": "Specific actionable recommendation",
+      "businessJustification": "Why this matters for business outcomes",
+      "estimatedImpact": "Quantifiable business impact estimate"
+    }
+  ],
+  "keyMetrics": {
+    "primaryConcern": "Main issue affecting business goals",
+    "quickWins": ["List of 2-3 easy improvements"],
+    "longTermFocus": "Strategic area for sustained improvement"
+  }
+}
+
+Focus on business outcomes, not just UX improvements.`;
+}
+
+function generateStrategicFallback(keyFindings: any, domain: string): any {
+  return {
+    businessImpact: {
+      revenueRisk: keyFindings.userImpact === 'high' ? 'medium' : 'low',
+      userRetentionRisk: keyFindings.userImpact,
+      competitiveDisadvantage: 'medium'
+    },
+    strategicRecommendations: [
+      {
+        priority: 'high',
+        category: 'conversion',
+        recommendation: 'Address identified usability issues to improve user experience',
+        businessJustification: 'Poor UX directly impacts conversion rates and customer satisfaction',
+        estimatedImpact: 'Potential 10-25% improvement in user engagement'
+      }
+    ],
+    keyMetrics: {
+      primaryConcern: keyFindings.criticalIssues[0] || 'Interface optimization needed',
+      quickWins: keyFindings.opportunities.slice(0, 2) || ['Review navigation', 'Improve visual hierarchy'],
+      longTermFocus: `${domain} domain-specific optimization`
+    },
+    generatedAt: new Date().toISOString(),
+    model: 'strategic-fallback',
+    confidence: 0.7
+  };
 }
 
 // Enhanced context-aware fallback generation functions
