@@ -58,7 +58,7 @@ export function ImageAnalysisDialog({
       }
 
       // Apply field mapping for consistent data structure
-      const mappedData = AnalysisDataMapper.extractAnalysisData(data.data);
+      const mappedData = AnalysisDataMapper.mapBackendToFrontend(data.data);
       // COMMENTED OUT: Repetitive analysis completion toast
       // toast.success('AI analysis completed successfully!');
       onAnalysisComplete(mappedData);

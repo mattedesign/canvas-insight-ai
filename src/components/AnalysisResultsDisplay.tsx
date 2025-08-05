@@ -26,19 +26,6 @@ export function AnalysisResultsDisplay({
   analysisContext
 }: AnalysisResultsDisplayProps) {
   
-  // 🔍 TEMPORARY DEBUG - Check data format
-  console.log('🔍 Debug - Raw analysis data:', analysis);
-  console.log('🔍 Debug - Has snake_case fields?', {
-    has_visual_annotations: !!(analysis as any)?.visual_annotations,
-    has_image_id: !!(analysis as any)?.image_id,
-    has_overall_score: !!(analysis as any)?.summary?.overall_score
-  });
-  console.log('🔍 Debug - Has camelCase fields?', {
-    hasVisualAnnotations: !!analysis?.visualAnnotations,
-    hasImageId: !!analysis?.imageId,
-    hasOverallScore: !!analysis?.summary?.overallScore
-  });
-  
   // Only render if we have valid analysis data
   if (!analysis || !image) {
     return null;

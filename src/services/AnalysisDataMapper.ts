@@ -9,25 +9,51 @@ export class AnalysisDataMapper {
   
   /**
    * Maps backend analysis data to frontend format
+   * Handles both snake_case (backend) and camelCase (frontend) inputs robustly
    */
   static mapBackendToFrontend(backendData: any): Partial<UXAnalysis> {
     if (!backendData || typeof backendData !== 'object') {
       return {};
     }
 
+    // Handle nested data structures first (from edge functions)
+    let sourceData = backendData;
+    if (backendData.data) {
+      sourceData = backendData.data;
+    } else if (backendData.analysis) {
+      sourceData = backendData.analysis;
+    }
+
     return {
-      id: backendData.id,
-      imageId: backendData.image_id || backendData.imageId,
-      imageName: backendData.image_name || backendData.imageName || 'Untitled Image',
-      imageUrl: backendData.image_url || backendData.imageUrl || '',
-      userContext: backendData.user_context || backendData.userContext || '',
-      visualAnnotations: backendData.visual_annotations || backendData.visualAnnotations || [],
-      suggestions: backendData.suggestions || [],
-      summary: this.mapSummary(backendData.summary),
-      metadata: backendData.metadata || {},
-      createdAt: new Date(backendData.created_at || backendData.createdAt || Date.now()),
-      modelUsed: backendData.model_used || backendData.modelUsed || 'unknown',
-      status: backendData.status || 'completed'
+      id: sourceData.id,
+      imageId: sourceData.image_id || sourceData.imageId,
+      imageName: sourceData.image_name || sourceData.imageName || 'Untitled Image',
+      imageUrl: sourceData.image_url || sourceData.imageUrl || '',
+      userContext: sourceData.user_context || sourceData.userContext || '',
+      visualAnnotations: sourceData.visual_annotations || sourceData.visualAnnotations || [],
+      suggestions: sourceData.suggestions || [],
+      summary: this.mapSummary(sourceData.summary),
+      metadata: this.mapMetadata(sourceData.metadata),
+      createdAt: new Date(sourceData.created_at || sourceData.createdAt || Date.now()),
+      modelUsed: sourceData.model_used || sourceData.modelUsed || 'unknown',
+      status: sourceData.status || 'completed'
+    };
+  }
+
+  /**
+   * Maps metadata with field name handling
+   */
+  private static mapMetadata(metadataData: any): any {
+    if (!metadataData || typeof metadataData !== 'object') {
+      return {};
+    }
+
+    return {
+      ...metadataData,
+      // Map any snake_case fields to camelCase if needed
+      stagesCompleted: metadataData.stages_completed || metadataData.stagesCompleted,
+      modelsUsed: metadataData.models_used || metadataData.modelsUsed,
+      naturalAnalysisMetadata: metadataData.natural_analysis_metadata || metadataData.naturalAnalysisMetadata
     };
   }
 
@@ -59,13 +85,6 @@ export class AnalysisDataMapper {
       strengths: summaryData.strengths || [],
       confidence: summaryData.confidence || 85
     };
-
-    console.log('🔍 AnalysisDataMapper: Summary mapping result...', {
-      originalKeys: summaryData ? Object.keys(summaryData) : [],
-      mappedKeys: Object.keys(mappedSummary),
-      hasOverallScore: !!mappedSummary.overallScore,
-      hasCategoryScores: !!mappedSummary.categoryScores
-    });
 
     return mappedSummary;
   }
@@ -123,20 +142,11 @@ export class AnalysisDataMapper {
   }
 
   /**
-   * Safely extracts data from complex analysis results
+   * @deprecated Use mapBackendToFrontend() instead for consistent field mapping
+   * This method is kept for backward compatibility but delegates to mapBackendToFrontend
    */
   static extractAnalysisData(rawData: any): any {
-    // Handle nested data structures from edge functions
-    if (rawData?.data) {
-      return this.mapBackendToFrontend(rawData.data);
-    }
-
-    // Handle direct analysis data
-    if (rawData?.analysis) {
-      return this.mapBackendToFrontend(rawData.analysis);
-    }
-
-    // Handle raw analysis object
+    console.warn('⚠️ extractAnalysisData is deprecated. Use mapBackendToFrontend() directly.');
     return this.mapBackendToFrontend(rawData);
   }
 }

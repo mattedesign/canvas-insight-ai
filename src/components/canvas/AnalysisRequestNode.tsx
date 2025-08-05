@@ -74,8 +74,8 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
             });
             setIsComplete(true);
             if (onAnalysisComplete) {
-              // Apply the data mapper before passing the analysis result
-              const mappedResult = AnalysisDataMapper.extractAnalysisData(result);
+              // Apply the data mapper for consistent field mapping
+              const mappedResult = AnalysisDataMapper.mapBackendToFrontend(analysisData);
               onAnalysisComplete(mappedResult);
             }
           } else {
