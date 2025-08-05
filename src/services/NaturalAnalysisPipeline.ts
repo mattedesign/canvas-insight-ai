@@ -422,23 +422,26 @@ export class NaturalAnalysisPipeline {
       .slice(0, 8) // Limit to 8 visual annotations
       .map((insight, index) => ({
         id: `insight-${index}`,
-        x: 50 + (index % 4) * 200, // Distribute across interface
-        y: 50 + Math.floor(index / 4) * 150,
+        x: 0.2 + (index % 3) * 0.3,  // 3 columns: 0.2, 0.5, 0.8
+        y: 0.2 + Math.floor(index / 3) * 0.3,  // Multiple rows
         type: this.mapSeverityToType(insight.severity),
         title: insight.title,
         description: insight.description,
         severity: insight.severity
       }));
 
-    // Generate dynamic suggestions from insights
+    // Generate dynamic suggestions from insights - preserve original content
     const suggestions = interpretedResult.insights.map((insight, index) => ({
       id: `suggestion-${index}`,
       category: this.mapToSuggestionCategory(insight.category),
       title: insight.title,
-      description: insight.description,
+      description: insight.description, // Preserve original description
       impact: this.mapSeverityToImpact(insight.severity),
       effort: this.estimateEffort(insight),
-      actionItems: insight.suggestions,
+      actionItems: insight.suggestions.length > 0 ? insight.suggestions : [
+        `Address ${insight.category.replace(/_/g, ' ')} issues`,
+        `Implement specific improvements for ${insight.title}`
+      ],
       relatedAnnotations: [`insight-${index}`]
     }));
 

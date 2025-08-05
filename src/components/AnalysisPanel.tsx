@@ -45,56 +45,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
   // Update current analysis when prop changes
   useEffect(() => {
     setCurrentAnalysis(analysis);
-    
-    // 🔍 Analysis Panel - Debug logging
-    console.log('🔍 Analysis Panel - Received data:', {
-      hasAnalysis: !!analysis,
-      analysisId: analysis?.id,
-      hasSuggestions: !!analysis?.suggestions,
-      suggestionsCount: analysis?.suggestions?.length,
-      hasVisualAnnotations: !!analysis?.visualAnnotations,
-      annotationsCount: analysis?.visualAnnotations?.length,
-      overallScore: analysis?.summary?.overallScore,
-      hasImage: !!image,
-      imageUrl: image?.url
-    });
-    
-    // Check for common field mapping issues
-    if (analysis) {
-      const anyAnalysis = analysis as any; // Type assertion for checking old field names
-      console.log('🔍 Analysis Panel - Field check:', {
-        hasOldFieldNames: {
-          visual_annotations: !!anyAnalysis.visual_annotations,
-          user_context: !!anyAnalysis.user_context,
-          image_id: !!anyAnalysis.image_id
-        },
-        hasNewFieldNames: {
-          visualAnnotations: !!analysis.visualAnnotations,
-          userContext: !!analysis.userContext,
-          imageId: !!analysis.imageId
-        },
-        summaryStructure: analysis.summary ? Object.keys(analysis.summary) : 'no summary'
-      });
-    }
   }, [analysis]);
-
-  // Add temporary test render if analysis exists
-  if (analysis && !currentAnalysis) {
-    return (
-      <div style={{ padding: 20, background: 'white', color: 'black', position: 'fixed', top: 0, left: 0, zIndex: 9999, width: '500px', height: '400px', overflow: 'auto' }}>
-        <h2>Analysis Debug View</h2>
-        <p>ID: {analysis.id}</p>
-        <p>Image: {analysis.imageName}</p>
-        <p>Score: {analysis.summary?.overallScore}</p>
-        <p>Suggestions: {analysis.suggestions?.length || 0}</p>
-        <p>Annotations: {analysis.visualAnnotations?.length || 0}</p>
-        <details>
-          <summary>Raw Data</summary>
-          <pre>{JSON.stringify(analysis, null, 2)}</pre>
-        </details>
-      </div>
-    );
-  }
 
   if (!currentAnalysis || !image) return null;
 

@@ -3317,24 +3317,38 @@ async function synthesizeMultiModelResults(
           domainKeys.forEach((key, index) => {
             const domainData = result[key];
             if (domainData && typeof domainData === 'object') {
-              // Create suggestion from domain analysis using Smart Text Formatter
+              // Create suggestion from domain analysis - PRESERVE ORIGINAL CONTENT
               const smartDescription = SmartTextFormatter.formatAnalysisDescription(domainData);
+              
+              // Extract actual action items from Claude's response
+              const actionItems = [];
+              if (typeof domainData === 'object') {
+                Object.entries(domainData).forEach(([k, v]) => {
+                  if (typeof v === 'string' && v.length > 10) {
+                    actionItems.push(`${k.replace(/_/g, ' ')}: ${v}`);
+                  }
+                });
+              }
+              
               convertedSuggestions.push({
                 id: `converted_${index + 1}`,
                 category: 'usability',
-                title: `${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Improvement`,
+                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
                 description: smartDescription || SmartTextFormatter.formatFallback(domainData),
                 impact: 'medium',
                 effort: 'medium',
-                actionItems: ['Review analysis findings', 'Implement recommended changes']
+                actionItems: actionItems.length > 0 ? actionItems : [
+                  `Address ${key.replace(/_/g, ' ')} issues`,
+                  `Implement specific improvements for ${key.replace(/_/g, ' ')}`
+                ]
               });
               
-              // Create annotation from domain analysis with improved context
+              // Create annotation from domain analysis with improved context - USE GRID LAYOUT
               const annotationDescription = generateContextualAnnotationDescription(key, domainData);
               convertedAnnotations.push({
                 id: `converted_ann_${index + 1}`,
-                x: 0.5,
-                y: 0.3 + (index * 0.1),
+                x: 0.2 + (index % 3) * 0.3,  // 3 columns: 0.2, 0.5, 0.8
+                y: 0.2 + Math.floor(index / 3) * 0.3,  // Multiple rows
                 type: 'suggestion',
                 title: `${key.replace(/_/g, ' ')} Area`,
                 description: annotationDescription,
@@ -4475,8 +4489,8 @@ function createMemoryEfficientSynthesis(modelResults: any[], context: any): any 
     userContext: context.userContext || '',
     visualAnnotations: allInsights.slice(0, 4).map((insight, index) => ({
       id: `mem_annotation_${index}`,
-      x: 0.2 + (index * 0.2),
-      y: 0.3,
+      x: 0.2 + (index % 2) * 0.6,  // 2 columns: 0.2, 0.8
+      y: 0.3 + Math.floor(index / 2) * 0.4,  // 2 rows
       type: 'suggestion',
       title: insight.title || `Insight ${index + 1}`,
       description: insight.description || insight.text || 'UX insight identified',
@@ -4521,8 +4535,8 @@ function convertInterpretedToUXAnalysis(interpretedData: any, naturalData: any, 
     ?.slice(0, 8)
     ?.map((insight: any, index: number) => ({
       id: `insight-${index}`,
-      x: 50 + (index % 4) * 200,
-      y: 50 + Math.floor(index / 4) * 150,
+      x: 0.2 + (index % 3) * 0.3,  // 3 columns: 0.2, 0.5, 0.8
+      y: 0.2 + Math.floor(index / 3) * 0.3,  // Multiple rows
       type: mapSeverityToType(insight.severity),
       title: insight.title,
       description: insight.description,

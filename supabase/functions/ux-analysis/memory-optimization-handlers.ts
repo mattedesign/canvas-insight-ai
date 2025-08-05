@@ -284,8 +284,8 @@ function createMemoryEfficientSynthesis(modelResults: any[], context: any): any 
     userContext: context.userContext || '',
     visualAnnotations: allInsights.slice(0, 4).map((insight, index) => ({
       id: `mem_annotation_${index}`,
-      x: 0.2 + (index * 0.2),
-      y: 0.3,
+      x: 0.2 + (index % 2) * 0.6,  // 2 columns: 0.2, 0.8
+      y: 0.3 + Math.floor(index / 2) * 0.4,  // 2 rows
       type: 'suggestion',
       title: insight.title || `Insight ${index + 1}`,
       description: insight.description || insight.text || 'UX insight identified',
