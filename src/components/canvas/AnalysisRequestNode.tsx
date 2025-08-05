@@ -60,31 +60,61 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
         .then((result) => {
           if (!isMountedRef.current) return; // Check if still mounted
           
-          console.log('[AnalysisRequestNode] Analysis result:', result);
+          // STEP 1: Add Debug Code - Log raw analysis result
+          console.log('[AnalysisRequestNode] Raw analysis result:', JSON.stringify(result, null, 2));
           
-          // Validate result structure before marking complete
-          const analysisData = result?.data || result;
-          const validation = AnalysisDebugger.validateAnalysisStructure(analysisData);
+          // Check if it's wrapped in a response object
+          if (result?.data) {
+            console.log('[AnalysisRequestNode] Found wrapped data:', JSON.stringify(result.data, null, 2));
+          }
           
-          if (validation.valid) {
+          // STEP 2: Complete Fix - Handle nested data structures
+          const handleAnalysisComplete = (rawResult: any) => {
+            console.log('[AnalysisRequestNode] Handling analysis completion:', rawResult);
+            
+            // Extract the actual analysis data from nested structures
+            let analysisData = rawResult;
+            
+            // Check for success wrapper
+            if (rawResult?.success && rawResult?.data) {
+              analysisData = rawResult.data;
+            }
+            
+            // Check for synthesizedResult
+            if (analysisData?.synthesizedResult) {
+              analysisData = analysisData.synthesizedResult;
+            }
+            
+            // Apply the mapper
+            const mappedData = AnalysisDataMapper.mapBackendToFrontend(analysisData);
+            console.log('[AnalysisRequestNode] Mapped result:', JSON.stringify(mappedData, null, 2));
+            
+            // Validate we have the required fields
+            if (!mappedData.imageId || !mappedData.suggestions) {
+              console.error('[AnalysisRequestNode] Missing required fields after mapping:', {
+                hasImageId: !!mappedData.imageId,
+                hasSuggestions: !!mappedData.suggestions,
+                hasVisualAnnotations: !!mappedData.visualAnnotations
+              });
+              setError('Analysis returned incomplete data - missing required fields');
+              return;
+            }
+            
             AnalysisDebugger.log('AnalysisRequestNode', AnalysisLifecycle.ANALYSIS_COMPLETED, { 
               imageId, 
               imageName,
-              analysisId: analysisData.id 
+              analysisId: mappedData.id 
             });
             setIsComplete(true);
+            
+            // Pass the properly mapped data
             if (onAnalysisComplete) {
-              // Apply the data mapper for consistent field mapping
-              const mappedResult = AnalysisDataMapper.mapBackendToFrontend(analysisData);
-              onAnalysisComplete(mappedResult);
+              onAnalysisComplete(mappedData);
             }
-          } else {
-            AnalysisDebugger.log('AnalysisRequestNode', 'VALIDATION_FAILED', { 
-              imageId, 
-              issues: validation.issues 
-            });
-            setError('Analysis returned invalid or incomplete data');
-          }
+          };
+          
+          // Process the result
+          handleAnalysisComplete(result);
         })
         .catch((err) => {
           if (!isMountedRef.current) return; // Check if still mounted
