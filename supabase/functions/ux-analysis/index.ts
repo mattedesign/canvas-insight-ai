@@ -13,6 +13,10 @@ class SmartTextFormatter {
 
     // Handle different data structures
     if (typeof data === 'string') {
+      // If it's already a good string description, return it directly
+      if (data.length > 20 && !data.includes('{') && !data.includes('[')) {
+        return data;
+      }
       try {
         data = JSON.parse(data);
       } catch {
@@ -20,17 +24,20 @@ class SmartTextFormatter {
       }
     }
 
-    // Extract key information
+    // PRIORITIZE ORIGINAL AI CONTENT - Look for detailed insights first
+    const directInsights = this.extractDirectInsights(data);
+    if (directInsights.length > 0) {
+      return directInsights.join(' ');
+    }
+
+    // Extract key information only if no direct insights found
     const domain = data.domain || data.detectedDomain || 'general';
     const screenType = data.screen_type || data.screenType || data.interfaceType || 'interface';
     const findings = data.findings || data.analysis || data;
 
     let description = '';
 
-    // Start with domain and screen type context
-    description += this.formatContextIntro(domain, screenType);
-
-    // Add main findings
+    // Skip generic intro, focus on findings
     if (findings) {
       description += this.formatFindings(findings, domain);
     }
@@ -40,7 +47,71 @@ class SmartTextFormatter {
       description += this.formatSuggestions(data.suggestions);
     }
 
-    return description.trim();
+    return description.trim() || 'Detailed analysis findings are available for review.';
+  }
+
+  private static extractDirectInsights(data: any): string[] {
+    const insights: string[] = [];
+    
+    if (!data || typeof data !== 'object') return insights;
+    
+    // Look for direct insight fields that contain meaningful AI-generated content
+    const insightFields = [
+      'insight', 'finding', 'recommendation', 'analysis', 'description', 
+      'summary', 'observation', 'assessment', 'evaluation', 'review'
+    ];
+    
+    insightFields.forEach(field => {
+      if (data[field] && typeof data[field] === 'string' && data[field].length > 30) {
+        // Filter out generic templates
+        if (!data[field].includes('requires optimization') && 
+            !data[field].includes('needs improvement') &&
+            !data[field].includes('should be considered')) {
+          insights.push(data[field]);
+        }
+      }
+    });
+    
+    // Look for detailed content in nested objects
+    Object.values(data).forEach(value => {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        const nestedInsights = this.extractDirectInsights(value);
+        insights.push(...nestedInsights);
+      }
+    });
+    
+    // Look for meaningful string values that appear to be AI-generated insights
+    Object.entries(data).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.length > 40 && value.length < 500) {
+        // Check if this looks like actual AI analysis content
+        if (this.isActualInsight(value)) {
+          insights.push(value);
+        }
+      }
+    });
+    
+    return insights.slice(0, 3); // Limit to top 3 most relevant insights
+  }
+  
+  private static isActualInsight(text: string): boolean {
+    // Check if text contains specific analysis language rather than generic templates
+    const specificIndicators = [
+      'specifically', 'particularly', 'notably', 'however', 'although', 'because',
+      'users', 'interface', 'design', 'layout', 'content', 'navigation',
+      'visual hierarchy', 'user experience', 'accessibility', 'usability'
+    ];
+    
+    const genericIndicators = [
+      'requires optimization', 'needs improvement', 'should be enhanced',
+      'area identified for improvement', 'benefits from review'
+    ];
+    
+    const hasSpecific = specificIndicators.some(indicator => 
+      text.toLowerCase().includes(indicator));
+    const hasGeneric = genericIndicators.some(indicator => 
+      text.toLowerCase().includes(indicator));
+    
+    return hasSpecific && !hasGeneric;
   }
 
   private static formatContextIntro(domain: string, screenType: string): string {
@@ -80,15 +151,19 @@ class SmartTextFormatter {
       return findings + ' ';
     }
 
-    // E-commerce specific formatting
+    // FIRST: Try to extract original AI insights before using domain-specific templates
+    const originalInsights = this.extractInsights(findings);
+    if (originalInsights.length > 0) {
+      return originalInsights.join(' ') + ' ';
+    }
+
+    // FALLBACK: Only use domain-specific formatting if no original insights found
     if (domain.toLowerCase().includes('ecommerce') || domain.toLowerCase().includes('commerce')) {
       result += this.formatEcommerceFindings(findings);
     }
-    // Finance specific formatting
     else if (domain.toLowerCase().includes('finance') || domain.toLowerCase().includes('banking')) {
       result += this.formatFinanceFindings(findings);
     }
-    // General formatting
     else {
       result += this.formatGeneralFindings(findings);
     }
@@ -3318,30 +3393,21 @@ async function synthesizeMultiModelResults(
           domainKeys.forEach((key, index) => {
             const domainData = result[key];
             if (domainData && typeof domainData === 'object') {
-              // Create suggestion from domain analysis - PRESERVE ORIGINAL CONTENT
-              const smartDescription = SmartTextFormatter.formatAnalysisDescription(domainData);
+              // PRESERVE ORIGINAL AI CONTENT - Extract detailed insights directly
+              const aiGeneratedDescription = extractSpecificAIInsights(domainData);
               
-              // Extract actual action items from Claude's response
-              const actionItems = [];
-              if (typeof domainData === 'object') {
-                Object.entries(domainData).forEach(([k, v]) => {
-                  if (typeof v === 'string' && v.length > 10) {
-                    actionItems.push(`${k.replace(/_/g, ' ')}: ${v}`);
-                  }
-                });
-              }
+              // Extract actual detailed action items from AI response
+              const actionItems = extractDetailedActionItems(domainData);
               
               convertedSuggestions.push({
                 id: `converted_${index + 1}`,
-                category: 'usability',
-                title: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                description: smartDescription || SmartTextFormatter.formatFallback(domainData),
-                impact: 'medium',
-                effort: 'medium',
-                actionItems: actionItems.length > 0 ? actionItems : [
-                  `Address ${key.replace(/_/g, ' ')} issues`,
-                  `Implement specific improvements for ${key.replace(/_/g, ' ')}`
-                ]
+                category: mapKeyToCategory(key),
+                title: createSpecificTitle(key, domainData),
+                description: aiGeneratedDescription,
+                impact: inferImpactLevel(domainData),
+                effort: inferEffortLevel(domainData),
+                actionItems: actionItems.length > 0 ? actionItems : extractFallbackActionItems(key, domainData),
+                relatedAnnotations: []
               });
               
               // Create annotation from domain analysis with improved context - USE GRID LAYOUT
@@ -3929,25 +3995,280 @@ function generateContextualFallbackAnnotations(userContext: string, interfaceHin
 }
 
 function generateContextualAnnotationDescription(key: string, domainData: any): string {
-  // Generate contextual descriptions for annotations based on domain analysis key
-  const keyMappings: Record<string, string> = {
-    cart_and_checkout_flow_optimization: 'Shopping cart and checkout process requires optimization for better conversion rates and user experience.',
-    product_presentation: 'Product display and presentation elements need enhancement to improve user engagement and sales conversion.',
-    navigation_usability: 'Navigation structure and usability improvements needed to enhance user flow and findability.',
-    mobile_responsiveness: 'Mobile responsive design elements require attention for optimal cross-device experience.',
-    accessibility_compliance: 'Accessibility features and compliance standards need improvement for inclusive user experience.',
-    page_loading_performance: 'Page loading speed and performance optimization needed to reduce bounce rates.',
-    visual_hierarchy: 'Visual hierarchy and information organization require restructuring for better user comprehension.',
-    trust_signals: 'Trust indicators and security signals need enhancement to improve user confidence.',
-    call_to_action_optimization: 'Call-to-action elements require optimization for better visibility and conversion rates.',
-    form_usability: 'Form design and usability improvements needed to reduce abandonment and increase completion rates.'
+  // PRESERVE ORIGINAL AI CONTENT - Extract actual detailed insights from AI analysis
+  
+  // Try to extract the most specific and actionable insight from the AI response
+  if (domainData && typeof domainData === 'object') {
+    // Look for specific findings or recommendations in the AI data
+    const specificFindings = [];
+    
+    Object.entries(domainData).forEach(([subKey, value]) => {
+      if (typeof value === 'string' && value.length > 20 && value.length < 300) {
+        // This looks like actual AI-generated insight content
+        specificFindings.push(value);
+      } else if (Array.isArray(value)) {
+        // Extract from arrays of insights
+        value.forEach(item => {
+          if (typeof item === 'string' && item.length > 20 && item.length < 300) {
+            specificFindings.push(item);
+          } else if (typeof item === 'object' && item.description) {
+            specificFindings.push(item.description);
+          }
+        });
+      } else if (typeof value === 'object' && value !== null) {
+        // Check nested objects for detailed content
+        if (value.finding || value.insight || value.recommendation) {
+          const content = value.finding || value.insight || value.recommendation;
+          if (typeof content === 'string' && content.length > 20) {
+            specificFindings.push(content);
+          }
+        }
+      }
+    });
+    
+    // Return the most detailed and specific finding
+    if (specificFindings.length > 0) {
+      // Sort by length and specificity, prefer longer detailed descriptions
+      const bestFinding = specificFindings
+        .filter(finding => !finding.includes('should be') && !finding.includes('requires'))
+        .sort((a, b) => b.length - a.length)[0] || specificFindings[0];
+      
+      return bestFinding;
+    }
+    
+    // If we have structured data but no specific findings, try to extract meaningful content
+    if (domainData.summary) {
+      return domainData.summary;
+    }
+    
+    if (domainData.description) {
+      return domainData.description;
+    }
+    
+    // Try to convert the object content to a meaningful description
+    const entries = Object.entries(domainData)
+      .filter(([k, v]) => typeof v === 'string' && v.length > 10)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
+      .slice(0, 2); // Limit to avoid overwhelming
+    
+    if (entries.length > 0) {
+      return entries.join('. ');
+    }
+  }
+  
+  // Only use generic fallback if we absolutely cannot extract specific content
+  const fallbackDescription = `Analysis identified specific ${key.replace(/_/g, ' ')} considerations that require attention based on detailed review.`;
+  
+  return fallbackDescription;
+}
+
+// ENHANCED AI CONTENT EXTRACTION FUNCTIONS
+function extractSpecificAIInsights(domainData: any): string {
+  if (!domainData || typeof domainData !== 'object') {
+    return 'Analysis provided detailed insights for review.';
+  }
+
+  // Look for direct insight fields first
+  const directFields = ['insight', 'finding', 'recommendation', 'analysis', 'description'];
+  for (const field of directFields) {
+    if (domainData[field] && typeof domainData[field] === 'string' && domainData[field].length > 20) {
+      return domainData[field];
+    }
+  }
+
+  // Extract the most descriptive string values
+  const meaningfulStrings = [];
+  Object.entries(domainData).forEach(([key, value]) => {
+    if (typeof value === 'string' && value.length > 20 && value.length < 500) {
+      // Exclude obviously generated keys or generic content
+      if (!value.includes('requires optimization') && !value.includes('needs improvement')) {
+        meaningfulStrings.push(value);
+      }
+    }
+  });
+
+  if (meaningfulStrings.length > 0) {
+    // Return the longest, most detailed insight
+    return meaningfulStrings.sort((a, b) => b.length - a.length)[0];
+  }
+
+  // Try to construct from multiple shorter insights
+  const shortInsights = [];
+  Object.entries(domainData).forEach(([key, value]) => {
+    if (typeof value === 'string' && value.length > 10 && value.length <= 20) {
+      shortInsights.push(`${key.replace(/_/g, ' ')}: ${value}`);
+    }
+  });
+
+  if (shortInsights.length > 0) {
+    return shortInsights.slice(0, 3).join('. ');
+  }
+
+  return 'Detailed analysis findings available for this area.';
+}
+
+function extractDetailedActionItems(domainData: any): string[] {
+  const actionItems = [];
+  
+  if (!domainData || typeof domainData !== 'object') {
+    return actionItems;
+  }
+
+  // Look for action-oriented fields
+  const actionFields = ['actions', 'recommendations', 'improvements', 'suggestions', 'steps'];
+  
+  actionFields.forEach(field => {
+    if (domainData[field]) {
+      if (Array.isArray(domainData[field])) {
+        domainData[field].forEach((item: any) => {
+          if (typeof item === 'string' && item.length > 10) {
+            actionItems.push(item);
+          } else if (typeof item === 'object' && item.action) {
+            actionItems.push(item.action);
+          }
+        });
+      } else if (typeof domainData[field] === 'string') {
+        actionItems.push(domainData[field]);
+      }
+    }
+  });
+
+  // Extract action-oriented content from all string fields
+  Object.entries(domainData).forEach(([key, value]) => {
+    if (typeof value === 'string' && value.length > 15) {
+      // Look for action-oriented language
+      if (value.includes('should') || value.includes('consider') || value.includes('implement') || 
+          value.includes('improve') || value.includes('optimize') || value.includes('enhance')) {
+        actionItems.push(value);
+      }
+    }
+  });
+
+  // Deduplicate and limit
+  const uniqueActions = [...new Set(actionItems)];
+  return uniqueActions.slice(0, 5); // Limit to top 5 action items
+}
+
+function mapKeyToCategory(key: string): string {
+  const categoryMappings: Record<string, string> = {
+    accessibility: 'accessibility',
+    visual: 'visual',
+    usability: 'usability',
+    performance: 'performance',
+    content: 'content',
+    navigation: 'usability',
+    mobile: 'usability',
+    security: 'usability',
+    trust: 'visual',
+    form: 'usability',
+    checkout: 'usability',
+    cart: 'usability',
+    product: 'content'
   };
 
-  // Use predefined mapping or generate from key
-  const description = keyMappings[key] || 
-    `${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} area identified for improvement based on analysis findings.`;
+  // Find category based on key content
+  for (const [category, mapping] of Object.entries(categoryMappings)) {
+    if (key.toLowerCase().includes(category)) {
+      return mapping;
+    }
+  }
 
-  return description;
+  return 'usability'; // Default category
+}
+
+function createSpecificTitle(key: string, domainData: any): string {
+  // Try to extract a specific title from the data
+  if (domainData.title) {
+    return domainData.title;
+  }
+
+  if (domainData.issue_title || domainData.issueTitle) {
+    return domainData.issue_title || domainData.issueTitle;
+  }
+
+  // Create a more specific title based on content
+  const keyWords = key.replace(/_/g, ' ').split(' ');
+  const meaningfulWords = keyWords.filter(word => 
+    !['and', 'the', 'a', 'an', 'is', 'are', 'of', 'for', 'with'].includes(word.toLowerCase())
+  );
+
+  // Capitalize properly
+  const title = meaningfulWords
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  return title || 'Interface Analysis Finding';
+}
+
+function inferImpactLevel(domainData: any): string {
+  if (!domainData || typeof domainData !== 'object') return 'medium';
+
+  // Look for explicit impact indicators
+  if (domainData.impact) {
+    return domainData.impact.toLowerCase();
+  }
+
+  if (domainData.priority) {
+    const priority = domainData.priority.toLowerCase();
+    return priority === 'critical' ? 'high' : priority === 'low' ? 'low' : 'medium';
+  }
+
+  // Infer from content
+  const content = JSON.stringify(domainData).toLowerCase();
+  
+  if (content.includes('critical') || content.includes('urgent') || content.includes('broken')) {
+    return 'high';
+  }
+  
+  if (content.includes('minor') || content.includes('cosmetic') || content.includes('nice to have')) {
+    return 'low';
+  }
+  
+  return 'medium';
+}
+
+function inferEffortLevel(domainData: any): string {
+  if (!domainData || typeof domainData !== 'object') return 'medium';
+
+  // Look for explicit effort indicators
+  if (domainData.effort || domainData.complexity) {
+    const level = (domainData.effort || domainData.complexity).toLowerCase();
+    return ['low', 'medium', 'high'].includes(level) ? level : 'medium';
+  }
+
+  // Infer from content type and complexity
+  const content = JSON.stringify(domainData).toLowerCase();
+  
+  if (content.includes('redesign') || content.includes('rebuild') || content.includes('major')) {
+    return 'high';
+  }
+  
+  if (content.includes('color') || content.includes('text') || content.includes('spacing')) {
+    return 'low';
+  }
+  
+  return 'medium';
+}
+
+function extractFallbackActionItems(key: string, domainData: any): string[] {
+  // Create specific action items based on the analysis area
+  const area = key.replace(/_/g, ' ');
+  
+  const baseActions = [
+    `Review and analyze ${area} implementation`,
+    `Identify specific ${area} improvement opportunities`,
+    `Implement targeted ${area} enhancements`
+  ];
+
+  // Add content-specific actions if we have data
+  if (domainData && typeof domainData === 'object') {
+    const dataKeys = Object.keys(domainData);
+    if (dataKeys.length > 0) {
+      baseActions.push(`Address ${dataKeys.slice(0, 2).join(' and ')} specific findings`);
+    }
+  }
+
+  return baseActions.slice(0, 3);
 }
 
 function generateContextualFallbackSummary(userContext: string, interfaceHints: any): any {
