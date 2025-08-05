@@ -209,84 +209,95 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
           )}
         </div>
         
-        {/* Key Issues - Only show if actual data exists */}
-        {(safeAnalysis.summary.keyIssues?.length || 0) > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <h4 className="font-medium text-foreground text-sm">Key Issues</h4>
-              <Badge variant="outline" className="text-xs">
-                {safeAnalysis.summary.keyIssues.length}
-              </Badge>
-            </div>
-            <div className="space-y-1">
-              {safeAnalysis.summary.keyIssues.slice(0, 3).map((issue, index) => (
-                <div key={index} className="text-sm text-muted-foreground pl-2 border-l-2 border-destructive/30">
-                  {issue}
-                </div>
-              ))}
-              {safeAnalysis.summary.keyIssues.length > 3 && (
-                <div className="text-xs text-muted-foreground text-center pt-1">
-                  +{safeAnalysis.summary.keyIssues.length - 3} more issues
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Strengths - Only show if actual data exists */}
-        {(safeAnalysis.summary.strengths?.length || 0) > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <h4 className="font-medium text-foreground text-sm">Strengths</h4>
-              <Badge variant="outline" className="text-xs">
-                {safeAnalysis.summary.strengths.length}
-              </Badge>
-            </div>
-            <div className="space-y-1">
-              {safeAnalysis.summary.strengths.slice(0, 2).map((strength, index) => (
-                <div key={index} className="text-sm text-muted-foreground pl-2 border-l-2 border-green-600/30">
-                  {strength}
-                </div>
-              ))}
-              {safeAnalysis.summary.strengths.length > 2 && (
-                <div className="text-xs text-muted-foreground text-center pt-1">
-                  +{safeAnalysis.summary.strengths.length - 2} more strengths
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Strategic Business Insights - Priority Display */}
+        {(() => {
+          // Extract strategic insights from various potential locations
+          const strategicInsights = safeAnalysis.strategicInsights || 
+                                   safeAnalysis.metadata?.strategic_summary || 
+                                   safeAnalysis.metadata?.strategicInsights || 
+                                   safeAnalysis.metadata?.naturalAnalysisMetadata?.domainSpecificFindings?.strategic;
 
-        {/* Suggestions Preview */}
-        <div className="pt-2 border-t border-border space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">Top Suggestions</span>
-            </div>
-            <Badge variant="outline">
-              {safeAnalysis.suggestions.length}
-            </Badge>
-          </div>
-          
-          {safeAnalysis.suggestions.slice(0, 2).map((suggestion, index) => (
-            <div key={index} className="text-xs text-muted-foreground p-2 bg-muted/30 rounded border-l-2 border-primary/50">
-              <div className="flex items-center gap-1 mb-1">
-                {getSuggestionIcon(suggestion.category)}
-                <span className="font-medium capitalize">{suggestion.category}</span>
+          if (strategicInsights?.primaryConcern || strategicInsights?.strategicRecommendation) {
+            return (
+              <div className="space-y-4 pt-2 border-t border-border">
+                {/* Primary Business Challenge */}
+                {strategicInsights.primaryConcern && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <h4 className="font-medium text-foreground text-sm">Primary Business Challenge</h4>
+                    </div>
+                    <div className="text-sm text-muted-foreground pl-2 border-l-2 border-destructive/30 bg-destructive/5 p-2 rounded-r">
+                      {strategicInsights.primaryConcern}
+                    </div>
+                  </div>
+                )}
+
+                {/* Strategic Intervention */}
+                {strategicInsights.strategicRecommendation && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium text-foreground text-sm">Strategic Intervention</h4>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-foreground pl-2 border-l-2 border-primary/50">
+                        {strategicInsights.strategicRecommendation.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded border-l-2 border-primary">
+                        {strategicInsights.strategicRecommendation.expectedOutcome}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>{suggestion.title}</div>
+            );
+          }
+
+          // Fallback to legacy data only if no strategic insights
+          const hasLegacyData = (safeAnalysis.summary.keyIssues?.length || 0) > 0 || 
+                               (safeAnalysis.summary.strengths?.length || 0) > 0 ||
+                               safeAnalysis.suggestions?.length > 0;
+
+          if (!hasLegacyData) return null;
+
+          return (
+            <div className="pt-2 border-t border-border space-y-4">
+              {/* Legacy Key Issues - Reduced prominence */}
+              {(safeAnalysis.summary.keyIssues?.length || 0) > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-3 w-3 text-destructive" />
+                    <h4 className="font-medium text-foreground text-xs">Key Issues</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {safeAnalysis.summary.keyIssues.length}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-2 border-l-2 border-destructive/20">
+                    {safeAnalysis.summary.keyIssues.slice(0, 2).join(', ')}
+                    {safeAnalysis.summary.keyIssues.length > 2 && ` (+${safeAnalysis.summary.keyIssues.length - 2} more)`}
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Suggestions - Reframed as Implementation Details */}
+              {safeAnalysis.suggestions?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-3 w-3 text-primary" />
+                    <span className="text-xs font-medium text-foreground">Implementation Details</span>
+                    <Badge variant="outline" className="text-xs">
+                      {safeAnalysis.suggestions.length}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {safeAnalysis.suggestions.slice(0, 2).map(s => s.category).join(', ')} optimizations available
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
-          
-          {safeAnalysis.suggestions.length > 2 && (
-            <div className="text-xs text-muted-foreground text-center">
-              +{safeAnalysis.suggestions.length - 2} more suggestions
-            </div>
-          )}
-        </div>
+          );
+        })()}
         
         {/* Action Buttons */}
         <div className="pt-2 space-y-2">

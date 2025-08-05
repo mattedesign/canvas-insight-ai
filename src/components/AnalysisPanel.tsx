@@ -187,14 +187,35 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
             </CardHeader>
           </Card>
 
-          {/* Category Scores */}
+          {/* Strategic Business Insights - Priority Display */}
+          {strategicInsights && (
+            <StrategicInsightsPanel insights={strategicInsights} />
+          )}
+
+          {/* Category Scores with Business Context */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>Category Breakdown</CardTitle>
+              <CardTitle>Business Impact Assessment</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Performance metrics indicating potential business impact areas
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               {Object.entries(currentAnalysis.summary?.categoryScores || {}).map(([category, score]) => {
                 const safeScore = typeof score === 'number' ? score : 0;
+                const getBusinessContext = (cat: string, score: number) => {
+                  if (score < 60) {
+                    switch (cat) {
+                      case 'usability': return 'May impact user satisfaction and retention';
+                      case 'accessibility': return 'Could limit market reach and compliance';
+                      case 'visual': return 'May affect brand perception and engagement';
+                      case 'content': return 'Could reduce conversion and clarity';
+                      default: return 'Requires strategic attention';
+                    }
+                  }
+                  return '';
+                };
+                
                 return (
                   <div key={category} className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -205,6 +226,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
                       <span className={`font-medium ${getScoreColor(safeScore)}`}>{safeScore}%</span>
                     </div>
                     <Progress value={safeScore} className="h-2" />
+                    {getBusinessContext(category, safeScore) && (
+                      <p className="text-xs text-muted-foreground italic pl-6">
+                        {getBusinessContext(category, safeScore)}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -216,63 +242,66 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
             </CardContent>
           </Card>
 
-          {/* Key Issues */}
-          {(currentAnalysis.summary?.keyIssues?.length || 0) > 0 && (
+          {/* Legacy Data - Reduced Prominence */}
+          {((currentAnalysis.summary?.keyIssues?.length || 0) > 0 || (currentAnalysis.summary?.strengths?.length || 0) > 0) && (
             <Card>
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <CardTitle>Key Issues</CardTitle>
-                  <Badge variant="outline">{currentAnalysis.summary?.keyIssues?.length || 0}</Badge>
-                </div>
+                <CardTitle className="text-base">Technical Observations</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Detailed technical findings for implementation reference
+                </p>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {(currentAnalysis.summary?.keyIssues || []).map((issue, index) => (
-                    <div key={index} className="p-3 bg-destructive/5 border-l-2 border-destructive/30 rounded-r">
-                      <p className="text-sm text-foreground">{issue}</p>
+              <CardContent className="space-y-4">
+                {/* Key Issues - Reduced prominence */}
+                {(currentAnalysis.summary?.keyIssues?.length || 0) > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <h4 className="font-medium text-foreground text-sm">Technical Issues</h4>
+                      <Badge variant="outline" className="text-xs">{currentAnalysis.summary?.keyIssues?.length || 0}</Badge>
                     </div>
-                  ))}
-                </div>
+                    <div className="grid gap-2">
+                      {(currentAnalysis.summary?.keyIssues || []).map((issue, index) => (
+                        <div key={index} className="p-2 bg-destructive/5 border-l-2 border-destructive/20 rounded-r text-sm">
+                          {issue}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Strengths - Reduced prominence */}
+                {(currentAnalysis.summary?.strengths?.length || 0) > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <h4 className="font-medium text-foreground text-sm">Technical Strengths</h4>
+                      <Badge variant="outline" className="text-xs">{currentAnalysis.summary?.strengths?.length || 0}</Badge>
+                    </div>
+                    <div className="grid gap-2">
+                      {(currentAnalysis.summary?.strengths || []).map((strength, index) => (
+                        <div key={index} className="p-2 bg-green-50 dark:bg-green-950/20 border-l-2 border-green-600/20 rounded-r text-sm">
+                          {strength}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Strengths */}
-          {(currentAnalysis.summary?.strengths?.length || 0) > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <CardTitle>Strengths</CardTitle>
-                  <Badge variant="outline">{currentAnalysis.summary?.strengths?.length || 0}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {(currentAnalysis.summary?.strengths || []).map((strength, index) => (
-                    <div key={index} className="p-3 bg-green-50 dark:bg-green-950/20 border-l-2 border-green-600/30 rounded-r">
-                      <p className="text-sm text-foreground">{strength}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Strategic Business Insights */}
-          {strategicInsights && (
-            <StrategicInsightsPanel insights={strategicInsights} />
-          )}
-
-          {/* Detailed Suggestions */}
+          {/* Implementation Details - Reframed Suggestions */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Lightbulb className="h-5 w-5 text-primary" />
-                <CardTitle>Detailed Suggestions</CardTitle>
+                <CardTitle>Implementation Roadmap</CardTitle>
                 <Badge variant="outline">{currentAnalysis.suggestions.length}</Badge>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Prioritized action items to achieve strategic improvements
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
