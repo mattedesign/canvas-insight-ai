@@ -291,53 +291,47 @@ export class NaturalAnalysisPipeline {
   }
 
   /**
-   * Collect natural insights from AI models using ux-analysis function with memory optimizations
+   * Collect natural insights from AI models using new delegated architecture
    */
   private async collectNaturalInsights(request: NaturalAnalysisRequest): Promise<NaturalAnalysisResult> {
-    console.log('🎯 Collecting natural insights using memory-optimized ux-analysis function...');
+    console.log('🎯 Collecting natural insights using new delegated architecture...');
     
-    const { data, error } = await supabase.functions.invoke('ux-analysis', {
+    // Step 1: Collect raw insights from natural-ai-analysis
+    const { data: naturalData, error: naturalError } = await supabase.functions.invoke('natural-ai-analysis', {
       body: {
-        type: 'MEMORY_OPTIMIZED_NATURAL_ANALYSIS',
-        payload: {
-          imageUrl: request.imageUrl,
-          userContext: request.userContext,
-          analysisContext: request.analysisContext,
-          naturalMode: true,
-          memoryOptimized: true,
-          maxMemoryMB: 80 // Conservative memory limit for natural analysis
-        }
-      }
-    });
-
-    if (error) {
-      console.error('❌ Memory-optimized natural analysis collection failed:', error);
-      
-      // Check if it's a memory-related error and suggest optimization
-      if (error.message && error.message.toLowerCase().includes('memory')) {
-        throw new Error(`Memory limit exceeded during analysis. Image optimization may be required. Original error: ${error.message}`);
-      }
-      
-      throw new Error(`Natural analysis failed: ${error.message}`);
-    }
-
-    // Transform the response to match expected structure
-    if (data && data.analysis) {
-      return {
         imageUrl: request.imageUrl,
         userContext: request.userContext,
         analysisContext: request.analysisContext,
-        rawResponses: data.rawResponses || [],
-        timestamp: new Date().toISOString(),
-        totalProcessingTime: data.metadata?.processingTime || 0
-      };
+        models: request.models || ['openai', 'claude', 'google']
+      }
+    });
+
+    if (naturalError) {
+      console.error('❌ Natural analysis collection failed:', naturalError);
+      throw new Error(`Natural analysis failed: ${naturalError.message}`);
     }
 
-    throw new Error('Invalid response from memory-optimized natural analysis');
+    if (!naturalData || !naturalData.rawResponses) {
+      throw new Error('Invalid response from natural-ai-analysis function');
+    }
+
+    console.log('✅ Raw insights collected:', {
+      responseCount: naturalData.rawResponses.length,
+      totalProcessingTime: naturalData.totalProcessingTime
+    });
+
+    return {
+      imageUrl: request.imageUrl,
+      userContext: request.userContext,
+      analysisContext: request.analysisContext,
+      rawResponses: naturalData.rawResponses,
+      timestamp: naturalData.timestamp || new Date().toISOString(),
+      totalProcessingTime: naturalData.totalProcessingTime || 0
+    };
   }
 
   /**
-   * Interpret raw AI responses - for natural mode, this is already done by the ux-analysis function
+   * Interpret raw AI responses using ai-insight-interpreter
    */
   private async interpretInsights(request: {
     rawResponses: ModelResponse[];
@@ -345,35 +339,67 @@ export class NaturalAnalysisPipeline {
     userContext?: string;
     imageUrl?: string;
   }): Promise<InterpreterResult> {
-    console.log('🧠 Interpreting insights from natural analysis...');
+    console.log('🧠 Interpreting insights using ai-insight-interpreter...');
     
-    // Since the ux-analysis function already handles interpretation in natural mode,
-    // we create a compatible structure from the raw responses
-    const insights: InterpretedInsight[] = request.rawResponses.map((response, index) => ({
+    const { data: interpretedData, error: interpretError } = await supabase.functions.invoke('ai-insight-interpreter', {
+      body: {
+        rawResponses: request.rawResponses,
+        analysisContext: request.analysisContext,
+        userContext: request.userContext,
+        imageUrl: request.imageUrl
+      }
+    });
+
+    if (interpretError) {
+      console.error('❌ Insight interpretation failed:', interpretError);
+      
+      // Fallback to simple interpretation if specialized interpreter fails
+      console.log('🔄 Falling back to simple interpretation...');
+      return this.createSimpleInterpretation(request.rawResponses);
+    }
+
+    if (!interpretedData || !interpretedData.insights) {
+      console.warn('⚠️ Invalid interpreter response, using fallback...');
+      return this.createSimpleInterpretation(request.rawResponses);
+    }
+
+    console.log('✅ Insights interpreted:', {
+      insightCount: interpretedData.insights.length,
+      confidenceScore: interpretedData.summary?.confidenceScore
+    });
+
+    return interpretedData;
+  }
+
+  /**
+   * Create simple interpretation as fallback
+   */
+  private createSimpleInterpretation(rawResponses: ModelResponse[]): InterpreterResult {
+    const insights: InterpretedInsight[] = rawResponses.map((response, index) => ({
       category: 'usability',
       title: `${response.model} Analysis`,
-      description: response.response.substring(0, 200) + '...',
+      description: response.response.substring(0, 200) + (response.response.length > 200 ? '...' : ''),
       severity: 'medium' as const,
       confidence: response.confidence,
       actionable: true,
-      suggestions: [response.response.substring(0, 100) + '...'],
+      suggestions: [response.response.substring(0, 100) + (response.response.length > 100 ? '...' : '')],
       sourceModels: [response.model]
     }));
 
     return {
       insights,
       summary: {
-        overallAssessment: 'Natural analysis completed with multiple AI models',
+        overallAssessment: 'Analysis completed with multiple AI models',
         keyStrengths: [],
         criticalIssues: [],
-        recommendedActions: [],
-        confidenceScore: request.rawResponses.reduce((acc, r) => acc + r.confidence, 0) / request.rawResponses.length
+        recommendedActions: insights.map(i => i.title),
+        confidenceScore: rawResponses.reduce((acc, r) => acc + r.confidence, 0) / rawResponses.length
       },
       domainSpecificFindings: {},
       metadata: {
         totalInsights: insights.length,
         interpretationTime: 0,
-        sourceModels: request.rawResponses.map(r => r.model),
+        sourceModels: rawResponses.map(r => r.model),
         timestamp: new Date().toISOString()
       }
     };

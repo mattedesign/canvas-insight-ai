@@ -4162,10 +4162,9 @@ async function handleEnhancedContextAnalysis(body: any) {
 
 // Memory-optimized natural analysis handler
 async function handleMemoryOptimizedNaturalAnalysis(body: any) {
-  console.log('🧠 Memory-Optimized Natural Analysis - Processing request:', {
+  console.log('🧠 Memory-Optimized Natural Analysis - DELEGATING to specialized functions:', {
     hasPayload: !!body.payload,
-    memoryLimit: body.payload?.maxMemoryMB || 80,
-    imageUrl: body.payload?.imageUrl?.substring(0, 50) + '...'
+    memoryLimit: body.payload?.maxMemoryMB || 80
   });
 
   try {
@@ -4181,85 +4180,117 @@ async function handleMemoryOptimizedNaturalAnalysis(body: any) {
       throw new Error('Missing required field: imageUrl');
     }
 
-    console.log('🧠 Processing with memory limit:', `${maxMemoryMB}MB`);
+    console.log('🔄 PHASE 2: Delegating to natural-ai-analysis function...');
 
-    // Execute analysis with reduced models for memory efficiency
-    const models = maxMemoryMB < 60 ? ['gpt-4o'] : ['gpt-4o', 'claude-3-5-sonnet-20241022'];
-    console.log('🧠 Selected models for memory optimization:', models);
-
-    // Process sequentially to avoid memory spikes
-    const modelResults = [];
-    for (const model of models) {
-      try {
-        console.log(`🧠 Processing with model: ${model}`);
-        
-        const modelPrompt = buildMemoryOptimizedNaturalPrompt(userContext, analysisContext);
-        
-        const modelResult = await executeModel({
-          model,
-          stage: 'memory_optimized_natural',
-          imageUrl,
-          prompt: modelPrompt,
-          systemPrompt: 'You are a UX analyst providing natural language insights about interface design and usability.',
-          analysisContext,
-          userContext
-        });
-
-        const responseText = await modelResult.text();
-        const parsedResult = parseJsonFromResponse(responseText, model, 'memory_optimized_natural');
-
-        if (parsedResult.success) {
-          modelResults.push({
-            model,
-            result: parsedResult.data,
-            confidence: 0.8,
-            processingTime: Date.now()
-          });
-        } else {
-          // For natural mode, raw text is acceptable
-          modelResults.push({
-            model,
-            result: responseText,
-            confidence: 0.7,
-            processingTime: Date.now()
-          });
-        }
-
-        // Force garbage collection opportunity
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-      } catch (modelError) {
-        console.error(`❌ Model ${model} failed in memory-optimized mode:`, modelError);
-        // Continue with remaining models
-      }
-    }
-
-    if (modelResults.length === 0) {
-      throw new Error('All models failed in memory-optimized mode');
-    }
-
-    // Create simplified synthesis for memory efficiency
-    const synthesizedResult = createMemoryEfficientSynthesis(modelResults, {
-      imageUrl,
-      userContext,
-      analysisContext
+    // Step 1: Delegate to natural-ai-analysis for raw data collection
+    const naturalAnalysisResponse = await fetch(`${supabaseUrl}/functions/v1/natural-ai-analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify({
+        imageUrl,
+        userContext,
+        analysisContext,
+        models: maxMemoryMB < 60 ? ['openai'] : ['openai', 'claude']
+      })
     });
 
-    console.log('✅ Memory-optimized natural analysis completed:', {
-      modelsProcessed: modelResults.length,
+    if (!naturalAnalysisResponse.ok) {
+      const errorText = await naturalAnalysisResponse.text();
+      throw new Error(`Natural analysis failed: ${errorText}`);
+    }
+
+    const naturalData = await naturalAnalysisResponse.json();
+    
+    if (!naturalData.rawResponses || naturalData.rawResponses.length === 0) {
+      throw new Error('No raw responses received from natural-ai-analysis');
+    }
+
+    console.log('✅ Raw insights collected:', {
+      responseCount: naturalData.rawResponses.length,
+      models: naturalData.rawResponses.map((r: any) => r.model)
+    });
+
+    console.log('🔄 PHASE 2: Delegating to ai-insight-interpreter function...');
+
+    // Step 2: Delegate to ai-insight-interpreter for synthesis
+    const interpreterResponse = await fetch(`${supabaseUrl}/functions/v1/ai-insight-interpreter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify({
+        rawResponses: naturalData.rawResponses,
+        analysisContext,
+        userContext,
+        imageUrl
+      })
+    });
+
+    if (!interpreterResponse.ok) {
+      const errorText = await interpreterResponse.text();
+      console.warn('⚠️ Interpreter failed, using fallback synthesis:', errorText);
+      
+      // Fallback: Use simplified synthesis from raw responses
+      const fallbackSynthesis = createMemoryEfficientSynthesis(naturalData.rawResponses.map((r: any) => ({
+        model: r.model,
+        result: r.response,
+        confidence: r.confidence || 0.8,
+        processingTime: r.processingTime || 0
+      })), { imageUrl, userContext, analysisContext });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          analysis: fallbackSynthesis,
+          rawResponses: naturalData.rawResponses,
+          metadata: {
+            memoryOptimized: true,
+            memoryLimitMB: maxMemoryMB,
+            modelsUsed: naturalData.rawResponses.map((r: any) => r.model),
+            processingTime: Date.now(),
+            delegatedArchitecture: true,
+            interpreterUsed: false
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const interpretedData = await interpreterResponse.json();
+
+    console.log('✅ Insights interpreted:', {
+      insightCount: interpretedData.insights?.length || 0,
+      confidenceScore: interpretedData.summary?.confidenceScore
+    });
+
+    // Step 3: Convert interpreted results to UXAnalysis format with snake_case field names
+    const finalAnalysis = convertInterpretedToUXAnalysis(interpretedData, naturalData, imageUrl, userContext);
+
+    console.log('✅ Memory-optimized natural analysis completed via delegation:', {
+      modelsProcessed: naturalData.rawResponses.length,
+      insightsGenerated: interpretedData.insights?.length || 0,
       memoryLimit: `${maxMemoryMB}MB`
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        analysis: synthesizedResult,
-        rawResponses: modelResults,
+        analysis: finalAnalysis,
+        rawResponses: naturalData.rawResponses,
+        interpretedData: interpretedData,
         metadata: {
           memoryOptimized: true,
           memoryLimitMB: maxMemoryMB,
-          modelsUsed: modelResults.map(r => r.model),
-          processingTime: Date.now()
+          modelsUsed: naturalData.rawResponses.map((r: any) => r.model),
+          processingTime: Date.now(),
+          delegatedArchitecture: true,
+          interpreterUsed: true
         }
       }),
       {
@@ -4268,13 +4299,13 @@ async function handleMemoryOptimizedNaturalAnalysis(body: any) {
     );
 
   } catch (error) {
-    console.error('❌ Memory-optimized natural analysis failed:', error);
+    console.error('❌ Delegated natural analysis failed:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message,
-        stage: 'memory-optimized-natural-analysis',
+        stage: 'delegated-natural-analysis',
         details: error.stack,
         timestamp: new Date().toISOString()
       }),
@@ -4482,22 +4513,110 @@ function createMemoryEfficientSynthesis(modelResults: any[], context: any): any 
     modelUsed: `memory-optimized-${modelResults.map(r => r.model).join('+')}`,
     status: 'completed'
   };
+// Helper function to convert interpreted results to UXAnalysis format with snake_case fields
+function convertInterpretedToUXAnalysis(interpretedData: any, naturalData: any, imageUrl: string, userContext?: string): any {
+  // Generate visual_annotations (snake_case) from insights
+  const visual_annotations = interpretedData.insights
+    ?.filter((insight: any) => insight.actionable)
+    ?.slice(0, 8)
+    ?.map((insight: any, index: number) => ({
+      id: `insight-${index}`,
+      x: 50 + (index % 4) * 200,
+      y: 50 + Math.floor(index / 4) * 150,
+      type: mapSeverityToType(insight.severity),
+      title: insight.title,
+      description: insight.description,
+      severity: insight.severity
+    })) || [];
+
+  // Generate suggestions from insights
+  const suggestions = interpretedData.insights?.map((insight: any, index: number) => ({
+    id: `suggestion-${index}`,
+    category: mapToSuggestionCategory(insight.category),
+    title: insight.title,
+    description: insight.description,
+    impact: insight.severity,
+    effort: estimateEffortFromInsight(insight),
+    action_items: insight.suggestions || [],
+    related_annotations: [`insight-${index}`]
+  })) || [];
+
+  // Create summary with snake_case fields
+  const summary = {
+    overall_score: Math.round((interpretedData.summary?.confidenceScore || 0.7) * 100),
+    category_scores: {
+      usability: 75,
+      accessibility: 75,
+      visual: 75,
+      content: 75
+    },
+    key_issues: interpretedData.summary?.criticalIssues || [],
+    strengths: interpretedData.summary?.keyStrengths || []
+  };
+
+  // Create metadata with snake_case fields
+  const metadata = {
+    objects: [],
+    text: extractTextFromRawResponses(naturalData.rawResponses),
+    colors: [],
+    faces: 0,
+    natural_analysis_metadata: {
+      source_models: naturalData.rawResponses?.map((r: any) => r.model) || [],
+      total_processing_time: naturalData.totalProcessingTime || 0,
+      interpretation_time: interpretedData.metadata?.interpretationTime || 0,
+      raw_response_count: naturalData.rawResponses?.length || 0,
+      domain_specific_findings: interpretedData.domainSpecificFindings || {}
+    }
+  };
+
+  return {
+    id: `delegated-analysis-${Date.now()}`,
+    image_id: '',
+    image_name: 'Natural Analysis',
+    image_url: imageUrl,
+    user_context: userContext || '',
+    visual_annotations,
+    suggestions,
+    summary,
+    metadata,
+    created_at: new Date().toISOString(),
+    model_used: `delegated-pipeline-${naturalData.rawResponses?.map((r: any) => r.model).join('+') || 'unknown'}`,
+    status: 'completed'
+  };
 }
 
-function extractInsightsFromText(text: string, model: string): any[] {
-  const insights = [];
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
-  
-  sentences.slice(0, 3).forEach((sentence, index) => {
-    insights.push({
-      title: `${model} Insight ${index + 1}`,
-      description: sentence.trim(),
-      text: sentence.trim(),
-      confidence: 0.7
-    });
-  });
-  
-  return insights;
+// Helper functions for analysis conversion
+function mapSeverityToType(severity: string): string {
+  switch (severity) {
+    case 'high': return 'issue';
+    case 'medium': return 'suggestion';
+    case 'low': return 'success';
+    default: return 'suggestion';
+  }
+}
+
+function mapToSuggestionCategory(category: string): string {
+  const categoryMap: Record<string, string> = {
+    'usability': 'usability',
+    'accessibility': 'accessibility',
+    'visual': 'visual',
+    'content': 'content',
+    'performance': 'performance'
+  };
+  return categoryMap[category.toLowerCase()] || 'usability';
+}
+
+function estimateEffortFromInsight(insight: any): string {
+  const suggestionCount = insight.suggestions?.length || 0;
+  if (insight.category === 'visual' && suggestionCount <= 2) return 'low';
+  if (insight.category === 'accessibility' && suggestionCount > 3) return 'high';
+  if (suggestionCount <= 2) return 'low';
+  if (suggestionCount <= 4) return 'medium';
+  return 'high';
+}
+
+function extractTextFromRawResponses(rawResponses: any[]): string[] {
+  return rawResponses?.map((r: any) => r.response?.substring(0, 100) + '...') || [];
 }
 
 function createStructuredFallback(responseText: string, model: string): any {
