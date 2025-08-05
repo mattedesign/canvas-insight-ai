@@ -260,13 +260,24 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         {/* Annotation Markers */}
         {analysis && showAnnotations && analysis.visualAnnotations?.map((annotation) => {
           const isActive = activeAnnotation?.annotation.id === annotation.id;
+          
+          // Debug logging to see actual coordinate values
+          console.log('Canvas annotation positioning:', {
+            id: annotation.id,
+            originalX: annotation.x,
+            originalY: annotation.y,
+            calculatedLeft: `${annotation.x * 100}%`,
+            calculatedTop: `${annotation.y * 100}%`,
+            title: annotation.title
+          });
+          
           return (
             <div
               key={annotation.id}
               className={`absolute rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110 z-10 ${getMarkerColor(annotation.type, isActive)}`}
               style={{
-                left: `${annotation.x}%`,
-                top: `${annotation.y}%`,
+                left: `${annotation.x * 100}%`,
+                top: `${annotation.y * 100}%`,
               }}
               data-annotation-id={annotation.id}
               title={annotation.title}
