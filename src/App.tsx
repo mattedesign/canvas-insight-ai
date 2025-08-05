@@ -13,6 +13,7 @@ import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminOnlyRoute from "./components/AdminOnlyRoute";
 
 // Lazy load pages for better performance and reduced initial bundle size
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -94,9 +95,9 @@ const App = () => {
                     } />
                     <Route path="/analytics" element={
                       <RouteErrorBoundary routeName="Analytics" fallbackRoute="/dashboard">
-                        <ProtectedRoute>
+                        <AdminOnlyRoute>
                           <Analytics />
-                        </ProtectedRoute>
+                        </AdminOnlyRoute>
                       </RouteErrorBoundary>
                     } />
                     <Route path="/subscription" element={
@@ -108,9 +109,9 @@ const App = () => {
                     } />
                     <Route path="/production" element={
                       <RouteErrorBoundary routeName="Production" fallbackRoute="/dashboard">
-                        <ProtectedRoute>
+                        <AdminOnlyRoute>
                           <ProductionReadiness />
-                        </ProtectedRoute>
+                        </AdminOnlyRoute>
                       </RouteErrorBoundary>
                     } />
                     {/* Testing routes removed for production optimization */}
