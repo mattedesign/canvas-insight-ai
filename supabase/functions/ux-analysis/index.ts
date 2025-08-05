@@ -826,6 +826,16 @@ serve(async (req) => {
           // Handle natural collection mode analysis
           console.log('🌟 Processing NATURAL_ANALYSIS request')
           return await handleNaturalModeAnalysis(body)
+          
+        case 'MEMORY_OPTIMIZED_NATURAL_ANALYSIS':
+          // Handle memory-optimized natural analysis
+          console.log('🧠 Processing MEMORY_OPTIMIZED_NATURAL_ANALYSIS request')
+          return await handleMemoryOptimizedNaturalAnalysis(body)
+          
+        case 'MEMORY_OPTIMIZED_CHUNK':
+          // Handle single model chunk for memory optimization
+          console.log('🧠 Processing MEMORY_OPTIMIZED_CHUNK request')
+          return await handleMemoryOptimizedChunk(body)
         
         default:
           throw new Error(`Unknown action: ${body.action}`)

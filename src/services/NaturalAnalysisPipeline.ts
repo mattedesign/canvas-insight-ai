@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { AnalysisContext } from '@/types/contextTypes';
 import { UXAnalysis } from '@/types/ux-analysis';
 import { AnalysisDataMapper } from './AnalysisDataMapper';
+import { imageOptimizationService } from './ImageOptimizationService';
+import { enhancedErrorRecoveryService } from './EnhancedErrorRecoveryService';
 
 interface NaturalAnalysisRequest {
   imageUrl: string;
@@ -73,7 +75,7 @@ interface NaturalAnalysisExecutionResult {
 export class NaturalAnalysisPipeline {
   
   /**
-   * Execute natural analysis pipeline
+   * Execute natural analysis pipeline with memory optimization and error recovery
    */
   async execute(
     imageUrl: string,
@@ -84,39 +86,76 @@ export class NaturalAnalysisPipeline {
     const startTime = Date.now();
     
     try {
-      console.log('🎯 Starting Natural Analysis Pipeline:', {
+      console.log('🎯 Starting Enhanced Natural Analysis Pipeline:', {
         imageUrl: imageUrl.substring(0, 50) + '...',
         hasUserContext: !!userContext,
         hasAnalysisContext: !!analysisContext
       });
 
-      onProgress?.(10, 'Collecting natural AI insights...');
+      onProgress?.(5, 'Optimizing image for analysis...');
 
-      // Step 1: Collect natural responses from AI models
-      const naturalResult = await this.collectNaturalInsights({
-        imageUrl,
-        userContext,
-        analysisContext,
-        models: ['openai', 'claude', 'google']
+      // Step 1: Optimize image to prevent memory issues
+      const optimizedImageResult = await this.optimizeImageForAnalysis(imageUrl);
+      const processImageUrl = optimizedImageResult.wasOptimized ? optimizedImageResult.url : imageUrl;
+
+      console.log('🎯 Image optimization result:', {
+        wasOptimized: optimizedImageResult.wasOptimized,
+        originalSize: optimizedImageResult.originalSizeKB ? `${optimizedImageResult.originalSizeKB}KB` : 'unknown',
+        optimizedSize: optimizedImageResult.optimizedSizeKB ? `${optimizedImageResult.optimizedSizeKB}KB` : 'unknown'
       });
+
+      onProgress?.(15, 'Collecting natural AI insights...');
+
+      // Step 2: Collect natural responses from AI models with error handling
+      let naturalResult: NaturalAnalysisResult;
+      try {
+        naturalResult = await this.collectNaturalInsights({
+          imageUrl: processImageUrl,
+          userContext,
+          analysisContext,
+          models: ['openai', 'claude', 'google']
+        });
+      } catch (insightError) {
+        console.warn('🎯 Primary insight collection failed, attempting recovery...');
+        
+        const recoveryResult = await enhancedErrorRecoveryService.attemptRecovery({
+          imageUrl: processImageUrl,
+          userContext,
+          originalError: insightError as Error,
+          failedStages: ['natural_insights']
+        });
+
+        if (recoveryResult.success && recoveryResult.analysis) {
+          // Convert recovered analysis back to expected format
+          return {
+            success: true,
+            analysis: recoveryResult.analysis,
+            rawResponses: [],
+            interpretedResult: this.createFallbackInterpretedResult(),
+            executionTime: Date.now() - startTime
+          };
+        }
+        
+        throw insightError;
+      }
 
       onProgress?.(50, 'Interpreting AI insights...');
 
-      // Step 2: Interpret raw responses into actionable insights
+      // Step 3: Interpret raw responses into actionable insights
       const interpretedResult = await this.interpretInsights({
         rawResponses: naturalResult.rawResponses,
         analysisContext,
         userContext,
-        imageUrl
+        imageUrl: processImageUrl
       });
 
       onProgress?.(80, 'Synthesizing analysis...');
 
-      // Step 3: Convert interpreted insights to UXAnalysis format
+      // Step 4: Convert interpreted insights to UXAnalysis format
       const synthesizedAnalysis = this.synthesizeToUXAnalysis(
         interpretedResult,
         naturalResult,
-        imageUrl,
+        processImageUrl,
         userContext
       );
 
@@ -124,10 +163,11 @@ export class NaturalAnalysisPipeline {
 
       const executionTime = Date.now() - startTime;
 
-      console.log('✅ Natural Analysis Pipeline completed:', {
+      console.log('✅ Enhanced Natural Analysis Pipeline completed:', {
         totalInsights: interpretedResult.insights?.length || 0,
         confidenceScore: interpretedResult.summary?.confidenceScore || 0,
-        executionTime
+        executionTime,
+        imageOptimized: optimizedImageResult.wasOptimized
       });
 
       return {
@@ -140,7 +180,32 @@ export class NaturalAnalysisPipeline {
 
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      console.error('❌ Natural Analysis Pipeline failed:', error);
+      console.error('❌ Enhanced Natural Analysis Pipeline failed:', error);
+      
+      // Attempt final error recovery
+      try {
+        console.log('🎯 Attempting final error recovery...');
+        
+        const recoveryResult = await enhancedErrorRecoveryService.attemptRecovery({
+          imageUrl,
+          userContext,
+          originalError: error as Error,
+          failedStages: ['full_pipeline']
+        });
+
+        if (recoveryResult.success && recoveryResult.analysis) {
+          console.log('✅ Final error recovery successful');
+          return {
+            success: true,
+            analysis: recoveryResult.analysis,
+            rawResponses: [],
+            interpretedResult: this.createFallbackInterpretedResult(),
+            executionTime
+          };
+        }
+      } catch (recoveryError) {
+        console.error('❌ Final error recovery also failed:', recoveryError);
+      }
       
       return {
         success: false,
@@ -151,25 +216,108 @@ export class NaturalAnalysisPipeline {
   }
 
   /**
-   * Collect natural insights from AI models using ux-analysis function
+   * Optimize image for analysis to prevent memory issues
+   */
+  private async optimizeImageForAnalysis(imageUrl: string): Promise<{
+    url: string;
+    wasOptimized: boolean;
+    originalSizeKB?: number;
+    optimizedSizeKB?: number;
+  }> {
+    try {
+      const optimizationCheck = await imageOptimizationService.checkOptimizationNeeded(imageUrl);
+      
+      if (!optimizationCheck.needsOptimization) {
+        return {
+          url: imageUrl,
+          wasOptimized: false,
+          originalSizeKB: optimizationCheck.estimatedSize / 1024
+        };
+      }
+
+      const optimized = await imageOptimizationService.optimizeForAnalysis(imageUrl, {
+        targetSizeKB: 400, // Conservative target for analysis
+        quality: 0.8,
+        maxWidth: 1024,
+        maxHeight: 768
+      });
+
+      return {
+        url: optimized.url,
+        wasOptimized: true,
+        originalSizeKB: optimized.originalSize / 1024,
+        optimizedSizeKB: optimized.optimizedSize / 1024
+      };
+
+    } catch (error) {
+      console.warn('🎯 Image optimization failed, using original:', error);
+      return {
+        url: imageUrl,
+        wasOptimized: false
+      };
+    }
+  }
+
+  /**
+   * Create fallback interpreted result for error recovery
+   */
+  private createFallbackInterpretedResult(): InterpreterResult {
+    return {
+      insights: [{
+        category: 'usability',
+        title: 'Recovery Analysis',
+        description: 'Analysis completed after error recovery',
+        severity: 'low',
+        confidence: 0.7,
+        actionable: true,
+        suggestions: ['Review interface design'],
+        sourceModels: ['recovery']
+      }],
+      summary: {
+        overallAssessment: 'Analysis recovered successfully',
+        keyStrengths: ['Recovery system functioning'],
+        criticalIssues: [],
+        recommendedActions: ['Consider re-running full analysis'],
+        confidenceScore: 0.7
+      },
+      domainSpecificFindings: {},
+      metadata: {
+        totalInsights: 1,
+        interpretationTime: 0,
+        sourceModels: ['recovery'],
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
+  /**
+   * Collect natural insights from AI models using ux-analysis function with memory optimizations
    */
   private async collectNaturalInsights(request: NaturalAnalysisRequest): Promise<NaturalAnalysisResult> {
-    console.log('🎯 Collecting natural insights using ux-analysis function...');
+    console.log('🎯 Collecting natural insights using memory-optimized ux-analysis function...');
     
     const { data, error } = await supabase.functions.invoke('ux-analysis', {
       body: {
-        type: 'NATURAL_ANALYSIS',
+        type: 'MEMORY_OPTIMIZED_NATURAL_ANALYSIS',
         payload: {
           imageUrl: request.imageUrl,
           userContext: request.userContext,
           analysisContext: request.analysisContext,
-          naturalMode: true
+          naturalMode: true,
+          memoryOptimized: true,
+          maxMemoryMB: 80 // Conservative memory limit for natural analysis
         }
       }
     });
 
     if (error) {
-      console.error('❌ Natural analysis collection failed:', error);
+      console.error('❌ Memory-optimized natural analysis collection failed:', error);
+      
+      // Check if it's a memory-related error and suggest optimization
+      if (error.message && error.message.toLowerCase().includes('memory')) {
+        throw new Error(`Memory limit exceeded during analysis. Image optimization may be required. Original error: ${error.message}`);
+      }
+      
       throw new Error(`Natural analysis failed: ${error.message}`);
     }
 
@@ -185,7 +333,7 @@ export class NaturalAnalysisPipeline {
       };
     }
 
-    throw new Error('Invalid response from natural analysis');
+    throw new Error('Invalid response from memory-optimized natural analysis');
   }
 
   /**
