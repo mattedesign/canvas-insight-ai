@@ -56,7 +56,7 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
   const { analysis, onGenerateConcept, isGeneratingConcept = false, onExpandedChange } = data;
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // ✅ ENHANCED: Use robust validation as secondary defense
+  // ✅ ENHANCED: Prioritize actual data over fallbacks
   const safeAnalysis = useMemo(() => {
     // Quick validation check first
     if (!AnalysisValidator.isValidAnalysis(analysis)) {
@@ -70,25 +70,16 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
       return validationResult.data;
     }
     
-    // Fallback safety (legacy approach for additional safety)
+    // Minimal safety - preserve actual data without generating fallbacks
     const baseSummary = analysis.summary || {} as any;
-    const baseCategoryScores = (baseSummary.categoryScores || {}) as Record<string, number>;
     
-    const safeCategoryScores = {
-      usability: typeof baseCategoryScores.usability === 'number' ? baseCategoryScores.usability : 0,
-      accessibility: typeof baseCategoryScores.accessibility === 'number' ? baseCategoryScores.accessibility : 0,
-      visual: typeof baseCategoryScores.visual === 'number' ? baseCategoryScores.visual : 0,
-      content: typeof baseCategoryScores.content === 'number' ? baseCategoryScores.content : 0,
-      ...baseCategoryScores
-    };
-
     return {
       ...analysis,
       id: analysis.id || '',
       summary: {
         ...baseSummary,
         overallScore: typeof baseSummary.overallScore === 'number' ? baseSummary.overallScore : 0,
-        categoryScores: safeCategoryScores,
+        categoryScores: baseSummary.categoryScores || {},
         keyIssues: Array.isArray(baseSummary.keyIssues) ? baseSummary.keyIssues : [],
         strengths: Array.isArray(baseSummary.strengths) ? baseSummary.strengths : []
       },
@@ -196,28 +187,37 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
         {/* Category Scores */}
         <div className="space-y-3">
           <h4 className="font-medium text-foreground text-sm">Category Scores</h4>
-          {Object.entries(safeAnalysis.summary.categoryScores).map(([category, score]) => {
-            const numScore = typeof score === 'number' ? score : 0;
-            return (
-              <div key={category} className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="capitalize text-muted-foreground">{category}</span>
+          {Object.keys(safeAnalysis.summary.categoryScores).length > 0 ? (
+            Object.entries(safeAnalysis.summary.categoryScores).map(([category, score]) => {
+              const numScore = typeof score === 'number' ? score : 0;
+              return (
+                <div key={category} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="capitalize text-muted-foreground">{category}</span>
+                    </div>
+                    <span className={getScoreColor(numScore)}>{numScore}%</span>
                   </div>
-                  <span className={getScoreColor(numScore)}>{numScore}%</span>
+                  <Progress value={numScore} className="h-2" />
                 </div>
-                <Progress value={numScore} className="h-2" />
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Category scores not available
+            </div>
+          )}
         </div>
         
-        {/* Key Issues */}
-        {safeAnalysis.summary.keyIssues.length > 0 && (
+        {/* Key Issues - Only show if actual data exists */}
+        {(safeAnalysis.summary.keyIssues?.length || 0) > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-destructive" />
               <h4 className="font-medium text-foreground text-sm">Key Issues</h4>
+              <Badge variant="outline" className="text-xs">
+                {safeAnalysis.summary.keyIssues.length}
+              </Badge>
             </div>
             <div className="space-y-1">
               {safeAnalysis.summary.keyIssues.slice(0, 3).map((issue, index) => (
@@ -225,16 +225,24 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
                   {issue}
                 </div>
               ))}
+              {safeAnalysis.summary.keyIssues.length > 3 && (
+                <div className="text-xs text-muted-foreground text-center pt-1">
+                  +{safeAnalysis.summary.keyIssues.length - 3} more issues
+                </div>
+              )}
             </div>
           </div>
         )}
         
-        {/* Strengths */}
-        {safeAnalysis.summary.strengths.length > 0 && (
+        {/* Strengths - Only show if actual data exists */}
+        {(safeAnalysis.summary.strengths?.length || 0) > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <h4 className="font-medium text-foreground text-sm">Strengths</h4>
+              <Badge variant="outline" className="text-xs">
+                {safeAnalysis.summary.strengths.length}
+              </Badge>
             </div>
             <div className="space-y-1">
               {safeAnalysis.summary.strengths.slice(0, 2).map((strength, index) => (
@@ -242,6 +250,11 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
                   {strength}
                 </div>
               ))}
+              {safeAnalysis.summary.strengths.length > 2 && (
+                <div className="text-xs text-muted-foreground text-center pt-1">
+                  +{safeAnalysis.summary.strengths.length - 2} more strengths
+                </div>
+              )}
             </div>
           </div>
         )}
