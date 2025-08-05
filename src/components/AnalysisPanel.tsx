@@ -167,15 +167,7 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
             </CardContent>
           </Card>
 
-          {/* Analysis Version Manager */}
-          {image.id && (
-            <AnalysisVersionManager
-              imageId={image.id}
-              currentAnalysisId={currentAnalysis.id}
-              onAnalysisSelected={handleAnalysisSelected}
-              onNewAnalysis={handleNewAnalysis}
-            />
-          )}
+          {/* Analysis Version Manager - Hidden per user request */}
 
           {/* Overall Score */}
           <Card>

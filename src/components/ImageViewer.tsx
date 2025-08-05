@@ -205,7 +205,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
           />
           
           {/* Annotation Markers */}
-          {showAnnotations && analysis.visualAnnotations.map((annotation) => (
+          {showAnnotations && analysis.visualAnnotations?.length > 0 && analysis.visualAnnotations.map((annotation) => (
             <AnnotationMarker
               key={annotation.id}
               annotation={annotation}

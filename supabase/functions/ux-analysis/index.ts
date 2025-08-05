@@ -69,7 +69,7 @@ class SmartTextFormatter {
     const domainLabel = domainLabels[domain.toLowerCase()] || domain;
     const screenLabel = screenLabels[screenType.toLowerCase()] || screenType;
 
-    return `This ${domainLabel} ${screenLabel} analysis reveals several key insights. `;
+    return ``; // Removed repetitive phrase per user request
   }
 
   private static formatFindings(findings: any, domain: string): string {
