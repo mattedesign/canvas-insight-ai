@@ -196,7 +196,9 @@ export class DynamicPromptBuilder {
       },
       
       synthesis: {
-        all: `Synthesize all findings into actionable recommendations prioritized by ${user.outputPreferences?.prioritization || 'impact'}. Create a cohesive improvement strategy that balances user needs, business goals, and technical feasibility.`
+        all: `Synthesize all findings into actionable recommendations prioritized by ${user.outputPreferences?.prioritization || 'impact'}. Create a cohesive improvement strategy that balances user needs, business goals, and technical feasibility.
+        
+        Additionally, provide strategic business insights using the new framework - focus on identifying the single biggest business problem this interface creates, not just UX issues.`
       }
     };
 
@@ -383,6 +385,14 @@ ${context.user.inferredRole === 'designer' ? `Designer Perspective:
   "visualAnnotations": [{ "element": "", "x": 0, "y": 0, "issue": "", "recommendation": "" }],
   "implementationRoadmap": { "immediate": [], "shortTerm": [], "longTerm": [] },
   "successMetrics": [{ "metric": "", "currentState": "", "targetState": "", "measurement": "" }],
+  "strategicInsights": {
+    "primaryConcern": "The single biggest business problem this interface creates (one clear sentence)",
+    "strategicRecommendation": {
+      "title": "Strategic intervention needed (action-oriented title)",
+      "businessJustification": "Why this is the right business priority right now (2-3 sentences)",
+      "expectedOutcome": "Qualitative transformation when solved (what fundamentally changes for the business)"
+    }
+  },
   "summary": {
     "overallScore": 0,
     "categoryScores": {

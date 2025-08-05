@@ -35,10 +35,10 @@ export function AnalysisResultsDisplay({
   // Check if this is a natural analysis
   const isNaturalAnalysis = analysis.metadata.naturalAnalysisMetadata;
   
-  // Extract strategic insights from analysis metadata
-  const strategicInsights = analysis.metadata?.strategic_summary || 
-                           analysis.metadata?.strategicInsights || 
-                           analysis.metadata?.naturalAnalysisMetadata?.domainSpecificFindings?.strategic;
+  // Extract strategic insights from different possible locations
+  const strategicInsights = analysis.metadata?.strategicInsights || 
+                           analysis.summary?.strategicInsights ||
+                           analysis.strategicInsights;
   
   return (
     <div className="space-y-4">

@@ -19,6 +19,16 @@ export interface Suggestion {
   relatedAnnotations: string[];
 }
 
+// Strategic Business Insights - New Structure
+export interface StrategicBusinessInsights {
+  primaryConcern: string;
+  strategicRecommendation: {
+    title: string;
+    businessJustification: string;
+    expectedOutcome: string;
+  };
+}
+
 export interface VisionMetadata {
   objects: Array<{
     name: string;
@@ -41,7 +51,7 @@ export interface VisionMetadata {
   };
   // Strategic insights data
   strategic_summary?: any;
-  strategicInsights?: any;
+  strategicInsights?: StrategicBusinessInsights;
 }
 
 export interface AnalysisSummary {
@@ -54,6 +64,7 @@ export interface AnalysisSummary {
   };
   keyIssues: string[];
   strengths: string[];
+  strategicInsights?: StrategicBusinessInsights;
 }
 
 export interface GeneratedConcept {
@@ -153,6 +164,7 @@ export interface UXAnalysis {
   createdAt: Date;
   modelUsed?: string; // AI model used for analysis
   status?: 'processing' | 'analyzing' | 'completed' | 'error';
+  strategicInsights?: StrategicBusinessInsights;
 }
 
 export interface UploadedImage {

@@ -4,6 +4,7 @@
  */
 
 import { ValidationService } from './ValidationService';
+import { StrategicBusinessInsights } from '@/types/ux-analysis';
 
 export interface SummaryGenerationConfig {
   enforceValidation: boolean;
@@ -26,6 +27,8 @@ export interface GeneratedSummary {
   consistency?: number;
   thematicCoherence?: number;
   userFlowContinuity?: number;
+  // Strategic business insights (new structure)
+  strategicInsights?: StrategicBusinessInsights;
 }
 
 export class SummaryGenerator {
@@ -110,6 +113,11 @@ export class SummaryGenerator {
       summary.consistency = this.generateConsistency(workingSummary, analysisData);
       summary.thematicCoherence = this.generateThematicCoherence(workingSummary, analysisData);
       summary.userFlowContinuity = this.generateUserFlowContinuity(workingSummary, analysisData);
+    }
+
+    // Add strategic business insights if available
+    if (analysisData?.strategicInsights || workingSummary?.strategicInsights) {
+      summary.strategicInsights = this.generateStrategicInsights(workingSummary, analysisData);
     }
 
     // Final validation
@@ -355,6 +363,45 @@ export class SummaryGenerator {
     return match ? match[1] : null;
   }
 
+  private generateStrategicInsights(inputSummary: any, analysisData: any): StrategicBusinessInsights {
+    // Try to extract from analysis data first
+    if (analysisData?.strategicInsights) {
+      return {
+        primaryConcern: analysisData.strategicInsights.primaryConcern || 'Business impact assessment needs completion',
+        strategicRecommendation: {
+          title: analysisData.strategicInsights.strategicRecommendation?.title || 'Strategic review required',
+          businessJustification: analysisData.strategicInsights.strategicRecommendation?.businessJustification || 'Detailed business analysis needed to identify priority interventions',
+          expectedOutcome: analysisData.strategicInsights.strategicRecommendation?.expectedOutcome || 'Improved business performance and competitive positioning'
+        }
+      };
+    }
+
+    // Try to extract from input summary
+    if (inputSummary?.strategicInsights) {
+      return {
+        primaryConcern: inputSummary.strategicInsights.primaryConcern || 'Business impact assessment needs completion',
+        strategicRecommendation: {
+          title: inputSummary.strategicInsights.strategicRecommendation?.title || 'Strategic review required',
+          businessJustification: inputSummary.strategicInsights.strategicRecommendation?.businessJustification || 'Detailed business analysis needed to identify priority interventions',
+          expectedOutcome: inputSummary.strategicInsights.strategicRecommendation?.expectedOutcome || 'Improved business performance and competitive positioning'
+        }
+      };
+    }
+
+    // Fallback: Generate based on key issues
+    const keyIssues = analysisData?.summary?.keyIssues || inputSummary?.keyIssues || [];
+    const primaryIssue = keyIssues[0] || 'Interface optimization needed';
+    
+    return {
+      primaryConcern: `Critical business challenge: ${primaryIssue.toLowerCase()} impacting user experience and operational efficiency`,
+      strategicRecommendation: {
+        title: 'Comprehensive interface optimization initiative',
+        businessJustification: 'Current interface limitations create friction in user workflows, potentially impacting conversion rates and customer satisfaction. Strategic intervention needed to maintain competitive position.',
+        expectedOutcome: 'Enhanced user experience driving improved engagement metrics, reduced support costs, and stronger competitive differentiation'
+      }
+    };
+  }
+
   private generateEmergencyFallbackSummary(): GeneratedSummary {
     console.warn('[SummaryGenerator] Using emergency fallback summary');
     return {
@@ -367,7 +414,15 @@ export class SummaryGenerator {
       },
       keyIssues: ['Analysis incomplete - please retry'],
       strengths: ['Interface has basic structure'],
-      confidence: 0.5
+      confidence: 0.5,
+      strategicInsights: {
+        primaryConcern: 'Analysis incomplete - strategic assessment required',
+        strategicRecommendation: {
+          title: 'Complete comprehensive analysis',
+          businessJustification: 'Insufficient data available to provide strategic business recommendations',
+          expectedOutcome: 'Better understanding of business impact and optimization opportunities'
+        }
+      }
     };
   }
 }
