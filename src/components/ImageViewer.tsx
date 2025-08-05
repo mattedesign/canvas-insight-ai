@@ -70,6 +70,16 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
       }
     };
 
+    // Debug logging to see actual coordinate values
+    console.log('Annotation positioning:', {
+      id: annotation.id,
+      originalX: annotation.x,
+      originalY: annotation.y,
+      calculatedLeft: `${annotation.x * 100}%`,
+      calculatedTop: `${annotation.y * 100}%`,
+      title: annotation.title
+    });
+
     return (
       <button
         className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-20 ${getMarkerColor()}`}
