@@ -4190,7 +4190,7 @@ async function handleMemoryOptimizedNaturalAnalysis(body: any) {
       try {
         console.log(`🧠 Processing with model: ${model}`);
         
-        const modelPrompt = buildNaturalAnalysisPrompt(userContext, analysisContext);
+        const modelPrompt = buildMemoryOptimizedNaturalPrompt(userContext, analysisContext);
         
         const modelResult = await executeModel({
           model,
@@ -4372,7 +4372,7 @@ async function handleMemoryOptimizedChunk(body: any) {
 
 // Helper functions for memory optimization
 
-function buildNaturalAnalysisPrompt(userContext?: string, analysisContext?: any): string {
+function buildMemoryOptimizedNaturalPrompt(userContext?: string, analysisContext?: any): string {
   const contextPart = userContext ? `Context: ${userContext}` : 'General UX analysis';
   const interfaceType = analysisContext?.image?.primaryType || 'interface';
   
