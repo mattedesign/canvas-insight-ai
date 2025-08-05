@@ -4659,6 +4659,4 @@ function createStructuredFallback(responseText: string, model: string): any {
       originalResponse: responseText.substring(0, 500)
     }
   };
-});
-
-// Close the entire serve function properly
+}
