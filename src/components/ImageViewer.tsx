@@ -74,8 +74,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = memo(({
       <button
         className={`absolute w-4 h-4 rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-20 ${getMarkerColor()}`}
         style={{
-          left: `${annotation.x}%`,
-          top: `${annotation.y}%`,
+          left: `${annotation.x * 100}%`,
+          top: `${annotation.y * 100}%`,
         }}
         data-annotation-id={annotation.id}
         onClick={(e) => {

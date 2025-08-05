@@ -52,8 +52,8 @@ const AnnotationMarker: React.FC<{
         ${getMarkerStyle()}
       `}
       style={{
-        left: `${annotation.x}%`,
-        top: `${annotation.y}%`,
+        left: `${annotation.x * 100}%`,
+        top: `${annotation.y * 100}%`,
         transform: 'translate(-50%, -50%)',
       }}
       data-annotation-id={annotation.id}
