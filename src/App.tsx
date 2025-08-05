@@ -22,6 +22,7 @@ const Projects = lazy(() => import("./pages/Projects"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Subscription = lazy(() => import("./pages/Subscription"));
 const Auth = lazy(() => import("./pages/Auth"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const ProductionReadiness = lazy(() => import("./pages/ProductionReadiness"));
 // Performance testing dashboard removed for production
@@ -93,10 +94,10 @@ const App = () => {
                         </ProtectedRoute>
                       </RouteErrorBoundary>
                     } />
-                    <Route path="/analytics" element={
-                      <RouteErrorBoundary routeName="Analytics" fallbackRoute="/dashboard">
+                    <Route path="/admin" element={
+                      <RouteErrorBoundary routeName="Admin" fallbackRoute="/dashboard">
                         <AdminOnlyRoute>
-                          <Analytics />
+                          <Admin />
                         </AdminOnlyRoute>
                       </RouteErrorBoundary>
                     } />
@@ -105,13 +106,6 @@ const App = () => {
                         <ProtectedRoute>
                           <Subscription />
                         </ProtectedRoute>
-                      </RouteErrorBoundary>
-                    } />
-                    <Route path="/production" element={
-                      <RouteErrorBoundary routeName="Production" fallbackRoute="/dashboard">
-                        <AdminOnlyRoute>
-                          <ProductionReadiness />
-                        </AdminOnlyRoute>
                       </RouteErrorBoundary>
                     } />
                     {/* Testing routes removed for production optimization */}
