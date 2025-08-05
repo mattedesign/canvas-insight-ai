@@ -39,6 +39,9 @@ export interface VisionMetadata {
     rawResponseCount: number;
     domainSpecificFindings: Record<string, any>;
   };
+  // Strategic insights data
+  strategic_summary?: any;
+  strategicInsights?: any;
 }
 
 export interface AnalysisSummary {

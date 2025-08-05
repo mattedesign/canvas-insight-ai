@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnalysisVersionManager } from './AnalysisVersionManager';
+import { StrategicInsightsPanel } from './StrategicInsightsPanel';
 import { analysisService } from '@/services/TypeSafeAnalysisService';
 import { toast } from '@/hooks/use-toast';
 import { 
@@ -48,6 +49,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
   }, [analysis]);
 
   if (!currentAnalysis || !image) return null;
+
+  // Extract strategic insights from analysis metadata
+  const strategicInsights = currentAnalysis.metadata?.strategic_summary || 
+                           currentAnalysis.metadata?.strategicInsights || 
+                           currentAnalysis.metadata?.naturalAnalysisMetadata?.domainSpecificFindings?.strategic;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -252,6 +258,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Strategic Business Insights */}
+          {strategicInsights && (
+            <StrategicInsightsPanel insights={strategicInsights} />
           )}
 
           {/* Detailed Suggestions */}

@@ -7,6 +7,7 @@ import { AnalysisPanel } from './AnalysisPanel';
 import { ScreenTypeDetectionDisplay } from './ScreenTypeDetectionDisplay';
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
 import { NaturalAnalysisDisplay } from './NaturalAnalysisDisplay';
+import { StrategicInsightsPanel } from './StrategicInsightsPanel';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { AnalysisContext } from '@/types/contextTypes';
 
@@ -34,6 +35,11 @@ export function AnalysisResultsDisplay({
   // Check if this is a natural analysis
   const isNaturalAnalysis = analysis.metadata.naturalAnalysisMetadata;
   
+  // Extract strategic insights from analysis metadata
+  const strategicInsights = analysis.metadata?.strategic_summary || 
+                           analysis.metadata?.strategicInsights || 
+                           analysis.metadata?.naturalAnalysisMetadata?.domainSpecificFindings?.strategic;
+  
   return (
     <div className="space-y-4">
       {/* Context Detection Results */}
@@ -45,6 +51,11 @@ export function AnalysisResultsDisplay({
           />
           <AnalysisContextDisplay context={analysisContext} />
         </div>
+      )}
+      
+      {/* Strategic Business Insights */}
+      {strategicInsights && (
+        <StrategicInsightsPanel insights={strategicInsights} />
       )}
       
       {/* Natural Analysis Display (for new pipeline) */}
