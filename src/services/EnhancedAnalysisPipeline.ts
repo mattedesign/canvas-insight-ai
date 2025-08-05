@@ -14,6 +14,8 @@ import { PipelineRecoveryService } from './PipelineRecoveryService';
 import { OptimizedContextDetectionPipeline } from './OptimizedContextDetectionPipeline';
 // Priority 3: Analysis Quality
 import { SummaryGenerator } from './SummaryGenerator';
+// Enhanced Loading Messages
+import LoadingMessageMapper from './LoadingMessageMapper';
 
 export interface AnalysisProgress {
   stage: string;
@@ -55,6 +57,9 @@ export class EnhancedAnalysisPipeline {
   // Priority 3: Analysis Quality Services
   private summaryGenerator: SummaryGenerator;
   
+  // Enhanced Loading Messages
+  private messageMapper: LoadingMessageMapper;
+  
   // Internal state tracking
   private analysisContext: AnalysisContext | null = null;
 
@@ -73,6 +78,9 @@ export class EnhancedAnalysisPipeline {
     
     // Initialize Priority 3: Analysis Quality Services
     this.summaryGenerator = SummaryGenerator.getInstance();
+    
+    // Initialize Enhanced Loading Messages
+    this.messageMapper = LoadingMessageMapper.getInstance();
   }
 
   /**
@@ -148,19 +156,22 @@ export class EnhancedAnalysisPipeline {
       
       // Priority 2: Save initial progress
       this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext || '', 'initialization', 5);
-      // Phase 1: Extract Google Vision metadata for context-specific progress
-      this.updateProgress('google-vision', 10, 'Extracting visual metadata and detecting interface type...', {});
+      
+      // Phase 1: Extract Google Vision metadata with technical progress messaging
+      this.updateProgressWithContext('google-vision', 5, undefined, {});
       
       const visionMetadata = await this.extractGoogleVisionMetadata(imageId, imageUrl);
       const interfaceType = this.inferInterfaceTypeFromMetadata(visionMetadata);
+      const detectedElements = this.extractKeyElements(visionMetadata);
       
-      this.updateProgress('google-vision', 20, `Successfully identified ${interfaceType} interface with ${this.extractKeyElements(visionMetadata).length} key elements`, {
+      this.updateProgressWithContext('google-vision', 20, undefined, {
         interfaceType,
-        detectedElements: this.extractKeyElements(visionMetadata)
+        detectedElements,
+        elementCount: detectedElements.length
       });
 
-      // Phase 2: Enhanced context detection with optimized pipeline
-      this.updateProgress('context-detection', 35, `Analyzing ${interfaceType} interface and understanding user context...`, {
+      // Phase 2: Enhanced context detection with technical progress messaging
+      this.updateProgressWithContext('context-detection', 25, undefined, {
         interfaceType
       });
       
@@ -179,7 +190,7 @@ export class EnhancedAnalysisPipeline {
           clarificationNeeded: analysisContext.clarificationNeeded
         });
         
-        this.updateProgress('context-detection', 42, `Context identified: ${analysisContext.image.primaryType} interface for ${analysisContext.user.inferredRole || 'user'} (${Math.round(analysisContext.confidence * 100)}% confidence)`, {
+        this.updateProgressWithContext('context-detection', 42, undefined, {
           interfaceType: analysisContext.image.primaryType,
           userRole: analysisContext.user.inferredRole,
           contextConfidence: analysisContext.confidence,
@@ -196,7 +207,7 @@ export class EnhancedAnalysisPipeline {
 
       // Phase 3: Check if clarification is needed
       if (analysisContext.clarificationNeeded || analysisContext.confidence < 0.7) {
-        this.updateProgress('clarification-needed', 40, `Context confidence low (${Math.round(analysisContext.confidence * 100)}%) - additional information would improve analysis quality`, {
+        this.updateProgressWithContext('clarification-needed', 40, undefined, {
           interfaceType: analysisContext.image.primaryType,
           contextConfidence: analysisContext.confidence,
           requiresClarification: true
@@ -220,9 +231,8 @@ export class EnhancedAnalysisPipeline {
         };
       }
 
-      // Phase 4: Context-aware AI analysis with specific progress messages
-      const specificMessage = this.getContextSpecificMessage(analysisContext, visionMetadata);
-      this.updateProgress('ai-analysis', 60, specificMessage, {
+      // Phase 4: Context-aware AI analysis with technical progress messaging
+      this.updateProgressWithContext('ai-analysis', 45, analysisContext, {
         interfaceType: analysisContext.image.primaryType,
         detectedElements: this.extractKeyElements(visionMetadata),
         contextConfidence: analysisContext.confidence
@@ -302,8 +312,8 @@ export class EnhancedAnalysisPipeline {
         }
       }
 
-      // Phase 5: Final processing and storage with enhanced summary generation
-      this.updateProgress('finalizing', 90, 'Finalizing analysis and generating insights...', {
+      // Phase 5: Final processing and storage with technical progress messaging
+      this.updateProgressWithContext('finalizing', 85, analysisContext, {
         interfaceType: analysisContext.image.primaryType
       });
       
@@ -330,7 +340,7 @@ export class EnhancedAnalysisPipeline {
       // Priority 2: Mark progress as complete and save final state
       this.progressService.saveProgress(this.currentRequestId!, imageUrl, userContext || '', 'complete', 100, finalAnalysisResult);
 
-      this.updateProgress('complete', 100, `${analysisContext.image.primaryType} analysis completed`, {
+      this.updateProgressWithContext('complete', 100, analysisContext, {
         interfaceType: analysisContext.image.primaryType,
         contextConfidence: analysisContext.confidence
       });
@@ -384,7 +394,7 @@ export class EnhancedAnalysisPipeline {
         }
       }
       
-      this.updateProgress('error', 0, `Analysis failed: ${error.message}`, {});
+      this.updateProgressWithContext('error', 0, undefined, { errorMessage: error.message });
       
       return {
         success: false,
@@ -914,6 +924,36 @@ Focus on:
         metadata
       });
     }
+  }
+
+  /**
+   * Update progress with contextual loading messages
+   */
+  private updateProgressWithContext(
+    stage: string, 
+    progress: number, 
+    context?: AnalysisContext, 
+    metadata?: any
+  ): void {
+    if (!this.progressCallback) return;
+
+    // Get contextual message from message mapper
+    const messageConfig = this.messageMapper.getContextualMessage(stage, progress, context, metadata);
+    
+    // Build enhanced metadata
+    const enhancedMetadata = {
+      ...metadata,
+      ...messageConfig,
+      estimatedDuration: this.messageMapper.getEstimatedDuration(stage, progress),
+      subSteps: messageConfig.subSteps || []
+    };
+
+    this.progressCallback({
+      stage,
+      progress,
+      message: messageConfig.main,
+      metadata: enhancedMetadata
+    });
   }
 
   /**
