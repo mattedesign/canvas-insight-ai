@@ -14,14 +14,26 @@ export const useMultiSelection = (allIds: string[] = []) => {
   });
 
   const toggleSelection = useCallback((id: string, modifierKey: 'ctrl' | 'shift' | 'none' = 'none') => {
+    console.log('[useMultiSelection] toggleSelection called:', {
+      id: id.substring(0, 12) + '...',
+      modifierKey,
+      currentState: {
+        selectedIds: state.selectedIds.map(sid => sid.substring(0, 8) + '...'),
+        isMultiSelectMode: state.isMultiSelectMode,
+        lastSelectedId: state.lastSelectedId?.substring(0, 8) + '...'
+      }
+    });
+    
     setState(prev => {
+      let newState;
+      
       if (modifierKey === 'ctrl') {
         // Ctrl/Cmd+Click: Toggle individual items
         const newSelectedIds = prev.selectedIds.includes(id)
           ? prev.selectedIds.filter(selectedId => selectedId !== id)
           : [...prev.selectedIds, id];
         
-        return {
+        newState = {
           selectedIds: newSelectedIds,
           isMultiSelectMode: newSelectedIds.length > 1,
           lastSelectedId: id,
@@ -36,22 +48,36 @@ export const useMultiSelection = (allIds: string[] = []) => {
           const end = Math.max(lastIndex, currentIndex);
           const rangeIds = allIds.slice(start, end + 1);
           
-          return {
+          newState = {
             selectedIds: rangeIds,
             isMultiSelectMode: rangeIds.length > 1,
             lastSelectedId: id,
           };
+        } else {
+          newState = {
+            selectedIds: [id],
+            isMultiSelectMode: false,
+            lastSelectedId: id,
+          };
         }
+      } else {
+        // Regular click: Single selection
+        newState = {
+          selectedIds: [id],
+          isMultiSelectMode: false,
+          lastSelectedId: id,
+        };
       }
       
-      // Regular click: Single selection
-      return {
-        selectedIds: [id],
-        isMultiSelectMode: false,
-        lastSelectedId: id,
-      };
+      console.log('[useMultiSelection] new state:', {
+        selectedIds: newState.selectedIds.map(sid => sid.substring(0, 8) + '...'),
+        isMultiSelectMode: newState.isMultiSelectMode,
+        lastSelectedId: newState.lastSelectedId?.substring(0, 8) + '...'
+      });
+      
+      return newState;
     });
-  }, [allIds]);
+  }, [allIds, state.selectedIds, state.isMultiSelectMode, state.lastSelectedId]);
 
   const selectMultiple = useCallback((ids: string[]) => {
     setState({

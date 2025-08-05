@@ -145,9 +145,22 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
       // For mobile devices (768px and under), treat all clicks as multi-select
       // For desktop, use the traditional Ctrl/Cmd/Shift key detection
       const isMultiSelectKey = isMobile || e.ctrlKey || e.metaKey || e.shiftKey;
+      
+      console.log('[ImageNode] Selection click:', {
+        imageId: image.id,
+        imageName: image.name,
+        isMultiSelectKey,
+        currentTool,
+        isMobile,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        isSelected
+      });
+      
       onToggleSelection(image.id, isMultiSelectKey);
     }
-  }, [currentTool, onToggleSelection, image.id, isMobile]);
+  }, [currentTool, onToggleSelection, image.id, isMobile, image.name, isSelected]);
 
   // AI Integration Handlers
   const handleAnalyzeImage = useCallback((imageId: string) => {
@@ -209,7 +222,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     >
     <Card 
       className={`max-w-2xl overflow-hidden bg-background border-border shadow-lg transition-all cursor-pointer ${
-        isSelected ? 'ring-2 ring-primary ring-offset-2' : ''
+        isSelected ? 'ring-2 ring-primary ring-offset-2 border-primary' : 'hover:border-muted-foreground'
       }`} 
       onDoubleClick={handleDoubleClick}
       onClick={handleNodeClick}

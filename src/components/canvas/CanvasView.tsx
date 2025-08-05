@@ -42,10 +42,13 @@ import { AIContextMenu } from './AIContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
+import { SelectionDebugger } from '../SelectionDebugger';
 
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
+
+import { AnnotationNode } from './AnnotationNode';
 
 const nodeTypes = {
   image: ImageNode,
@@ -60,6 +63,7 @@ const nodeTypes = {
   enhancedGroupAnalysis: EnhancedGroupAnalysisNode,
   imageLoading: ImageLoadingNode,
   analysisLoading: AnalysisLoadingNode,
+  annotation: AnnotationNode,
 };
 
 export interface CanvasViewProps {
@@ -163,16 +167,22 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     onOpenAnalysisPanel?.(analysisId);
   }, [onOpenAnalysisPanel]);
 
+  // Create selection callback that properly converts between interfaces
+  const handleToggleSelection = useCallback((imageId: string, isCtrlOrCmd: boolean) => {
+    const modifierKey = isCtrlOrCmd ? 'ctrl' : 'none';
+    multiSelection.toggleSelection(imageId, modifierKey);
+  }, [multiSelection.toggleSelection]);
+
   // Stable callback references
   const stableCallbacks = useMemo(() => ({
-    onToggleSelection: multiSelection.toggleSelection,
+    onToggleSelection: handleToggleSelection,
     isSelected: multiSelection.isSelected,
     onViewChange,
     onImageSelect,
     onGenerateConcept,
     onOpenAnalysisPanel: onOpenAnalysisPanel,
     onExpandedChange: handleAnalysisExpansion
-  }), [multiSelection.toggleSelection, multiSelection.isSelected, onViewChange, onImageSelect, onGenerateConcept, onOpenAnalysisPanel, handleAnalysisExpansion]);
+  }), [handleToggleSelection, multiSelection.isSelected, onViewChange, onImageSelect, onGenerateConcept, onOpenAnalysisPanel, handleAnalysisExpansion]);
 
   // Group management handlers
   const handleDeleteGroup = useCallback((groupId: string) => {
@@ -1667,17 +1677,38 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [toast]);
 
   const handleCreateGroup = useCallback(() => {
-    if (multiSelection.state.selectedIds.length < 2) {
+    const selectedCount = multiSelection.state.selectedIds.length;
+    const selectedIds = multiSelection.state.selectedIds;
+    
+    console.log('[CanvasView] Group creation attempt:', {
+      selectedCount,
+      selectedIds,
+      multiSelectMode: multiSelection.state.isMultiSelectMode,
+      hasOnCreateGroup: !!onCreateGroup
+    });
+    
+    if (selectedCount < 2) {
       toast({
-        title: "Select Multiple Images",
-        description: "Please select at least 2 images to create a group.",
+        title: "Selection Required",
+        description: "Please select at least 2 images to create a group",
+        category: "action-required",
+      });
+      return;
+    }
+    
+    if (!onCreateGroup) {
+      console.error('[CanvasView] onCreateGroup callback is missing!');
+      toast({
+        title: "Group Creation Error",
+        description: "Group creation functionality is not properly connected",
         category: "error",
       });
       return;
     }
     
-    // Directly create group without dialog
-    onCreateGroup?.(multiSelection.state.selectedIds);
+    // Create group with selected image IDs
+    console.log('[CanvasView] Creating group with IDs:', selectedIds);
+    onCreateGroup(selectedIds);
     multiSelection.clearSelection();
     
     // COMMENTED OUT: Repetitive group creation toast
@@ -1872,6 +1903,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
           selectedCount={multiSelection.state.selectedIds.length}
         />
       </ReactFlow>
+      
+      {/* Selection Debugger for Development */}
+      <SelectionDebugger multiSelection={multiSelection} />
     </div>
   );
 };

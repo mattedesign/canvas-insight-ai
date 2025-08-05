@@ -144,15 +144,12 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
 
       const { data, error } = await supabase.functions.invoke('ux-analysis', {
         body: {
-          type: 'INPAINT_REGION',
-          payload: {
-            imageUrl: imageUrl,
-            imageName: 'drawing-region',
-            prompt: prompt,
-          action: 'analyze',
-          bounds: drawingBounds
-        },
-        aiModel: 'claude-opus-4-20250514'
+          type: 'REGION_ANALYSIS',
+          imageUrl: imageUrl,
+          imageName: 'drawing-region',
+          prompt: prompt,
+          bounds: drawingBounds,
+          action: 'analyze'
         }
       });
 
@@ -163,17 +160,17 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       if (data?.success) {
         toast({
           title: "Analysis complete",
-          description: data.data.analysis.observation || "Region analysis completed",
+          description: data.data?.analysis?.observation || "Region analysis completed",
         });
         console.log('Analysis result:', data.data);
       } else {
-        throw new Error(data?.data?.error || 'Analysis failed');
+        throw new Error(data?.error || 'Analysis failed');
       }
     } catch (error) {
       console.error('Analysis failed:', error);
       toast({
         title: "Analysis failed",
-        description: error.message || "Failed to analyze region",
+        description: error instanceof Error ? error.message : "Failed to analyze region",
         variant: "destructive",
       });
     }
@@ -211,18 +208,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         const maskDataUrl = tempCanvas.toDataURL('image/png');
         const maskData = maskDataUrl.split(',')[1]; // Remove data:image/png;base64, prefix
         
-        const { data, error } = await supabase.functions.invoke('ux-analysis', {
+        const { data, error } = await supabase.functions.invoke('inpainting-service', {
           body: {
-            type: 'INPAINT_REGION',
-            payload: {
-              imageUrl: imageUrl,
-              imageName: 'drawing-region',
-              prompt: prompt,
-              action: 'generate',
-              maskData: maskData,
-              bounds: drawingBounds
-            },
-            aiModel: 'stability-ai' // Prefer Stability AI for generation
+            imageUrl: imageUrl,
+            imageName: 'drawing-region',
+            prompt: prompt,
+            maskData: maskData,
+            bounds: drawingBounds
           }
         });
 
