@@ -30,7 +30,16 @@ export class SummaryValidator {
       warnings: []
     };
 
+    // Enhanced debugging for summary validation
+    console.log('🔍 SummaryValidator: Validating summary object...', {
+      hasSummary: !!summary,
+      summaryType: typeof summary,
+      summaryKeys: summary ? Object.keys(summary) : [],
+      isArray: Array.isArray(summary)
+    });
+
     if (!summary || typeof summary !== 'object') {
+      console.warn('⚠️ SummaryValidator: Summary missing or invalid, creating default');
       result.isValid = false;
       result.missingProperties.push('summary (entire object missing)');
       return result;

@@ -10,6 +10,7 @@ import { AnalysisFieldMappingDebug } from '@/utils/analysisFieldMappingDebug';
 import { simplifiedImageService } from './SimplifiedImageService';
 import { apiStatusService } from './APIStatusService';
 import { enhancedAnalysisStorage } from './EnhancedAnalysisStorage';
+import { AnalysisIntegrationService, type IntegrationResponse } from './AnalysisIntegrationService';
 import type { LegacyUXAnalysis as UXAnalysis, UploadedImage } from '@/context/AppStateTypes';
 
 export interface AnalysisRequest {
@@ -126,22 +127,30 @@ class TypeSafeAnalysisService {
         console.warn('🔧 Field mapping issues detected:', mappingValidation.issues);
       }
 
-      // Apply robust validation and normalization
-      console.log('🔍 TypeSafeAnalysisService: Validating analysis data...', {
+      // Enhanced validation debugging for summary structure
+      console.log('🔍 TypeSafeAnalysisService: Pre-validation analysis data...', {
+        hasRawSummary: !!analysisData?.summary,
+        hasMappedSummary: !!mappedData?.summary,
+        rawSummaryType: typeof analysisData?.summary,
+        mappedSummaryType: typeof mappedData?.summary,
+        rawSummaryKeys: analysisData?.summary ? Object.keys(analysisData.summary) : [],
+        mappedSummaryKeys: mappedData?.summary ? Object.keys(mappedData.summary) : [],
         hasVisualAnnotations: Array.isArray(mappedData?.visualAnnotations),
         hasSuggestions: Array.isArray(mappedData?.suggestions),
         annotationsLength: mappedData?.visualAnnotations?.length || 0,
         suggestionsLength: mappedData?.suggestions?.length || 0
       });
-      const validationResult = AnalysisValidator.validateAndNormalize(mappedData);
+
+      // Use the new integration service for standardized processing
+      const integrationResult = this.processWithIntegration(mappedData, false);
       
-      if (validationResult.warnings.length > 0) {
-        console.warn('TypeSafeAnalysisService validation warnings:', validationResult.warnings);
+      if (!integrationResult.success) {
+        throw new Error(integrationResult.error || 'Integration processing failed');
       }
 
       const response: AnalysisResponse = {
         success: true,
-        analysis: validationResult.data,
+        analysis: integrationResult.analysis!,
         processingTime: performance.now() - startTime,
       };
       
@@ -307,6 +316,13 @@ class TypeSafeAnalysisService {
   
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  /**
+   * Process analysis data using the integration service
+   */
+  private processWithIntegration(analysisData: any, bypassValidation: boolean = false): IntegrationResponse {
+    return AnalysisIntegrationService.processEdgeFunctionResponse(analysisData, bypassValidation);
   }
   
   // Cache management

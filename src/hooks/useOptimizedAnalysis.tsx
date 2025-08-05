@@ -94,6 +94,14 @@ export const useOptimizedAnalysis = () => {
           _isNaturalAnalysis: true
         };
         
+        console.log('🎯 Natural analysis complete, bypassing validation:', {
+          hasResult: !!result,
+          hasData: !!data.analysis,
+          resultKeys: result ? Object.keys(result) : [],
+          hasSummary: !!result.summary,
+          summaryKeys: result.summary ? Object.keys(result.summary) : []
+        });
+        
         return result;
       }
 

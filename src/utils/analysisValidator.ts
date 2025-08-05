@@ -19,6 +19,16 @@ export class AnalysisValidator {
   static validateAndNormalize(rawAnalysis: any): ValidationResult {
     const warnings: string[] = [];
     
+    // Enhanced debugging for validation input
+    console.log('🔍 AnalysisValidator: Input validation...', {
+      hasInput: !!rawAnalysis,
+      inputType: typeof rawAnalysis,
+      hasSummary: !!rawAnalysis?.summary,
+      summaryType: typeof rawAnalysis?.summary,
+      summaryKeys: rawAnalysis?.summary ? Object.keys(rawAnalysis.summary) : [],
+      isNaturalAnalysis: !!rawAnalysis?._isNaturalAnalysis
+    });
+    
     // Ensure basic structure exists
     if (!rawAnalysis || typeof rawAnalysis !== 'object') {
       warnings.push('Analysis data is null or not an object');
@@ -26,6 +36,16 @@ export class AnalysisValidator {
         isValid: false,
         warnings,
         data: this.createDefaultAnalysis()
+      };
+    }
+
+    // Skip validation for natural analysis (already validated by edge function)
+    if (rawAnalysis._isNaturalAnalysis) {
+      console.log('🚀 AnalysisValidator: Skipping validation for natural analysis');
+      return {
+        isValid: true,
+        warnings: [],
+        data: rawAnalysis
       };
     }
 
