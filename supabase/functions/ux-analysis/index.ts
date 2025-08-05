@@ -854,7 +854,7 @@ serve(async (req) => {
       throw new Error(`Model is required for pipeline execution`)
     }
 
-    return await executeModel(body)
+    return await executeModel(body);
 
   } catch (error) {
     console.error('❌ Edge function error:', error)
