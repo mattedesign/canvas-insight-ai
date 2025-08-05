@@ -5,6 +5,8 @@
 
 import type { UXAnalysis } from '@/types/ux-analysis';
 
+console.log('🔍 BUILD DEBUG: AnalysisDataMapper file loading...');
+
 export class AnalysisDataMapper {
   
   /**

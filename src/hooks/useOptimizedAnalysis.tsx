@@ -4,6 +4,8 @@ import { ProgressiveAnalysisLoader, AnalysisCache, PerformanceOptimizer } from '
 import { naturalAnalysisPipeline } from '@/services/NaturalAnalysisPipeline';
 import { AnalysisContext } from '@/types/contextTypes';
 
+console.log('🔍 BUILD DEBUG: useOptimizedAnalysis hook loading...');
+
 export interface AnalysisProgress {
   stage: string;
   progress: number;

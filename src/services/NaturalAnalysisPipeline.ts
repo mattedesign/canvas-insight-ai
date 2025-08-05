@@ -10,6 +10,8 @@ import { AnalysisDataMapper } from './AnalysisDataMapper';
 import { imageOptimizationService } from './ImageOptimizationService';
 import { enhancedErrorRecoveryService } from './EnhancedErrorRecoveryService';
 
+console.log('🔍 BUILD DEBUG: NaturalAnalysisPipeline file loading...');
+
 interface NaturalAnalysisRequest {
   imageUrl: string;
   userContext?: string;
