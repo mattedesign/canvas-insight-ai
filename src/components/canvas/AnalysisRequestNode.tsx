@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAI } from '@/context/AIContext';
 import { ContextClarification } from '@/components/ContextClarification';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
+import { AnalysisDataMapper } from '@/services/AnalysisDataMapper';
 
 export interface AnalysisRequestNodeData extends Record<string, unknown> {
   imageId: string;
@@ -73,7 +74,9 @@ export const AnalysisRequestNode = memo(({ data, id }: AnalysisRequestNodeProps)
             });
             setIsComplete(true);
             if (onAnalysisComplete) {
-              onAnalysisComplete(result);
+              // Apply the data mapper before passing the analysis result
+              const mappedResult = AnalysisDataMapper.extractAnalysisData(result);
+              onAnalysisComplete(mappedResult);
             }
           } else {
             AnalysisDebugger.log('AnalysisRequestNode', 'VALIDATION_FAILED', { 
