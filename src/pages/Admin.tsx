@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, BarChart3, Settings, Activity } from 'lucide-react';
+import { Shield, BarChart3, Settings, Activity, AlertTriangle } from 'lucide-react';
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
 import { ProductionReadinessDashboard } from '@/components/production/ProductionReadinessDashboard';
+import { FallbackAnalyticsPanel } from '@/components/admin/FallbackAnalyticsPanel';
 import { Sidebar } from '@/components/Sidebar';
 
 const Admin = () => {
@@ -50,10 +51,14 @@ const Admin = () => {
         <div className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="analytics" className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
                   Analytics & Monitoring
+                </TabsTrigger>
+                <TabsTrigger value="fallbacks" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Fallback Analytics
                 </TabsTrigger>
                 <TabsTrigger value="production" className="flex items-center gap-2">
                   <Activity className="h-4 w-4" />
@@ -76,6 +81,10 @@ const Admin = () => {
                     <MonitoringDashboard />
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="fallbacks" className="space-y-6">
+                <FallbackAnalyticsPanel />
               </TabsContent>
 
               <TabsContent value="production" className="space-y-6">

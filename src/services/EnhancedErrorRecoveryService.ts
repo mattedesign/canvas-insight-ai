@@ -4,6 +4,8 @@
 
 import { PipelineRecoveryService } from './PipelineRecoveryService';
 import { memoryOptimizedAnalysisService } from './MemoryOptimizedAnalysisService';
+import { FallbackLoggingService } from './FallbackLoggingService';
+import { Logger } from '@/utils/logging';
 import type { UXAnalysis } from '@/types/ux-analysis';
 
 interface RecoveryAttempt {
@@ -81,6 +83,19 @@ class EnhancedErrorRecoveryService {
           recoveryPath.push(attempt);
 
           console.log(`✅ Recovery successful with strategy: ${strategy}`);
+
+          // Log successful recovery
+          await FallbackLoggingService.logFallbackUsage({
+            service_name: 'EnhancedErrorRecoveryService',
+            fallback_type: `recovery_${strategy}`,
+            original_error: context.originalError.message,
+            context_data: {
+              strategy,
+              failedStages: context.failedStages,
+              recoveryTime: Date.now() - startTime,
+              imageId: context.imageId
+            }
+          });
           
           return {
             success: true,
@@ -111,6 +126,19 @@ class EnhancedErrorRecoveryService {
 
     // If all strategies failed, return comprehensive error info
     console.error('❌ All recovery strategies failed');
+
+    // Log complete recovery failure
+    await FallbackLoggingService.logFallbackUsage({
+      service_name: 'EnhancedErrorRecoveryService',
+      fallback_type: 'recovery_complete_failure',
+      original_error: context.originalError.message,
+      context_data: {
+        failedStages: context.failedStages,
+        attemptedStrategies: recoveryPath.map(r => r.strategy),
+        totalRecoveryTime: Date.now() - startTime,
+        imageId: context.imageId
+      }
+    });
     
     return {
       success: false,

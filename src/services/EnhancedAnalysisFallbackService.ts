@@ -4,6 +4,8 @@
  */
 
 import { UXAnalysis } from '@/types/ux-analysis';
+import { FallbackLoggingService } from './FallbackLoggingService';
+import { Logger } from '@/utils/logging';
 
 export interface AnalysisContext {
   imageId: string;
@@ -25,10 +27,10 @@ export class EnhancedAnalysisFallbackService {
   /**
    * Create intelligent fallback analysis based on available context and vision metadata
    */
-  static createIntelligentFallback(
+  static async createIntelligentFallback(
     context: AnalysisContext,
     originalAnalysis?: any
-  ): FallbackResult {
+  ): Promise<FallbackResult> {
     const fallbackReasons: string[] = [];
     let confidence = 0.3; // Base confidence for fallback
 
@@ -73,6 +75,27 @@ export class EnhancedAnalysisFallbackService {
       status: 'completed',
       createdAt: new Date()
     };
+
+    // Log fallback usage
+    Logger.warn('analysis', 'Creating intelligent fallback analysis', { 
+      hasOriginal: !!originalAnalysis,
+      domain,
+      screenType,
+      confidence
+    });
+
+    await FallbackLoggingService.logFallbackUsage({
+      service_name: 'EnhancedAnalysisFallbackService',
+      fallback_type: 'intelligent_fallback',
+      original_error: originalAnalysis ? 'Generic analysis detected' : 'No analysis available',
+      context_data: {
+        domain,
+        screenType,
+        confidence,
+        hasOriginal: !!originalAnalysis,
+        imageId: context.imageId
+      }
+    });
 
     return {
       analysis,
@@ -442,10 +465,10 @@ export class EnhancedAnalysisFallbackService {
   /**
    * Enhance existing analysis if it appears generic
    */
-  static enhanceGenericAnalysis(
+  static async enhanceGenericAnalysis(
     analysis: any,
     context: AnalysisContext
-  ): FallbackResult {
+  ): Promise<FallbackResult> {
     if (!this.isGenericFallback(analysis)) {
       return {
         analysis,
@@ -456,7 +479,21 @@ export class EnhancedAnalysisFallbackService {
     }
 
     // Analysis appears generic, enhance it
-    const fallback = this.createIntelligentFallback(context, analysis);
+    Logger.info('analysis', 'Enhanced generic analysis with intelligent fallback', {
+      originalWasGeneric: true
+    });
+
+    await FallbackLoggingService.logFallbackUsage({
+      service_name: 'EnhancedAnalysisFallbackService',
+      fallback_type: 'generic_enhancement',
+      original_error: 'Generic analysis detected',
+      context_data: {
+        imageId: context.imageId,
+        originalAnalysis: typeof analysis === 'object' ? 'partial_data' : 'invalid_data'
+      }
+    });
+
+    const fallback = await this.createIntelligentFallback(context, analysis);
     
     return {
       ...fallback,

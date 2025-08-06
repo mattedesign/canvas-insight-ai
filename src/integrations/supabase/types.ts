@@ -527,6 +527,36 @@ export type Database = {
         }
         Relationships: []
       }
+      fallback_events: {
+        Row: {
+          context_data: Json | null
+          created_at: string
+          fallback_type: string
+          id: string
+          original_error: string | null
+          service_name: string
+          user_id: string | null
+        }
+        Insert: {
+          context_data?: Json | null
+          created_at?: string
+          fallback_type: string
+          id?: string
+          original_error?: string | null
+          service_name: string
+          user_id?: string | null
+        }
+        Update: {
+          context_data?: Json | null
+          created_at?: string
+          fallback_type?: string
+          id?: string
+          original_error?: string | null
+          service_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       generated_concepts: {
         Row: {
           analysis_id: string | null
