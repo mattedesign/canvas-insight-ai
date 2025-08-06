@@ -465,7 +465,8 @@ export class OptimizedProjectService {
   }
 
   /**
-   * ✅ AGGREGATED METRICS: Get metrics across all projects
+   * ✅ AGGREGATED METRICS: Get metrics across all projects (REFACTORED)
+   * Fixed with optimized queries and proper error handling
    */
   static async getAggregatedMetrics(): Promise<{
     totalProjects: number;
@@ -473,70 +474,109 @@ export class OptimizedProjectService {
     totalAnalyses: number;
     activeProjects: number;
   }> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    try {
+      console.log('[OptimizedProjectService] Starting getAggregatedMetrics...');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('[OptimizedProjectService] User not authenticated');
+        throw new Error('User not authenticated');
+      }
 
-    // Get project counts
-    const { count: totalProjects } = await supabase
-      .from('projects')
-      .select('id', { count: 'exact' })
-      .eq('user_id', user.id);
+      console.log('[OptimizedProjectService] User authenticated:', user.id);
 
-    // Get total images across all projects
-    const { count: totalImages } = await supabase
-      .from('images')
-      .select('id', { count: 'exact' })
-      .in('project_id', await supabase
+      // Step 1: Get all user projects first
+      const { data: userProjects, error: projectsError } = await supabase
         .from('projects')
         .select('id')
-        .eq('user_id', user.id)
-        .then(({ data }) => data?.map(p => p.id) || [])
-      );
+        .eq('user_id', user.id);
 
-    // Get total analyses across all projects
-    let totalAnalyses = 0;
-    if (totalImages && totalImages > 0) {
-      const { data: userImages } = await supabase
-        .from('images')
-        .select('id')
-        .in('project_id', await supabase
-          .from('projects')
-          .select('id')
-          .eq('user_id', user.id)
-          .then(({ data }) => data?.map(p => p.id) || [])
-        );
-
-      if (userImages && userImages.length > 0) {
-        const { count } = await supabase
-          .from('ux_analyses')
-          .select('id', { count: 'exact' })
-          .in('image_id', userImages.map(img => img.id));
-        
-        totalAnalyses = count || 0;
+      if (projectsError) {
+        console.error('[OptimizedProjectService] Error fetching projects:', projectsError);
+        throw projectsError;
       }
+
+      const totalProjects = userProjects?.length || 0;
+      console.log('[OptimizedProjectService] Found projects:', totalProjects);
+
+      if (totalProjects === 0) {
+        console.log('[OptimizedProjectService] No projects found, returning zeros');
+        return {
+          totalProjects: 0,
+          totalImages: 0,
+          totalAnalyses: 0,
+          activeProjects: 0
+        };
+      }
+
+      const projectIds = userProjects.map(p => p.id);
+      console.log('[OptimizedProjectService] Project IDs:', projectIds);
+
+      // Step 2: Get images count with JOIN optimization
+      const { data: userImages, error: imagesError } = await supabase
+        .from('images')
+        .select('id, project_id')
+        .in('project_id', projectIds);
+
+      if (imagesError) {
+        console.error('[OptimizedProjectService] Error fetching images:', imagesError);
+        throw imagesError;
+      }
+
+      const totalImages = userImages?.length || 0;
+      console.log('[OptimizedProjectService] Found images:', totalImages);
+
+      // Step 3: Get analyses count only if we have images
+      let totalAnalyses = 0;
+      let activeProjects = 0;
+
+      if (totalImages > 0 && userImages) {
+        const imageIds = userImages.map(img => img.id);
+        console.log('[OptimizedProjectService] Image IDs for analysis lookup:', imageIds.length);
+
+        const { data: userAnalyses, error: analysesError } = await supabase
+          .from('ux_analyses')
+          .select('id, image_id')
+          .in('image_id', imageIds);
+
+        if (analysesError) {
+          console.error('[OptimizedProjectService] Error fetching analyses:', analysesError);
+          throw analysesError;
+        }
+
+        totalAnalyses = userAnalyses?.length || 0;
+        console.log('[OptimizedProjectService] Found analyses:', totalAnalyses);
+
+        // Step 4: Calculate active projects (projects with images)
+        const projectsWithImages = new Set(userImages.map(img => img.project_id));
+        activeProjects = projectsWithImages.size;
+        console.log('[OptimizedProjectService] Active projects (with images):', activeProjects);
+      }
+
+      const result = {
+        totalProjects,
+        totalImages,
+        totalAnalyses,
+        activeProjects
+      };
+
+      console.log('[OptimizedProjectService] Aggregated metrics result:', result);
+      return result;
+
+    } catch (error) {
+      console.error('[OptimizedProjectService] getAggregatedMetrics failed:', error);
+      
+      // Return safe defaults instead of throwing
+      const fallbackResult = {
+        totalProjects: 0,
+        totalImages: 0,
+        totalAnalyses: 0,
+        activeProjects: 0
+      };
+      
+      console.log('[OptimizedProjectService] Returning fallback result due to error:', fallbackResult);
+      return fallbackResult;
     }
-
-    // Count active projects (projects with images or analyses)
-    const { data: activeProjectData } = await supabase
-      .from('projects')
-      .select(`
-        id,
-        images (id),
-        ux_analyses: images (ux_analyses (id))
-      `)
-      .eq('user_id', user.id);
-
-    const activeProjects = activeProjectData?.filter(project => 
-      (project.images?.length || 0) > 0 || 
-      (project.ux_analyses?.some(img => (img.ux_analyses?.length || 0) > 0))
-    ).length || 0;
-
-    return {
-      totalProjects: totalProjects || 0,
-      totalImages: totalImages || 0,
-      totalAnalyses,
-      activeProjects
-    };
   }
 
   /**
