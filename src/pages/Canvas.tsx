@@ -3,12 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useFinalAppContext } from '@/context/FinalAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ProjectService } from '@/services/DataMigrationService';
+import { ProjectService, GroupMigrationService } from '@/services/DataMigrationService';
 import { CanvasWithContextMenu } from '@/components/canvas/CanvasWithContextMenu';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { AnalysisFlowDebugger } from '@/components/AnalysisFlowDebugger';
-
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 import { WorkspaceCleanupDialog, CleanupOptions } from '@/components/WorkspaceCleanupDialog';
@@ -240,20 +239,42 @@ const Canvas = () => {
     }
   }, [analyses, uploadedImages, toast]);
 
-  const handleCreateGroup = useCallback((imageIds: string[]) => {
-    dispatch({
-      type: 'ADD_GROUP',
-      payload: {
+  const handleCreateGroup = useCallback(async (imageIds: string[]) => {
+    try {
+      const newGroup = {
         id: crypto.randomUUID(),
         name: 'New Group',
         description: 'Group created from canvas',
         color: '#3b82f6',
         imageIds,
         position: { x: 100, y: 100 },
-        createdAt: new Date()
-      }
-    });
-  }, [dispatch]);
+        createdAt: new Date(),
+        projectId: ''
+      };
+
+      // Save to database first
+      await GroupMigrationService.migrateGroupToDatabase(newGroup);
+      
+      // Then update local state
+      dispatch({
+        type: 'ADD_GROUP',
+        payload: newGroup
+      });
+
+      toast({
+        category: 'success',
+        title: 'Group Created',
+        description: 'Images have been grouped successfully.'
+      });
+    } catch (error) {
+      console.error('Failed to create group:', error);
+      toast({
+        category: 'error', 
+        title: 'Group Creation Failed',
+        description: 'Failed to create group. Please try again.'
+      });
+    }
+  }, [dispatch, toast]);
 
   const handleUngroup = useCallback((groupId: string) => {
     console.log('Ungroup:', groupId);

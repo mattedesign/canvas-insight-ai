@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFinalAppContext } from '@/context/FinalAppContext';
-import { ProjectService } from '@/services/DataMigrationService';
+import { ProjectService, GroupMigrationService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
-
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 
 const SimplifiedCanvas = () => {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ const SimplifiedCanvas = () => {
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   
-  
+  const { toast } = useFilteredToast();
   const loadedRef = useRef<string | null>(null);
 
   // Stable data loading effect with minimal dependencies
@@ -222,7 +222,7 @@ const SimplifiedCanvas = () => {
   }, [dispatch]);
 
   // Group creation handler
-  const handleCreateGroup = useCallback((imageIds: string[]) => {
+  const handleCreateGroup = useCallback(async (imageIds: string[]) => {
     console.log('[SimplifiedCanvas] Creating group with images:', imageIds);
     
     if (imageIds.length < 2) {
@@ -230,22 +230,43 @@ const SimplifiedCanvas = () => {
       return;
     }
     
-    const newGroup = {
-      id: crypto.randomUUID(),
-      name: `Group ${imageGroups.length + 1}`,
-      description: 'Group created from canvas',
-      color: '#3b82f6',
-      imageIds,
-      position: { x: 100, y: 100 },
-      createdAt: new Date()
-    };
-    
-    console.log('[SimplifiedCanvas] Dispatching ADD_GROUP with:', newGroup);
-    dispatch({
-      type: 'ADD_GROUP',
-      payload: newGroup
-    });
-  }, [dispatch, imageGroups.length]);
+    try {
+      const newGroup = {
+        id: crypto.randomUUID(),
+        name: `Group ${imageGroups.length + 1}`,
+        description: 'Group created from canvas',
+        color: '#3b82f6',
+        imageIds,
+        position: { x: 100, y: 100 },
+        createdAt: new Date(),
+        projectId: ''
+      };
+      
+      console.log('[SimplifiedCanvas] Saving group to database:', newGroup);
+      // Save to database first
+      await GroupMigrationService.migrateGroupToDatabase(newGroup);
+      
+      console.log('[SimplifiedCanvas] Dispatching ADD_GROUP with:', newGroup);
+      // Then update local state
+      dispatch({
+        type: 'ADD_GROUP',
+        payload: newGroup
+      });
+
+      toast({
+        category: 'success',
+        title: 'Group Created',
+        description: 'Images have been grouped successfully.'
+      });
+    } catch (error) {
+      console.error('[SimplifiedCanvas] Failed to create group:', error);
+      toast({
+        category: 'error',
+        title: 'Group Creation Failed',
+        description: 'Failed to create group. Please try again.'
+      });
+    }
+  }, [dispatch, imageGroups.length, toast]);
 
   if (isLoading) {
     return (
