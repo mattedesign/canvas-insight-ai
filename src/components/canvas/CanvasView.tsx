@@ -16,6 +16,15 @@ import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { getSafeDimensions } from '@/utils/imageUtils';
+import { 
+  calculateProfessionalLayout, 
+  calculateResponsiveCanvasLayout,
+  calculateEnhancedGroupLayout,
+  convertLayoutToCanvasPositions,
+  getOptimalImageDimensions,
+  ENHANCED_LAYOUT_CONFIG
+} from '@/utils/canvasLayoutUtils';
+import { useCanvasViewportManager } from '@/utils/canvasViewportManager';
 import { AnalysisRequestNodeData, AnalysisRequestNode } from './AnalysisRequestNode';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
@@ -125,6 +134,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(true);
   
   const [groups, setGroups] = useState<ImageGroup[]>([]);
+  const [viewportDimensions, setViewportDimensions] = useState({ width: 1400, height: 1000 });
   
   // Analysis workflow state
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
@@ -133,6 +143,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
+  
+  // Initialize viewport manager for professional layout
+  const { 
+    fitContentToView, 
+    autoFitIfNeeded, 
+    calculateContentBounds 
+  } = useCanvasViewportManager();
   
   // Convert uploaded images to canvas items for context menu
   const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
@@ -486,21 +503,21 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     });
   }, [toast]);
 
-  // Enhanced memoization with proper dependency tracking for analysis changes
+  // Enhanced memoization with professional layout calculation
   const initialElements = useMemo(() => {
-  AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING START ===');
-  const renderStats = {
-    uploadedImages: (uploadedImages || []).length,
-    analyses: (analyses || []).length,
-    analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
-    imageGroups: (imageGroups || []).length,
-    showAnalysis,
-    currentTool,
-    analysisRequestsCount: analysisRequests.size,
-    analysisRequestIds: Array.from(analysisRequests.keys())
-  };
-  AnalysisDebugger.log('CanvasView', 'Input data summary', renderStats);
-    
+    AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING WITH PROFESSIONAL LAYOUT ===');
+    const renderStats = {
+      uploadedImages: (uploadedImages || []).length,
+      analyses: (analyses || []).length,
+      analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
+      imageGroups: (imageGroups || []).length,
+      showAnalysis,
+      currentTool,
+      analysisRequestsCount: analysisRequests.size,
+      analysisRequestIds: Array.from(analysisRequests.keys())
+    };
+    AnalysisDebugger.log('CanvasView', 'Input data summary', renderStats);
+      
     if ((uploadedImages || []).length === 0) {
       console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
       return { nodes: [], edges: [] };
@@ -517,77 +534,102 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     
-    let yOffset = 0;
-    const horizontalSpacing = 100;
-    const minVerticalSpacing = 150;
-    
-    // Standardized spacing constants
-    const SPACING_CONSTANTS = {
-      GROUP_PADDING: 32,
-      GROUP_HEADER_HEIGHT: 60,
-      MIN_VERTICAL_SPACING: 150,
-      ANALYSIS_CARD_WIDTH: 400,
-      CONCEPT_DETAILS_WIDTH: 400,
-      SPACING_BUFFER: 50
+    // Enhanced layout configuration based on viewport
+    const layoutConfig = {
+      ...ENHANCED_LAYOUT_CONFIG,
+      containerWidth: viewportDimensions.width,
+      containerHeight: viewportDimensions.height,
+      adaptiveLayout: true,
+      responsiveBreakpoints: {
+        mobile: 768,
+        tablet: 1024,
+        desktop: 1400
+      }
     };
     
     const groupedImageIds = new Set((imageGroups || []).flatMap(group => group.imageIds || []));
 
-    // Process ungrouped images first
+    // === PROFESSIONAL LAYOUT SYSTEM ===
+    // Process ungrouped images with professional grid layout
     const ungroupedImages = (uploadedImages || []).filter(image => !groupedImageIds.has(image.id));
-    console.log('[CanvasView] Processing ungrouped images:', ungroupedImages.length);
+    console.log('[CanvasView] Processing ungrouped images with professional layout:', ungroupedImages.length);
     
-    ungroupedImages.forEach((image, index) => {
-      const analysis = analyses.find(a => a.imageId === image.id);
+    // Calculate professional layout for ungrouped images
+    if (ungroupedImages.length > 0) {
+      const layoutResult = isMobile 
+        ? calculateResponsiveCanvasLayout(ungroupedImages, viewportDimensions.width, viewportDimensions.height, layoutConfig)
+        : calculateProfessionalLayout(ungroupedImages, layoutConfig);
       
-      // Calculate image display dimensions with safe dimension access
-      const safeDimensions = getSafeDimensions(image);
-      const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.8);
-      const scaleFactor = maxDisplayHeight / safeDimensions.height;
-      const displayWidth = Math.min(safeDimensions.width * scaleFactor, 800); // max-width constraint
-      const displayHeight = maxDisplayHeight;
+      const canvasPositions = convertLayoutToCanvasPositions(layoutResult);
+      console.log('[CanvasView] Professional layout calculated:', { 
+        totalItems: layoutResult.positions.length,
+        columns: layoutResult.columns,
+        totalWidth: layoutResult.totalWidth,
+        totalHeight: layoutResult.totalHeight
+      });
       
-      // Check if image is still loading or processing
-      const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
+      // Create nodes for ungrouped images using professional positioning
+      ungroupedImages.forEach((image, index) => {
+        const analysis = analyses.find(a => a.imageId === image.id);
+        const position = canvasPositions[index];
+        
+        if (!position) {
+          console.warn('[CanvasView] No position calculated for image:', image.id);
+          return;
+        }
       
-      // Create image node or loading node based on status
-      const imageNode: Node = {
-        id: `image-${image.id}`,
-        type: isImageLoading ? 'imageLoading' : 'image',
-        position: { x: 50, y: yOffset },
-        data: isImageLoading ? {
-          id: image.id,
-          name: image.name,
-          status: image.status!,
-          error: image.status === 'error' ? 'Upload failed' : undefined
-        } : { 
-          image,
-          analysis,
-          showAnnotations,
-          currentTool,
-          onViewChange: stableCallbacks.onViewChange,
-          onImageSelect: stableCallbacks.onImageSelect,
-          onToggleSelection: stableCallbacks.onToggleSelection,
-          isSelected: stableCallbacks.isSelected(image.id),
-          onAnnotationClick: () => {},
-          onAnalysisComplete: (newAnalysis: UXAnalysis) => {
-            onAnalysisComplete?.(image.id, newAnalysis);
+        // Use professional dynamic sizing
+        const optimalDimensions = getOptimalImageDimensions(image, 'canvas', viewportDimensions.width);
+        const displayWidth = position.width || optimalDimensions.width;
+        const displayHeight = position.height || optimalDimensions.height;
+      
+        // Check if image is still loading or processing
+        const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
+        
+        // Create image node with professional positioning
+        const imageNode: Node = {
+          id: `image-${image.id}`,
+          type: isImageLoading ? 'imageLoading' : 'image',
+          position: { x: position.x, y: position.y },
+          data: isImageLoading ? {
+            id: image.id,
+            name: image.name,
+            status: image.status!,
+            error: image.status === 'error' ? 'Upload failed' : undefined
+          } : { 
+            image,
+            analysis,
+            showAnnotations,
+            currentTool,
+            onViewChange: stableCallbacks.onViewChange,
+            onImageSelect: stableCallbacks.onImageSelect,
+            onToggleSelection: stableCallbacks.onToggleSelection,
+            isSelected: stableCallbacks.isSelected(image.id),
+            onAnnotationClick: () => {},
+            onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+              onAnalysisComplete?.(image.id, newAnalysis);
+            },
+            onCreateAnalysisRequest: handleCreateAnalysisRequest
           },
-          onCreateAnalysisRequest: handleCreateAnalysisRequest
-        },
-      };
-      nodes.push(imageNode);
+          style: {
+            width: displayWidth,
+            height: displayHeight
+          }
+        };
+        nodes.push(imageNode);
 
-      let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
+        // Calculate smart positioning for related nodes
+        const nodeSpacing = 50;
+        let rightmostXPosition = position.x + displayWidth + nodeSpacing;
 
-      // Check for analysis request node - only show if no analysis exists yet
-      const analysisRequest = analysisRequests.get(image.id);
-      const hasAnalysis = !!(analyses || []).find(a => a.imageId === image.id);
-      if (analysisRequest && !isImageLoading && !hasAnalysis) {
-        const requestNode: Node = {
-          id: `analysis-request-${image.id}`,
-          type: 'analysisRequest',
-          position: { x: rightmostXPosition, y: yOffset },
+        // Check for analysis request node - only show if no analysis exists yet
+        const analysisRequest = analysisRequests.get(image.id);
+        const hasAnalysis = !!(analyses || []).find(a => a.imageId === image.id);
+        if (analysisRequest && !isImageLoading && !hasAnalysis) {
+          const requestNode: Node = {
+            id: `analysis-request-${image.id}`,
+            type: 'analysisRequest',
+            position: { x: rightmostXPosition, y: position.y },
           data: {
             imageId: image.id,
             imageName: image.name,
@@ -661,8 +703,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         };
         edges.push(requestEdge);
 
-        rightmostXPosition += 400 + horizontalSpacing; // Update position for next node
-      }
+          rightmostXPosition += 400 + nodeSpacing; // Update position for next node
+        }
 
 
         // Create analysis card node if analysis exists, showAnalysis is true, and no request is pending
@@ -681,7 +723,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const cardNode: Node = {
             id: `card-${analysis.id}`,
             type: isAnalysisLoading ? 'analysisLoading' : 'analysisCard',
-            position: { x: cardXPosition, y: yOffset },
+            position: { x: cardXPosition, y: position.y },
             data: isAnalysisLoading ? {
               imageId: analysis.imageId,
               imageName: analysis.imageName,
@@ -695,172 +737,123 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 onExpandedChange: stableCallbacks.onExpandedChange
               },
           };
-        nodes.push(cardNode);
+          nodes.push(cardNode);
 
-        // Create edge connecting image to analysis card (only if both exist and not loading)
-        if (!isImageLoading) {
-          const edge: Edge = {
-            id: `edge-${image.id}-${analysis.id}`,
-            source: `image-${image.id}`,
-            target: `card-${analysis.id}`,
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: 'hsl(var(--primary))' },
-          };
-          edges.push(edge);
+          // Create edge connecting image to analysis card (only if both exist and not loading)
+          if (!isImageLoading) {
+            const edge: Edge = {
+              id: `edge-${image.id}-${analysis.id}`,
+              source: `image-${image.id}`,
+              target: `card-${analysis.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(edge);
+          }
+
+          rightmostXPosition += analysisCardWidth + nodeSpacing; // Card width + spacing
+
+          // Add concept nodes for this analysis
+          const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+          let currentConceptXPosition = rightmostXPosition;
+          
+          conceptsForAnalysis.forEach((concept, conceptIndex) => {
+            // Create concept image node (artboard) - use same dimensions as original image
+            const conceptImageNode: Node = {
+              id: `concept-image-${concept.id}`,
+              type: 'conceptImage',
+              position: { x: currentConceptXPosition, y: position.y },
+              data: { 
+                concept,
+                originalImage: image,
+                displayWidth,
+                displayHeight
+              },
+            };
+            nodes.push(conceptImageNode);
+
+            // Create concept details node (positioned to the right of concept image)
+            const conceptDetailsXPosition = currentConceptXPosition + displayWidth + nodeSpacing;
+            const conceptDetailsNode: Node = {
+              id: `concept-details-${concept.id}`,
+              type: 'conceptDetails',
+              position: { x: conceptDetailsXPosition, y: position.y },
+              data: { concept },
+            };
+            nodes.push(conceptDetailsNode);
+
+            // Create edge connecting analysis card to concept image
+            const conceptImageEdge: Edge = {
+              id: `edge-${analysis.id}-${concept.id}-image`,
+              source: `card-${analysis.id}`,
+              target: `concept-image-${concept.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(conceptImageEdge);
+
+            // Create edge connecting concept image to concept details
+            const conceptDetailsEdge: Edge = {
+              id: `edge-${concept.id}-image-details`,
+              source: `concept-image-${concept.id}`,
+              target: `concept-details-${concept.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(conceptDetailsEdge);
+
+            // Update position for next concept (if any) - use original image width + spacing + details width
+            currentConceptXPosition = conceptDetailsXPosition + 400 + nodeSpacing;
+          });
         }
+      });
+    }
 
-        rightmostXPosition += analysisCardWidth + horizontalSpacing; // Card width + spacing
-
-        // Add concept nodes for this analysis
-        const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-        let currentConceptXPosition = rightmostXPosition;
-        
-        conceptsForAnalysis.forEach((concept, conceptIndex) => {
-          // Create concept image node (artboard) - use same dimensions as original image
-          const conceptImageNode: Node = {
-            id: `concept-image-${concept.id}`,
-            type: 'conceptImage',
-            position: { x: currentConceptXPosition, y: yOffset },
-            data: { 
-              concept,
-              originalImage: image,
-              displayWidth,
-              displayHeight
-            },
-          };
-          nodes.push(conceptImageNode);
-
-          // Create concept details node (positioned to the right of concept image)
-          const conceptDetailsXPosition = currentConceptXPosition + displayWidth + horizontalSpacing;
-          const conceptDetailsNode: Node = {
-            id: `concept-details-${concept.id}`,
-            type: 'conceptDetails',
-            position: { x: conceptDetailsXPosition, y: yOffset },
-            data: { concept },
-          };
-          nodes.push(conceptDetailsNode);
-
-          // Create edge connecting analysis card to concept image
-          const conceptImageEdge: Edge = {
-            id: `edge-${analysis.id}-${concept.id}-image`,
-            source: `card-${analysis.id}`,
-            target: `concept-image-${concept.id}`,
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: 'hsl(var(--primary))' },
-          };
-          edges.push(conceptImageEdge);
-
-          // Create edge connecting concept image to concept details
-          const conceptDetailsEdge: Edge = {
-            id: `edge-${concept.id}-image-details`,
-            source: `concept-image-${concept.id}`,
-            target: `concept-details-${concept.id}`,
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: 'hsl(var(--primary))' },
-          };
-          edges.push(conceptDetailsEdge);
-
-          // Update position for next concept (if any) - use original image width + spacing + details width
-          currentConceptXPosition = conceptDetailsXPosition + 400 + horizontalSpacing;
-        });
-      }
-
-      // Calculate spacing for next image based on current image height
-      const nextSpacing = Math.max(displayHeight + minVerticalSpacing, 400);
-      yOffset += nextSpacing;
-    });
-
-    // Process image groups with containers and individual analysis cards
+    // === PROFESSIONAL GROUP LAYOUT ===
+    // Process image groups with enhanced professional layout
+    let currentGroupYOffset = ungroupedImages.length > 0 
+      ? Math.max(...nodes.filter(n => n.id.startsWith('image-')).map(n => n.position.y + 400)) + 100
+      : 100;
+      
     imageGroups.forEach((group, groupIndex) => {
       const groupImages = uploadedImages.filter(img => group.imageIds.includes(img.id));
       const displayMode = groupDisplayModes[group.id] || 'standard';
       
-      // Calculate container dimensions based on display mode
-      let containerWidth = 0;
-      let containerHeight = 0;
-      const padding = SPACING_CONSTANTS.GROUP_PADDING;
-      const headerHeight = SPACING_CONSTANTS.GROUP_HEADER_HEIGHT;
+      if (groupImages.length === 0) return;
       
-      if (displayMode === 'standard') {
-        // Vertical stacking: each image+analysis pair stacked vertically
-        let maxWidth = 0;
-        let totalHeight = headerHeight + padding; // Header space + top padding
-        
-        groupImages.forEach((image, imageIndex) => {
-          const analysis = analyses.find(a => a.imageId === image.id);
-          const safeDimensions = getSafeDimensions(image);
-          const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
-          const scaleFactor = maxDisplayHeight / safeDimensions.height;
-          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
-          const displayHeight = maxDisplayHeight;
-          
-          // Width calculation for horizontal layout
-          const horizontalSpacing = Math.max(displayWidth * 0.6, 250);
-          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
-          
-          // Add width for concept nodes if they exist for this analysis
-          if (analysis) {
-            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-            if (conceptsForAnalysis.length > 0) {
-              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
-              pairWidth += conceptWidth;
-            }
-          }
-          
-          maxWidth = Math.max(maxWidth, pairWidth);
-          
-          // Calculate actual content height: image height + buffer
-          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6); // Analysis card min height
-          totalHeight += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
-        });
-        
-        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
-        containerHeight = totalHeight + padding; // Bottom padding
-      } else {
-        // Alternative stacked layout
-        let maxWidth = 0;
-        let totalHeight = headerHeight + padding; // Header space + top padding
-        
-        groupImages.forEach((image, imageIndex) => {
-          const analysis = analyses.find(a => a.imageId === image.id);
-          const safeDimensions = getSafeDimensions(image);
-          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
-          const scaleFactor = maxDisplayHeight / safeDimensions.height;
-          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
-          const displayHeight = maxDisplayHeight;
-          
-          // Width calculation for stacked layout
-          const horizontalSpacing = Math.max(displayWidth * 0.8, 200);
-          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
-          
-          // Add width for concept nodes if they exist for this analysis
-          if (analysis) {
-            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-            if (conceptsForAnalysis.length > 0) {
-              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
-              pairWidth += conceptWidth;
-            }
-          }
-          
-          maxWidth = Math.max(maxWidth, pairWidth);
-          
-          // Calculate actual content height for stacked mode
-          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
-          totalHeight += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
-        });
-        
-        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
-        containerHeight = totalHeight + padding; // Bottom padding
-      }
+      // Calculate professional group layout
+      const groupLayoutResult = calculateEnhancedGroupLayout(
+        group, 
+        groupImages, 
+        displayMode === 'stacked' ? 'stacked' : 'grid',
+        {
+          containerWidth: Math.min(viewportDimensions.width * 0.9, 1200),
+          padding: 40,
+          spacing: 24
+        }
+      );
       
-      // Create group container node using React Flow's built-in group type
+      const groupCanvasPositions = convertLayoutToCanvasPositions(groupLayoutResult);
+      const containerWidth = groupLayoutResult.totalWidth;
+      const containerHeight = groupLayoutResult.totalHeight + 80; // Header space
+      const padding = 20;
+      
+      console.log('[CanvasView] Professional group layout calculated:', {
+        groupId: group.id,
+        imageCount: groupImages.length,
+        layoutColumns: groupLayoutResult.columns,
+        layoutRows: groupLayoutResult.rows,
+        containerDimensions: { width: containerWidth, height: containerHeight }
+      });
+      
+      // Create group container node with professional positioning
       const containerNode: Node = {
         id: `group-container-${group.id}`,
         type: 'group',
-        position: { x: 50, y: yOffset },
+        position: { x: 50, y: currentGroupYOffset },
         style: { 
           width: containerWidth,
           height: containerHeight,
@@ -877,11 +870,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       };
       nodes.push(containerNode);
       
-      // Position images and their individual analysis cards inside the container
-      if (displayMode === 'standard') {
-        // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
-        let currentY = headerHeight + padding; // Start below header with consistent padding
-        groupImages.forEach((image, imageIndex) => {
+      // Position images inside the container using professional layout
+      groupImages.forEach((image, imageIndex) => {
+        const analysis = analyses.find(a => a.imageId === image.id);
+        const groupPosition = groupCanvasPositions[imageIndex];
+        
+        if (!groupPosition) {
+          console.warn('[CanvasView] No group position calculated for image:', image.id);
+          return;
+        }
+        
+        // Calculate absolute position (container position + relative position + header offset)
+        const absolutePosition = {
+          x: containerNode.position.x + groupPosition.x + padding,
+          y: containerNode.position.y + groupPosition.y + 60 // Header offset
+        };
+        
+        const optimalDimensions = getOptimalImageDimensions(image, 'group', containerWidth);
+        const displayWidth = groupPosition.width || optimalDimensions.width;
+        const displayHeight = groupPosition.height || optimalDimensions.height;
           const analysis = analyses.find(a => a.imageId === image.id);
           const safeDimensions = getSafeDimensions(image);
           const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
@@ -1088,198 +1095,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6);
           currentY += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
         });
-      } else {
-        // Alternative stacked layout
-        let currentY = headerHeight + padding; // Start below header with consistent padding
-        groupImages.forEach((image, imageIndex) => {
-          const analysis = analyses.find(a => a.imageId === image.id);
-          const safeDimensions = getSafeDimensions(image);
-          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
-          const scaleFactor = maxDisplayHeight / safeDimensions.height;
-          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
-          const displayHeight = maxDisplayHeight;
-          
-          // Image node - positioned relative to group container origin
-          const imageNode: Node = {
-            id: `image-${image.id}`,
-            type: 'image',
-            position: { x: padding, y: currentY },
-            parentId: `group-container-${group.id}`,
-            extent: 'parent',
-            data: { 
-              image,
-              analysis,
-              showAnnotations,
-              currentTool,
-              onViewChange: stableCallbacks.onViewChange,
-              onImageSelect: stableCallbacks.onImageSelect,
-              onToggleSelection: stableCallbacks.onToggleSelection,
-              isSelected: stableCallbacks.isSelected(image.id),
-              onAnnotationClick: () => {},
-              onAnalysisComplete: (newAnalysis: UXAnalysis) => {
-                onAnalysisComplete?.(image.id, newAnalysis);
-              },
-              onCreateAnalysisRequest: handleCreateAnalysisRequest
-            },
-          };
-          nodes.push(imageNode);
-
-          let rightmostXPosition = padding + displayWidth + 50; // Start after image with some spacing
-          
-          // Check for analysis request node for grouped images (stacked mode)
-          const analysisRequest = analysisRequests.get(image.id);
-          if (analysisRequest) {
-            const requestNode: Node = {
-              id: `group-analysis-request-${image.id}`,
-              type: 'analysisRequest',
-              position: { x: rightmostXPosition, y: currentY },
-              parentId: `group-container-${group.id}`,
-              extent: 'parent',
-              data: {
-                imageId: image.id,
-                imageName: image.name,
-                imageUrl: image.url,
-                userContext: '',
-                onAnalysisComplete: (result: any) => {
-                  console.log('[CanvasView] Stacked group analysis completed:', result);
-                  setAnalysisRequests(prev => {
-                    const newMap = new Map(prev);
-                    newMap.delete(image.id);
-                    return newMap;
-                  });
-                  if (onAnalysisComplete) {
-                    onAnalysisComplete(image.id, result);
-                  }
-                },
-                onError: (error: string) => {
-                  console.error('[CanvasView] Stacked group analysis failed:', error);
-                  setAnalysisRequests(prev => {
-                    const newMap = new Map(prev);
-                    newMap.delete(image.id);
-                    return newMap;
-                  });
-                  toast({
-                    title: "Analysis Failed",
-                    description: error,
-                    variant: "destructive",
-                    category: "error"
-                  });
-                }
-              }
-            };
-            nodes.push(requestNode);
-
-            // Create edge connecting image to analysis request
-            const requestEdge: Edge = {
-              id: `edge-group-${image.id}-request`,
-              source: `image-${image.id}`,
-              target: `group-analysis-request-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
-            };
-            edges.push(requestEdge);
-
-            rightmostXPosition += 400 + 50; // Update position for next node
-          }
-
-          
-          // Individual analysis card for this image - with proportional spacing for stacked mode
-          if (analysis && showAnalysis) {
-            const horizontalSpacing = Math.max(displayWidth * 0.8, 200); // Reduced spacing for stacked mode
-            const analysisNode: Node = {
-              id: `group-image-analysis-${image.id}`,
-              type: 'analysisCard',
-              position: { x: padding + displayWidth + horizontalSpacing, y: currentY },
-              parentId: `group-container-${group.id}`,
-              extent: 'parent',
-              data: { 
-                analysis,
-                onGenerateConcept: stableCallbacks.onGenerateConcept,
-                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
-                isGeneratingConcept,
-                onExpandedChange: stableCallbacks.onExpandedChange
-              },
-            };
-            nodes.push(analysisNode);
-            
-            // Create edge connecting image to its analysis
-            const edge: Edge = {
-              id: `edge-group-image-${image.id}-analysis`,
-              source: `image-${image.id}`,
-              target: `group-image-analysis-${image.id}`,
-              type: 'smoothstep',
-              animated: true,
-              style: { stroke: 'hsl(var(--primary))' },
-            };
-            edges.push(edge);
-            
-            // Add concept nodes for this analysis (same as ungrouped)
-            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
-            const analysisCardWidth = 400; // Standard width
-            let currentConceptXPosition = padding + displayWidth + horizontalSpacing + analysisCardWidth + 100; // After analysis card
-            
-            conceptsForAnalysis.forEach((concept, conceptIndex) => {
-              // Create concept image node (artboard) - use same dimensions as original image
-              const conceptImageNode: Node = {
-                id: `concept-image-${concept.id}`,
-                type: 'conceptImage',
-                position: { x: currentConceptXPosition, y: currentY },
-                parentId: `group-container-${group.id}`,
-                extent: 'parent',
-                data: { 
-                  concept,
-                  originalImage: image,
-                  displayWidth,
-                  displayHeight
-                },
-              };
-              nodes.push(conceptImageNode);
-
-              // Create concept details node (positioned to the right of concept image)
-              const conceptDetailsXPosition = currentConceptXPosition + displayWidth + 100;
-              const conceptDetailsNode: Node = {
-                id: `concept-details-${concept.id}`,
-                type: 'conceptDetails',
-                position: { x: conceptDetailsXPosition, y: currentY },
-                parentId: `group-container-${group.id}`,
-                extent: 'parent',
-                data: { concept },
-              };
-              nodes.push(conceptDetailsNode);
-
-              // Create edge connecting analysis card to concept image
-              const conceptImageEdge: Edge = {
-                id: `edge-group-${analysis.id}-${concept.id}-image`,
-                source: `group-image-analysis-${image.id}`,
-                target: `concept-image-${concept.id}`,
-                type: 'smoothstep',
-                animated: true,
-                style: { stroke: 'hsl(var(--primary))' },
-              };
-              edges.push(conceptImageEdge);
-
-              // Create edge connecting concept image to concept details
-              const conceptDetailsEdge: Edge = {
-                id: `edge-group-${concept.id}-image-details`,
-                source: `concept-image-${concept.id}`,
-                target: `concept-details-${concept.id}`,
-                type: 'smoothstep',
-                animated: true,
-                style: { stroke: 'hsl(var(--primary))' },
-              };
-              edges.push(conceptDetailsEdge);
-
-              // Update position for next concept (if any) - use original image width + spacing + details width
-              currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
-            });
-          }
-          
-          // Move to next vertical position based on actual content height for stacked mode
-          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
-          currentY += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
-        });
-      }
       
       // Group analysis workflow: Check for prompt sessions and analysis results
       const groupSessions = groupPromptSessions.filter(session => session.groupId === group.id);
@@ -1432,13 +1247,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         }
       }
       
-      yOffset += containerHeight + 100; // Space between groups
+      currentGroupYOffset += containerHeight + 100; // Space between groups
     });
 
-    // Add analysis workflow nodes (requests and progress)
+    // Add analysis workflow nodes (requests and progress) - positioned using professional layout
     analysisRequests.forEach(({ imageId, imageName, imageUrl }) => {
       const imageNode = nodes.find(n => n.id === `image-${imageId}`);
-      const imagePosition = imageNode?.position || { x: 50, y: yOffset };
+      const imagePosition = imageNode?.position || { x: 50, y: currentGroupYOffset };
       
       const analysisRequestNode: Node = {
         id: `analysis-request-${imageId}`,
@@ -1515,11 +1330,30 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     analysisRequests.size,
     currentTool, 
     isGeneratingConcept,
-    analysisRequests
+    analysisRequests,
+    // Professional layout dependencies
+    viewportDimensions.width,
+    viewportDimensions.height,
+    isMobile
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // Track viewport dimensions for responsive layout
+  useEffect(() => {
+    const updateViewportDimensions = () => {
+      setViewportDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    updateViewportDimensions();
+    window.addEventListener('resize', updateViewportDimensions);
+    
+    return () => window.removeEventListener('resize', updateViewportDimensions);
+  }, []);
   
   // Helper function to update analysis node
   const updateAnalysisNode = useCallback((nodeId: string, updates: Partial<any>) => {
@@ -1644,7 +1478,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     setIsUpdating,
   } = useUndoRedo([], []);
 
-  // Single consolidated effect to manage all node state updates
+  // Single consolidated effect to manage all node state updates with professional layout
   useEffect(() => {
     setIsUpdating(true);
     
@@ -1655,12 +1489,39 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     // Save to history
     saveState(initialElements.nodes, initialElements.edges);
     
+    // Auto-fit viewport if needed for professional layout
+    if (initialElements.nodes.length > 0) {
+      const layoutPositions = initialElements.nodes
+        .filter(n => n.id.startsWith('image-'))
+        .map(n => ({
+          imageId: n.id.replace('image-', ''),
+          x: n.position.x,
+          y: n.position.y,
+          width: n.style?.width as number || 400,
+          height: n.style?.height as number || 300,
+          row: 0,
+          column: 0
+        }));
+      
+      // Auto-fit content to view after a short delay
+      const autoFitTimeout = setTimeout(() => {
+        autoFitIfNeeded(layoutPositions);
+      }, 300);
+      
+      const cleanup = () => {
+        setIsUpdating(false);
+        clearTimeout(autoFitTimeout);
+      };
+      
+      return cleanup;
+    }
+    
     // Clean up updating flag
     const cleanup = () => setIsUpdating(false);
     const timeoutId = setTimeout(cleanup, 0);
     
     return () => clearTimeout(timeoutId);
-  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, setIsUpdating]);
+  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, setIsUpdating, autoFitIfNeeded]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
