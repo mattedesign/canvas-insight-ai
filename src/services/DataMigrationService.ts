@@ -549,7 +549,6 @@ export class GroupMigrationService {
       .insert({
         id: group.id,
         project_id: projectId,
-        user_id: user.id,
         name: group.name,
         description: group.description,
         color: group.color,
