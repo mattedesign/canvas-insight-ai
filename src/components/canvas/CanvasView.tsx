@@ -39,7 +39,6 @@ import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOv
 import { CanvasUploadZone } from '../CanvasUploadZone';
 import { AICanvasToolbar } from './AICanvasToolbar';
 import { useCanvasContextMenu, CanvasItem, CanvasContextMenuHandlers } from '@/hooks/useCanvasContextMenu';
-import { useCanvasLayout } from '@/hooks/useCanvasLayout';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
@@ -201,23 +200,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   // AI Integration - Use the new pipeline
   const { analyzeImageWithAI } = useAI();
-
-  // Enhanced layout management
-  const {
-    nodes: layoutNodes,
-    containerDimensions,
-    layoutMode,
-    isValid: layoutIsValid,
-    validationErrors,
-    setLayoutMode,
-    getLayoutStats
-  } = useCanvasLayout(uploadedImages, analyses, {
-    layoutMode: 'flow',
-    autoValidate: true,
-    onLayoutError: (errors) => {
-      console.warn('[CanvasView] Layout validation errors:', errors);
-    }
-  });
 
   // Handle analysis panel opening
   const handleAnalysisExpansion = useCallback((analysisId: string) => {
@@ -506,26 +488,25 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   // Enhanced memoization with proper dependency tracking for analysis changes
   const initialElements = useMemo(() => {
-    AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING START ===');
-    const renderStats = {
-      uploadedImages: (uploadedImages || []).length,
-      analyses: (analyses || []).length,
-      analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
-      imageGroups: (imageGroups || []).length,
-      showAnalysis,
-      currentTool,
-      analysisRequestsCount: analysisRequests.size,
-      analysisRequestIds: Array.from(analysisRequests.keys()),
-      layoutStats: getLayoutStats()
-    };
-    AnalysisDebugger.log('CanvasView', 'Input data summary with layout stats', renderStats);
+  AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING START ===');
+  const renderStats = {
+    uploadedImages: (uploadedImages || []).length,
+    analyses: (analyses || []).length,
+    analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
+    imageGroups: (imageGroups || []).length,
+    showAnalysis,
+    currentTool,
+    analysisRequestsCount: analysisRequests.size,
+    analysisRequestIds: Array.from(analysisRequests.keys())
+  };
+  AnalysisDebugger.log('CanvasView', 'Input data summary', renderStats);
     
     if ((uploadedImages || []).length === 0) {
       console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
       return { nodes: [], edges: [] };
     }
     
-    console.log('[CanvasView] Image details with layout validation:', (uploadedImages || []).map(img => ({
+    console.log('[CanvasView] Image details:', (uploadedImages || []).map(img => ({
       id: img.id,
       name: img.name,
       url: img.url ? `${img.url.substring(0, 50)}...` : 'NO_URL',
@@ -533,17 +514,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       status: img.status
     })));
     
-    // Use the improved layout nodes as the base, but fall back to old system for now
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     
-    console.log('[CanvasView] Using enhanced layout with', layoutNodes.length, 'positioned nodes');
-    
-    // Use enhanced layout if available, otherwise fallback to original positioning
     let yOffset = 0;
-    const horizontalSpacing = 200; // Increased from 100 to prevent overlap
-    const minVerticalSpacing = 200; // Increased from 150 to prevent overlap
-    let nextYOffset = containerDimensions.height + 100;
+    const horizontalSpacing = 100;
+    const minVerticalSpacing = 150;
     
     // Standardized spacing constants
     const SPACING_CONSTANTS = {
@@ -564,18 +540,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     ungroupedImages.forEach((image, index) => {
       const analysis = analyses.find(a => a.imageId === image.id);
       
-      // Calculate image display dimensions with safe dimension access - ENHANCED SCALING
+      // Calculate image display dimensions with safe dimension access
       const safeDimensions = getSafeDimensions(image);
-      const maxDisplayWidth = 600; // Consistent max width
-      const maxDisplayHeight = 400; // Consistent max height
-      
-      // Scale to fit within consistent bounds while maintaining aspect ratio
-      const widthScale = maxDisplayWidth / safeDimensions.width;
-      const heightScale = maxDisplayHeight / safeDimensions.height;
-      const scaleFactor = Math.min(widthScale, heightScale, 1); // Don't upscale
-      
-      const displayWidth = Math.round(safeDimensions.width * scaleFactor);
-      const displayHeight = Math.round(safeDimensions.height * scaleFactor);
+      const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.8);
+      const scaleFactor = maxDisplayHeight / safeDimensions.height;
+      const displayWidth = Math.min(safeDimensions.width * scaleFactor, 800); // max-width constraint
+      const displayHeight = maxDisplayHeight;
       
       // Check if image is still loading or processing
       const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
@@ -584,7 +554,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       const imageNode: Node = {
         id: `image-${image.id}`,
         type: isImageLoading ? 'imageLoading' : 'image',
-        position: { x: 50, y: nextYOffset },
+        position: { x: 50, y: yOffset },
         data: isImageLoading ? {
           id: image.id,
           name: image.name,
@@ -608,7 +578,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       };
       nodes.push(imageNode);
 
-      let rightmostXPosition = 50 + displayWidth + 200; // Use spacing constant
+      let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
 
       // Check for analysis request node - only show if no analysis exists yet
       const analysisRequest = analysisRequests.get(image.id);
@@ -617,7 +587,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         const requestNode: Node = {
           id: `analysis-request-${image.id}`,
           type: 'analysisRequest',
-          position: { x: rightmostXPosition, y: nextYOffset },
+          position: { x: rightmostXPosition, y: yOffset },
           data: {
             imageId: image.id,
             imageName: image.name,
@@ -1322,7 +1292,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         const promptCollectionNode: Node = {
           id: `group-prompt-${group.id}`,
           type: 'groupPromptCollection',
-          position: { x: rightmostXPosition, y: nextYOffset },
+          position: { x: rightmostXPosition, y: yOffset },
           data: {
             group,
             onSubmitPrompt: onSubmitGroupPrompt,

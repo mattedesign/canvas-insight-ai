@@ -220,12 +220,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           src={image.url}
           alt={image.name}
           className="w-full h-auto object-contain"
-          style={{ 
-            maxWidth: '600px',
-            maxHeight: '400px',
-            width: `${Math.min(image.dimensions.width, 600)}px`,
-            height: 'auto'
-          }}
+          style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
           onError={(e) => {
             console.error(`[ImageNode] Image load failed:`, {
               imageName: image.name,
