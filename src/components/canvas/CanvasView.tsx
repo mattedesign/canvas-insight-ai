@@ -243,17 +243,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, [groups, multiSelection.selectMultiple, toast]);
 
-  const handleAnalyzeGroup = useCallback((groupId: string) => {
-    const group = groups.find(g => g.id === groupId);
-    if (group) {
-      // COMMENTED OUT: Repetitive group analysis start toast
-      // toast({
-      //   title: "Group Analysis",
-      //   description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
-      //   category: "success",
-      // });
-    }
-  }, [groups, toast]);
+  // Remove local handleAnalyzeGroup - use the prop onAnalyzeGroup instead
 
   // Fork creation handler - directly create fork without modal
   const handleCreateForkClick = useCallback((sessionId: string) => {

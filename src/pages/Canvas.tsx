@@ -407,7 +407,7 @@ const Canvas = () => {
   }, [state.imageGroups, state.uploadedImages, dispatch, toast]);
 
   const handleAnalyzeGroup = useCallback(async (groupId: string) => {
-    console.log('Analyze group:', groupId);
+    console.log('[Canvas] handleAnalyzeGroup called with groupId:', groupId);
     
     // Start group analysis with a default comprehensive prompt
     await handleSubmitGroupPrompt(

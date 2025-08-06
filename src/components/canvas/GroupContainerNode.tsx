@@ -44,7 +44,10 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
         <div className="group-actions">
           {onAnalyzeGroup && (
             <button 
-              onClick={() => onAnalyzeGroup(group.id)}
+              onClick={() => {
+                console.log('[GroupContainerNode] Analyze button clicked for group:', group.id);
+                onAnalyzeGroup(group.id);
+              }}
               className="group-action-btn"
               title="Analyze group"
             >
