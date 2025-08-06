@@ -72,19 +72,71 @@ export function getImageDimensionsWithFallback(
 }
 
 /**
- * Get safe dimensions from image object with fallback
+ * Standard canvas display constants - fixed max dimensions for all images
+ */
+export const CANVAS_DISPLAY_CONSTANTS = {
+  MAX_WIDTH: 400,
+  MAX_HEIGHT: 300,
+  MIN_WIDTH: 120,
+  MIN_HEIGHT: 90,
+  ASPECT_RATIO_THRESHOLD: 3, // Maximum aspect ratio before constraining
+  GROUP_SPACING: 20,
+  GRID_PADDING: 16
+} as const;
+
+/**
+ * Calculate standardized display dimensions for canvas images
+ * Always returns consistent, predictable dimensions
+ */
+export function getStandardDisplayDimensions(
+  originalDimensions: ImageDimensions
+): ImageDimensions {
+  const { width: origWidth, height: origHeight } = originalDimensions;
+  
+  // Handle invalid dimensions
+  if (!origWidth || !origHeight || origWidth <= 0 || origHeight <= 0) {
+    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT };
+  }
+  
+  const aspectRatio = origWidth / origHeight;
+  
+  // Handle extreme aspect ratios
+  if (aspectRatio > CANVAS_DISPLAY_CONSTANTS.ASPECT_RATIO_THRESHOLD) {
+    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT / 2 };
+  }
+  if (aspectRatio < 1 / CANVAS_DISPLAY_CONSTANTS.ASPECT_RATIO_THRESHOLD) {
+    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH / 2, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT };
+  }
+  
+  // Calculate proportional scaling within max bounds
+  const widthRatio = CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH / origWidth;
+  const heightRatio = CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT / origHeight;
+  const scale = Math.min(widthRatio, heightRatio, 1); // Never scale up
+  
+  const displayWidth = Math.round(origWidth * scale);
+  const displayHeight = Math.round(origHeight * scale);
+  
+  // Ensure minimum dimensions
+  return {
+    width: Math.max(displayWidth, CANVAS_DISPLAY_CONSTANTS.MIN_WIDTH),
+    height: Math.max(displayHeight, CANVAS_DISPLAY_CONSTANTS.MIN_HEIGHT)
+  };
+}
+
+/**
+ * Get safe dimensions from image object with standardized canvas sizing
  */
 export function getSafeDimensions(
   image: { dimensions?: { width: number; height: number } },
-  fallback: ImageDimensions = { width: 800, height: 600 }
+  fallback: ImageDimensions = { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT }
 ): ImageDimensions {
   if (!image.dimensions || 
       typeof image.dimensions.width !== 'number' || 
       typeof image.dimensions.height !== 'number' ||
       image.dimensions.width <= 0 || 
       image.dimensions.height <= 0) {
-    console.warn('Invalid or missing image dimensions, using fallback:', fallback);
+    console.warn('Invalid or missing image dimensions, using standardized fallback:', fallback);
     return fallback;
   }
-  return image.dimensions;
+  return getStandardDisplayDimensions(image.dimensions);
 }

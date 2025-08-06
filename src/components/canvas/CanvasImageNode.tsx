@@ -90,12 +90,12 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
       <CardContent className="p-4">
         {/* Image Container */}
         <div className="relative mb-3">
-          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-muted">
+          <div className="rounded-lg overflow-hidden bg-muted" style={{ width: '400px', height: '300px' }}>
             {image.url ? (
               <img
                 src={image.url}
                 alt={image.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 loading="lazy"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;

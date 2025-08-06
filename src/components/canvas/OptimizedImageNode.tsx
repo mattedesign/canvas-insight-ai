@@ -139,7 +139,7 @@ export const OptimizedImageNode: React.FC<OptimizedImageNodeProps> = memo(({ dat
           src={image.url}
           alt={image.name}
           className={`w-full h-auto object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
-          style={{ maxWidth: `${image.dimensions.width}px`, maxHeight: '80vh' }}
+          style={{ maxWidth: '400px', maxHeight: '300px' }}
           onError={handleImageError}
           onLoad={handleImageLoad}
         />
