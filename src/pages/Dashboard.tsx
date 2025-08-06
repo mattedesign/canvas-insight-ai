@@ -69,8 +69,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
   const toast = useFilteredToast();
-  const { currentProjectId, aggregatedView } = useProjectSelection();
-  const { metrics, aggregatedMetrics, loading: metricsLoading, error: metricsError, refreshMetrics } = useDashboardMetrics(currentProjectId, aggregatedView);
+  const { aggregatedMetrics, loading: metricsLoading, error: metricsError, refreshMetrics } = useDashboardMetrics(null, true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,12 +121,12 @@ const Dashboard = () => {
     if (projectsLoadedRef.current || !user || metricsLoading) return;
     
     // Skip if metrics haven't changed
-    if (metrics === lastMetricsRef.current && !aggregatedMetrics) return;
+    if (aggregatedMetrics === lastMetricsRef.current) return;
     
     const fetchProjectsData = async () => {
       try {
         projectsLoadedRef.current = true;
-        lastMetricsRef.current = metrics;
+        lastMetricsRef.current = aggregatedMetrics;
         setLoading(true);
         setError(metricsError);
 
@@ -161,12 +160,10 @@ const Dashboard = () => {
         // For the summary dashboard, we'll use the metrics data directly
         setAnalyses([]);
 
-        // Use either aggregated metrics or project-specific metrics
-        const currentMetrics = aggregatedMetrics || metrics;
         setStats({
           totalProjects: aggregatedMetrics?.totalProjects || (projects?.length || 0),
-          totalImages: currentMetrics?.totalImages || 0,
-          totalAnalyses: currentMetrics?.totalAnalyses || 0,
+          totalImages: aggregatedMetrics?.totalImages || 0,
+          totalAnalyses: aggregatedMetrics?.totalAnalyses || 0,
           recentProjects: projectsWithCounts
         });
       } catch (err) {
@@ -178,7 +175,7 @@ const Dashboard = () => {
     };
 
     fetchProjectsData();
-  }, [user?.id, metrics?.totalAnalyses, aggregatedMetrics?.totalAnalyses, aggregatedView]);
+  }, [user?.id, aggregatedMetrics?.totalAnalyses, metricsLoading]);
 
   if (loading || metricsLoading) {
     return (
@@ -239,10 +236,9 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold">Dashboard</h1>
-                  <p className="text-muted-foreground">Overview of your UX analysis projects</p>
+                  <h1 className="text-2xl font-bold">Portfolio Dashboard</h1>
+                  <p className="text-muted-foreground">Aggregated insights across all your UX analysis projects</p>
                 </div>
-                <ProjectSelector />
               </div>
               
               {/* Subscription Status */}
@@ -283,34 +279,16 @@ const Dashboard = () => {
               </Button>
             </div>
 
-            {/* Context Banner */}
-            {!metricsLoading && (
+            {/* Overview Banner */}
+            {!metricsLoading && aggregatedMetrics && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm">
-                    {aggregatedView ? (
-                      <>
-                        <BarChart3 className="h-4 w-4 text-primary" />
-                        <span className="font-medium">Showing analytics across all your projects</span>
-                        {aggregatedMetrics && (
-                          <span className="text-muted-foreground">
-                            • {aggregatedMetrics.totalProjects} projects • {aggregatedMetrics.activeProjects} active
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Activity className="h-4 w-4 text-primary" />
-                        <span className="font-medium">
-                          Showing analytics for current project
-                        </span>
-                        {metrics && (
-                          <span className="text-muted-foreground">
-                            • {metrics.totalAnalyses} analyses • {metrics.totalImages} images
-                          </span>
-                        )}
-                      </>
-                    )}
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Portfolio overview</span>
+                    <span className="text-muted-foreground">
+                      • {aggregatedMetrics.totalProjects} projects • {aggregatedMetrics.activeProjects} active • {aggregatedMetrics.totalAnalyses} total analyses
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -326,7 +304,7 @@ const Dashboard = () => {
               <TabsContent value="overview" className="space-y-6">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {aggregatedView && aggregatedMetrics ? (
+                  {aggregatedMetrics ? (
                     <>
                       <StatsCard
                         title="Total Projects"
@@ -350,28 +328,9 @@ const Dashboard = () => {
                       />
                     </>
                   ) : (
-                    <>
-                      <StatsCard
-                        title="Project Images"
-                        value={metrics?.totalImages || 0}
-                        icon={Images}
-                      />
-                      <StatsCard
-                        title="Project Analyses"
-                        value={metrics?.totalAnalyses || 0}
-                        icon={Lightbulb}
-                      />
-                      <StatsCard
-                        title="Average Score"
-                        value={metrics?.averageScore || 0}
-                        icon={BarChart3}
-                      />
-                      <StatsCard
-                        title="Account Type"
-                        value={subscription?.subscription_tier || 'Free'}
-                        icon={Users}
-                      />
-                    </>
+                    <div className="col-span-4 text-center py-8">
+                      <p className="text-muted-foreground">No data available</p>
+                    </div>
                   )}
                 </div>
 
@@ -407,7 +366,8 @@ const Dashboard = () => {
               <TabsContent value="insights" className="space-y-6">
                 <SummaryDashboard 
                   analyses={analyses}
-                  metrics={aggregatedView ? null : metrics}
+                  metrics={null}
+                  aggregatedMetrics={aggregatedMetrics}
                   loading={metricsLoading}
                   error={metricsError}
                   onRefresh={refreshMetrics}

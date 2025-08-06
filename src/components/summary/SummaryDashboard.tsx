@@ -12,6 +12,7 @@ import { RefreshCw, AlertCircle } from 'lucide-react';
 interface SummaryDashboardProps {
   analyses: UXAnalysis[];
   metrics?: DashboardMetrics | null;
+  aggregatedMetrics?: any | null;
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
@@ -20,6 +21,7 @@ interface SummaryDashboardProps {
 export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({ 
   analyses, 
   metrics, 
+  aggregatedMetrics,
   loading, 
   error, 
   onRefresh 
@@ -57,7 +59,7 @@ export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({
   }
 
   // No data state
-  if (!metrics || (metrics.totalAnalyses === 0 && analyses.length === 0)) {
+  if (!aggregatedMetrics || aggregatedMetrics.totalAnalyses === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-4">
@@ -65,15 +67,17 @@ export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({
             <span className="text-2xl">📊</span>
           </div>
           <h3 className="text-lg font-semibold">No Analysis Data</h3>
-          <p className="text-muted-foreground">Upload some designs to see aggregated insights</p>
+          <p className="text-muted-foreground">Upload some designs to see aggregated insights across your projects</p>
         </div>
       </div>
     );
   }
 
-  const displayMetrics = metrics || {
-    totalAnalyses: analyses.length,
-    totalImages: analyses.length,
+  const displayMetrics = aggregatedMetrics || {
+    totalAnalyses: 0,
+    totalImages: 0,
+    totalProjects: 0,
+    activeProjects: 0,
     averageScore: 0,
     totalIssues: 0,
     totalSuggestions: 0,
@@ -102,11 +106,11 @@ export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({
         <div className="flex items-center justify-between">
           <div className="text-center flex-1 space-y-2">
             <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              UX Analysis Summary
+              Portfolio Analytics
             </h1>
             <p className="text-muted-foreground">
-              Insights from {displayMetrics.totalAnalyses} analysis{displayMetrics.totalAnalyses !== 1 ? 'es' : ''} 
-              across {displayMetrics.totalImages} design{displayMetrics.totalImages !== 1 ? 's' : ''}
+              Aggregated insights from {displayMetrics.totalAnalyses} analysis{displayMetrics.totalAnalyses !== 1 ? 'es' : ''} 
+              across {displayMetrics.totalProjects} project{displayMetrics.totalProjects !== 1 ? 's' : ''}
             </p>
           </div>
           {onRefresh && (
