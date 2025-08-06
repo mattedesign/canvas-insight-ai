@@ -221,6 +221,32 @@ const SimplifiedCanvas = () => {
     }
   }, [dispatch]);
 
+  // Group creation handler
+  const handleCreateGroup = useCallback((imageIds: string[]) => {
+    console.log('[SimplifiedCanvas] Creating group with images:', imageIds);
+    
+    if (imageIds.length < 2) {
+      console.warn('[SimplifiedCanvas] Cannot create group with less than 2 images');
+      return;
+    }
+    
+    const newGroup = {
+      id: crypto.randomUUID(),
+      name: `Group ${imageGroups.length + 1}`,
+      description: 'Group created from canvas',
+      color: '#3b82f6',
+      imageIds,
+      position: { x: 100, y: 100 },
+      createdAt: new Date()
+    };
+    
+    console.log('[SimplifiedCanvas] Dispatching ADD_GROUP with:', newGroup);
+    dispatch({
+      type: 'ADD_GROUP',
+      payload: newGroup
+    });
+  }, [dispatch, imageGroups.length]);
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-background">
@@ -292,7 +318,7 @@ const SimplifiedCanvas = () => {
             onImageSelect={handleImageSelect}
             onGenerateConcept={handleGenerateConcept}
             onOpenAnalysisPanel={handleOpenAnalysisPanel}
-            onCreateGroup={() => {}}
+            onCreateGroup={handleCreateGroup}
             onUngroup={() => {}}
             onDeleteGroup={() => {}}
             onEditGroup={() => {}}
