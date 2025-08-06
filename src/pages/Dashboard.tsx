@@ -4,16 +4,18 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { DashboardMetrics } from '@/services/DashboardService';
-// Performance monitoring removed for production optimization
+import { SummaryDashboard } from '@/components/summary/SummaryDashboard';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, BarChart3, Images, Lightbulb, Users } from 'lucide-react';
 import { ProjectService } from '@/services/DataMigrationService';
 import { CanvasStateService } from '@/services/CanvasStateService';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { UXAnalysis } from '@/types/ux-analysis';
 
 interface DashboardStats {
   totalProjects: number;
@@ -65,10 +67,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
   const toast = useFilteredToast();
-  const { metrics, loading: metricsLoading, error: metricsError } = useDashboardMetrics();
+  const { metrics, loading: metricsLoading, error: metricsError, refreshMetrics } = useDashboardMetrics();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('overview');
   
   // Add this ref after state declarations
   const projectsLoadedRef = useRef(false);
@@ -150,6 +154,10 @@ const Dashboard = () => {
             };
           })
         );
+
+        // For the summary dashboard, we'll use the metrics data directly
+        // The SummaryDashboard component handles empty analyses gracefully
+        setAnalyses([]);
 
         // Combine metrics data with projects data
         setStats({
@@ -269,57 +277,77 @@ const Dashboard = () => {
               </Button>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatsCard
-                title="Total Projects"
-                value={stats?.totalProjects || 0}
-                icon={BarChart3}
-              />
-              <StatsCard
-                title="Images Analyzed"
-                value={stats?.totalImages || 0}
-                icon={Images}
-              />
-              <StatsCard
-                title="AI Analyses"
-                value={stats?.totalAnalyses || 0}
-                icon={Lightbulb}
-              />
-              <StatsCard
-                title="Account Type"
-                value={subscription?.subscription_tier || 'Free'}
-                icon={Users}
-              />
-            </div>
+            {/* Tabbed Content */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="insights">Analytics</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="overview" className="space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatsCard
+                    title="Total Projects"
+                    value={stats?.totalProjects || 0}
+                    icon={BarChart3}
+                  />
+                  <StatsCard
+                    title="Images Analyzed"
+                    value={stats?.totalImages || 0}
+                    icon={Images}
+                  />
+                  <StatsCard
+                    title="AI Analyses"
+                    value={stats?.totalAnalyses || 0}
+                    icon={Lightbulb}
+                  />
+                  <StatsCard
+                    title="Account Type"
+                    value={subscription?.subscription_tier || 'Free'}
+                    icon={Users}
+                  />
+                </div>
 
-            {/* Recent Projects */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Projects</CardTitle>
-                <CardDescription>Your most recently updated projects</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {stats?.recentProjects.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">No projects yet</p>
-                    <Button onClick={handleCreateProject}>
-                      Create Your First Project
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {stats?.recentProjects.map((project) => (
-                      <RecentProjectItem
-                        key={project.id}
-                        project={project}
-                        onOpen={(projectId) => navigate(`/canvas/${projectId}`)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                {/* Recent Projects */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Projects</CardTitle>
+                    <CardDescription>Your most recently updated projects</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {stats?.recentProjects.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground mb-4">No projects yet</p>
+                        <Button onClick={handleCreateProject}>
+                          Create Your First Project
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {stats?.recentProjects.map((project) => (
+                          <RecentProjectItem
+                            key={project.id}
+                            project={project}
+                            onOpen={(projectId) => navigate(`/canvas/${projectId}`)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="insights" className="space-y-6">
+                <SummaryDashboard 
+                  analyses={analyses}
+                  metrics={metrics}
+                  loading={metricsLoading}
+                  error={metricsError}
+                  onRefresh={refreshMetrics}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
