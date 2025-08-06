@@ -294,13 +294,27 @@ export const UnifiedFloatingToolbar: React.FC<UnifiedFloatingToolbarProps> = ({
       ? 'Select 2 or more items to create a group' 
       : `Create group from ${selectedCount} selected items`;
 
+    const handleGroupClick = () => {
+      console.log('[UnifiedFloatingToolbar] Group button clicked:', {
+        selectedCount,
+        isDisabled,
+        hasOnCreateGroup: !!onCreateGroup
+      });
+      
+      if (onCreateGroup) {
+        onCreateGroup();
+      } else {
+        console.error('[UnifiedFloatingToolbar] onCreateGroup is not defined!');
+      }
+    };
+
     return (
       <>
         <Button 
           variant="ghost" 
           size="sm" 
           className="h-8 px-2 gap-1"
-          onClick={onCreateGroup}
+          onClick={handleGroupClick}
           disabled={isDisabled}
           title={title}
         >
