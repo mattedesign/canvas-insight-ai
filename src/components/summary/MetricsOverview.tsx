@@ -1,12 +1,49 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Zap, Minus } from 'lucide-react';
 import { UXAnalysis } from '@/types/ux-analysis';
-import { DashboardMetrics } from '@/services/DashboardService';
+import { DashboardMetrics, MetricTrend } from '@/services/DashboardService';
 
 interface MetricsOverviewProps {
   analyses: UXAnalysis[];
   metrics?: DashboardMetrics;
 }
+
+// Helper function to format trend value
+const formatTrendValue = (trend: MetricTrend): string => {
+  if (!trend.hasSufficientData) {
+    return 'Insufficient data';
+  }
+  
+  if (trend.trendDirection === 'stable') {
+    return 'No change';
+  }
+  
+  const sign = trend.trendDirection === 'up' ? '+' : '';
+  return `${sign}${trend.trendPercentage}%`;
+};
+
+// Helper function to get trend description
+const getTrendDescription = (trend: MetricTrend, metricName: string): string => {
+  if (!trend.hasSufficientData) {
+    return `Not enough historical data for ${metricName.toLowerCase()} trends`;
+  }
+  
+  const confidence = Math.round(trend.confidenceScore * 100);
+  return `Trend based on recent analysis data (${confidence}% confidence)`;
+};
+
+// Helper function to render trend icon
+const renderTrendIcon = (trend: MetricTrend) => {
+  if (!trend.hasSufficientData || trend.trendDirection === 'stable') {
+    return <Minus className="w-3 h-3" />;
+  }
+  
+  return trend.trendDirection === 'up' ? (
+    <TrendingUp className="w-3 h-3" />
+  ) : (
+    <TrendingDown className="w-3 h-3" />
+  );
+};
 
 export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metrics: dashboardMetrics }) => {
   // Early return with safe defaults if no analyses
@@ -17,34 +54,34 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metr
         value: 0,
         suffix: '/100',
         icon: Target,
-        trend: 'down' as const,
-        trendValue: '0%',
-        description: 'No designs analyzed yet'
+        trend: null,
+        trendValue: 'No data',
+        description: 'Upload designs to start tracking UX scores'
       },
       {
         title: 'Total Issues Found',
         value: 0,
         icon: AlertTriangle,
-        trend: 'down' as const,
-        trendValue: '0%',
-        description: 'No issues found yet'
+        trend: null,
+        trendValue: 'No data',
+        description: 'Issues will appear after analysis'
       },
       {
         title: 'High Impact Items',
         value: 0,
         icon: Zap,
-        trend: 'up' as const,
-        trendValue: '0',
-        description: 'No suggestions yet'
+        trend: null,
+        trendValue: 'No data',
+        description: 'Critical improvements to prioritize'
       },
       {
         title: 'Accessibility Score',
         value: 0,
         suffix: '/100',
         icon: CheckCircle,
-        trend: 'down' as const,
-        trendValue: '0%',
-        description: 'No accessibility data yet'
+        trend: null,
+        trendValue: 'No data',
+        description: 'WCAG compliance tracking'
       }
     ];
 
@@ -71,6 +108,10 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metr
             
             <div className="mt-4 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{metric.description}</span>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Minus className="w-3 h-3" />
+                <span>{metric.trendValue}</span>
+              </div>
             </div>
           </div>
         ))}
@@ -102,40 +143,44 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metr
       sum + (analysis.suggestions?.filter(s => s.impact === 'high').length || 0), 0
     );
 
+  // Get trend data
+  const trends = dashboardMetrics?.trends;
+  const analysisQuality = dashboardMetrics?.analysisQuality;
+
   const metricsData = [
     {
       title: 'Overall UX Score',
       value: avgScore,
       suffix: '/100',
       icon: Target,
-      trend: avgScore >= 70 ? 'up' : 'down',
-      trendValue: '+12%',
-      description: 'Average across all designs'
+      trend: trends?.averageScore,
+      trendValue: trends?.averageScore ? formatTrendValue(trends.averageScore) : 'No trend data',
+      description: trends?.averageScore ? getTrendDescription(trends.averageScore, 'UX Score') : 'Average across all analyzed designs'
     },
     {
       title: 'Total Issues Found',
       value: totalIssues,
       icon: AlertTriangle,
-      trend: 'down',
-      trendValue: '-23%',
-      description: 'Across all uploaded designs'
+      trend: trends?.totalIssues,
+      trendValue: trends?.totalIssues ? formatTrendValue(trends.totalIssues) : 'No trend data',
+      description: trends?.totalIssues ? getTrendDescription(trends.totalIssues, 'Issues') : 'Identified design and usability issues'
     },
     {
       title: 'High Impact Items',
       value: highImpactSuggestions,
       icon: Zap,
-      trend: 'up',
-      trendValue: '+5',
-      description: 'Priority suggestions'
+      trend: null, // No specific trend for this metric yet
+      trendValue: analysisQuality ? `${Math.round(analysisQuality.successRate)}% success` : 'No data',
+      description: analysisQuality ? `Analysis quality: ${Math.round(analysisQuality.averageConfidence * 100)}% avg confidence` : 'Critical improvements to prioritize'
     },
     {
       title: 'Accessibility Score',
       value: accessibilityScore,
       suffix: '/100',
       icon: CheckCircle,
-      trend: accessibilityScore >= 70 ? 'up' : 'down',
-      trendValue: '+8%',
-      description: 'WCAG compliance level'
+      trend: trends?.accessibility,
+      trendValue: trends?.accessibility ? formatTrendValue(trends.accessibility) : 'No trend data',
+      description: trends?.accessibility ? getTrendDescription(trends.accessibility, 'Accessibility') : 'WCAG compliance assessment'
     }
   ];
 
@@ -156,7 +201,9 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metr
               </div>
             </div>
             <div className={`p-2 rounded-lg ${
-              metric.trend === 'up' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+              metric.trend?.trendDirection === 'up' ? 'bg-success/10 text-success' : 
+              metric.trend?.trendDirection === 'down' ? 'bg-destructive/10 text-destructive' : 
+              'bg-muted text-muted-foreground'
             }`}>
               <metric.icon className="w-4 h-4" />
             </div>
@@ -165,13 +212,11 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ analyses, metr
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{metric.description}</span>
             <div className={`flex items-center gap-1 text-xs ${
-              metric.trend === 'up' ? 'text-green-600' : 'text-red-600'
+              metric.trend?.trendDirection === 'up' ? 'text-success' : 
+              metric.trend?.trendDirection === 'down' ? 'text-destructive' : 
+              'text-muted-foreground'
             }`}>
-              {metric.trend === 'up' ? (
-                <TrendingUp className="w-3 h-3" />
-              ) : (
-                <TrendingDown className="w-3 h-3" />
-              )}
+              {renderTrendIcon(metric.trend || { trendDirection: 'stable', hasSufficientData: false } as MetricTrend)}
               <span>{metric.trendValue}</span>
             </div>
           </div>

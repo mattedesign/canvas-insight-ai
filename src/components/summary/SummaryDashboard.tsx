@@ -81,7 +81,18 @@ export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({
     issueDistribution: { high: 0, medium: 0, low: 0 },
     recentActivity: [],
     topIssues: [],
-    patterns: { commonIssues: [], improvementAreas: [], strengths: [] }
+    patterns: { commonIssues: [], improvementAreas: [], strengths: [] },
+    trends: {
+      averageScore: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+      totalIssues: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+      analysisSuccessRate: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+      accessibility: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false }
+    },
+    analysisQuality: {
+      successRate: 100,
+      averageConfidence: 0,
+      failureReasons: []
+    }
   };
 
   return (

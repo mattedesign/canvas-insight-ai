@@ -1,5 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface MetricTrend {
+  currentValue: number;
+  previousValue: number;
+  trendPercentage: number;
+  trendDirection: 'up' | 'down' | 'stable';
+  confidenceScore: number;
+  hasSufficientData: boolean;
+}
+
 export interface DashboardMetrics {
   totalAnalyses: number;
   totalImages: number;
@@ -31,11 +40,23 @@ export interface DashboardMetrics {
     improvementAreas: string[];
     strengths: string[];
   };
+  // New trend data
+  trends: {
+    averageScore: MetricTrend;
+    totalIssues: MetricTrend;
+    analysisSuccessRate: MetricTrend;
+    accessibility: MetricTrend;
+  };
+  analysisQuality: {
+    successRate: number;
+    averageConfidence: number;
+    failureReasons: string[];
+  };
 }
 
 export class DashboardService {
   /**
-   * Get comprehensive dashboard metrics for a project
+   * Get comprehensive dashboard metrics for a project with trend analysis
    */
   static async getDashboardMetrics(projectId: string): Promise<DashboardMetrics | null> {
     try {
@@ -147,6 +168,12 @@ export class DashboardService {
       // Analyze patterns
       const patterns = this.analyzePatterns(analyses);
 
+      // Get trend analysis
+      const trends = await this.getTrendAnalysis(projectId);
+
+      // Get analysis quality metrics
+      const analysisQuality = await this.getAnalysisQuality(projectId);
+
       return {
         totalAnalyses,
         totalImages,
@@ -157,7 +184,9 @@ export class DashboardService {
         issueDistribution: issueSeverityCounts,
         recentActivity,
         topIssues,
-        patterns
+        patterns,
+        trends,
+        analysisQuality
       };
 
     } catch (error) {
@@ -324,6 +353,176 @@ export class DashboardService {
   }
 
   /**
+   * Get trend analysis for key metrics
+   */
+  private static async getTrendAnalysis(projectId: string): Promise<DashboardMetrics['trends']> {
+    try {
+      // Record current metrics snapshot first
+      await supabase.rpc('record_metrics_snapshot', { p_project_id: projectId });
+
+      // Get trends for key metrics
+      const [averageScoreTrend, totalIssuesTrend, successRateTrend, accessibilityTrend] = await Promise.all([
+        supabase.rpc('calculate_metric_trend', { 
+          p_project_id: projectId, 
+          p_metric_name: 'average_score',
+          p_days_back: 7 
+        }),
+        supabase.rpc('calculate_metric_trend', { 
+          p_project_id: projectId, 
+          p_metric_name: 'total_issues',
+          p_days_back: 7 
+        }),
+        supabase.rpc('calculate_metric_trend', { 
+          p_project_id: projectId, 
+          p_metric_name: 'analysis_success_rate',
+          p_days_back: 7 
+        }),
+        supabase.rpc('calculate_metric_trend', { 
+          p_project_id: projectId, 
+          p_metric_name: 'average_score', // Use overall score as proxy for accessibility
+          p_days_back: 7 
+        })
+      ]);
+
+      return {
+        averageScore: this.parseTrendData(averageScoreTrend.data),
+        totalIssues: this.parseTrendData(totalIssuesTrend.data),
+        analysisSuccessRate: this.parseTrendData(successRateTrend.data),
+        accessibility: this.parseTrendData(accessibilityTrend.data)
+      };
+    } catch (error) {
+      console.error('Error getting trend analysis:', error);
+      return this.getEmptyTrends();
+    }
+  }
+
+  /**
+   * Parse trend data from database function
+   */
+  private static parseTrendData(data: any): MetricTrend {
+    if (!data) return this.getEmptyTrend();
+    
+    return {
+      currentValue: data.current_value || 0,
+      previousValue: data.previous_value || 0,
+      trendPercentage: data.trend_percentage || 0,
+      trendDirection: data.trend_direction || 'stable',
+      confidenceScore: data.confidence_score || 0,
+      hasSufficientData: data.has_sufficient_data || false
+    };
+  }
+
+  /**
+   * Get analysis quality metrics
+   */
+  private static async getAnalysisQuality(projectId: string): Promise<DashboardMetrics['analysisQuality']> {
+    try {
+      // Get images for this project
+      const { data: projectImages } = await supabase
+        .from('images')
+        .select('id')
+        .eq('project_id', projectId);
+        
+      const imageIds = projectImages?.map(img => img.id) || [];
+      
+      if (imageIds.length === 0) {
+        return { successRate: 100, averageConfidence: 0, failureReasons: [] };
+      }
+
+      // Get analysis quality data
+      const { data: analyses } = await supabase
+        .from('ux_analyses')
+        .select('status, metadata, summary')
+        .in('image_id', imageIds);
+
+      if (!analyses || analyses.length === 0) {
+        return { successRate: 100, averageConfidence: 0, failureReasons: [] };
+      }
+
+      const successfulAnalyses = analyses.filter(a => a.status === 'completed');
+      const successRate = (successfulAnalyses.length / analyses.length) * 100;
+
+      // Calculate average confidence from metadata
+      let totalConfidence = 0;
+      let confidenceCount = 0;
+      const failureReasons: string[] = [];
+
+      analyses.forEach(analysis => {
+        const metadata = analysis.metadata as any || {};
+        if (metadata.confidence && typeof metadata.confidence === 'number') {
+          totalConfidence += metadata.confidence;
+          confidenceCount++;
+        }
+
+        if (analysis.status !== 'completed' && metadata.error && typeof metadata.error === 'string') {
+          const reason = this.categorizeFailureReason(metadata.error);
+          if (!failureReasons.includes(reason)) {
+            failureReasons.push(reason);
+          }
+        }
+      });
+
+      const averageConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
+
+      return {
+        successRate,
+        averageConfidence,
+        failureReasons: failureReasons.slice(0, 3) // Top 3 failure reasons
+      };
+    } catch (error) {
+      console.error('Error getting analysis quality:', error);
+      return { successRate: 100, averageConfidence: 0, failureReasons: [] };
+    }
+  }
+
+  /**
+   * Categorize failure reasons for better UX
+   */
+  private static categorizeFailureReason(error: string): string {
+    const errorLower = error.toLowerCase();
+    if (errorLower.includes('api') || errorLower.includes('key')) {
+      return 'API Configuration Issue';
+    }
+    if (errorLower.includes('timeout') || errorLower.includes('timeout')) {
+      return 'Request Timeout';
+    }
+    if (errorLower.includes('image') || errorLower.includes('format')) {
+      return 'Image Processing Error';
+    }
+    if (errorLower.includes('json') || errorLower.includes('parse')) {
+      return 'Response Parsing Error';
+    }
+    return 'Unknown Error';
+  }
+
+  /**
+   * Get empty trend data
+   */
+  private static getEmptyTrend(): MetricTrend {
+    return {
+      currentValue: 0,
+      previousValue: 0,
+      trendPercentage: 0,
+      trendDirection: 'stable',
+      confidenceScore: 0,
+      hasSufficientData: false
+    };
+  }
+
+  /**
+   * Get empty trends object
+   */
+  private static getEmptyTrends(): DashboardMetrics['trends'] {
+    const emptyTrend = this.getEmptyTrend();
+    return {
+      averageScore: emptyTrend,
+      totalIssues: emptyTrend,
+      analysisSuccessRate: emptyTrend,
+      accessibility: emptyTrend
+    };
+  }
+
+  /**
    * Get empty metrics when no data is available
    */
   private static getEmptyMetrics(): DashboardMetrics {
@@ -350,6 +549,12 @@ export class DashboardService {
         commonIssues: [],
         improvementAreas: [],
         strengths: [],
+      },
+      trends: this.getEmptyTrends(),
+      analysisQuality: {
+        successRate: 100,
+        averageConfidence: 0,
+        failureReasons: []
       }
     };
   }

@@ -815,6 +815,51 @@ export type Database = {
           },
         ]
       }
+      metrics_history: {
+        Row: {
+          analysis_success_rate: number
+          average_score: number
+          category_scores: Json
+          id: string
+          issue_distribution: Json
+          metadata: Json
+          project_id: string
+          recorded_at: string
+          total_analyses: number
+          total_images: number
+          total_issues: number
+          user_id: string
+        }
+        Insert: {
+          analysis_success_rate?: number
+          average_score?: number
+          category_scores?: Json
+          id?: string
+          issue_distribution?: Json
+          metadata?: Json
+          project_id: string
+          recorded_at?: string
+          total_analyses?: number
+          total_images?: number
+          total_issues?: number
+          user_id: string
+        }
+        Update: {
+          analysis_success_rate?: number
+          average_score?: number
+          category_scores?: Json
+          id?: string
+          issue_distribution?: Json
+          metadata?: Json
+          project_id?: string
+          recorded_at?: string
+          total_analyses?: number
+          total_images?: number
+          total_issues?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       performance_metrics: {
         Row: {
           created_at: string
@@ -1209,6 +1254,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_metric_trend: {
+        Args: {
+          p_project_id: string
+          p_metric_name: string
+          p_days_back?: number
+        }
+        Returns: Json
+      }
       check_database_health: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1279,6 +1332,10 @@ export type Database = {
       has_recent_analysis: {
         Args: { p_image_id: string; p_analysis_type: string; p_hours?: number }
         Returns: boolean
+      }
+      record_metrics_snapshot: {
+        Args: { p_project_id: string }
+        Returns: string
       }
       store_analysis_result: {
         Args: {
