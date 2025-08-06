@@ -12,7 +12,7 @@ export interface ProjectOption {
 }
 
 export const useProjectSelection = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [aggregatedView, setAggregatedView] = useState(false);
@@ -20,7 +20,13 @@ export const useProjectSelection = () => {
   const [error, setError] = useState<string | null>(null);
 
   const loadProjects = useCallback(async () => {
+    // Wait for auth to complete before proceeding
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
+      console.log('[useProjectSelection] No authenticated user, clearing projects');
       setProjects([]);
       setCurrentProjectId(null);
       setLoading(false);
@@ -56,7 +62,7 @@ export const useProjectSelection = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, aggregatedView]);
+  }, [user, aggregatedView, authLoading]);
 
   const switchProject = useCallback(async (projectId: string) => {
     try {

@@ -4,7 +4,7 @@ import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { useAuth } from '@/context/AuthContext';
 
 export const useDashboardMetrics = (projectId?: string | null, aggregatedView = false) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [aggregatedMetrics, setAggregatedMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -15,7 +15,13 @@ export const useDashboardMetrics = (projectId?: string | null, aggregatedView = 
   const lastLoadKey = useRef<string>('');
 
   const loadMetrics = useCallback(async () => {
+    // Wait for auth to complete before proceeding
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
+      console.log('[useDashboardMetrics] No authenticated user, clearing metrics');
       setMetrics(null);
       setAggregatedMetrics(null);
       setLoading(false);
@@ -56,7 +62,7 @@ export const useDashboardMetrics = (projectId?: string | null, aggregatedView = 
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [user?.id, projectId, aggregatedView]);
+  }, [user?.id, projectId, aggregatedView, authLoading]);
 
   const refreshMetrics = useCallback(() => {
     lastLoadKey.current = ''; // Reset to force reload
