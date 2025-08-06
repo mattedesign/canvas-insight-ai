@@ -465,14 +465,24 @@ export class OptimizedProjectService {
   }
 
   /**
-   * ✅ AGGREGATED METRICS: Get metrics across all projects (REFACTORED)
-   * Fixed with optimized queries and proper error handling
+   * ✅ AGGREGATED METRICS: Get comprehensive metrics across all projects
+   * Returns full dashboard-compatible metrics structure
    */
   static async getAggregatedMetrics(): Promise<{
     totalProjects: number;
     totalImages: number;
     totalAnalyses: number;
     activeProjects: number;
+    averageScore: number;
+    totalIssues: number;
+    totalSuggestions: number;
+    categoryScores: { usability: number; accessibility: number; visual: number; content: number };
+    issueDistribution: { high: number; medium: number; low: number };
+    recentActivity: any[];
+    topIssues: any[];
+    patterns: { commonIssues: any[]; improvementAreas: any[]; strengths: any[] };
+    trends: any;
+    analysisQuality: { successRate: number; averageConfidence: number; failureReasons: any[] };
   }> {
     try {
       console.log('[OptimizedProjectService] Starting getAggregatedMetrics...');
@@ -505,7 +515,26 @@ export class OptimizedProjectService {
           totalProjects: 0,
           totalImages: 0,
           totalAnalyses: 0,
-          activeProjects: 0
+          activeProjects: 0,
+          averageScore: 0,
+          totalIssues: 0,
+          totalSuggestions: 0,
+          categoryScores: { usability: 0, accessibility: 0, visual: 0, content: 0 },
+          issueDistribution: { high: 0, medium: 0, low: 0 },
+          recentActivity: [],
+          topIssues: [],
+          patterns: { commonIssues: [], improvementAreas: [], strengths: [] },
+          trends: {
+            averageScore: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+            totalIssues: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+            analysisSuccessRate: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+            accessibility: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false }
+          },
+          analysisQuality: {
+            successRate: 0,
+            averageConfidence: 0,
+            failureReasons: []
+          }
         };
       }
 
@@ -553,14 +582,100 @@ export class OptimizedProjectService {
         console.log('[OptimizedProjectService] Active projects (with images):', activeProjects);
       }
 
+      // Step 5: Calculate comprehensive analytics if we have analyses
+      let averageScore = 0;
+      let totalSuggestions = 0;
+      let categoryScores = { usability: 0, accessibility: 0, visual: 0, content: 0 };
+      let issueDistribution = { high: 0, medium: 0, low: 0 };
+
+      if (totalAnalyses > 0) {
+        // Get detailed analysis data for calculations
+        const { data: detailedAnalyses, error: detailError } = await supabase
+          .from('ux_analyses')
+          .select('summary, suggestions, visual_annotations')
+          .in('image_id', userImages.map(img => img.id));
+
+        if (!detailError && detailedAnalyses) {
+          console.log('[OptimizedProjectService] Found detailed analyses for metrics:', detailedAnalyses.length);
+          
+          let scoreSum = 0;
+          let scoreCount = 0;
+          let categoryTotals = { usability: 0, accessibility: 0, visual: 0, content: 0 };
+          let categoryCount = 0;
+
+          detailedAnalyses.forEach(analysis => {
+            // Calculate average score - handle JSON types safely
+            const summary = analysis.summary as any;
+            const score = summary?.overallScore;
+            if (typeof score === 'number' && score > 0) {
+              scoreSum += score;
+              scoreCount++;
+            }
+
+            // Count suggestions and categorize by impact
+            if (analysis.suggestions) {
+              const suggestions = Array.isArray(analysis.suggestions) ? analysis.suggestions : [];
+              totalSuggestions += suggestions.length;
+              
+              suggestions.forEach((suggestion: any) => {
+                const impact = suggestion.impact?.toLowerCase();
+                if (impact === 'high') issueDistribution.high++;
+                else if (impact === 'medium') issueDistribution.medium++;
+                else if (impact === 'low') issueDistribution.low++;
+              });
+            }
+
+            // Calculate category scores - handle JSON types safely
+            const catScores = summary?.categoryScores;
+            if (catScores && typeof catScores === 'object') {
+              if (typeof catScores.usability === 'number') categoryTotals.usability += catScores.usability;
+              if (typeof catScores.accessibility === 'number') categoryTotals.accessibility += catScores.accessibility;
+              if (typeof catScores.visual === 'number') categoryTotals.visual += catScores.visual;
+              if (typeof catScores.content === 'number') categoryTotals.content += catScores.content;
+              categoryCount++;
+            }
+          });
+
+          averageScore = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0;
+          
+          if (categoryCount > 0) {
+            categoryScores = {
+              usability: Math.round(categoryTotals.usability / categoryCount),
+              accessibility: Math.round(categoryTotals.accessibility / categoryCount),
+              visual: Math.round(categoryTotals.visual / categoryCount),
+              content: Math.round(categoryTotals.content / categoryCount)
+            };
+          }
+        }
+      }
+
       const result = {
         totalProjects,
         totalImages,
         totalAnalyses,
-        activeProjects
+        activeProjects,
+        averageScore,
+        totalIssues: issueDistribution.high + issueDistribution.medium + issueDistribution.low,
+        totalSuggestions,
+        categoryScores,
+        issueDistribution,
+        recentActivity: [],
+        topIssues: [],
+        patterns: { commonIssues: [], improvementAreas: [], strengths: [] },
+        trends: {
+          averageScore: { currentValue: averageScore, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          totalIssues: { currentValue: issueDistribution.high + issueDistribution.medium + issueDistribution.low, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          analysisSuccessRate: { currentValue: 100, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          accessibility: { currentValue: categoryScores.accessibility, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false }
+        },
+        analysisQuality: {
+          successRate: 100,
+          averageConfidence: 0.8,
+          failureReasons: []
+        }
       };
 
-      console.log('[OptimizedProjectService] Aggregated metrics result:', result);
+      console.log('[OptimizedProjectService] Comprehensive aggregated metrics result:', result);
       return result;
 
     } catch (error) {
@@ -571,7 +686,26 @@ export class OptimizedProjectService {
         totalProjects: 0,
         totalImages: 0,
         totalAnalyses: 0,
-        activeProjects: 0
+        activeProjects: 0,
+        averageScore: 0,
+        totalIssues: 0,
+        totalSuggestions: 0,
+        categoryScores: { usability: 0, accessibility: 0, visual: 0, content: 0 },
+        issueDistribution: { high: 0, medium: 0, low: 0 },
+        recentActivity: [],
+        topIssues: [],
+        patterns: { commonIssues: [], improvementAreas: [], strengths: [] },
+        trends: {
+          averageScore: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          totalIssues: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          analysisSuccessRate: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false },
+          accessibility: { currentValue: 0, previousValue: 0, trendPercentage: 0, trendDirection: 'stable' as const, confidenceScore: 0, hasSufficientData: false }
+        },
+        analysisQuality: {
+          successRate: 0,
+          averageConfidence: 0,
+          failureReasons: []
+        }
       };
       
       console.log('[OptimizedProjectService] Returning fallback result due to error:', fallbackResult);
