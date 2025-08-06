@@ -84,6 +84,7 @@ export interface CanvasViewProps {
   onUngroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
   onEditGroup?: (groupId: string) => void;
+  onAnalyzeGroup?: (groupId: string) => void;
   onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
   onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   onEditGroupPrompt?: (sessionId: string) => void;
@@ -112,6 +113,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   onUngroup,
   onDeleteGroup,
   onEditGroup,
+  onAnalyzeGroup,
   onGroupDisplayModeChange,
   onSubmitGroupPrompt,
   onEditGroupPrompt,
@@ -872,6 +874,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onUngroup,
           onDeleteGroup,
           onEdit: onEditGroup,
+          onAnalyzeGroup,
           onDisplayModeChange: onGroupDisplayModeChange,
         },
       };

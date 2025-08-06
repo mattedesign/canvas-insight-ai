@@ -65,6 +65,12 @@ export function appStateReducer(state: AppState, action: AppAction): AppState {
     case 'CLEAR_GROUPS':
       return { ...state, imageGroups: [] };
     
+    case 'ADD_GROUP_ANALYSIS':
+      return {
+        ...state,
+        groupAnalysesWithPrompts: [...state.groupAnalysesWithPrompts, action.payload]
+      };
+    
     case 'TOGGLE_ANNOTATIONS':
       return { ...state, showAnnotations: !state.showAnnotations };
     

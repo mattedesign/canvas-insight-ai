@@ -2,7 +2,7 @@ import React from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { ImageGroup } from '@/types/ux-analysis';
 import { Button } from '@/components/ui/button';
-import { LayoutGrid, Layers, Edit2 } from 'lucide-react';
+import { LayoutGrid, Layers, Edit2, BarChart3 } from 'lucide-react';
 
 interface GroupContainerNodeData {
   group: ImageGroup;
@@ -10,6 +10,7 @@ interface GroupContainerNodeData {
   onUngroup?: (groupId: string) => void;
   onDelete?: (groupId: string) => void;
   onEdit?: (groupId: string) => void;
+  onAnalyzeGroup?: (groupId: string) => void;
   onDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
 }
 
@@ -17,7 +18,7 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
   data,
   selected 
 }) => {
-  const { group, displayMode = 'standard', onUngroup, onDelete, onEdit, onDisplayModeChange } = data as unknown as GroupContainerNodeData;
+  const { group, displayMode = 'standard', onUngroup, onDelete, onEdit, onAnalyzeGroup, onDisplayModeChange } = data as unknown as GroupContainerNodeData;
 
   const handleDisplayModeToggle = () => {
     const newMode = displayMode === 'standard' ? 'stacked' : 'standard';
@@ -41,6 +42,15 @@ export const GroupContainerNode: React.FC<NodeProps> = ({
           </Button>
         </div>
         <div className="group-actions">
+          {onAnalyzeGroup && (
+            <button 
+              onClick={() => onAnalyzeGroup(group.id)}
+              className="group-action-btn"
+              title="Analyze group"
+            >
+              <BarChart3 className="w-3 h-3" />
+            </button>
+          )}
           {onEdit && (
             <button 
               onClick={() => onEdit(group.id)}

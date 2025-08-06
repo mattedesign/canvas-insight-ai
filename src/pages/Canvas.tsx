@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectService, GroupMigrationService, GroupAnalysisMigrationService } from '@/services/DataMigrationService';
 import { analysisService } from '@/services/TypeSafeAnalysisService';
-import { CanvasWithContextMenu } from '@/components/canvas/CanvasWithContextMenu';
+import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { AnalysisFlowDebugger } from '@/components/AnalysisFlowDebugger';
@@ -279,7 +279,13 @@ const Canvas = () => {
 
   const handleUngroup = useCallback((groupId: string) => {
     console.log('Ungroup:', groupId);
-  }, []);
+    dispatch({ type: 'REMOVE_GROUP', payload: groupId });
+    toast({
+      category: 'success',
+      title: 'Group Ungrouped',
+      description: 'Images have been removed from the group.'
+    });
+  }, [dispatch, toast]);
 
   const handleDeleteGroup = useCallback(async (groupId: string) => {
     try {
@@ -399,6 +405,17 @@ const Canvas = () => {
       });
     }
   }, [state.imageGroups, state.uploadedImages, dispatch, toast]);
+
+  const handleAnalyzeGroup = useCallback(async (groupId: string) => {
+    console.log('Analyze group:', groupId);
+    
+    // Start group analysis with a default comprehensive prompt
+    await handleSubmitGroupPrompt(
+      groupId, 
+      'Analyze the overall user flow and information architecture across these screens. Evaluate visual consistency and design system adherence. Identify accessibility issues and improvement opportunities. Assess content clarity and information hierarchy.',
+      false
+    );
+  }, [handleSubmitGroupPrompt]);
 
   const handleOpenAnalysisPanel = useCallback((analysisId: string) => {
     setSelectedAnalysisId(analysisId);
@@ -604,7 +621,28 @@ const Canvas = () => {
             setCanvasError(error.message);
           }}
         >
-          <CanvasWithContextMenu />
+          <PerformantCanvasView
+            uploadedImages={Array.isArray(uploadedImages) ? uploadedImages : []}
+            analyses={Array.isArray(analyses) ? analyses : []}
+            generatedConcepts={Array.isArray(generatedConcepts) ? generatedConcepts : []}
+            imageGroups={Array.isArray(imageGroups) ? imageGroups : []}
+            groupAnalysesWithPrompts={Array.isArray(groupAnalysesWithPrompts) ? groupAnalysesWithPrompts : []}
+            groupDisplayModes={typeof groupDisplayModes === 'object' && groupDisplayModes ? groupDisplayModes : {}}
+            showAnnotations={typeof showAnnotations === 'boolean' ? showAnnotations : false}
+            onToggleAnnotations={handleToggleAnnotations}
+            onImageSelect={handleImageSelect}
+            onGenerateConcept={handleGenerateConcept}
+            onOpenAnalysisPanel={handleOpenAnalysisPanel}
+            onCreateGroup={handleCreateGroup}
+            onUngroup={handleUngroup}
+            onDeleteGroup={handleDeleteGroup}
+            onEditGroup={handleEditGroup}
+            onAnalyzeGroup={handleAnalyzeGroup}
+            onGroupDisplayModeChange={handleGroupDisplayModeChange}
+            onSubmitGroupPrompt={handleSubmitGroupPrompt}
+            onAnalysisComplete={handleAnalysisComplete}
+            onImageUpload={() => {}}
+          />
         </ErrorBoundary>
         
         {/* Analysis Panel */}
