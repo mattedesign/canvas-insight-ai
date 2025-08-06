@@ -314,7 +314,16 @@ export const UnifiedFloatingToolbar: React.FC<UnifiedFloatingToolbarProps> = ({
           variant="ghost" 
           size="sm" 
           className="h-8 px-2 gap-1"
-          onClick={handleGroupClick}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[UnifiedFloatingToolbar] Group button clicked:', {
+              selectedCount,
+              isDisabled,
+              hasOnCreateGroup: !!onCreateGroup
+            });
+            handleGroupClick();
+          }}
           disabled={isDisabled}
           title={title}
         >
