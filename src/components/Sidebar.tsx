@@ -7,11 +7,9 @@ import {
   Bell, 
   Crown, 
   User,
-  Activity,
   Trash2,
   LogOut,
-  Brain,
-  Monitor
+  Brain
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { useAuth } from '@/context/AuthContext';
@@ -52,17 +50,12 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   const isOnProjects = location.pathname === '/projects';
-  const isOnAnalytics = location.pathname === '/analytics';
-  
-  const isOnProduction = location.pathname === '/production';
   const isOnSubscription = location.pathname === '/subscription';
   
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Folder, label: 'Previous', active: isOnProjects },
-    { icon: Activity, label: 'Analytics', active: isOnAnalytics },
-    { icon: Monitor, label: 'Production', active: isOnProduction },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: isOnSubscription },
     { icon: User, label: 'Profile', active: false },
@@ -87,8 +80,6 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
             onClick={
               item.label === 'Dashboard' ? () => enhancedNavigate('/dashboard') :
               item.label === 'Previous' ? () => enhancedNavigate('/projects') :
-              item.label === 'Analytics' ? () => enhancedNavigate('/analytics') :
-              item.label === 'Production' ? () => enhancedNavigate('/production') :
               item.label === 'Subscription' ? () => enhancedNavigate('/subscription') :
               undefined
             }
@@ -102,8 +93,6 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
             title={
               item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Previous' ? 'Previous Analyses' :
-              item.label === 'Analytics' ? 'System Analytics' :
-              item.label === 'Production' ? 'Production Readiness' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :
               item.label === 'Profile' ? 'Profile' :
