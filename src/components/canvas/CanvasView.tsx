@@ -633,10 +633,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   }, [nodes, autoFitIfNeeded]);
 
   // Undo/Redo functionality
-  const { canUndo, canRedo, undo, redo } = useUndoRedo(
-    { nodes, edges },
-    { setNodes, setEdges }
-  );
+  const { canUndo, canRedo, undo, redo } = useUndoRedo(layoutNodes, layoutEdges);
 
   return (
     <div className="relative w-full h-full bg-gradient-to-br from-background via-background to-muted/20">
@@ -713,13 +710,14 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         <CanvasFloatingToolbar
           currentTool={currentTool}
           onToolChange={setCurrentTool}
-          selectedIds={multiSelection.state.selectedIds}
-          onBatchAnalysis={handleBatchAnalysis}
-          onGroupAnalysis={handleGroupAnalysis}
+          onToggleAnnotations={onToggleAnnotations || (() => {})}
+          onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
+          onAddComment={() => {}}
           onCreateGroup={() => onCreateGroup?.(multiSelection.state.selectedIds)}
-          onClearSelection={multiSelection.clearSelection}
           showAnnotations={showAnnotations}
-          onToggleAnnotations={onToggleAnnotations}
+          showAnalysis={showAnalysis}
+          hasMultiSelection={multiSelection.state.selectedIds.length > 0}
+          selectedCount={multiSelection.state.selectedIds.length}
         />
       </AnnotationOverlayProvider>
     </div>
