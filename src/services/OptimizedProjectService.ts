@@ -71,23 +71,13 @@ export class OptimizedProjectService {
         throw new Error('User not authenticated');
       }
 
-      console.log('[OptimizedProjectService] Looking for existing projects for user:', user.id);
+      console.log('[OptimizedProjectService] Looking for best project for user:', user.id);
 
-      // Get or create default project for user
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (error) {
-        console.error('[OptimizedProjectService] Error fetching projects:', error);
-        throw error;
-      }
-
-      if (projects && projects.length > 0) {
-        this.currentProjectId = projects[0].id;
-        console.log('[OptimizedProjectService] Found existing project:', this.currentProjectId);
+      // Smart project selection: prioritize projects with data, then most recent
+      const smartProject = await this.getSmartDefaultProject();
+      if (smartProject) {
+        this.currentProjectId = smartProject;
+        console.log('[OptimizedProjectService] Selected smart default project:', this.currentProjectId);
         return this.currentProjectId;
       }
 
@@ -404,6 +394,149 @@ export class OptimizedProjectService {
 
   static clearAllCache() {
     ProjectStatsCache.clear();
+  }
+
+  /**
+   * ✅ SMART PROJECT SELECTION: Get the best project for dashboard
+   * Prioritizes projects with data, then most recently updated
+   */
+  static async getSmartDefaultProject(): Promise<string | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // Get all projects with their update times and activity
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select(`
+        id, 
+        updated_at,
+        images!inner (id),
+        ux_analyses: images!inner (ux_analyses!inner (id))
+      `)
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error || !projects || projects.length === 0) {
+      // Fallback to any project if smart selection fails
+      const { data: fallbackProjects } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      
+      return fallbackProjects?.[0]?.id || null;
+    }
+
+    // Score projects based on data and recency
+    const scoredProjects = projects.map(project => {
+      const imageCount = project.images?.length || 0;
+      const analysisCount = project.ux_analyses?.length || 0;
+      const daysSinceUpdate = (Date.now() - new Date(project.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+      
+      // Higher score = better project
+      const dataScore = analysisCount * 10 + imageCount * 5; // Heavily weight analyses
+      const recencyScore = Math.max(0, 30 - daysSinceUpdate); // More recent = higher score
+      const totalScore = dataScore + recencyScore;
+      
+      return {
+        id: project.id,
+        score: totalScore,
+        imageCount,
+        analysisCount,
+        daysSinceUpdate: Math.round(daysSinceUpdate)
+      };
+    });
+
+    // Sort by score (highest first) and return the best project
+    scoredProjects.sort((a, b) => b.score - a.score);
+    const bestProject = scoredProjects[0];
+    
+    console.log('[OptimizedProjectService] Smart project selection:', {
+      selectedProject: bestProject.id,
+      score: bestProject.score,
+      imageCount: bestProject.imageCount,
+      analysisCount: bestProject.analysisCount,
+      daysSinceUpdate: bestProject.daysSinceUpdate,
+      totalProjects: scoredProjects.length
+    });
+
+    return bestProject.id;
+  }
+
+  /**
+   * ✅ AGGREGATED METRICS: Get metrics across all projects
+   */
+  static async getAggregatedMetrics(): Promise<{
+    totalProjects: number;
+    totalImages: number;
+    totalAnalyses: number;
+    activeProjects: number;
+  }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get project counts
+    const { count: totalProjects } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact' })
+      .eq('user_id', user.id);
+
+    // Get total images across all projects
+    const { count: totalImages } = await supabase
+      .from('images')
+      .select('id', { count: 'exact' })
+      .in('project_id', await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', user.id)
+        .then(({ data }) => data?.map(p => p.id) || [])
+      );
+
+    // Get total analyses across all projects
+    let totalAnalyses = 0;
+    if (totalImages && totalImages > 0) {
+      const { data: userImages } = await supabase
+        .from('images')
+        .select('id')
+        .in('project_id', await supabase
+          .from('projects')
+          .select('id')
+          .eq('user_id', user.id)
+          .then(({ data }) => data?.map(p => p.id) || [])
+        );
+
+      if (userImages && userImages.length > 0) {
+        const { count } = await supabase
+          .from('ux_analyses')
+          .select('id', { count: 'exact' })
+          .in('image_id', userImages.map(img => img.id));
+        
+        totalAnalyses = count || 0;
+      }
+    }
+
+    // Count active projects (projects with images or analyses)
+    const { data: activeProjectData } = await supabase
+      .from('projects')
+      .select(`
+        id,
+        images (id),
+        ux_analyses: images (ux_analyses (id))
+      `)
+      .eq('user_id', user.id);
+
+    const activeProjects = activeProjectData?.filter(project => 
+      (project.images?.length || 0) > 0 || 
+      (project.ux_analyses?.some(img => (img.ux_analyses?.length || 0) > 0))
+    ).length || 0;
+
+    return {
+      totalProjects: totalProjects || 0,
+      totalImages: totalImages || 0,
+      totalAnalyses,
+      activeProjects
+    };
   }
 
   /**

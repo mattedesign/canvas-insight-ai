@@ -3,25 +3,28 @@ import { DashboardService, DashboardMetrics } from '@/services/DashboardService'
 import { OptimizedProjectService } from '@/services/OptimizedProjectService';
 import { useAuth } from '@/context/AuthContext';
 
-export const useDashboardMetrics = () => {
+export const useDashboardMetrics = (projectId?: string | null, aggregatedView = false) => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [aggregatedMetrics, setAggregatedMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Prevent duplicate loads
   const loadingRef = useRef(false);
-  const loadedForUserRef = useRef<string | null>(null);
+  const lastLoadKey = useRef<string>('');
 
   const loadMetrics = useCallback(async () => {
-    // Skip if already loading or loaded for this user
-    if (loadingRef.current || loadedForUserRef.current === user?.id) {
+    if (!user) {
+      setMetrics(null);
+      setAggregatedMetrics(null);
+      setLoading(false);
       return;
     }
 
-    if (!user) {
-      setMetrics(null);
-      setLoading(false);
+    // Create a key to prevent duplicate loads
+    const loadKey = `${user.id}-${projectId || 'smart'}-${aggregatedView}`;
+    if (loadingRef.current || lastLoadKey.current === loadKey) {
       return;
     }
 
@@ -30,32 +33,56 @@ export const useDashboardMetrics = () => {
       setLoading(true);
       setError(null);
       
-      const projectId = await OptimizedProjectService.getCurrentProject();
-      const data = await DashboardService.getDashboardMetrics(projectId);
+      if (aggregatedView) {
+        // Load aggregated metrics across all projects
+        const aggregated = await OptimizedProjectService.getAggregatedMetrics();
+        setAggregatedMetrics(aggregated);
+        setMetrics(null);
+      } else {
+        // Load metrics for specific or smart-selected project
+        const targetProjectId = projectId || await OptimizedProjectService.getCurrentProject();
+        const data = await DashboardService.getDashboardMetrics(targetProjectId);
+        setMetrics(data);
+        setAggregatedMetrics(null);
+      }
       
-      setMetrics(data);
-      loadedForUserRef.current = user.id;
+      lastLoadKey.current = loadKey;
     } catch (err) {
       console.error('Error loading dashboard metrics:', err);
       setError('Failed to load dashboard metrics');
       setMetrics(null);
+      setAggregatedMetrics(null);
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [user?.id]); // Only depend on user ID, not the whole user object
+  }, [user?.id, projectId, aggregatedView]);
 
   const refreshMetrics = useCallback(() => {
-    loadedForUserRef.current = null; // Reset to force reload
+    lastLoadKey.current = ''; // Reset to force reload
     loadMetrics();
   }, [loadMetrics]);
 
   useEffect(() => {
     loadMetrics();
-  }, [loadMetrics]); // Depend on the stable loadMetrics function
+  }, [loadMetrics]);
+
+  // Listen for project changes
+  useEffect(() => {
+    const handleProjectChange = () => {
+      lastLoadKey.current = ''; // Reset to force reload
+      loadMetrics();
+    };
+
+    window.addEventListener('projectChanged', handleProjectChange);
+    return () => {
+      window.removeEventListener('projectChanged', handleProjectChange);
+    };
+  }, [loadMetrics]);
 
   return {
     metrics,
+    aggregatedMetrics,
     loading,
     error,
     refreshMetrics

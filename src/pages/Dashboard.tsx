@@ -11,11 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, BarChart3, Images, Lightbulb, Users } from 'lucide-react';
+import { Plus, BarChart3, Images, Lightbulb, Users, Activity } from 'lucide-react';
 import { ProjectService } from '@/services/DataMigrationService';
 import { CanvasStateService } from '@/services/CanvasStateService';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { UXAnalysis } from '@/types/ux-analysis';
+import { ProjectSelector } from '@/components/ProjectSelector';
+import { useProjectSelection } from '@/hooks/useProjectSelection';
 
 interface DashboardStats {
   totalProjects: number;
@@ -67,7 +69,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, subscription } = useAuth();
   const toast = useFilteredToast();
-  const { metrics, loading: metricsLoading, error: metricsError, refreshMetrics } = useDashboardMetrics();
+  const { currentProjectId, aggregatedView } = useProjectSelection();
+  const { metrics, aggregatedMetrics, loading: metricsLoading, error: metricsError, refreshMetrics } = useDashboardMetrics(currentProjectId, aggregatedView);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +122,7 @@ const Dashboard = () => {
     if (projectsLoadedRef.current || !user || metricsLoading) return;
     
     // Skip if metrics haven't changed
-    if (metrics === lastMetricsRef.current) return;
+    if (metrics === lastMetricsRef.current && !aggregatedMetrics) return;
     
     const fetchProjectsData = async () => {
       try {
@@ -156,14 +159,14 @@ const Dashboard = () => {
         );
 
         // For the summary dashboard, we'll use the metrics data directly
-        // The SummaryDashboard component handles empty analyses gracefully
         setAnalyses([]);
 
-        // Combine metrics data with projects data
+        // Use either aggregated metrics or project-specific metrics
+        const currentMetrics = aggregatedMetrics || metrics;
         setStats({
-          totalProjects: metrics?.totalAnalyses ? Math.ceil(metrics.totalAnalyses / 5) : 0, // Estimate
-          totalImages: metrics?.totalImages || 0,
-          totalAnalyses: metrics?.totalAnalyses || 0,
+          totalProjects: aggregatedMetrics?.totalProjects || (projects?.length || 0),
+          totalImages: currentMetrics?.totalImages || 0,
+          totalAnalyses: currentMetrics?.totalAnalyses || 0,
           recentProjects: projectsWithCounts
         });
       } catch (err) {
@@ -175,7 +178,7 @@ const Dashboard = () => {
     };
 
     fetchProjectsData();
-  }, [user?.id, metrics?.totalAnalyses]); // Specific dependencies
+  }, [user?.id, metrics?.totalAnalyses, aggregatedMetrics?.totalAnalyses, aggregatedView]);
 
   if (loading || metricsLoading) {
     return (
@@ -234,9 +237,12 @@ const Dashboard = () => {
         <div className="border-b bg-background/95 backdrop-blur">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Overview of your UX analysis projects</p>
+              <div className="flex items-center gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold">Dashboard</h1>
+                  <p className="text-muted-foreground">Overview of your UX analysis projects</p>
+                </div>
+                <ProjectSelector />
               </div>
               
               {/* Subscription Status */}
@@ -277,6 +283,39 @@ const Dashboard = () => {
               </Button>
             </div>
 
+            {/* Context Banner */}
+            {!metricsLoading && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-sm">
+                    {aggregatedView ? (
+                      <>
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Showing analytics across all your projects</span>
+                        {aggregatedMetrics && (
+                          <span className="text-muted-foreground">
+                            • {aggregatedMetrics.totalProjects} projects • {aggregatedMetrics.activeProjects} active
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="h-4 w-4 text-primary" />
+                        <span className="font-medium">
+                          Showing analytics for current project
+                        </span>
+                        {metrics && (
+                          <span className="text-muted-foreground">
+                            • {metrics.totalAnalyses} analyses • {metrics.totalImages} images
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Tabbed Content */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
@@ -287,26 +326,53 @@ const Dashboard = () => {
               <TabsContent value="overview" className="space-y-6">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <StatsCard
-                    title="Total Projects"
-                    value={stats?.totalProjects || 0}
-                    icon={BarChart3}
-                  />
-                  <StatsCard
-                    title="Images Analyzed"
-                    value={stats?.totalImages || 0}
-                    icon={Images}
-                  />
-                  <StatsCard
-                    title="AI Analyses"
-                    value={stats?.totalAnalyses || 0}
-                    icon={Lightbulb}
-                  />
-                  <StatsCard
-                    title="Account Type"
-                    value={subscription?.subscription_tier || 'Free'}
-                    icon={Users}
-                  />
+                  {aggregatedView && aggregatedMetrics ? (
+                    <>
+                      <StatsCard
+                        title="Total Projects"
+                        value={aggregatedMetrics.totalProjects}
+                        icon={BarChart3}
+                      />
+                      <StatsCard
+                        title="Total Images"
+                        value={aggregatedMetrics.totalImages}
+                        icon={Images}
+                      />
+                      <StatsCard
+                        title="Total Analyses"
+                        value={aggregatedMetrics.totalAnalyses}
+                        icon={Lightbulb}
+                      />
+                      <StatsCard
+                        title="Active Projects"
+                        value={aggregatedMetrics.activeProjects}
+                        icon={Activity}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <StatsCard
+                        title="Project Images"
+                        value={metrics?.totalImages || 0}
+                        icon={Images}
+                      />
+                      <StatsCard
+                        title="Project Analyses"
+                        value={metrics?.totalAnalyses || 0}
+                        icon={Lightbulb}
+                      />
+                      <StatsCard
+                        title="Average Score"
+                        value={metrics?.averageScore || 0}
+                        icon={BarChart3}
+                      />
+                      <StatsCard
+                        title="Account Type"
+                        value={subscription?.subscription_tier || 'Free'}
+                        icon={Users}
+                      />
+                    </>
+                  )}
                 </div>
 
                 {/* Recent Projects */}
@@ -341,7 +407,7 @@ const Dashboard = () => {
               <TabsContent value="insights" className="space-y-6">
                 <SummaryDashboard 
                   analyses={analyses}
-                  metrics={metrics}
+                  metrics={aggregatedView ? null : metrics}
                   loading={metricsLoading}
                   error={metricsError}
                   onRefresh={refreshMetrics}
