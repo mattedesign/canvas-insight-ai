@@ -88,28 +88,46 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
       onClick={handleImageClick}
     >
       <CardContent className="p-4">
-        {/* Image Container */}
+        {/* Image Container - Dynamic Sizing */}
         <div className="relative mb-3">
-          <div className="rounded-lg overflow-hidden bg-muted" style={{ width: '400px', height: '300px' }}>
-            {image.url ? (
-              <img
-                src={image.url}
-                alt={image.name}
-                className="w-full h-full object-contain"
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  target.nextElementSibling?.classList.remove('hidden');
+          {(() => {
+            const { getOptimalImageDimensions } = require('@/utils/canvasLayoutUtils');
+            const dimensions = getOptimalImageDimensions(image, 'canvas');
+            return (
+              <div 
+                className="rounded-lg overflow-hidden bg-muted flex items-center justify-center" 
+                style={{ 
+                  width: `${dimensions.width}px`, 
+                  height: `${dimensions.height}px`,
+                  minWidth: '200px',
+                  minHeight: '150px'
                 }}
-              />
-            ) : null}
-            
-            {/* Fallback for broken images */}
-            <div className="hidden w-full h-full flex items-center justify-center text-muted-foreground">
-              <ImageIcon size={48} />
-            </div>
-          </div>
+              >
+                {image.url ? (
+                  <img
+                    src={image.url}
+                    alt={image.name}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                    style={{
+                      width: 'auto',
+                      height: 'auto'
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                 ) : null}
+                
+                {/* Fallback for broken images */}
+                <div className="hidden w-full h-full flex items-center justify-center text-muted-foreground">
+                  <ImageIcon size={48} />
+                </div>
+              </div>
+            );
+          })()}
           
           {/* Status badge */}
           <Badge 

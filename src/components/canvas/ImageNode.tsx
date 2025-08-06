@@ -216,38 +216,47 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
       }}
     >
       <div className="relative image-container" ref={imageContainerRef}>
-        <img
-          src={image.url}
-          alt={image.name}
-          className="w-full h-auto object-contain"
-          style={{ maxWidth: '400px', maxHeight: '300px' }}
-          onError={(e) => {
-            console.error(`[ImageNode] Image load failed:`, {
-              imageName: image.name,
-              imageId: image.id,
-              url: image.url,
-              hasFile: !!image.file,
-              isBlob: image.url.startsWith('blob:'),
-              isSupabase: image.url.includes('supabase'),
-              statusCode: e.currentTarget.complete ? 'complete but error' : 'loading failed'
-            });
-            
-            // Show error state instead of hiding
-            e.currentTarget.style.display = 'block';
-            e.currentTarget.style.backgroundColor = 'hsl(var(--muted))';
-            e.currentTarget.style.border = '2px dashed hsl(var(--border))';
-            e.currentTarget.style.minHeight = '200px';
-            e.currentTarget.alt = `Failed to load: ${image.name}`;
-          }}
-          onLoad={() => {
-            console.log(`[ImageNode] Image loaded successfully:`, {
-              imageName: image.name,
-              imageId: image.id,
-              dimensions: image.dimensions,
-              url: image.url.substring(0, 100) + '...'
-            });
-          }}
-        />
+        {(() => {
+          const { getOptimalImageDimensions } = require('@/utils/canvasLayoutUtils');
+          const dimensions = getOptimalImageDimensions(image, 'canvas');
+          return (
+            <div 
+              className="flex items-center justify-center bg-muted"
+              style={{ 
+                width: `${dimensions.width}px`,
+                height: `${dimensions.height}px`,
+                minWidth: '200px',
+                minHeight: '150px'
+              }}
+            >
+              <img
+                src={image.url}
+                alt={image.name}
+                className="max-w-full max-h-full object-contain"
+                onError={(e) => {
+                  console.error(`[ImageNode] Image load failed:`, {
+                    imageName: image.name,
+                    imageId: image.id,
+                    url: image.url
+                  });
+                  
+                  // Show error state
+                  e.currentTarget.style.display = 'block';
+                  e.currentTarget.style.backgroundColor = 'hsl(var(--muted))';
+                  e.currentTarget.style.border = '2px dashed hsl(var(--border))';
+                  e.currentTarget.alt = `Failed to load: ${image.name}`;
+                }}
+                onLoad={() => {
+                  console.log(`[ImageNode] Image loaded successfully:`, {
+                    imageName: image.name,
+                    imageId: image.id,
+                    dimensions: image.dimensions
+                  });
+                }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Drawing Overlay for Draw Mode */}
         <DrawingOverlay

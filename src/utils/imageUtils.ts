@@ -72,21 +72,22 @@ export function getImageDimensionsWithFallback(
 }
 
 /**
- * Standard canvas display constants - fixed max dimensions for all images
+ * Legacy display constants - kept for backward compatibility
+ * @deprecated Use dynamicImageSizing utilities instead
  */
 export const CANVAS_DISPLAY_CONSTANTS = {
-  MAX_WIDTH: 400,
-  MAX_HEIGHT: 300,
-  MIN_WIDTH: 120,
-  MIN_HEIGHT: 90,
-  ASPECT_RATIO_THRESHOLD: 3, // Maximum aspect ratio before constraining
-  GROUP_SPACING: 20,
-  GRID_PADDING: 16
+  MAX_WIDTH: 600,  // Increased for better quality
+  MAX_HEIGHT: 450, // Increased for better quality
+  MIN_WIDTH: 200,  // Increased minimum
+  MIN_HEIGHT: 150, // Increased minimum
+  ASPECT_RATIO_THRESHOLD: 3,
+  GROUP_SPACING: 24, // Increased spacing
+  GRID_PADDING: 20   // Increased padding
 } as const;
 
 /**
- * Calculate standardized display dimensions for canvas images
- * Always returns consistent, predictable dimensions
+ * Legacy function for standardized display dimensions
+ * @deprecated Use calculateDynamicDisplayDimensions from dynamicImageSizing instead
  */
 export function getStandardDisplayDimensions(
   originalDimensions: ImageDimensions
@@ -124,19 +125,40 @@ export function getStandardDisplayDimensions(
 }
 
 /**
- * Get safe dimensions from image object with standardized canvas sizing
+ * Enhanced dimensions calculation using dynamic sizing
+ */
+export function getEnhancedDisplayDimensions(
+  originalDimensions: ImageDimensions,
+  context: 'canvas' | 'group' | 'gallery' = 'canvas',
+  viewportWidth?: number
+): ImageDimensions {
+  // Import dynamically to avoid circular dependencies
+  const { calculateDynamicDisplayDimensions, getResponsiveDimensions } = require('./dynamicImageSizing');
+  
+  if (viewportWidth) {
+    const result = getResponsiveDimensions(originalDimensions, viewportWidth, context);
+    return { width: result.width, height: result.height };
+  }
+  
+  const result = calculateDynamicDisplayDimensions(originalDimensions, undefined, context);
+  return { width: result.width, height: result.height };
+}
+
+/**
+ * Get safe dimensions from image object with enhanced sizing
  */
 export function getSafeDimensions(
   image: { dimensions?: { width: number; height: number } },
-  fallback: ImageDimensions = { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT }
+  fallback: ImageDimensions = { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT },
+  context: 'canvas' | 'group' | 'gallery' = 'canvas'
 ): ImageDimensions {
   if (!image.dimensions || 
       typeof image.dimensions.width !== 'number' || 
       typeof image.dimensions.height !== 'number' ||
       image.dimensions.width <= 0 || 
       image.dimensions.height <= 0) {
-    console.warn('Invalid or missing image dimensions, using standardized fallback:', fallback);
-    return fallback;
+    console.warn('Invalid or missing image dimensions, using enhanced fallback:', fallback);
+    return getEnhancedDisplayDimensions(fallback, context);
   }
-  return getStandardDisplayDimensions(image.dimensions);
+  return getEnhancedDisplayDimensions(image.dimensions, context);
 }
