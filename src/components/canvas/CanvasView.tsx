@@ -520,6 +520,17 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     let yOffset = 0;
     const horizontalSpacing = 100;
     const minVerticalSpacing = 150;
+    
+    // Standardized spacing constants
+    const SPACING_CONSTANTS = {
+      GROUP_PADDING: 32,
+      GROUP_HEADER_HEIGHT: 60,
+      MIN_VERTICAL_SPACING: 150,
+      ANALYSIS_CARD_WIDTH: 400,
+      CONCEPT_DETAILS_WIDTH: 400,
+      SPACING_BUFFER: 50
+    };
+    
     const groupedImageIds = new Set((imageGroups || []).flatMap(group => group.imageIds || []));
 
     // Process ungrouped images first
@@ -770,10 +781,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Calculate container dimensions based on display mode
       let containerWidth = 0;
       let containerHeight = 0;
-      const padding = 32; // Consistent 32px padding on all sides
-      const headerHeight = 60; // Space for group title
-      const imageSpacing = 20;
-      const analysisSpacing = 100;
+      const padding = SPACING_CONSTANTS.GROUP_PADDING;
+      const headerHeight = SPACING_CONSTANTS.GROUP_HEADER_HEIGHT;
       
       if (displayMode === 'standard') {
         // Vertical stacking: each image+analysis pair stacked vertically
@@ -788,26 +797,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
           const displayHeight = maxDisplayHeight;
           
-          // Width needed for this pair: image + spacing + analysis card (expanded or collapsed)
-          const horizontalSpacing = Math.max(displayWidth * 1.2, 300); // At least 300px or 120% image width
-          const analysisCardWidth = 400; // Standard width
-          let pairWidth = displayWidth + horizontalSpacing + analysisCardWidth; // generous spacing + analysis card
+          // Width calculation for horizontal layout
+          const horizontalSpacing = Math.max(displayWidth * 0.6, 250);
+          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
           
           // Add width for concept nodes if they exist for this analysis
           if (analysis) {
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
             if (conceptsForAnalysis.length > 0) {
-              // Each concept adds: concept image (original width) + spacing + concept details (400px) + spacing
-              const conceptWidth = conceptsForAnalysis.length * (displayWidth + 100 + 400 + 100);
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
               pairWidth += conceptWidth;
             }
           }
           
           maxWidth = Math.max(maxWidth, pairWidth);
           
-          // Use triple the scaled image height as the minimum vertical space to over-correct
-          const minVerticalSpace = Math.max(displayHeight * 3, 500); // At least 500px or triple image height
-          totalHeight += minVerticalSpace;
+          // Calculate actual content height: image height + buffer
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6); // Analysis card min height
+          totalHeight += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
         });
         
         containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
@@ -825,24 +832,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
           const displayHeight = maxDisplayHeight;
           
-          const analysisCardWidth = 400; // Standard width
-          let pairWidth = displayWidth + Math.max(displayWidth * 1.0, 250) + analysisCardWidth; // Include generous spacing
+          // Width calculation for stacked layout
+          const horizontalSpacing = Math.max(displayWidth * 0.8, 200);
+          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
           
           // Add width for concept nodes if they exist for this analysis
           if (analysis) {
             const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
             if (conceptsForAnalysis.length > 0) {
-              // Each concept adds: concept image (original width) + spacing + concept details (400px) + spacing
-              const conceptWidth = conceptsForAnalysis.length * (displayWidth + 100 + 400 + 100);
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
               pairWidth += conceptWidth;
             }
           }
           
           maxWidth = Math.max(maxWidth, pairWidth);
           
-          // Use triple the scaled image height as the minimum vertical space for stacked mode
-          const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
-          totalHeight += minVerticalSpace;
+          // Calculate actual content height for stacked mode
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
+          totalHeight += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
         });
         
         containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
@@ -873,7 +880,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Position images and their individual analysis cards inside the container
       if (displayMode === 'standard') {
         // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
-        let currentY = headerHeight + padding; // Start below header with 32px top padding
+        let currentY = headerHeight + padding; // Start below header with consistent padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const safeDimensions = getSafeDimensions(image);
@@ -975,9 +982,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           }
 
           
-          // Individual analysis card for this image - with generous spacing
+          // Individual analysis card for this image - with proportional spacing
           if (analysis && showAnalysis && !isImageLoading) {
-            const horizontalSpacing = Math.max(displayWidth * 1.2, 300); // At least 300px or 120% image width
+            const horizontalSpacing = Math.max(displayWidth * 0.6, 250); // Proportional to image width
             
             // Check if analysis is still loading
             const isAnalysisLoading = analysis.status && ['processing', 'analyzing'].includes(analysis.status);
@@ -1077,13 +1084,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             });
           }
           
-          // Move to next vertical position using triple the image height to over-correct
-          const minVerticalSpace = Math.max(displayHeight * 3, 500); // At least 500px or triple image height
-          currentY += minVerticalSpace;
+          // Move to next vertical position based on actual content height
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6);
+          currentY += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
         });
       } else {
         // Alternative stacked layout
-        let currentY = headerHeight + padding; // Start below header with 32px top padding
+        let currentY = headerHeight + padding; // Start below header with consistent padding
         groupImages.forEach((image, imageIndex) => {
           const analysis = analyses.find(a => a.imageId === image.id);
           const safeDimensions = getSafeDimensions(image);
@@ -1177,9 +1184,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           }
 
           
-          // Individual analysis card for this image - with generous spacing for stacked mode
+          // Individual analysis card for this image - with proportional spacing for stacked mode
           if (analysis && showAnalysis) {
-            const horizontalSpacing = Math.max(displayWidth * 1.0, 250); // At least 250px or full image width
+            const horizontalSpacing = Math.max(displayWidth * 0.8, 200); // Reduced spacing for stacked mode
             const analysisNode: Node = {
               id: `group-image-analysis-${image.id}`,
               type: 'analysisCard',
@@ -1268,9 +1275,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             });
           }
           
-          // Move to next vertical position using triple the image height for stacked mode
-          const minVerticalSpace = Math.max(displayHeight * 3, 400); // At least 400px or triple image height
-          currentY += minVerticalSpace;
+          // Move to next vertical position based on actual content height for stacked mode
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
+          currentY += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
         });
       }
       
