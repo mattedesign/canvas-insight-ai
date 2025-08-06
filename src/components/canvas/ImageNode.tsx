@@ -11,7 +11,7 @@ import { useAnnotationOverlay, useGlobalCoordinates } from '../AnnotationOverlay
 import { useIsMobile } from '@/hooks/useIsMobile';
 
 import { AnalysisStatusIndicator } from '../AnalysisStatusIndicator';
-import { AIContextMenu } from './AIContextMenu';
+
 
 interface ImageNodeData {
   image: UploadedImage;
@@ -24,6 +24,7 @@ interface ImageNodeData {
   isSelected?: boolean;
   onAnalysisComplete?: (imageId: string, analysis: UXAnalysis) => void;
   onCreateAnalysisRequest?: (imageId: string) => void;
+  onContextMenu?: (imageId: string) => void;
 }
 
 interface ImageNodeProps {
@@ -32,7 +33,7 @@ interface ImageNodeProps {
 }
 
 export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
-  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false, onAnalysisComplete, onCreateAnalysisRequest } = data;
+  const { image, analysis, showAnnotations = true, currentTool = 'cursor', onViewChange, onImageSelect, onToggleSelection, isSelected = false, onAnalysisComplete, onCreateAnalysisRequest, onContextMenu } = data;
   const { toast } = useToast();
   const { fitView } = useReactFlow();
   const { showAnnotation, hideAnnotation, activeAnnotation } = useAnnotationOverlay();
@@ -202,30 +203,17 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
     });
   }, [toast]);
 
-  const handleEnhancedAnalysis = useCallback((imageId: string) => {
-    toast({
-      title: "Enhanced Analysis",
-      description: "Starting enhanced AI analysis with advanced features",
-    });
-  }, [toast]);
-  
   return (
-    <AIContextMenu
-      imageId={image.id}
-      imageName={image.name}
-      imageUrl={image.url}
-      isSelected={isSelected}
-      onAnalyzeImage={handleAnalyzeImage}
-      onViewAnalysis={handleViewAnalysis}
-      onCompareModels={handleCompareModels}
-      onEnhancedAnalysis={handleEnhancedAnalysis}
-    >
     <Card 
       className={`max-w-2xl overflow-hidden bg-background border-border shadow-lg transition-all cursor-pointer ${
         isSelected ? 'ring-2 ring-primary ring-offset-2 border-primary' : 'hover:border-muted-foreground'
       }`} 
       onDoubleClick={handleDoubleClick}
       onClick={handleNodeClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu?.(image.id);
+      }}
     >
       <div className="relative image-container" ref={imageContainerRef}>
         <img
@@ -409,6 +397,5 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
       )}
       
     </Card>
-    </AIContextMenu>
   );
 };

@@ -38,7 +38,7 @@ import { useFilteredToast } from '@/hooks/use-filtered-toast';
 import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { CanvasUploadZone } from '../CanvasUploadZone';
 import { AICanvasToolbar } from './AICanvasToolbar';
-import { AIContextMenu } from './AIContextMenu';
+import { useCanvasContextMenu, CanvasItem, CanvasContextMenuHandlers } from '@/hooks/useCanvasContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
@@ -133,6 +133,45 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
+  
+  // Convert uploaded images to canvas items for context menu
+  const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
+    id: image.id,
+    name: image.name,
+    type: 'image' as const
+  }));
+  
+  // Context menu handlers
+  const contextMenuHandlers: CanvasContextMenuHandlers = {
+    onAnalyze: useCallback((itemIds: string[]) => {
+      itemIds.forEach(id => handleAnalyzeImage(id));
+    }, []),
+    
+    onView: useCallback((itemId: string) => {
+      handleViewAnalysis(itemId);
+    }, []),
+    
+    onDelete: useCallback((itemIds: string[]) => {
+      // For now, just show a message - implement actual deletion later
+      toast({
+        title: "Delete Feature",
+        description: `Delete functionality for ${itemIds.length} image(s) will be implemented`,
+        category: "action-required",
+      });
+    }, [toast]),
+  };
+  
+  // Initialize context menu system
+  const {
+    selectedIds: contextSelectedIds,
+    clearSelection: clearContextSelection,
+    isSelected: isContextSelected,
+    openContextMenu,
+    contextMenuProps,
+    deleteDialogProps,
+    ContextMenu,
+    DeleteDialog,
+  } = useCanvasContextMenu(canvasItems, contextMenuHandlers);
   
   // Show helpful hint on first load for images without analysis
   useEffect(() => {
@@ -1750,6 +1789,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setIsUpdating={setIsUpdating}
         uploadedImages={uploadedImages}
         onImageUpload={onImageUpload}
+        onContextMenu={openContextMenu}
+        ContextMenu={ContextMenu}
+        DeleteDialog={DeleteDialog}
       />
     </AnnotationOverlayProvider>
   );
@@ -1782,6 +1824,9 @@ interface CanvasContentProps {
   setIsUpdating: any;
   uploadedImages: UploadedImage[];
   onImageUpload?: (files: File[]) => void;
+  onContextMenu?: (item: CanvasItem) => void;
+  ContextMenu?: (() => React.ReactElement) | null;
+  DeleteDialog?: (() => React.ReactElement) | null;
 }
 
 const CanvasContent: React.FC<CanvasContentProps> = ({
@@ -1810,6 +1855,9 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
   setIsUpdating,
   uploadedImages,
   onImageUpload,
+  onContextMenu,
+  ContextMenu,
+  DeleteDialog,
 }) => {
   const { activeAnnotation } = useAnnotationOverlay();
   const isPanningDisabled = !!activeAnnotation;
@@ -1906,6 +1954,10 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
       
       {/* Selection Debugger for Development */}
       <SelectionDebugger multiSelection={multiSelection} />
+      
+      {/* Context Menu and Delete Dialog */}
+      {ContextMenu && <ContextMenu />}
+      {DeleteDialog && <DeleteDialog />}
     </div>
   );
 };
