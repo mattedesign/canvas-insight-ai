@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CanvasViewProps } from './CanvasView';
-import { CanvasView } from './CanvasView';
+import { DirectCanvasView, DirectCanvasViewProps } from './DirectCanvasView';
 import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
 import './CanvasVisualEnhancements.css';
 
@@ -71,7 +71,7 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   // Use standard ReactFlow for smaller datasets (preserves all features)
   return (
     <div className="performant-canvas-standard enhanced-canvas-container">
-      <CanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
+      <DirectCanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
     </div>
   );
 };
