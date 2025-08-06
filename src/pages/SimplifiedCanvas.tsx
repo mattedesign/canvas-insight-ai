@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFinalAppContext } from '@/context/FinalAppContext';
-import { ProjectService, GroupMigrationService } from '@/services/DataMigrationService';
+import { ProjectService, GroupMigrationService, GroupAnalysisMigrationService } from '@/services/DataMigrationService';
+import { analysisService } from '@/services/TypeSafeAnalysisService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
@@ -268,6 +269,112 @@ const SimplifiedCanvas = () => {
     }
   }, [dispatch, imageGroups.length, toast]);
 
+  // Group analysis functionality
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+    console.log('[SimplifiedCanvas] Submit group prompt:', groupId, prompt, isCustom);
+    
+    try {
+      toast({
+        category: 'info',
+        title: "Starting Group Analysis",
+        description: "Analyzing group patterns and relationships...",
+      });
+
+      // Get the group and its images
+      const group = imageGroups.find(g => g.id === groupId);
+      if (!group) {
+        throw new Error('Group not found');
+      }
+
+      // Get image URLs from the group
+      const groupImages = uploadedImages.filter(img => 
+        group.imageIds.includes(img.id)
+      );
+
+      if (groupImages.length === 0) {
+        throw new Error('No images found in this group');
+      }
+
+      const imageUrls = groupImages.map(img => img.url);
+
+      // Perform the group analysis
+      const response = await analysisService.analyzeGroup({
+        imageUrls,
+        groupId,
+        prompt,
+        isCustom
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Group analysis failed');
+      }
+
+      if (response.analysis) {
+        // Extract the expected data structure from the response
+        const analysisData = response.analysis as any;
+        
+        // Create group analysis object with the expected structure
+        const groupAnalysis = {
+          id: crypto.randomUUID(),
+          sessionId: crypto.randomUUID(),
+          groupId,
+          prompt,
+          isCustom,
+          summary: {
+            overallScore: analysisData.summary?.overallScore || 0,
+            consistency: analysisData.summary?.consistency || 0,
+            thematicCoherence: analysisData.summary?.thematicCoherence || 0,
+            userFlowContinuity: analysisData.summary?.userFlowContinuity || 0
+          },
+          insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
+          recommendations: Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [],
+          patterns: {
+            commonElements: analysisData.patterns?.commonElements || [],
+            designInconsistencies: analysisData.patterns?.designInconsistencies || [],
+            userJourneyGaps: analysisData.patterns?.userJourneyGaps || []
+          },
+          analysis: analysisData.analysis,
+          createdAt: new Date()
+        };
+
+        // Store in database
+        await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(groupAnalysis);
+
+        // Update app state
+        dispatch({
+          type: 'ADD_GROUP_ANALYSIS',
+          payload: groupAnalysis
+        });
+
+        toast({
+          category: 'success',
+          title: "Group Analysis Complete",
+          description: "Analysis results have been generated and saved.",
+        });
+      }
+
+    } catch (error) {
+      console.error('[SimplifiedCanvas] Group analysis error:', error);
+      toast({
+        category: 'error',
+        title: "Group Analysis Failed",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: "destructive",
+      });
+    }
+  }, [imageGroups, uploadedImages, dispatch, toast]);
+
+  const handleAnalyzeGroup = useCallback(async (groupId: string) => {
+    console.log('[SimplifiedCanvas] handleAnalyzeGroup called with groupId:', groupId);
+    
+    // Start group analysis with a default comprehensive prompt
+    await handleSubmitGroupPrompt(
+      groupId, 
+      'Analyze the overall user flow and information architecture across these screens. Evaluate visual consistency and design system adherence. Identify accessibility issues and improvement opportunities. Assess content clarity and information hierarchy.',
+      false
+    );
+  }, [handleSubmitGroupPrompt]);
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-background">
@@ -344,7 +451,8 @@ const SimplifiedCanvas = () => {
             onDeleteGroup={() => {}}
             onEditGroup={() => {}}
             onGroupDisplayModeChange={() => {}}
-            onSubmitGroupPrompt={async () => {}}
+            onSubmitGroupPrompt={handleSubmitGroupPrompt}
+            onAnalyzeGroup={handleAnalyzeGroup}
             onAnalysisComplete={handleAnalysisComplete}
             onImageUpload={handleAddImages}
           />
