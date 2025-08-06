@@ -4,7 +4,7 @@ import { useFinalAppContext } from '@/context/FinalAppContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectService } from '@/services/DataMigrationService';
-import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
+import { CanvasWithContextMenu } from '@/components/canvas/CanvasWithContextMenu';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { AnalysisFlowDebugger } from '@/components/AnalysisFlowDebugger';
@@ -492,28 +492,7 @@ const Canvas = () => {
             setCanvasError(error.message);
           }}
         >
-          <PerformantCanvasView
-            uploadedImages={uploadedImages || []}
-            analyses={analyses || []}
-            generatedConcepts={generatedConcepts || []}
-            imageGroups={imageGroups || []}
-            groupAnalysesWithPrompts={groupAnalysesWithPrompts || []}
-            groupDisplayModes={groupDisplayModes || {}}
-            showAnnotations={showAnnotations}
-            onToggleAnnotations={handleToggleAnnotations}
-            onImageSelect={handleImageSelect}
-            onGenerateConcept={handleGenerateConcept}
-            onCreateGroup={handleCreateGroup}
-            onUngroup={handleUngroup}
-            onDeleteGroup={handleDeleteGroup}
-            onEditGroup={handleEditGroup}
-            onGroupDisplayModeChange={handleGroupDisplayModeChange}
-            onSubmitGroupPrompt={handleSubmitGroupPrompt}
-            onOpenAnalysisPanel={handleOpenAnalysisPanel}
-            onAnalysisComplete={handleAnalysisComplete}
-            onImageUpload={() => {}}
-            isGeneratingConcept={state.isGeneratingConcept}
-          />
+          <CanvasWithContextMenu />
         </ErrorBoundary>
         
         {/* Analysis Panel */}
