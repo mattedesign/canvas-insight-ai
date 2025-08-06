@@ -1,8 +1,7 @@
 import React from 'react';
 import type { CanvasViewProps } from './CanvasView';
-import { DirectCanvasView, DirectCanvasViewProps } from './DirectCanvasView';
+import { CanvasView } from './CanvasView';
 import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
-import { AnnotationOverlayProvider } from '../AnnotationOverlay';
 import './CanvasVisualEnhancements.css';
 
 // Performance thresholds for virtualization
@@ -55,29 +54,25 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   // Use virtualized view for large datasets
   if (shouldVirtualize) {
     return (
-      <AnnotationOverlayProvider>
-        <div className="performant-canvas-virtualized enhanced-canvas-container">
-          <VirtualizedCanvasContainer
-            uploadedImages={uploadedImages}
-            analyses={analyses}
-            onImageSelect={props.onImageSelect}
-            onOpenAnalysisPanel={props.onOpenAnalysisPanel}
-            onAnalysisComplete={props.onAnalysisComplete}
-            showAnnotations={props.showAnnotations}
-            selectedImageId={null} // TODO: Extract from props or context
-          />
-        </div>
-      </AnnotationOverlayProvider>
+      <div className="performant-canvas-virtualized enhanced-canvas-container">
+        <VirtualizedCanvasContainer
+          uploadedImages={uploadedImages}
+          analyses={analyses}
+          onImageSelect={props.onImageSelect}
+          onOpenAnalysisPanel={props.onOpenAnalysisPanel}
+          onAnalysisComplete={props.onAnalysisComplete}
+          showAnnotations={props.showAnnotations}
+          selectedImageId={null} // TODO: Extract from props or context
+        />
+      </div>
     );
   }
   
   // Use standard ReactFlow for smaller datasets (preserves all features)
   return (
-    <AnnotationOverlayProvider>
-      <div className="performant-canvas-standard enhanced-canvas-container">
-        <DirectCanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
-      </div>
-    </AnnotationOverlayProvider>
+    <div className="performant-canvas-standard enhanced-canvas-container">
+      <CanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
+    </div>
   );
 };
 

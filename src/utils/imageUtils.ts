@@ -72,93 +72,19 @@ export function getImageDimensionsWithFallback(
 }
 
 /**
- * Legacy display constants - kept for backward compatibility
- * @deprecated Use dynamicImageSizing utilities instead
- */
-export const CANVAS_DISPLAY_CONSTANTS = {
-  MAX_WIDTH: 600,  // Increased for better quality
-  MAX_HEIGHT: 450, // Increased for better quality
-  MIN_WIDTH: 200,  // Increased minimum
-  MIN_HEIGHT: 150, // Increased minimum
-  ASPECT_RATIO_THRESHOLD: 3,
-  GROUP_SPACING: 24, // Increased spacing
-  GRID_PADDING: 20   // Increased padding
-} as const;
-
-/**
- * Legacy function for standardized display dimensions
- * @deprecated Use calculateDynamicDisplayDimensions from dynamicImageSizing instead
- */
-export function getStandardDisplayDimensions(
-  originalDimensions: ImageDimensions
-): ImageDimensions {
-  const { width: origWidth, height: origHeight } = originalDimensions;
-  
-  // Handle invalid dimensions
-  if (!origWidth || !origHeight || origWidth <= 0 || origHeight <= 0) {
-    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT };
-  }
-  
-  const aspectRatio = origWidth / origHeight;
-  
-  // Handle extreme aspect ratios
-  if (aspectRatio > CANVAS_DISPLAY_CONSTANTS.ASPECT_RATIO_THRESHOLD) {
-    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT / 2 };
-  }
-  if (aspectRatio < 1 / CANVAS_DISPLAY_CONSTANTS.ASPECT_RATIO_THRESHOLD) {
-    return { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH / 2, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT };
-  }
-  
-  // Calculate proportional scaling within max bounds
-  const widthRatio = CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH / origWidth;
-  const heightRatio = CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT / origHeight;
-  const scale = Math.min(widthRatio, heightRatio, 1); // Never scale up
-  
-  const displayWidth = Math.round(origWidth * scale);
-  const displayHeight = Math.round(origHeight * scale);
-  
-  // Ensure minimum dimensions
-  return {
-    width: Math.max(displayWidth, CANVAS_DISPLAY_CONSTANTS.MIN_WIDTH),
-    height: Math.max(displayHeight, CANVAS_DISPLAY_CONSTANTS.MIN_HEIGHT)
-  };
-}
-
-/**
- * Enhanced dimensions calculation using dynamic sizing
- */
-export function getEnhancedDisplayDimensions(
-  originalDimensions: ImageDimensions,
-  context: 'canvas' | 'group' | 'gallery' = 'canvas',
-  viewportWidth?: number
-): ImageDimensions {
-  // Import dynamically to avoid circular dependencies
-  const { calculateDynamicDisplayDimensions, getResponsiveDimensions } = require('./dynamicImageSizing');
-  
-  if (viewportWidth) {
-    const result = getResponsiveDimensions(originalDimensions, viewportWidth, context);
-    return { width: result.width, height: result.height };
-  }
-  
-  const result = calculateDynamicDisplayDimensions(originalDimensions, undefined, context);
-  return { width: result.width, height: result.height };
-}
-
-/**
- * Get safe dimensions from image object with enhanced sizing
+ * Get safe dimensions from image object with fallback
  */
 export function getSafeDimensions(
   image: { dimensions?: { width: number; height: number } },
-  fallback: ImageDimensions = { width: CANVAS_DISPLAY_CONSTANTS.MAX_WIDTH, height: CANVAS_DISPLAY_CONSTANTS.MAX_HEIGHT },
-  context: 'canvas' | 'group' | 'gallery' = 'canvas'
+  fallback: ImageDimensions = { width: 800, height: 600 }
 ): ImageDimensions {
   if (!image.dimensions || 
       typeof image.dimensions.width !== 'number' || 
       typeof image.dimensions.height !== 'number' ||
       image.dimensions.width <= 0 || 
       image.dimensions.height <= 0) {
-    console.warn('Invalid or missing image dimensions, using enhanced fallback:', fallback);
-    return getEnhancedDisplayDimensions(fallback, context);
+    console.warn('Invalid or missing image dimensions, using fallback:', fallback);
+    return fallback;
   }
-  return getEnhancedDisplayDimensions(image.dimensions, context);
+  return image.dimensions;
 }

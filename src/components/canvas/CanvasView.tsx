@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useCanvasEnhancements, useFocusOverlay } from '@/hooks/useCanvasEnhancements';
 import {
   ReactFlow,
   useNodesState,
@@ -11,23 +12,17 @@ import {
   Background,
   BackgroundVariant,
 } from '@xyflow/react';
+import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
 import { UXAnalysis, UploadedImage, GeneratedConcept, ImageGroup, GroupAnalysis, GroupPromptSession, GroupAnalysisWithPrompt } from '@/types/ux-analysis';
 import { getSafeDimensions } from '@/utils/imageUtils';
-import { 
-  calculateProfessionalLayout, 
-  calculateResponsiveCanvasLayout,
-  calculateEnhancedGroupLayout,
-  convertLayoutToCanvasPositions,
-  getOptimalImageDimensions,
-  ENHANCED_LAYOUT_CONFIG
-} from '@/utils/canvasLayoutUtils';
-import { useCanvasViewportManager } from '@/utils/canvasViewportManager';
 import { AnalysisRequestNodeData, AnalysisRequestNode } from './AnalysisRequestNode';
 import { ImageNode } from './ImageNode';
 import { AnalysisCardNode } from './AnalysisCardNode';
+import { VirtualizedCanvasContainer } from './VirtualizedCanvasView';
 import { ConceptImageNode } from './ConceptImageNode';
 import { ConceptDetailsNode } from './ConceptDetailsNode';
+import { GroupNode } from './GroupNode';
 import { GroupContainerNode } from './GroupContainerNode';
 import { GroupAnalysisCardNode } from './GroupAnalysisCardNode';
 import { GroupPromptCollectionNode } from './GroupPromptCollectionNode';
@@ -40,11 +35,15 @@ import { useMultiSelection } from '@/hooks/useMultiSelection';
 import { UnifiedToolMode } from '../UnifiedFloatingToolbar';
 import { CanvasFloatingToolbar } from './CanvasFloatingToolbar';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
-import { AnnotationOverlayProvider } from '../AnnotationOverlay';
+import { AnnotationOverlayProvider, useAnnotationOverlay } from '../AnnotationOverlay';
 import { CanvasUploadZone } from '../CanvasUploadZone';
+import { AICanvasToolbar } from './AICanvasToolbar';
 import { useCanvasContextMenu, CanvasItem, CanvasContextMenuHandlers } from '@/hooks/useCanvasContextMenu';
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
+import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
+import { SelectionDebugger } from '../SelectionDebugger';
+
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -126,7 +125,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [showAnalysis, setShowAnalysis] = useState(true);
   
   const [groups, setGroups] = useState<ImageGroup[]>([]);
-  const [viewportDimensions, setViewportDimensions] = useState({ width: 1400, height: 1000 });
   
   // Analysis workflow state
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
@@ -135,12 +133,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
-  
-  // Initialize viewport manager for professional layout
-  const { 
-    fitContentToView, 
-    autoFitIfNeeded 
-  } = useCanvasViewportManager();
   
   // Convert uploaded images to canvas items for context menu
   const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
@@ -160,6 +152,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }, []),
     
     onDelete: useCallback((itemIds: string[]) => {
+      // For now, just show a message - implement actual deletion later
       toast({
         title: "Delete Feature",
         description: `Delete functionality for ${itemIds.length} image(s) will be implemented`,
@@ -179,6 +172,31 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     ContextMenu,
     DeleteDialog,
   } = useCanvasContextMenu(canvasItems, contextMenuHandlers);
+  
+  // Show helpful hint on first load for images without analysis
+  useEffect(() => {
+    // Only show notifications when in Lovable app context
+    if (!window.location.hostname.includes('lovable') && !window.location.hostname.includes('localhost')) {
+      return;
+    }
+
+    const imagesWithoutAnalysis = (uploadedImages || []).filter(img => 
+      !(analyses || []).some(analysis => analysis.imageId === img.id)
+    );
+    
+    if (imagesWithoutAnalysis.length > 0 && (uploadedImages?.length || 0) > 0) {
+      // COMMENTED OUT: Repetitive "ready for analysis" toast
+      // const timer = setTimeout(() => {
+      //   toast({
+      //     title: "AI Analysis Available",
+      //     description: `Click the "AI Analysis" button on any image to get instant UX insights. ${imagesWithoutAnalysis.length} image(s) ready for analysis.`,
+      //     category: "action-required"
+      //   });
+      // }, 2000);
+      // 
+      // return () => clearTimeout(timer);
+    }
+  }, [uploadedImages.length, analyses.length]);
   
   // AI Integration - Use the new pipeline
   const { analyzeImageWithAI } = useAI();
@@ -208,21 +226,45 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   // Group management handlers
   const handleDeleteGroup = useCallback((groupId: string) => {
     setGroups(prev => prev.filter(g => g.id !== groupId));
-  }, []);
+    // COMMENTED OUT: Repetitive group deletion toast
+    // toast({
+    //   description: "Group deleted successfully",
+    //   category: "success",
+    // });
+  }, [toast]);
 
   const handleViewGroup = useCallback((groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
       multiSelection.selectMultiple(group.imageIds);
+      // Remove informational group view toast
     }
-  }, [groups, multiSelection.selectMultiple]);
+  }, [groups, multiSelection.selectMultiple, toast]);
 
   const handleAnalyzeGroup = useCallback((groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      // Group analysis logic here
+      // COMMENTED OUT: Repetitive group analysis start toast
+      // toast({
+      //   title: "Group Analysis",
+      //   description: `Analyzing patterns across ${group.imageIds.length} images in "${group.name}"`,
+      //   category: "success",
+      // });
     }
-  }, [groups]);
+  }, [groups, toast]);
+
+  // Fork creation handler - directly create fork without modal
+  const handleCreateForkClick = useCallback((sessionId: string) => {
+    if (onCreateFork) {
+      onCreateFork(sessionId);
+      toast({
+        title: "Fork Created",
+        description: "Created new analysis branch - add your prompt to continue",
+        category: "action-required",
+      });
+    }
+  }, [onCreateFork, toast]);
+
 
   // Analysis workflow handlers
   const handleCreateAnalysisRequest = useCallback(async (imageId: string) => {
@@ -271,24 +313,61 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     console.log('[CanvasView] Analysis request created successfully');
   }, [uploadedImages]);
 
+
+  // Helper to store partial context for clarification
+  const storePartialContext = useCallback((nodeId: string, context: any, token: any) => {
+    // Store in a ref or state management for later use
+    // This will be used when user clicks on the clarification node
+    console.log('[CanvasView] Storing partial context for node:', nodeId);
+  }, []);
+
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     console.log('[CanvasView] Node clicked:', node.type, node.id);
     
     // Handle clarification node clicks
     if (node.type === 'analysisRequest' && node.data.status === 'clarification') {
       console.log('[CanvasView] Clarification needed for:', node.id);
+      // TODO: Implement clarification dialog
       toast({
         title: "Context Clarification",
         description: "Click functionality coming soon. The AI needs more context to provide optimal analysis.",
         category: "action-required"
       });
     }
+    
+    // ... rest of existing click handlers
   }, [toast]);
+
+  const handleClarificationClick = useCallback((node: Node) => {
+    // This would open a dialog to answer clarification questions
+    // For now, log it
+    console.log('[CanvasView] Clarification needed for:', node.id);
+    
+    // TODO: Implement clarification dialog
+    // This should:
+    // 1. Show the questions in a dialog
+    // 2. Collect answers
+    // 3. Resume analysis with pipeline.resumeWithClarification()
+  }, []);
+
+  const handleCancelAnalysisRequest = useCallback((imageId: string) => {
+    setAnalysisRequests(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(imageId);
+      return newMap;
+    });
+  }, []);
 
   // AI Integration Handlers
   const handleAnalysisTriggered = useCallback((imageId: string, analysis: any) => {
     onAnalysisComplete?.(imageId, analysis);
-  }, [onAnalysisComplete]);
+    // COMMENTED OUT: Repetitive analysis completion toast
+    // toast({
+    //   title: "Analysis Complete",
+    //   description: "AI analysis completed successfully",
+    //   category: "success",
+    // });
+  }, [onAnalysisComplete, toast]);
   
   const handleAnalyzeImage = useCallback(async (imageId: string) => {
     const image = (uploadedImages || []).find(img => img.id === imageId);
@@ -309,6 +388,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   const handleBatchAnalysis = useCallback(async (imageIds: string[]) => {
     const imagesToAnalyze = (uploadedImages || []).filter(img => imageIds.includes(img.id));
+    
+    // COMMENTED OUT: Repetitive batch analysis start toast
+    // toast({
+    //   title: "Batch Analysis Started",
+    //   description: `Analyzing ${imagesToAnalyze.length} images...`,
+    //   category: "success",
+    // });
 
     for (const image of imagesToAnalyze) {
       try {
@@ -318,11 +404,26 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         console.error(`Analysis failed for ${image.name}:`, error);
       }
     }
-  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete]);
+
+    // COMMENTED OUT: Repetitive batch analysis completion toast
+    // toast({
+    //   title: "Batch Analysis Complete",
+    //   description: `Completed analysis for ${imagesToAnalyze.length} images`,
+    //   category: "success",
+    // });
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleGroupAnalysis = useCallback(async (imageIds: string[]) => {
     const imagesToAnalyze = (uploadedImages || []).filter(img => imageIds.includes(img.id));
+    
+    // COMMENTED OUT: Repetitive group analysis start toast
+    // toast({
+    //   title: "Group Analysis Started",
+    //   description: `Analyzing patterns across ${imagesToAnalyze.length} images...`,
+    //   category: "success",
+    // });
 
+    // For now, this does individual analysis. In the future, this could call a group-specific analysis endpoint
     for (const image of imagesToAnalyze) {
       try {
         const analysis = await analyzeImageWithAI(image.id, image.url, image.name, 'Group analysis context');
@@ -331,395 +432,1539 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         console.error(`Group analysis failed for ${image.name}:`, error);
       }
     }
-  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete]);
+
+    // COMMENTED OUT: Repetitive group analysis completion toast
+    // toast({
+    //   title: "Group Analysis Complete",
+    //   description: `Completed group analysis for ${imagesToAnalyze.length} images`,
+    //   category: "success",
+    // });
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
     const image = (uploadedImages || []).find(img => img.id === imageId);
     if (!image) return;
 
     try {
-      console.log('[CanvasView] Starting enhanced analysis request for:', image.name);
-      
-      // For now, use the regular analysis function
-      const analysis = await analyzeImageWithAI(image.id, image.url, image.name);
-      handleAnalysisTriggered(image.id, analysis);
-      
-      toast({
-        title: "Enhanced Analysis Complete",
-        description: "Advanced AI analysis completed with additional insights",
-        category: "success"
-      });
+      const result = await analyzeImageWithAI(imageId, image.url, image.name);
+      if (result) {
+        onAnalysisComplete?.(image.id, result);
+        toast({
+          title: "Analysis Complete",
+          description: `AI analysis completed for ${image.name}`,
+          category: "success",
+        });
+      }
     } catch (error) {
-      console.error('[CanvasView] Enhanced analysis failed:', error);
+      console.error('Analysis failed:', error);
       toast({
-        title: "Enhanced Analysis Failed",
-        description: "Failed to complete enhanced analysis. Please try again.",
-        category: "error"
+        title: "Analysis Failed",
+        description: "Failed to perform analysis. Please try again.",
+        category: "error",
       });
     }
-  }, [uploadedImages, analyzeImageWithAI, handleAnalysisTriggered, toast]);
+  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
 
   const handleViewAnalysis = useCallback((imageId: string) => {
-    const analysis = analyses.find(a => a.imageId === imageId);
+    const analysis = (analyses || []).find(a => a.imageId === imageId);
     if (analysis) {
       onOpenAnalysisPanel?.(analysis.id);
     } else {
       toast({
         title: "No Analysis Found",
-        description: "This image hasn't been analyzed yet. Try running an analysis first.",
-        category: "action-required"
+        description: "This image hasn't been analyzed yet.",
+        category: "error",
       });
     }
   }, [analyses, onOpenAnalysisPanel, toast]);
 
-  // Professional Layout Implementation
-  const calculateProfessionalCanvasLayout = useCallback(() => {
+  const handleCompareModels = useCallback((imageId: string) => {
+    toast({
+      title: "Model Comparison",
+      description: "Use the AI toolbar to compare different AI models for this image.",
+      category: "action-required",
+    });
+  }, [toast]);
+
+  // Enhanced memoization with proper dependency tracking for analysis changes
+  const initialElements = useMemo(() => {
+  AnalysisDebugger.log('CanvasView', '=== CANVAS RENDERING START ===');
+  const renderStats = {
+    uploadedImages: (uploadedImages || []).length,
+    analyses: (analyses || []).length,
+    analysisIds: (analyses || []).map(a => `${a.imageId}:${a.id}`),
+    imageGroups: (imageGroups || []).length,
+    showAnalysis,
+    currentTool,
+    analysisRequestsCount: analysisRequests.size,
+    analysisRequestIds: Array.from(analysisRequests.keys())
+  };
+  AnalysisDebugger.log('CanvasView', 'Input data summary', renderStats);
+    
     if ((uploadedImages || []).length === 0) {
+      console.warn('[CanvasView] No uploaded images provided - canvas will be empty');
       return { nodes: [], edges: [] };
     }
-
+    
+    console.log('[CanvasView] Image details:', (uploadedImages || []).map(img => ({
+      id: img.id,
+      name: img.name,
+      url: img.url ? `${img.url.substring(0, 50)}...` : 'NO_URL',
+      dimensions: img.dimensions,
+      status: img.status
+    })));
+    
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     
-    // Constants for layout
+    let yOffset = 0;
+    const horizontalSpacing = 100;
+    const minVerticalSpacing = 150;
+    
+    // Standardized spacing constants
     const SPACING_CONSTANTS = {
-      sectionGap: 60,
-      groupSpacing: 80,
-      nodeMargin: 24,
-      analysisCardWidth: 400
+      GROUP_PADDING: 32,
+      GROUP_HEADER_HEIGHT: 60,
+      MIN_VERTICAL_SPACING: 150,
+      ANALYSIS_CARD_WIDTH: 400,
+      CONCEPT_DETAILS_WIDTH: 400,
+      SPACING_BUFFER: 50
     };
     
-    // Calculate container dimensions
-    const containerWidth = Math.max(viewportDimensions.width, 1400);
-    const containerHeight = Math.max(viewportDimensions.height, 1000);
-    
-    // Use professional layout configuration
-    const layoutConfig = {
-      ...ENHANCED_LAYOUT_CONFIG,
-      containerWidth,
-      containerHeight,
-      spacing: 24,
-      padding: 32
-    };
+    const groupedImageIds = new Set((imageGroups || []).flatMap(group => group.imageIds || []));
 
-    // Separate grouped and ungrouped images
-    const groupedImageIds = new Set((imageGroups || []).flatMap(group => group.imageIds));
-    const ungroupedImages = (uploadedImages || []).filter(img => !groupedImageIds.has(img.id));
+    // Process ungrouped images first
+    const ungroupedImages = (uploadedImages || []).filter(image => !groupedImageIds.has(image.id));
+    console.log('[CanvasView] Processing ungrouped images:', ungroupedImages.length);
     
-    let currentY = layoutConfig.padding;
-    
-    // 1. Layout ungrouped images first
-    if (ungroupedImages.length > 0) {
-      const ungroupedDimensions = ungroupedImages.map(img => 
-        getOptimalImageDimensions(img, 'canvas', containerWidth)
-      );
+    ungroupedImages.forEach((image, index) => {
+      const analysis = analyses.find(a => a.imageId === image.id);
       
-      const ungroupedLayout = calculateProfessionalLayout(ungroupedImages, {
-        ...layoutConfig,
-        containerHeight: containerHeight - currentY
-      });
+      // Calculate image display dimensions with safe dimension access
+      const safeDimensions = getSafeDimensions(image);
+      const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.8);
+      const scaleFactor = maxDisplayHeight / safeDimensions.height;
+      const displayWidth = Math.min(safeDimensions.width * scaleFactor, 800); // max-width constraint
+      const displayHeight = maxDisplayHeight;
       
-      const ungroupedPositions = convertLayoutToCanvasPositions(ungroupedLayout);
+      // Check if image is still loading or processing
+      const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
       
-      ungroupedImages.forEach((image, index) => {
-        const position = ungroupedPositions[index];
-        if (!position) return;
-        
-        const imageAnalysis = (analyses || []).find(a => a.imageId === image.id);
-        const imageDimensions = ungroupedDimensions[index];
-        const imageDisplayWidth = imageDimensions?.width || 300;
-        const imageDisplayHeight = imageDimensions?.height || 200;
-        
-        // Image node
-        nodes.push({
-          id: `image-${image.id}`,
-          type: 'image',
-          position: { 
-            x: position.x + layoutConfig.padding, 
-            y: position.y + currentY 
+      // Create image node or loading node based on status
+      const imageNode: Node = {
+        id: `image-${image.id}`,
+        type: isImageLoading ? 'imageLoading' : 'image',
+        position: { x: 50, y: yOffset },
+        data: isImageLoading ? {
+          id: image.id,
+          name: image.name,
+          status: image.status!,
+          error: image.status === 'error' ? 'Upload failed' : undefined
+        } : { 
+          image,
+          analysis,
+          showAnnotations,
+          currentTool,
+          onViewChange: stableCallbacks.onViewChange,
+          onImageSelect: stableCallbacks.onImageSelect,
+          onToggleSelection: stableCallbacks.onToggleSelection,
+          isSelected: stableCallbacks.isSelected(image.id),
+          onAnnotationClick: () => {},
+          onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+            onAnalysisComplete?.(image.id, newAnalysis);
           },
-          data: {
-            image,
-            analysis: imageAnalysis,
-            showAnnotations,
-            currentTool,
-            ...stableCallbacks,
-            onRequestAnalysis: handleCreateAnalysisRequest,
-            onToggleSelection: (imageId: string, isCtrlOrCmd: boolean) => 
-              handleToggleSelection(imageId, isCtrlOrCmd),
-            onRequestEnhancedAnalysis: handleEnhancedAnalysisRequest
-          },
-          style: { width: imageDisplayWidth, height: imageDisplayHeight }
-        });
-
-        // Add analysis card if analysis exists
-        if (imageAnalysis) {
-          nodes.push({
-            id: `analysis-${imageAnalysis.id}`,
-            type: 'analysisCard',
-            position: { 
-              x: position.x + imageDisplayWidth + 20 + layoutConfig.padding, 
-              y: position.y + currentY 
-            },
-            data: {
-              analysis: imageAnalysis,
-              onExpand: stableCallbacks.onExpandedChange,
-              onGenerateConcept: () => {
-                if (onGenerateConcept) {
-                  onGenerateConcept(imageAnalysis.id);
-                }
-              }
-            }
-          });
-
-          // Connect image to analysis
-          edges.push({
-            id: `edge-${image.id}-${imageAnalysis.id}`,
-            source: `image-${image.id}`,
-            target: `analysis-${imageAnalysis.id}`,
-            type: 'smoothstep',
-            style: { stroke: 'hsl(var(--border))' }
-          });
-        }
-      });
-      
-      // Update currentY for next section
-      currentY += ungroupedLayout.totalHeight + SPACING_CONSTANTS.sectionGap;
-    }
-
-    // 2. Layout groups
-    let groupYOffset = currentY;
-    (imageGroups || []).forEach((group) => {
-      const groupImages = (uploadedImages || []).filter(img => group.imageIds.includes(img.id));
-      if (groupImages.length === 0) return;
-
-      const displayMode = groupDisplayModes?.[group.id] || 'standard';
-      const groupLayoutMode = displayMode === 'standard' ? 'grid' : 'stacked';
-      const groupLayoutConfig = {
-        ...layoutConfig,
-        containerHeight: Math.max(400, containerHeight - groupYOffset),
-        spacing: displayMode === 'stacked' ? 8 : 16
+          onCreateAnalysisRequest: handleCreateAnalysisRequest
+        },
       };
+      nodes.push(imageNode);
 
-      const groupLayout = calculateEnhancedGroupLayout(
-        group, 
-        groupImages, 
-        groupLayoutMode, 
-        groupLayoutConfig
-      );
+      let rightmostXPosition = 50 + displayWidth + horizontalSpacing;
+
+      // Check for analysis request node - only show if no analysis exists yet
+      const analysisRequest = analysisRequests.get(image.id);
+      const hasAnalysis = !!(analyses || []).find(a => a.imageId === image.id);
+      if (analysisRequest && !isImageLoading && !hasAnalysis) {
+        const requestNode: Node = {
+          id: `analysis-request-${image.id}`,
+          type: 'analysisRequest',
+          position: { x: rightmostXPosition, y: yOffset },
+          data: {
+            imageId: image.id,
+            imageName: image.name,
+            imageUrl: image.url,
+            userContext: '',
+            onAnalysisComplete: (result: any) => {
+              // Handle successful analysis completion
+              AnalysisDebugger.log('CanvasView', AnalysisLifecycle.ANALYSIS_COMPLETED, { imageId: image.id, hasResult: !!result });
+              
+              // Validate analysis result structure
+              const analysisData = result?.data || result;
+              const validation = AnalysisDebugger.validateAnalysisStructure(analysisData);
+              
+              if (!validation.valid) {
+                AnalysisDebugger.log('CanvasView', 'VALIDATION_FAILED', { imageId: image.id, issues: validation.issues });
+                console.error('[CanvasView] Invalid analysis result structure:', validation.issues);
+                return;
+              }
+              
+              // Remove the analysis request immediately
+              setAnalysisRequests(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(image.id);
+                AnalysisDebugger.log('CanvasView', AnalysisLifecycle.REQUEST_REMOVED, { imageId: image.id });
+                return newMap;
+              });
+              
+              // Call the parent analysis complete handler with validated data
+              if (onAnalysisComplete) {
+                const finalAnalysis = {
+                  ...analysisData,
+                  imageId: image.id,
+                  imageName: image.name,
+                  imageUrl: image.url,
+                  createdAt: new Date().toISOString()
+                };
+                AnalysisDebugger.log('CanvasView', 'CALLING_PARENT_HANDLER', { imageId: image.id, analysisId: finalAnalysis.id });
+                onAnalysisComplete(image.id, finalAnalysis);
+              }
+            },
+            onError: (error: string) => {
+              console.error('[CanvasView] Analysis failed:', error);
+              
+              // Remove the analysis request
+              setAnalysisRequests(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(image.id);
+                return newMap;
+              });
+              
+              // Show error toast
+              toast({
+                title: "Analysis Failed",
+                description: error,
+                variant: "destructive",
+                category: "error"
+              });
+            }
+          }
+        };
+        nodes.push(requestNode);
+
+        // Create edge connecting image to analysis request
+        const requestEdge: Edge = {
+          id: `edge-${image.id}-request`,
+          source: `image-${image.id}`,
+          target: `analysis-request-${image.id}`,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+        };
+        edges.push(requestEdge);
+
+        rightmostXPosition += 400 + horizontalSpacing; // Update position for next node
+      }
+
+
+        // Create analysis card node if analysis exists, showAnalysis is true, and no request is pending
+        if (analysis && showAnalysis && !isImageLoading && !analysisRequests.has(image.id)) {
+          AnalysisDebugger.log('CanvasView', AnalysisLifecycle.CARD_CREATED, { 
+            analysisId: analysis.id, 
+            imageId: analysis.imageId, 
+            hasRequest: analysisRequests.has(image.id) 
+          });
+          const cardXPosition = rightmostXPosition;
+          const analysisCardWidth = 400; // Standard width
+          
+          // Check if analysis is still loading
+          const isAnalysisLoading = analysis.status && ['processing', 'analyzing'].includes(analysis.status);
+          
+          const cardNode: Node = {
+            id: `card-${analysis.id}`,
+            type: isAnalysisLoading ? 'analysisLoading' : 'analysisCard',
+            position: { x: cardXPosition, y: yOffset },
+            data: isAnalysisLoading ? {
+              imageId: analysis.imageId,
+              imageName: analysis.imageName,
+              status: analysis.status!,
+              error: analysis.status === 'error' ? 'Analysis failed' : undefined
+              } : { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
+                isGeneratingConcept,
+                onExpandedChange: stableCallbacks.onExpandedChange
+              },
+          };
+        nodes.push(cardNode);
+
+        // Create edge connecting image to analysis card (only if both exist and not loading)
+        if (!isImageLoading) {
+          const edge: Edge = {
+            id: `edge-${image.id}-${analysis.id}`,
+            source: `image-${image.id}`,
+            target: `card-${analysis.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))' },
+          };
+          edges.push(edge);
+        }
+
+        rightmostXPosition += analysisCardWidth + horizontalSpacing; // Card width + spacing
+
+        // Add concept nodes for this analysis
+        const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+        let currentConceptXPosition = rightmostXPosition;
+        
+        conceptsForAnalysis.forEach((concept, conceptIndex) => {
+          // Create concept image node (artboard) - use same dimensions as original image
+          const conceptImageNode: Node = {
+            id: `concept-image-${concept.id}`,
+            type: 'conceptImage',
+            position: { x: currentConceptXPosition, y: yOffset },
+            data: { 
+              concept,
+              originalImage: image,
+              displayWidth,
+              displayHeight
+            },
+          };
+          nodes.push(conceptImageNode);
+
+          // Create concept details node (positioned to the right of concept image)
+          const conceptDetailsXPosition = currentConceptXPosition + displayWidth + horizontalSpacing;
+          const conceptDetailsNode: Node = {
+            id: `concept-details-${concept.id}`,
+            type: 'conceptDetails',
+            position: { x: conceptDetailsXPosition, y: yOffset },
+            data: { concept },
+          };
+          nodes.push(conceptDetailsNode);
+
+          // Create edge connecting analysis card to concept image
+          const conceptImageEdge: Edge = {
+            id: `edge-${analysis.id}-${concept.id}-image`,
+            source: `card-${analysis.id}`,
+            target: `concept-image-${concept.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))' },
+          };
+          edges.push(conceptImageEdge);
+
+          // Create edge connecting concept image to concept details
+          const conceptDetailsEdge: Edge = {
+            id: `edge-${concept.id}-image-details`,
+            source: `concept-image-${concept.id}`,
+            target: `concept-details-${concept.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))' },
+          };
+          edges.push(conceptDetailsEdge);
+
+          // Update position for next concept (if any) - use original image width + spacing + details width
+          currentConceptXPosition = conceptDetailsXPosition + 400 + horizontalSpacing;
+        });
+      }
+
+      // Calculate spacing for next image based on current image height
+      const nextSpacing = Math.max(displayHeight + minVerticalSpacing, 400);
+      yOffset += nextSpacing;
+    });
+
+    // Process image groups with containers and individual analysis cards
+    imageGroups.forEach((group, groupIndex) => {
+      const groupImages = uploadedImages.filter(img => group.imageIds.includes(img.id));
+      const displayMode = groupDisplayModes[group.id] || 'standard';
       
-      const groupPositions = convertLayoutToCanvasPositions(groupLayout);
-
-      // Group container
-      nodes.push({
-        id: `group-${group.id}`,
+      // Calculate container dimensions based on display mode
+      let containerWidth = 0;
+      let containerHeight = 0;
+      const padding = SPACING_CONSTANTS.GROUP_PADDING;
+      const headerHeight = SPACING_CONSTANTS.GROUP_HEADER_HEIGHT;
+      
+      if (displayMode === 'standard') {
+        // Vertical stacking: each image+analysis pair stacked vertically
+        let maxWidth = 0;
+        let totalHeight = headerHeight + padding; // Header space + top padding
+        
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
+          const displayHeight = maxDisplayHeight;
+          
+          // Width calculation for horizontal layout
+          const horizontalSpacing = Math.max(displayWidth * 0.6, 250);
+          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
+          
+          // Add width for concept nodes if they exist for this analysis
+          if (analysis) {
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            if (conceptsForAnalysis.length > 0) {
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
+              pairWidth += conceptWidth;
+            }
+          }
+          
+          maxWidth = Math.max(maxWidth, pairWidth);
+          
+          // Calculate actual content height: image height + buffer
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6); // Analysis card min height
+          totalHeight += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
+        });
+        
+        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
+        containerHeight = totalHeight + padding; // Bottom padding
+      } else {
+        // Alternative stacked layout
+        let maxWidth = 0;
+        let totalHeight = headerHeight + padding; // Header space + top padding
+        
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
+          const displayHeight = maxDisplayHeight;
+          
+          // Width calculation for stacked layout
+          const horizontalSpacing = Math.max(displayWidth * 0.8, 200);
+          let pairWidth = displayWidth + horizontalSpacing + SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH;
+          
+          // Add width for concept nodes if they exist for this analysis
+          if (analysis) {
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            if (conceptsForAnalysis.length > 0) {
+              const conceptWidth = conceptsForAnalysis.length * (displayWidth + horizontalSpacing + SPACING_CONSTANTS.CONCEPT_DETAILS_WIDTH);
+              pairWidth += conceptWidth;
+            }
+          }
+          
+          maxWidth = Math.max(maxWidth, pairWidth);
+          
+          // Calculate actual content height for stacked mode
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
+          totalHeight += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
+        });
+        
+        containerWidth = Math.max(maxWidth + padding * 2, 600); // Left + right padding
+        containerHeight = totalHeight + padding; // Bottom padding
+      }
+      
+      // Create group container node using React Flow's built-in group type
+      const containerNode: Node = {
+        id: `group-container-${group.id}`,
         type: 'group',
-        position: { 
-          x: layoutConfig.padding, 
-          y: groupYOffset 
+        position: { x: 50, y: yOffset },
+        style: { 
+          width: containerWidth,
+          height: containerHeight,
+          borderColor: group.color,
         },
         data: {
           group,
           displayMode,
-          onDeleteGroup: handleDeleteGroup,
-          onViewGroup: handleViewGroup,
-          onAnalyzeGroup: handleAnalyzeGroup,
-          onDisplayModeChange: (mode: 'standard' | 'stacked') => {
-            onGroupDisplayModeChange?.(group.id, mode);
-          }
+          onUngroup,
+          onDeleteGroup,
+          onEdit: onEditGroup,
+          onDisplayModeChange: onGroupDisplayModeChange,
         },
-        style: { 
-          width: Math.min(groupLayout.totalWidth + 40, containerWidth - (layoutConfig.padding * 2)),
-          height: groupLayout.totalHeight + 120
-        }
-      });
+      };
+      nodes.push(containerNode);
+      
+      // Position images and their individual analysis cards inside the container
+      if (displayMode === 'standard') {
+        // Vertical stacking of horizontal pairs (like ungrouped layout but stacked)
+        let currentY = headerHeight + padding; // Start below header with consistent padding
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, window.innerHeight * 0.3);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 400);
+          const displayHeight = maxDisplayHeight;
+          
+          // Check if image is still loading or processing
+          const isImageLoading = image.status && ['uploading', 'processing', 'analyzing'].includes(image.status);
+          
+          // Image node - positioned relative to group container origin
+          const imageNode: Node = {
+            id: `image-${image.id}`,
+            type: isImageLoading ? 'imageLoading' : 'image',
+            position: { x: padding, y: currentY },
+            parentId: `group-container-${group.id}`,
+            extent: 'parent',
+            data: isImageLoading ? {
+              id: image.id,
+              name: image.name,
+              status: image.status!,
+              error: image.status === 'error' ? 'Upload failed' : undefined
+            } : { 
+              image,
+              analysis,
+              showAnnotations,
+              currentTool,
+              onViewChange: stableCallbacks.onViewChange,
+              onImageSelect: stableCallbacks.onImageSelect,
+              onToggleSelection: stableCallbacks.onToggleSelection,
+              isSelected: stableCallbacks.isSelected(image.id),
+              onAnnotationClick: () => {},
+              onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+                onAnalysisComplete?.(image.id, newAnalysis);
+              },
+              onCreateAnalysisRequest: handleCreateAnalysisRequest
+            },
+          };
+          nodes.push(imageNode);
 
-      // Group images
-      groupImages.forEach((image, imageIndex) => {
-        const position = groupPositions[imageIndex];
-        if (!position) return;
+          let rightmostXPosition = padding + displayWidth + 50; // Start after image with some spacing
+          
+          // Check for analysis request node for grouped images
+          const analysisRequest = analysisRequests.get(image.id);
+          if (analysisRequest && !isImageLoading) {
+            const requestNode: Node = {
+              id: `group-analysis-request-${image.id}`,
+              type: 'analysisRequest',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                imageUrl: image.url,
+                userContext: '',
+                onAnalysisComplete: (result: any) => {
+                  console.log('[CanvasView] Group analysis completed:', result);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  if (onAnalysisComplete) {
+                    onAnalysisComplete(image.id, result);
+                  }
+                },
+                onError: (error: string) => {
+                  console.error('[CanvasView] Group analysis failed:', error);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  toast({
+                    title: "Analysis Failed",
+                    description: error,
+                    variant: "destructive",
+                    category: "error"
+                  });
+                }
+              }
+            };
+            nodes.push(requestNode);
 
-        const groupImageAnalysis = (analyses || []).find(a => a.imageId === image.id);
-        const dimensions = getOptimalImageDimensions(image, 'group', containerWidth);
+            // Create edge connecting image to analysis request
+            const requestEdge: Edge = {
+              id: `edge-group-${image.id}-request`,
+              source: `image-${image.id}`,
+              target: `group-analysis-request-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+            };
+            edges.push(requestEdge);
 
-        nodes.push({
-          id: `group-image-${group.id}-${image.id}`,
-          type: 'image',
-          position: { 
-            x: layoutConfig.padding + 20 + position.x, 
-            y: groupYOffset + 60 + position.y 
-          },
-          data: {
-            image,
-            analysis: groupImageAnalysis,
-            showAnnotations,
-            currentTool,
-            ...stableCallbacks,
-            onRequestAnalysis: handleCreateAnalysisRequest,
-            onToggleSelection: handleToggleSelection,
-            onRequestEnhancedAnalysis: handleEnhancedAnalysisRequest
-          },
-          style: { 
-            width: dimensions?.width || 200, 
-            height: dimensions?.height || 150 
-          },
-          parentId: `group-${group.id}`,
-          extent: 'parent'
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
+
+          
+          // Individual analysis card for this image - with proportional spacing
+          if (analysis && showAnalysis && !isImageLoading) {
+            const horizontalSpacing = Math.max(displayWidth * 0.6, 250); // Proportional to image width
+            
+            // Check if analysis is still loading
+            const isAnalysisLoading = analysis.status && ['processing', 'analyzing'].includes(analysis.status);
+            
+            const analysisNode: Node = {
+              id: `group-image-analysis-${image.id}`,
+              type: isAnalysisLoading ? 'analysisLoading' : 'analysisCard',
+              position: { x: padding + displayWidth + horizontalSpacing, y: currentY }, // generous spacing
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: isAnalysisLoading ? {
+                imageId: analysis.imageId,
+                imageName: analysis.imageName,
+                status: analysis.status!,
+                error: analysis.status === 'error' ? 'Analysis failed' : undefined
+              } : { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
+                isGeneratingConcept,
+                onExpandedChange: stableCallbacks.onExpandedChange
+              },
+            };
+            nodes.push(analysisNode);
+            
+            // Create edge connecting image to its analysis (only if image not loading)
+            if (!isImageLoading) {
+              const edge: Edge = {
+                id: `edge-group-image-${image.id}-analysis`,
+                source: `image-${image.id}`,
+                target: `group-image-analysis-${image.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(edge);
+            }
+            
+            // Add concept nodes for this analysis (same as ungrouped)
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            const analysisCardWidth = 400; // Standard width
+            let currentConceptXPosition = padding + displayWidth + horizontalSpacing + analysisCardWidth + 100; // After analysis card
+            
+            conceptsForAnalysis.forEach((concept, conceptIndex) => {
+              // Create concept image node (artboard) - use same dimensions as original image
+              const conceptImageNode: Node = {
+                id: `concept-image-${concept.id}`,
+                type: 'conceptImage',
+                position: { x: currentConceptXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { 
+                  concept,
+                  originalImage: image,
+                  displayWidth,
+                  displayHeight
+                },
+              };
+              nodes.push(conceptImageNode);
+
+              // Create concept details node (positioned to the right of concept image)
+              const conceptDetailsXPosition = currentConceptXPosition + displayWidth + 100;
+              const conceptDetailsNode: Node = {
+                id: `concept-details-${concept.id}`,
+                type: 'conceptDetails',
+                position: { x: conceptDetailsXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptDetailsNode);
+
+              // Create edge connecting analysis card to concept image
+              const conceptImageEdge: Edge = {
+                id: `edge-group-${analysis.id}-${concept.id}-image`,
+                source: `group-image-analysis-${image.id}`,
+                target: `concept-image-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptImageEdge);
+
+              // Create edge connecting concept image to concept details
+              const conceptDetailsEdge: Edge = {
+                id: `edge-group-${concept.id}-image-details`,
+                source: `concept-image-${concept.id}`,
+                target: `concept-details-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptDetailsEdge);
+
+              // Update position for next concept (if any) - use original image width + spacing + details width
+              currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
+            });
+          }
+          
+          // Move to next vertical position based on actual content height
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.6);
+          currentY += contentHeight + SPACING_CONSTANTS.MIN_VERTICAL_SPACING;
         });
-      });
+      } else {
+        // Alternative stacked layout
+        let currentY = headerHeight + padding; // Start below header with consistent padding
+        groupImages.forEach((image, imageIndex) => {
+          const analysis = analyses.find(a => a.imageId === image.id);
+          const safeDimensions = getSafeDimensions(image);
+          const maxDisplayHeight = Math.min(safeDimensions.height, 200);
+          const scaleFactor = maxDisplayHeight / safeDimensions.height;
+          const displayWidth = Math.min(safeDimensions.width * scaleFactor, 250);
+          const displayHeight = maxDisplayHeight;
+          
+          // Image node - positioned relative to group container origin
+          const imageNode: Node = {
+            id: `image-${image.id}`,
+            type: 'image',
+            position: { x: padding, y: currentY },
+            parentId: `group-container-${group.id}`,
+            extent: 'parent',
+            data: { 
+              image,
+              analysis,
+              showAnnotations,
+              currentTool,
+              onViewChange: stableCallbacks.onViewChange,
+              onImageSelect: stableCallbacks.onImageSelect,
+              onToggleSelection: stableCallbacks.onToggleSelection,
+              isSelected: stableCallbacks.isSelected(image.id),
+              onAnnotationClick: () => {},
+              onAnalysisComplete: (newAnalysis: UXAnalysis) => {
+                onAnalysisComplete?.(image.id, newAnalysis);
+              },
+              onCreateAnalysisRequest: handleCreateAnalysisRequest
+            },
+          };
+          nodes.push(imageNode);
 
-      groupYOffset += groupLayout.totalHeight + SPACING_CONSTANTS.groupSpacing;
+          let rightmostXPosition = padding + displayWidth + 50; // Start after image with some spacing
+          
+          // Check for analysis request node for grouped images (stacked mode)
+          const analysisRequest = analysisRequests.get(image.id);
+          if (analysisRequest) {
+            const requestNode: Node = {
+              id: `group-analysis-request-${image.id}`,
+              type: 'analysisRequest',
+              position: { x: rightmostXPosition, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: {
+                imageId: image.id,
+                imageName: image.name,
+                imageUrl: image.url,
+                userContext: '',
+                onAnalysisComplete: (result: any) => {
+                  console.log('[CanvasView] Stacked group analysis completed:', result);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  if (onAnalysisComplete) {
+                    onAnalysisComplete(image.id, result);
+                  }
+                },
+                onError: (error: string) => {
+                  console.error('[CanvasView] Stacked group analysis failed:', error);
+                  setAnalysisRequests(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(image.id);
+                    return newMap;
+                  });
+                  toast({
+                    title: "Analysis Failed",
+                    description: error,
+                    variant: "destructive",
+                    category: "error"
+                  });
+                }
+              }
+            };
+            nodes.push(requestNode);
+
+            // Create edge connecting image to analysis request
+            const requestEdge: Edge = {
+              id: `edge-group-${image.id}-request`,
+              source: `image-${image.id}`,
+              target: `group-analysis-request-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+            };
+            edges.push(requestEdge);
+
+            rightmostXPosition += 400 + 50; // Update position for next node
+          }
+
+          
+          // Individual analysis card for this image - with proportional spacing for stacked mode
+          if (analysis && showAnalysis) {
+            const horizontalSpacing = Math.max(displayWidth * 0.8, 200); // Reduced spacing for stacked mode
+            const analysisNode: Node = {
+              id: `group-image-analysis-${image.id}`,
+              type: 'analysisCard',
+              position: { x: padding + displayWidth + horizontalSpacing, y: currentY },
+              parentId: `group-container-${group.id}`,
+              extent: 'parent',
+              data: { 
+                analysis,
+                onGenerateConcept: stableCallbacks.onGenerateConcept,
+                onOpenAnalysisPanel: stableCallbacks.onOpenAnalysisPanel,
+                isGeneratingConcept,
+                onExpandedChange: stableCallbacks.onExpandedChange
+              },
+            };
+            nodes.push(analysisNode);
+            
+            // Create edge connecting image to its analysis
+            const edge: Edge = {
+              id: `edge-group-image-${image.id}-analysis`,
+              source: `image-${image.id}`,
+              target: `group-image-analysis-${image.id}`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))' },
+            };
+            edges.push(edge);
+            
+            // Add concept nodes for this analysis (same as ungrouped)
+            const conceptsForAnalysis = generatedConcepts.filter(c => c.analysisId === analysis.id);
+            const analysisCardWidth = 400; // Standard width
+            let currentConceptXPosition = padding + displayWidth + horizontalSpacing + analysisCardWidth + 100; // After analysis card
+            
+            conceptsForAnalysis.forEach((concept, conceptIndex) => {
+              // Create concept image node (artboard) - use same dimensions as original image
+              const conceptImageNode: Node = {
+                id: `concept-image-${concept.id}`,
+                type: 'conceptImage',
+                position: { x: currentConceptXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { 
+                  concept,
+                  originalImage: image,
+                  displayWidth,
+                  displayHeight
+                },
+              };
+              nodes.push(conceptImageNode);
+
+              // Create concept details node (positioned to the right of concept image)
+              const conceptDetailsXPosition = currentConceptXPosition + displayWidth + 100;
+              const conceptDetailsNode: Node = {
+                id: `concept-details-${concept.id}`,
+                type: 'conceptDetails',
+                position: { x: conceptDetailsXPosition, y: currentY },
+                parentId: `group-container-${group.id}`,
+                extent: 'parent',
+                data: { concept },
+              };
+              nodes.push(conceptDetailsNode);
+
+              // Create edge connecting analysis card to concept image
+              const conceptImageEdge: Edge = {
+                id: `edge-group-${analysis.id}-${concept.id}-image`,
+                source: `group-image-analysis-${image.id}`,
+                target: `concept-image-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptImageEdge);
+
+              // Create edge connecting concept image to concept details
+              const conceptDetailsEdge: Edge = {
+                id: `edge-group-${concept.id}-image-details`,
+                source: `concept-image-${concept.id}`,
+                target: `concept-details-${concept.id}`,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))' },
+              };
+              edges.push(conceptDetailsEdge);
+
+              // Update position for next concept (if any) - use original image width + spacing + details width
+              currentConceptXPosition = conceptDetailsXPosition + 400 + 100;
+            });
+          }
+          
+          // Move to next vertical position based on actual content height for stacked mode
+          const contentHeight = Math.max(displayHeight, SPACING_CONSTANTS.ANALYSIS_CARD_WIDTH * 0.5);
+          currentY += contentHeight + (SPACING_CONSTANTS.MIN_VERTICAL_SPACING * 0.8); // Reduced spacing for stacked
+        });
+      }
+      
+      // Group analysis workflow: Check for prompt sessions and analysis results
+      const groupSessions = groupPromptSessions.filter(session => session.groupId === group.id);
+      const groupAnalysesForGroup = groupAnalysesWithPrompts.filter(analysis => analysis.groupId === group.id);
+      
+      let rightmostXPosition = 50 + containerWidth + 100;
+      
+      if (groupSessions.length === 0) {
+        // No sessions yet - show prompt collection node
+        const promptCollectionNode: Node = {
+          id: `group-prompt-${group.id}`,
+          type: 'groupPromptCollection',
+          position: { x: rightmostXPosition, y: yOffset },
+          data: {
+            group,
+            onSubmitPrompt: onSubmitGroupPrompt,
+            isLoading: false,
+          },
+        };
+        nodes.push(promptCollectionNode);
+        
+        // Create edge connecting container to prompt collection
+        const edge: Edge = {
+          id: `edge-group-${group.id}-prompt`,
+          source: `group-container-${group.id}`,
+          sourceHandle: 'analysis',
+          target: `group-prompt-${group.id}`,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+        };
+        edges.push(edge);
+      } else {
+        // Handle different session states
+        const pendingSessions = groupSessions.filter(s => s.status === 'pending');
+        const processingSessions = groupSessions.filter(s => s.status === 'processing');
+        const completedAnalyses = groupAnalysesForGroup.filter(analysis => {
+          const session = groupSessions.find(s => s.id === analysis.sessionId);
+          return session?.status === 'completed';
+        });
+        
+        // Show prompt collection nodes for pending sessions (including forks)
+        pendingSessions.forEach((session, index) => {
+          const promptCollectionNode: Node = {
+            id: `group-prompt-${session.id}`,
+            type: 'groupPromptCollection',
+            position: { x: rightmostXPosition, y: yOffset + (index * 120) },
+            data: {
+              group,
+              onSubmitPrompt: onSubmitGroupPrompt,
+              isLoading: false,
+            },
+          };
+          nodes.push(promptCollectionNode);
+          
+          // Create edge connecting container to prompt collection
+          const edge: Edge = {
+            id: `edge-group-${group.id}-prompt-${session.id}`,
+            source: `group-container-${group.id}`,
+            sourceHandle: 'analysis',
+            target: `group-prompt-${session.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+          };
+          edges.push(edge);
+        });
+        
+        // Show processing sessions
+        processingSessions.forEach((session, index) => {
+          const promptCollectionNode: Node = {
+            id: `group-prompt-processing-${session.id}`,
+            type: 'groupPromptCollection',
+            position: { x: rightmostXPosition + 420, y: yOffset + (index * 120) },
+            data: {
+              group,
+              onSubmitPrompt: onSubmitGroupPrompt,
+              isLoading: true,
+            },
+          };
+          nodes.push(promptCollectionNode);
+        });
+        
+        // Show completed analysis results
+        if (completedAnalyses.length > 0) {
+          // Show most recent completed analysis
+          const latestAnalysis = completedAnalyses.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          
+          const analysisResultsNode: Node = {
+            id: `group-enhanced-${latestAnalysis.id}`,
+            type: 'enhancedGroupAnalysis',
+            position: { x: rightmostXPosition + 840, y: yOffset },
+            data: {
+              analysis: latestAnalysis,
+              groupName: group.name,
+              imageCount: group.imageIds.length,
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: handleCreateForkClick,
+              onViewDetails: (analysisId: string) => {
+                // Remove informational group analysis view toast
+              },
+            },
+          };
+          nodes.push(analysisResultsNode);
+          
+          // Create edge connecting container to analysis results
+          const edge: Edge = {
+            id: `edge-group-${group.id}-results`,
+            source: `group-container-${group.id}`,
+            sourceHandle: 'analysis',
+            target: `group-enhanced-${latestAnalysis.id}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'hsl(var(--primary))', strokeDasharray: '5,5' },
+          };
+          edges.push(edge);
+          
+          // Show additional analysis branches if any
+          const otherAnalyses = completedAnalyses.filter(analysis => analysis.id !== latestAnalysis.id);
+          otherAnalyses.forEach((analysis, index) => {
+            const branchNode: Node = {
+              id: `group-branch-${analysis.id}`,
+              type: 'groupAnalysisResults',
+              position: { x: rightmostXPosition + 840, y: yOffset + (index + 1) * 150 },
+              data: {
+                analysis,
+                groupName: group.name,
+                onEditPrompt: onEditGroupPrompt,
+                onCreateFork: handleCreateForkClick,
+                onViewDetails: (analysisId: string) => {
+                  // Remove informational group analysis view toast
+                },
+              },
+            };
+            nodes.push(branchNode);
+            
+            // Create edge for branch
+            const branchEdge: Edge = {
+              id: `edge-group-${group.id}-branch-${analysis.id}`,
+              source: `group-enhanced-${latestAnalysis.id}`,
+              target: `group-branch-${analysis.id}`,
+              type: 'smoothstep',
+              animated: false,
+              style: { stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '3,3' },
+            };
+            edges.push(branchEdge);
+          });
+        }
+      }
+      
+      yOffset += containerHeight + 100; // Space between groups
     });
+
+    // Add analysis workflow nodes (requests and progress)
+    analysisRequests.forEach(({ imageId, imageName, imageUrl }) => {
+      const imageNode = nodes.find(n => n.id === `image-${imageId}`);
+      const imagePosition = imageNode?.position || { x: 50, y: yOffset };
+      
+      const analysisRequestNode: Node = {
+        id: `analysis-request-${imageId}`,
+        type: 'analysisRequest',
+        position: { 
+          x: imagePosition.x + 450, // Position to the right of the image
+          y: imagePosition.y
+        },
+        data: {
+          imageId,
+          imageName,
+          imageUrl: imageUrl || '',
+          userContext: '',
+          onAnalysisComplete: (result: any) => {
+            console.log('[CanvasView] Gallery analysis completed for:', imageId, result);
+            AnalysisDebugger.log('CanvasView', `Analysis completed for ${imageId}`, {
+              hasResult: !!result,
+              resultKeys: result ? Object.keys(result) : [],
+              hasId: !!result?.id,
+              hasSuggestions: !!result?.suggestions
+            });
+            setAnalysisRequests(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(imageId);
+              return newMap;
+            });
+            // The result is already the analysis data structure, not wrapped in data
+            if (onAnalysisComplete) {
+              onAnalysisComplete(imageId, result);
+            }
+          },
+          onError: (error: string) => {
+            console.error('[CanvasView] Gallery analysis failed:', error);
+            setAnalysisRequests(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(imageId);
+              return newMap;
+            });
+            toast({
+              title: "Analysis Failed",
+              description: error,
+              variant: "destructive",
+              category: "error"
+            });
+          }
+        }
+      };
+      nodes.push(analysisRequestNode);
+      
+      // Create edge from image to request node
+      const requestEdge: Edge = {
+        id: `edge-image-${imageId}-to-request`,
+        source: `image-${imageId}`,
+        target: `analysis-request-${imageId}`,
+        type: 'smoothstep',
+        animated: true
+      };
+      edges.push(requestEdge);
+    });
+
 
     return { nodes, edges };
   }, [
-    uploadedImages,
-    analyses,
-    imageGroups,
-    groupDisplayModes,
-    viewportDimensions,
-    showAnnotations,
-    currentTool,
-    stableCallbacks,
-    handleCreateAnalysisRequest,
-    handleToggleSelection,
-    handleEnhancedAnalysisRequest,
-    handleDeleteGroup,
-    handleViewGroup,
-    handleAnalyzeGroup,
-    onGroupDisplayModeChange,
-    onGenerateConcept
+    uploadedImages, 
+    analyses, 
+    generatedConcepts, 
+    imageGroups, 
+    groupAnalysesWithPrompts, 
+    groupDisplayModes, 
+    showAnnotations, 
+    showAnalysis,
+    // Enhanced dependency tracking for analysis changes
+    (analyses || []).map(a => `${a.id}:${a.imageId}`).join(','),
+    analysisRequests.size,
+    currentTool, 
+    isGeneratingConcept,
+    analysisRequests
   ]);
 
-  // Calculate layout using the professional system
-  const { nodes: layoutNodes, edges: layoutEdges } = useMemo(() => 
-    calculateProfessionalCanvasLayout(), [calculateProfessionalCanvasLayout]
-  );
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // Helper function to update analysis node
+  const updateAnalysisNode = useCallback((nodeId: string, updates: Partial<any>) => {
+    setNodes(nodes => nodes.map(node => 
+      node.id === nodeId 
+        ? { ...node, data: { ...node.data, ...updates } }
+        : node
+    ));
+  }, []);
 
-  // React Flow state management
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
+  const onStartAnalysis = useCallback(async (imageId: string, imageName: string, context?: string) => {
+    console.log('[CanvasView] Starting analysis for image:', imageId, 'with context:', context);
+    
+    // Find the image node
+    const imageNode = nodes.find(n => n.id === `image-${imageId}` && n.type === 'image');
+    if (!imageNode) {
+      console.error('[CanvasView] Image node not found:', imageId);
+      return;
+    }
 
-  // Update nodes when layout changes
+    // Create analysis request node ID
+    const analysisNodeId = `analysis-request-${imageId}`;
+    
+    // Check if analysis node already exists
+    const existingNode = nodes.find(n => n.id === analysisNodeId);
+    if (existingNode) {
+      console.log('[CanvasView] Analysis already in progress for:', imageId);
+      return;
+    }
+
+    // Create the analysis node
+    const analysisNode: Node = {
+      id: analysisNodeId,
+      type: 'analysisRequest',
+      position: {
+        x: imageNode.position.x + 350,
+        y: imageNode.position.y
+      },
+      data: {
+        imageId,
+        imageName,
+        status: 'loading',
+        progress: 0,
+        stage: 'Initializing...'
+      }
+    };
+
+    // Create edge
+    const edge: Edge = {
+      id: `edge-${imageId}-${analysisNodeId}`,
+      source: `image-${imageId}`,
+      target: analysisNodeId,
+      type: 'smoothstep'
+    };
+
+    // Add to canvas
+    setNodes(currentNodes => [...currentNodes, analysisNode]);
+    setEdges(currentEdges => [...currentEdges, edge]);
+
+    // Get image data
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) {
+      console.error('[CanvasView] Image not found in uploadedImages:', imageId);
+      updateAnalysisNode(analysisNodeId, { status: 'error', error: 'Image not found' });
+      return;
+    }
+
+    try {
+      console.log('[CanvasView] Executing AI analysis for image:', image.url);
+      
+      // Update node to show progress
+      updateAnalysisNode(analysisNodeId, {
+        progress: 10,
+        stage: 'Starting analysis...',
+        status: 'loading'
+      });
+      
+      // Use AIContext which handles blob URL conversion
+      const result = await analyzeImageWithAI(
+        image.id,
+        image.url,
+        image.name,
+        context || 'General UX analysis'
+      );
+      
+      console.log('[CanvasView] AI analysis result:', result);
+      
+      // Handle results - AIContext returns data directly
+      if (result?.requiresClarification) {
+        updateAnalysisNode(analysisNodeId, {
+          status: 'clarification',
+          clarificationQuestions: result.questions || ['Please provide more context for analysis']
+        });
+      } else if (result) {
+        // Success - create analysis card with the direct result
+        onAnalysisComplete?.(imageId, result);
+        
+        // Remove request node
+        setNodes(currentNodes => currentNodes.filter(n => n.id !== analysisNodeId));
+        setEdges(currentEdges => currentEdges.filter(e => e.target !== analysisNodeId));
+      } else {
+        throw new Error('No data returned from AI analysis');
+      }
+      
+    } catch (error) {
+      console.error('[CanvasView] Pipeline execution failed:', error);
+      updateAnalysisNode(analysisNodeId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Analysis failed'
+      });
+    }
+  }, [nodes, uploadedImages, onAnalysisComplete, updateAnalysisNode]);
+
+  const handleStartAnalysis = onStartAnalysis;
+  
+  const {
+    saveState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    setIsUpdating,
+  } = useUndoRedo([], []);
+
+  // Single consolidated effect to manage all node state updates
   useEffect(() => {
-    setNodes(layoutNodes);
-    setEdges(layoutEdges);
-  }, [layoutNodes, layoutEdges, setNodes, setEdges]);
+    setIsUpdating(true);
+    
+    // Update nodes and edges based on latest computed elements
+    setNodes(initialElements.nodes);
+    setEdges(initialElements.edges);
+    
+    // Save to history
+    saveState(initialElements.nodes, initialElements.edges);
+    
+    // Clean up updating flag
+    const cleanup = () => setIsUpdating(false);
+    const timeoutId = setTimeout(cleanup, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, [initialElements.nodes, initialElements.edges, setNodes, setEdges, setIsUpdating]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        const previousState = undo();
+        if (previousState) {
+          setIsUpdating(true);
+          setNodes(previousState.nodes);
+          setEdges(previousState.edges);
+          setTimeout(() => setIsUpdating(false), 0);
+        }
+      } else if ((event.ctrlKey || event.metaKey) && event.key === 'z' && event.shiftKey) {
+        event.preventDefault();
+        const nextState = redo();
+        if (nextState) {
+          setIsUpdating(true);
+          setNodes(nextState.nodes);
+          setEdges(nextState.edges);
+          setTimeout(() => setIsUpdating(false), 0);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, setNodes, setEdges, setIsUpdating]);
 
   const onConnect = useCallback(
-    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges],
   );
 
-  // Viewport management
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (nodes.length > 0) {
-        const positions = nodes.map(node => ({
-          x: node.position.x,
-          y: node.position.y,
-          width: node.style?.width as number || 300,
-          height: node.style?.height as number || 200,
-          imageId: node.id,
-          row: 0, // Default values for GridPosition
-          column: 0
-        }));
-        
-        autoFitIfNeeded(positions);
-      }
-    }, 100);
+  const handleToolChange = useCallback((tool: UnifiedToolMode) => {
+    setCurrentTool(tool);
+    const toolMessages = {
+      cursor: isMobile ? 'Cursor tool - Select artboards (dragging disabled on mobile)' : 'Cursor tool - Select and move artboards',
+      draw: 'Draw tool - Paint regions for inpainting feedback'
+    };
+    // Remove tool change toast - this is routine UI feedback
+  }, [toast, isMobile]);
 
-    return () => clearTimeout(timer);
-  }, [nodes, autoFitIfNeeded]);
+  const handleToggleAnnotations = useCallback(() => {
+    onToggleAnnotations?.();
+    // Remove annotation toggle toast - this is routine UI feedback
+  }, [onToggleAnnotations, showAnnotations, toast]);
 
-  // Undo/Redo functionality
-  const { canUndo, canRedo, undo, redo } = useUndoRedo(layoutNodes, layoutEdges);
+  const handleToggleAnalysis = useCallback(() => {
+    setShowAnalysis(prev => !prev);
+    // Remove analysis toggle toast - this is routine UI feedback
+  }, [showAnalysis, toast]);
+
+  const handleAddComment = useCallback(() => {
+    toast({
+      title: "Add Comment Mode",
+      description: "Click on an artboard to add a new annotation",
+      category: "action-required",
+    });
+  }, [toast]);
+
+  const handleCreateGroup = useCallback(() => {
+    const selectedCount = multiSelection.state.selectedIds.length;
+    const selectedIds = multiSelection.state.selectedIds;
+    
+    console.log('[CanvasView] Group creation attempt:', {
+      selectedCount,
+      selectedIds,
+      multiSelectMode: multiSelection.state.isMultiSelectMode,
+      hasOnCreateGroup: !!onCreateGroup
+    });
+    
+    if (selectedCount < 2) {
+      toast({
+        title: "Selection Required",
+        description: "Please select at least 2 images to create a group",
+        category: "action-required",
+      });
+      return;
+    }
+    
+    if (!onCreateGroup) {
+      console.error('[CanvasView] onCreateGroup callback is missing!');
+      toast({
+        title: "Group Creation Error",
+        description: "Group creation functionality is not properly connected",
+        category: "error",
+      });
+      return;
+    }
+    
+    // Create group with selected image IDs
+    console.log('[CanvasView] Creating group with IDs:', selectedIds);
+    onCreateGroup(selectedIds);
+    multiSelection.clearSelection();
+    
+    // COMMENTED OUT: Repetitive group creation toast
+    // toast({
+    //   title: "Group Created",
+    //   description: `Successfully created group with ${multiSelection.state.selectedIds.length} images`,
+    //   category: "success",
+    // });
+  }, [onCreateGroup, multiSelection, toast]);
+
+
+
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-background via-background to-muted/20">
-      <AnnotationOverlayProvider>
-        {/* Canvas Controls */}
-        <div className="absolute top-4 right-4 z-20 flex gap-2">
-          {/* Undo/Redo */}
-          <div className="flex gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border shadow-sm">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={undo}
-              disabled={!canUndo}
-              className="h-8 w-8 p-0"
-            >
-              <Undo2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={redo}
-              disabled={!canRedo}
-              className="h-8 w-8 p-0"
-            >
-              <Redo2 className="h-4 w-4" />
-            </Button>
-          </div>
+    <AnnotationOverlayProvider>
+      <CanvasContent 
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        currentTool={currentTool}
+        showAnnotations={showAnnotations}
+        showAnalysis={showAnalysis}
+        isMobile={isMobile}
+        handleToolChange={handleToolChange}
+        handleToggleAnnotations={handleToggleAnnotations}
+        handleToggleAnalysis={handleToggleAnalysis}
+        handleAddComment={handleAddComment}
+        handleCreateGroup={handleCreateGroup}
+        multiSelection={multiSelection}
+        undo={undo}
+        redo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        setNodes={setNodes}
+        setEdges={setEdges}
+        setIsUpdating={setIsUpdating}
+        uploadedImages={uploadedImages}
+        onImageUpload={onImageUpload}
+        onContextMenu={openContextMenu}
+        ContextMenu={ContextMenu}
+        DeleteDialog={DeleteDialog}
+      />
+    </AnnotationOverlayProvider>
+  );
+};
+
+// Separate component to access useAnnotationOverlay hook
+interface CanvasContentProps {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: any;
+  onEdgesChange: any;
+  onConnect: any;
+  onNodeClick: (event: React.MouseEvent, node: Node) => void;
+  currentTool: UnifiedToolMode;
+  showAnnotations: boolean;
+  showAnalysis: boolean;
+  isMobile: boolean;
+  handleToolChange: (tool: UnifiedToolMode) => void;
+  handleToggleAnnotations: () => void;
+  handleToggleAnalysis: () => void;
+  handleAddComment: () => void;
+  handleCreateGroup: () => void;
+  multiSelection: any;
+  undo: () => any;
+  redo: () => any;
+  canUndo: boolean;
+  canRedo: boolean;
+  setNodes: any;
+  setEdges: any;
+  setIsUpdating: any;
+  uploadedImages: UploadedImage[];
+  onImageUpload?: (files: File[]) => void;
+  onContextMenu?: (item: CanvasItem) => void;
+  ContextMenu?: (() => React.ReactElement) | null;
+  DeleteDialog?: (() => React.ReactElement) | null;
+}
+
+const CanvasContent: React.FC<CanvasContentProps> = ({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onNodeClick,
+  currentTool,
+  showAnnotations,
+  showAnalysis,
+  isMobile,
+  handleToolChange,
+  handleToggleAnnotations,
+  handleToggleAnalysis,
+  handleAddComment,
+  handleCreateGroup,
+  multiSelection,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  setNodes,
+  setEdges,
+  setIsUpdating,
+  uploadedImages,
+  onImageUpload,
+  onContextMenu,
+  ContextMenu,
+  DeleteDialog,
+}) => {
+  const { activeAnnotation } = useAnnotationOverlay();
+  const isPanningDisabled = !!activeAnnotation;
+  
+  // Initialize focus overlay
+  useFocusOverlay();
+  
+  // Disable node dragging on mobile/tablet screens (768px and under)
+  const isNodeDraggingEnabled = currentTool === 'cursor' && !isPanningDisabled && !isMobile;
+
+  // Get selected images for AI toolbar
+  const selectedImages = uploadedImages.filter(img => 
+    multiSelection.state.selectedIds.includes(img.id)
+  );
+
+  return (
+    <div className="h-full w-full bg-background relative" style={{ height: '100vh', width: '100%' }}>
+      {/* Upload Zone - Show only when no images exist */}
+      {onImageUpload && uploadedImages.length === 0 && (
+        <CanvasUploadZone 
+          onImageUpload={onImageUpload}
+          isUploading={false}
+          hasImages={uploadedImages.length > 0}
+        />
+      )}
+
+      {/* AI Canvas Toolbar - Will be added in next phase */}
+      
+
+      {/* Visual feedback when panning is disabled */}
+      {isPanningDisabled && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-muted/90 backdrop-blur-sm text-muted-foreground text-xs px-3 py-1 rounded-md border">
+          Pan disabled - Close annotation to enable
         </div>
+      )}
 
-        {/* Main Canvas */}
-        <div className="w-full h-full">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{
-              padding: 0.1,
-              includeHiddenNodes: false,
-              minZoom: 0.1,
-              maxZoom: 1.5,
-            }}
-            className="bg-transparent"
-            panOnScroll={true}
-            selectionOnDrag={false}
-            panOnDrag={true}
-            zoomOnScroll={true}
-            zoomOnPinch={true}
-            zoomOnDoubleClick={false}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-            minZoom={0.1}
-            maxZoom={2}
-            deleteKeyCode={null}
-            multiSelectionKeyCode={['Meta', 'Control']}
-            selectNodesOnDrag={false}
-          >
-            <Background 
-              variant={BackgroundVariant.Dots} 
-              gap={20} 
-              size={1}
-              className="opacity-30"
-            />
-          </ReactFlow>
-        </div>
-
-        {/* Upload Zone Overlay */}
-        <CanvasUploadZone onImageUpload={onImageUpload} />
-
-        {/* Floating Canvas Controls */}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        fitView={uploadedImages.length > 0} // Fit view when images are loaded to center content
+        fitViewOptions={{
+          padding: 0.2,
+          includeHiddenNodes: false,
+          minZoom: 0.5,
+          maxZoom: 2
+        }}
+        style={{ width: '100%', height: '100%' }}
+        panOnDrag={!isPanningDisabled}
+        panOnScroll={!isPanningDisabled}
+        zoomOnScroll
+        zoomOnPinch
+        zoomOnDoubleClick={currentTool !== 'draw'}
+        selectionOnDrag={isNodeDraggingEnabled}
+        nodesDraggable={isNodeDraggingEnabled}
+        nodesConnectable={currentTool === 'cursor'}
+        elementsSelectable={currentTool === 'cursor'}
+        className={`bg-background tool-${currentTool} ${isPanningDisabled ? 'annotation-active' : ''} ${isMobile ? 'mobile-view' : ''} canvas-enhanced-flow`}
+        proOptions={{ hideAttribution: true }}
+        zoomActivationKeyCode={['Meta', 'Control']}
+        minZoom={0.1}
+        maxZoom={4}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+      >
+        
+        <Background 
+          variant={BackgroundVariant.Dots}
+          color="hsl(var(--muted-foreground) / 0.2)" 
+          size={1} 
+          gap={20}
+          className="enhanced-canvas-background"
+        />
+        {/* Custom controls are now in FloatingToolbar */}
+        
+        {/* Unified Floating Toolbar - Must be inside ReactFlow for useReactFlow hook */}
         <CanvasFloatingToolbar
-          currentTool={currentTool}
-          onToolChange={setCurrentTool}
-          onToggleAnnotations={onToggleAnnotations || (() => {})}
-          onToggleAnalysis={() => setShowAnalysis(!showAnalysis)}
-          onAddComment={() => {}}
-          onCreateGroup={() => onCreateGroup?.(multiSelection.state.selectedIds)}
+          onToolChange={handleToolChange}
+          onToggleAnnotations={handleToggleAnnotations}
+          onToggleAnalysis={handleToggleAnalysis}
+          onAddComment={handleAddComment}
+          onCreateGroup={handleCreateGroup}
+          onImageUpload={onImageUpload}
           showAnnotations={showAnnotations}
           showAnalysis={showAnalysis}
-          hasMultiSelection={multiSelection.state.selectedIds.length > 0}
+          currentTool={currentTool}
+          hasMultiSelection={multiSelection.state.isMultiSelectMode}
           selectedCount={multiSelection.state.selectedIds.length}
         />
-      </AnnotationOverlayProvider>
+      </ReactFlow>
+      
+      {/* Selection Debugger for Development */}
+      <SelectionDebugger multiSelection={multiSelection} />
+      
+      {/* Context Menu and Delete Dialog */}
+      {ContextMenu && <ContextMenu />}
+      {DeleteDialog && <DeleteDialog />}
     </div>
   );
 };

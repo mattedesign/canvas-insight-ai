@@ -2,14 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFinalAppContext } from '@/context/FinalAppContext';
-import { ProjectService, GroupMigrationService, DataMigrationService, ImageMigrationService } from '@/services/DataMigrationService';
+import { ProjectService, GroupMigrationService } from '@/services/DataMigrationService';
 import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
-import { loadImageDimensions } from '@/utils/imageUtils';
-import { BlobUrlReplacementService } from '@/services/BlobUrlReplacementService';
 
 const SimplifiedCanvas = () => {
   const navigate = useNavigate();
@@ -56,7 +54,7 @@ const SimplifiedCanvas = () => {
           targetProjectId = await ProjectService.getCurrentProject();
         }
         
-        const result = await DataMigrationService.loadAllFromDatabase(targetProjectId);
+        const result = await (await import('@/services/DataMigrationService')).DataMigrationService.loadAllFromDatabase(targetProjectId);
         
         if (result.success && result.data) {
           dispatch({ type: 'MERGE_FROM_DATABASE', payload: result.data });
@@ -173,6 +171,8 @@ const SimplifiedCanvas = () => {
     
     try {
       // PHASE 2: Immediate storage upload and blob URL replacement
+      const { loadImageDimensions } = await import('@/utils/imageUtils');
+      const { BlobUrlReplacementService } = await import('@/services/BlobUrlReplacementService');
       
       const uploadPromises = files.map(async (file) => {
         console.log('[SimplifiedCanvas] Processing file:', file.name);
@@ -207,6 +207,7 @@ const SimplifiedCanvas = () => {
       dispatch({ type: 'ADD_IMAGES', payload: results });
       
       // Persist to database in background
+      const { ImageMigrationService } = await import('@/services/DataMigrationService');
       for (const image of results) {
         try {
           await ImageMigrationService.migrateImageToDatabase(image);

@@ -88,46 +88,28 @@ export const CanvasImageNode: React.FC<CanvasImageNodeProps> = memo(({
       onClick={handleImageClick}
     >
       <CardContent className="p-4">
-        {/* Image Container - Dynamic Sizing */}
+        {/* Image Container */}
         <div className="relative mb-3">
-          {(() => {
-            const { getOptimalImageDimensions } = require('@/utils/canvasLayoutUtils');
-            const dimensions = getOptimalImageDimensions(image, 'canvas');
-            return (
-              <div 
-                className="rounded-lg overflow-hidden bg-muted flex items-center justify-center" 
-                style={{ 
-                  width: `${dimensions.width}px`, 
-                  height: `${dimensions.height}px`,
-                  minWidth: '200px',
-                  minHeight: '150px'
+          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-muted">
+            {image.url ? (
+              <img
+                src={image.url}
+                alt={image.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  target.nextElementSibling?.classList.remove('hidden');
                 }}
-              >
-                {image.url ? (
-                  <img
-                    src={image.url}
-                    alt={image.name}
-                    className="max-w-full max-h-full object-contain"
-                    loading="lazy"
-                    style={{
-                      width: 'auto',
-                      height: 'auto'
-                    }}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      target.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                 ) : null}
-                
-                {/* Fallback for broken images */}
-                <div className="hidden w-full h-full flex items-center justify-center text-muted-foreground">
-                  <ImageIcon size={48} />
-                </div>
-              </div>
-            );
-          })()}
+              />
+            ) : null}
+            
+            {/* Fallback for broken images */}
+            <div className="hidden w-full h-full flex items-center justify-center text-muted-foreground">
+              <ImageIcon size={48} />
+            </div>
+          </div>
           
           {/* Status badge */}
           <Badge 
