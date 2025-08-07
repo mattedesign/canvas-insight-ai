@@ -144,28 +144,25 @@ export class ProgressiveAnalysisLoader {
 
       onProgress?.('Preparing request...', 30);
       
-      // Build correct request type based on analysis type
-      let requestType: string;
-      if (analysisType === 'image') {
-        requestType = 'IMAGE';
-      } else if (analysisType === 'group') {
-        requestType = 'ANALYZE_GROUP';
-      } else if (analysisType === 'concept') {
-        requestType = 'GENERATE_CONCEPT';
-      } else {
-        requestType = 'IMAGE'; // fallback
-      }
-      
-      const requestPayload = {
-        type: requestType,
-        payload
-      };
-
       onProgress?.('Sending to AI...', 40);
       
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: requestPayload
-      });
+      let data: any;
+      let error: any;
+      
+      if (analysisType === 'group') {
+        ({ data, error } = await supabase.functions.invoke('group-ux-analysis', {
+          body: payload
+        }));
+      } else {
+        // Build request payload for ux-analysis
+        const requestType = analysisType === 'concept' ? 'GENERATE_CONCEPT' : 'IMAGE';
+        ({ data, error } = await supabase.functions.invoke('ux-analysis', {
+          body: {
+            type: requestType,
+            payload
+          }
+        }));
+      }
       
       if (error) {
         throw new Error(`Analysis failed: ${error.message}`);
@@ -175,7 +172,9 @@ export class ProgressiveAnalysisLoader {
       
       // Extract analysis data from response if it's wrapped
       let analysisData = data;
-      if (data && typeof data === 'object' && 'analysis' in data) {
+      if (analysisType === 'group') {
+        analysisData = data?.groupAnalysis ?? data?.data ?? data;
+      } else if (data && typeof data === 'object' && 'analysis' in data) {
         analysisData = data.analysis;
         console.log('📦 Extracted analysis from wrapped response');
       }

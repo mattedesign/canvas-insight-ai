@@ -196,15 +196,12 @@ class TypeSafeAnalysisService {
         throw new Error('Group ID and prompt are required');
       }
       
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
+      const { data, error } = await supabase.functions.invoke('group-ux-analysis', {
         body: {
-          type: 'ANALYZE_GROUP',
-          payload: {
-            imageUrls: request.imageUrls,
-            groupId: request.groupId,
-            prompt: request.prompt,
-            isCustom: request.isCustom || false,
-          },
+          imageUrls: request.imageUrls,
+          prompt: request.prompt,
+          groupId: request.groupId,
+          isCustom: request.isCustom || false,
         },
       });
       
@@ -216,27 +213,17 @@ class TypeSafeAnalysisService {
         throw new Error('No group analysis data received');
       }
 
-      // Handle both old and new response formats
-      let analysisData = data;
-      if (data.success === true && data.data) {
-        analysisData = data.data;
-      } else if (data.success === false) {
+      // Normalize to expected shape for UI consumers
+      let analysisData: any;
+      if (data.success === false) {
         throw new Error(data.error || 'Group analysis failed');
       }
-
-      // Apply field mapping for group analysis
-      const mappedData = AnalysisDataMapper.mapBackendToFrontend(analysisData);
-      
-      // Apply validation for group analysis results
-      const validationResult = AnalysisValidator.validateAndNormalize(mappedData);
-      
-      if (validationResult.warnings.length > 0) {
-        console.warn('TypeSafeAnalysisService group analysis warnings:', validationResult.warnings);
-      }
+      // Prefer groupAnalysis key when present
+      analysisData = data.groupAnalysis ?? data.data ?? data;
 
       return {
         success: true,
-        analysis: validationResult.data,
+        analysis: analysisData,
         processingTime: performance.now() - startTime,
       };
     } catch (error) {

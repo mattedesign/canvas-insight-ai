@@ -274,7 +274,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
           
           return (
             <div
-              key={annotation.id}
+              key={`${annotation.id}-${image.id}`}
               className={`absolute rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110 z-10 ${getMarkerColor(annotation.type, isActive)}`}
               style={{
                 left: `${annotation.x * 100}%`,

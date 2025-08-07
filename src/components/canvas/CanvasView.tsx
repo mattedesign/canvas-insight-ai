@@ -1598,9 +1598,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         // Show completed analysis results
         if (completedAnalyses.length > 0) {
           // Show most recent completed analysis
-          const latestAnalysis = completedAnalyses.sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )[0];
+          const latestAnalysis = (completedAnalyses
+            .filter(a => a && a.createdAt)
+            .sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0))[0])
+            || completedAnalyses[0];
           
           const analysisResultsNode: Node = {
             id: `group-enhanced-${latestAnalysis.id}`,
