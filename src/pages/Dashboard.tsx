@@ -241,6 +241,18 @@ const Dashboard = () => {
                 </div>
               </div>
               
+              {/* Quick Actions */}
+              <div className="flex gap-4">
+                <Button onClick={handleCreateProject} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  New Project
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/projects')} className="gap-2">
+                  <Images className="h-4 w-4" />
+                  View Projects
+                </Button>
+              </div>
+              
               {/* Subscription Status */}
               {subscription && (
                 <Badge variant="outline">
@@ -267,17 +279,6 @@ const Dashboard = () => {
               </Card>
             )}
 
-            {/* Quick Actions */}
-            <div className="flex gap-4">
-              <Button onClick={handleCreateProject} className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Project
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/projects')} className="gap-2">
-                <Images className="h-4 w-4" />
-                View Projects
-              </Button>
-            </div>
 
             {/* Overview Banner */}
             {!metricsLoading && aggregatedMetrics && (
