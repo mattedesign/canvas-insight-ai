@@ -142,14 +142,51 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       return;
     }
 
+    // Validate images first
+    if (!images || images.length === 0) {
+      toast({
+        category: 'error',
+        title: "No Images Available",
+        description: "Please ensure there are images in this group to analyze"
+      });
+      return;
+    }
+
+    // Validate image URLs
+    const imageUrls = images
+      .filter(img => img?.url && typeof img.url === 'string' && img.url.trim() !== '')
+      .map(img => img.url);
+
+    console.log('GroupAnalysisWorkflow - Image validation:', {
+      totalImages: images.length,
+      validUrls: imageUrls.length,
+      sampleUrls: imageUrls.slice(0, 3).map(url => url.substring(0, 50) + '...'),
+      allImages: images.map(img => ({
+        id: img.id,
+        hasUrl: !!img.url,
+        urlLength: img.url?.length || 0,
+        urlStart: img.url?.substring(0, 30) || 'NO_URL'
+      }))
+    });
+
+    if (imageUrls.length === 0) {
+      toast({
+        category: 'error',
+        title: "Invalid Image URLs",
+        description: "No valid image URLs found. Please check your images."
+      });
+      return;
+    }
+
     setIsRunning(true);
     setCurrentStage(0);
     
+    const analysisPrompts = selectedTemplate 
+      ? selectedTemplate.prompts 
+      : [customPrompt.trim()];
+    const primaryPrompt = analysisPrompts[0];
+    
     try {
-      const analysisPrompts = selectedTemplate 
-        ? selectedTemplate.prompts 
-        : [customPrompt.trim()];
-
       initializeAnalysisStages(selectedTemplate || {
         id: 'custom',
         name: 'Custom Analysis',
@@ -162,14 +199,11 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       toast({
         category: 'info',
         title: "Starting Analysis",
-        description: `Beginning analysis of ${images.length} images`
+        description: `Beginning analysis of ${imageUrls.length} valid images`
       });
-
-      // Use the optimized analysis hook for the first stage
-      const imageUrls = images.map(img => img.url);
-      const primaryPrompt = analysisPrompts[0];
       
-      const result = await analyzeGroup(imageUrls, {
+      // Log the payload being sent for debugging
+      const analysisPayload = {
         groupId: group.id,
         prompt: primaryPrompt,
         groupMetadata: {
@@ -177,7 +211,15 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
           description: group.description,
           color: group.color
         }
+      };
+
+      console.log('GroupAnalysisWorkflow - Calling analyzeGroup:', {
+        imageUrlCount: imageUrls.length,
+        payload: analysisPayload,
+        firstImageUrl: imageUrls[0]?.substring(0, 50) + '...'
       });
+
+      const result = await analyzeGroup(imageUrls, analysisPayload);
 
       // Update stage completion
       setAnalysisStages(prev => prev.map((stage, index) => 
@@ -214,11 +256,20 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       toast({
         category: 'success',
         title: "Analysis Complete",
-        description: `Successfully analyzed ${images.length} images`
+        description: `Successfully analyzed ${imageUrls.length} images`
       });
 
     } catch (error) {
       console.error('Group analysis failed:', error);
+      
+      // Log detailed error information for debugging
+      console.error('GroupAnalysisWorkflow - Analysis error details:', {
+        error: error.message,
+        stack: error.stack,
+        imageCount: imageUrls?.length || 0,
+        groupId: group.id,
+        hasPrompt: !!primaryPrompt
+      });
       
       // Update failed stage
       setAnalysisStages(prev => prev.map((stage, index) => 
@@ -227,10 +278,17 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
           : stage
       ));
       
+      // Provide more specific error message
+      const errorMessage = error.message?.includes('No image URLs') 
+        ? `Image validation failed: ${error.message}`
+        : error.message?.includes('CORS')
+        ? 'Network error occurred. Please try again.'
+        : `Analysis failed: ${error.message || 'Unknown error'}`;
+      
       toast({
         category: 'error',
         title: "Analysis Failed",
-        description: "Failed to complete group analysis. Please try again."
+        description: errorMessage
       });
     } finally {
       setIsRunning(false);

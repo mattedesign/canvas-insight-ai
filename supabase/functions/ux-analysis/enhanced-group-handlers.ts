@@ -3,6 +3,12 @@
  * Multi-model group analysis with cross-image insights
  */
 
+// CORS Headers for web requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 // Enhanced Group Analysis Handler with Multi-Model Support
 export async function handleEnhancedGroupAnalysis(body: any) {
   console.log('👥 Enhanced Group Analysis - Processing request:', {
