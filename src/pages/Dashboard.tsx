@@ -280,20 +280,6 @@ const Dashboard = () => {
             )}
 
 
-            {/* Overview Banner */}
-            {!metricsLoading && aggregatedMetrics && (
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm">
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Portfolio overview</span>
-                    <span className="text-muted-foreground">
-                      • {aggregatedMetrics.totalProjects} projects • {aggregatedMetrics.activeProjects} active • {aggregatedMetrics.totalAnalyses} total analyses
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Tabbed Content */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
