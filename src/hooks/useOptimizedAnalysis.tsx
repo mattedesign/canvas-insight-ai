@@ -194,7 +194,7 @@ export const useOptimizedAnalysis = () => {
         isLoading: true
       });
 
-      // Use enhanced group analysis pipeline
+      // Use enhanced group analysis pipeline with standardized response handling
       const response = await supabase.functions.invoke('ux-analysis', {
         body: {
           type: 'ENHANCED_GROUP_ANALYSIS',
@@ -228,25 +228,37 @@ export const useOptimizedAnalysis = () => {
         isLoading: true
       });
 
-      const result = response.data?.analysis || response.data;
-
-      // Cache the result
-      if (result) {
-        AnalysisCache.set(cacheKey, 'group', result, payload.prompt);
+      const analysisData = response.data;
+      
+      // Handle both old and new response formats for backward compatibility
+      const groupAnalysis = analysisData?.groupAnalysis || analysisData?.analysis;
+      
+      if (!groupAnalysis) {
+        throw new Error('No group analysis data received from enhanced group analysis');
       }
 
+      // Update cache with the group analysis
+      AnalysisCache.set(cacheKey, 'group', groupAnalysis, payload.prompt);
+      
       const duration = Date.now() - startTimeRef.current;
       PerformanceOptimizer.trackAnalysis(duration, false);
-
+      
       setProgress({
         stage: 'complete',
         progress: 100,
         isLoading: false
       });
       
-      onProgressUpdate?.('complete', 100, 'Group analysis completed');
-
-      return result;
+      onProgressUpdate?.('complete', 100, 'Enhanced group analysis complete');
+      
+      console.log('✅ Group Analysis Completed:', {
+        overallScore: groupAnalysis.summary?.overallScore,
+        imageCount: analysisData.imageCount,
+        individualAnalyses: analysisData.individualAnalyses?.length,
+        processingTime: analysisData.processingTime
+      });
+      
+      return groupAnalysis;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Group analysis failed';

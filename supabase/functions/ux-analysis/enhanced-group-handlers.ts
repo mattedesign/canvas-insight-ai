@@ -34,12 +34,13 @@ export async function handleEnhancedGroupAnalysis(body: any) {
 
     console.log(`👥 Processing enhanced group analysis for ${imageUrls.length} images with ${models.length} models`);
 
-    // Phase 1: Individual Image Analysis with Group Context
+    // Phase 1: Individual Image Analysis with Group Context - PROCESS ALL IMAGES
     const individualAnalyses = [];
     
+    // CRITICAL FIX: Process ALL images, not just a sample
     for (let i = 0; i < imageUrls.length; i++) {
       const imageUrl = imageUrls[i];
-      console.log(`📸 Processing image ${i + 1}/${imageUrls.length}`);
+      console.log(`📸 Processing image ${i + 1}/${imageUrls.length} - URL: ${imageUrl.substring(0, 100)}...`);
 
       // Create group-aware context for each image
       const groupAwarePrompt = `Analyze this interface as part of a ${imageUrls.length}-image group analysis.
@@ -57,7 +58,7 @@ Consider:
 
 Provide detailed analysis with focus on both individual quality and group consistency patterns.
 
-Return comprehensive JSON with detailed suggestions, visual annotations, and summary data.`;
+Return comprehensive JSON with suggestions array, visualAnnotations array, and summary object with camelCase field names.`;
 
       if (enableMultiModel && models.length > 1) {
         // Multi-model analysis for enhanced insights
@@ -148,22 +149,30 @@ Return comprehensive JSON with detailed suggestions, visual annotations, and sum
 
     console.log('✅ Enhanced group analysis completed successfully');
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        analysis: groupSynthesis,
-        individualAnalyses: individualAnalyses,
-        crossImageAnalysis: crossImageAnalysis,
-        groupId,
+    // STANDARDIZED RESPONSE FORMAT - camelCase for frontend compatibility
+    const standardizedResponse = {
+      success: true,
+      groupAnalysis: convertToStandardFormat(groupSynthesis),
+      individualAnalyses: individualAnalyses.map(analysis => convertAnalysisToStandardFormat(analysis)),
+      crossImageAnalysis: convertCrossImageToStandardFormat(crossImageAnalysis),
+      groupId,
+      imageCount: imageUrls.length,
+      processingTime: Date.now(),
+      metadata: {
+        analysisType: 'enhanced_group_analysis',
         imageCount: imageUrls.length,
-        metadata: {
-          analysisType: 'enhanced_group_analysis',
-          processingTime: Date.now(),
-          isCustom,
-          modelsUsed: enableMultiModel ? models : [models[0] || 'gpt-4o'],
-          multiModelEnabled: enableMultiModel
+        modelsUsed: enableMultiModel ? models : [models[0] || 'gpt-4o'],
+        multiModelEnabled: enableMultiModel,
+        analysisDepth: 'comprehensive',
+        groupContext: {
+          primaryType: 'group_analysis',
+          domain: 'general'
         }
-      }),
+      }
+    };
+
+    return new Response(
+      JSON.stringify(standardizedResponse),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
@@ -172,14 +181,23 @@ Return comprehensive JSON with detailed suggestions, visual annotations, and sum
   } catch (error) {
     console.error('❌ Enhanced group analysis failed:', error);
     
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        stage: 'enhanced-group-analysis',
-        groupId: body.payload?.groupId,
+    // STANDARDIZED ERROR RESPONSE FORMAT
+    const errorResponse = {
+      success: false,
+      error: error.message,
+      stage: 'enhanced-group-analysis',
+      groupId: body.payload?.groupId,
+      imageCount: body.payload?.imageUrls?.length || 0,
+      processingTime: Date.now(),
+      metadata: {
+        analysisType: 'enhanced_group_analysis',
+        failed: true,
         timestamp: new Date().toISOString()
-      }),
+      }
+    };
+    
+    return new Response(
+      JSON.stringify(errorResponse),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -291,7 +309,70 @@ Return JSON with:
   }
 }
 
-// Helper Functions
+// Helper Functions for Response Format Standardization
+
+// Convert analysis to standardized camelCase format expected by frontend
+function convertAnalysisToStandardFormat(analysis: any): any {
+  return {
+    id: analysis.id || `analysis_${Date.now()}`,
+    imageId: analysis.imageId || analysis.image_id,
+    imageName: analysis.imageName || analysis.image_name || 'Group Image',
+    imageUrl: analysis.imageUrl || analysis.image_url,
+    userContext: analysis.userContext || analysis.user_context,
+    suggestions: analysis.suggestions || [],
+    visualAnnotations: analysis.visualAnnotations || analysis.visual_annotations || [],
+    summary: {
+      overallScore: analysis.summary?.overallScore || analysis.summary?.overall_score || 0,
+      categoryScores: {
+        usability: analysis.summary?.categoryScores?.usability || analysis.summary?.category_scores?.usability || 0,
+        accessibility: analysis.summary?.categoryScores?.accessibility || analysis.summary?.category_scores?.accessibility || 0,
+        visual: analysis.summary?.categoryScores?.visual || analysis.summary?.category_scores?.visual || 0,
+        content: analysis.summary?.categoryScores?.content || analysis.summary?.category_scores?.content || 0
+      },
+      keyIssues: analysis.summary?.keyIssues || analysis.summary?.key_issues || [],
+      strengths: analysis.summary?.strengths || []
+    },
+    metadata: analysis.metadata || {},
+    createdAt: analysis.createdAt || analysis.created_at || new Date()
+  };
+}
+
+function convertToStandardFormat(groupSynthesis: any): any {
+  return {
+    id: groupSynthesis.id || `group_${Date.now()}`,
+    sessionId: groupSynthesis.sessionId || groupSynthesis.session_id || `session_${Date.now()}`,
+    groupId: groupSynthesis.groupId || groupSynthesis.group_id,
+    prompt: groupSynthesis.prompt,
+    summary: {
+      overallScore: groupSynthesis.summary?.overallScore || groupSynthesis.summary?.overall_score || 0,
+      consistency: groupSynthesis.summary?.consistency || 0,
+      thematicCoherence: groupSynthesis.summary?.thematicCoherence || groupSynthesis.summary?.thematic_coherence || 0,
+      userFlowContinuity: groupSynthesis.summary?.userFlowContinuity || groupSynthesis.summary?.user_flow_continuity || 0
+    },
+    insights: groupSynthesis.insights || [],
+    recommendations: groupSynthesis.recommendations || [],
+    patterns: {
+      commonElements: groupSynthesis.patterns?.commonElements || groupSynthesis.patterns?.common_elements || [],
+      designInconsistencies: groupSynthesis.patterns?.designInconsistencies || groupSynthesis.patterns?.design_inconsistencies || [],
+      userJourneyGaps: groupSynthesis.patterns?.userJourneyGaps || groupSynthesis.patterns?.user_journey_gaps || []
+    },
+    analysis: groupSynthesis.analysis || {},
+    createdAt: groupSynthesis.createdAt || groupSynthesis.created_at || new Date()
+  };
+}
+
+function convertCrossImageToStandardFormat(crossImageAnalysis: any): any {
+  return {
+    consistencyScore: crossImageAnalysis.consistencyScore || crossImageAnalysis.consistency_score || 0,
+    thematicCoherence: crossImageAnalysis.thematicCoherence || crossImageAnalysis.thematic_coherence || 0,
+    userFlowContinuity: crossImageAnalysis.userFlowContinuity || crossImageAnalysis.user_flow_continuity || 0,
+    crossImageInsights: crossImageAnalysis.crossImageInsights || crossImageAnalysis.cross_image_insights || [],
+    commonPatterns: crossImageAnalysis.commonPatterns || crossImageAnalysis.common_patterns || [],
+    designInconsistencies: crossImageAnalysis.designInconsistencies || crossImageAnalysis.design_inconsistencies || [],
+    userJourneyGaps: crossImageAnalysis.userJourneyGaps || crossImageAnalysis.user_journey_gaps || [],
+    recommendations: crossImageAnalysis.recommendations || []
+  };
+}
 
 async function synthesizeMultiModelGroupResults(
   modelResults: any[],
@@ -321,6 +402,7 @@ async function synthesizeMultiModelGroupResults(
     const uniqueSuggestions = deduplicateSuggestions(allSuggestions).slice(0, 8);
     const uniqueAnnotations = deduplicateAnnotations(allAnnotations).slice(0, 6);
 
+    // STANDARDIZED RESPONSE FORMAT
     return {
       suggestions: uniqueSuggestions,
       visualAnnotations: uniqueAnnotations,
@@ -335,7 +417,8 @@ async function synthesizeMultiModelGroupResults(
         groupSize: totalImages,
         multiModelSynthesis: true,
         modelsUsed: modelResults.map(r => r.model),
-        groupPrompt: groupPrompt.substring(0, 100)
+        groupPrompt: groupPrompt.substring(0, 100),
+        processedWithGroupAwareness: true
       }
     };
 
@@ -463,7 +546,12 @@ async function synthesizeGroupAnalysis(
     'Maintain consistency standards across the interface group'
   ];
 
+  // STANDARDIZED GROUP SYNTHESIS FORMAT
   return {
+    id: `group_analysis_${groupId}_${Date.now()}`,
+    sessionId: `session_${groupId}_${Date.now()}`,
+    groupId: groupId,
+    prompt: prompt,
     summary: {
       overallScore: avgScore,
       consistency: crossImageAnalysis.patterns?.consistency || 70,

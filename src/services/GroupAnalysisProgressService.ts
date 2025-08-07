@@ -184,12 +184,33 @@ export class GroupAnalysisProgressService {
   ): Node {
     const progressData = this.progressData.get(groupId);
     
+    // Standardize the analysis results format for consistent display
+    const standardizedResults = {
+      id: analysisResults?.id || `group_${groupId}_${Date.now()}`,
+      sessionId: analysisResults?.sessionId || `session_${groupId}`,
+      summary: {
+        overallScore: analysisResults?.summary?.overallScore || 0,
+        consistency: analysisResults?.summary?.consistency || 0,
+        thematicCoherence: analysisResults?.summary?.thematicCoherence || 0,
+        userFlowContinuity: analysisResults?.summary?.userFlowContinuity || 0
+      },
+      insights: analysisResults?.insights || [],
+      recommendations: analysisResults?.recommendations || [],
+      patterns: {
+        commonElements: analysisResults?.patterns?.commonElements || [],
+        designInconsistencies: analysisResults?.patterns?.designInconsistencies || [],
+        userJourneyGaps: analysisResults?.patterns?.userJourneyGaps || []
+      },
+      analysis: analysisResults?.analysis || {},
+      createdAt: analysisResults?.createdAt || new Date()
+    };
+    
     return {
       id: `group-analysis-results-${groupId}`,
       type: 'groupAnalysisResults',
       position,
       data: {
-        analysis: analysisResults,
+        analysisResults: standardizedResults,
         groupName: progressData?.groupName || 'Unknown Group',
         onEditPrompt,
         onCreateFork,
