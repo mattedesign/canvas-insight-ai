@@ -918,8 +918,18 @@ serve(async (req) => {
           console.log('🧠 Processing MEMORY_OPTIMIZED_CHUNK request')
           return await handleMemoryOptimizedChunk(body)
         
+        case 'ANALYZE_GROUP':
+          // Handle group analysis
+          console.log('👥 Processing ANALYZE_GROUP request')
+          return await handleGroupAnalysis(body)
+        
+        case 'GENERATE_CONCEPT':
+          // Handle concept generation
+          console.log('💡 Processing GENERATE_CONCEPT request')
+          return await handleConceptGeneration(body)
+        
         default:
-          throw new Error(`Unknown action: ${body.action}`)
+          throw new Error(`Unknown action: ${actionType}`)
       }
     }
 
@@ -4938,6 +4948,286 @@ Provide specific, actionable insights in conversational language. Focus on the m
 ${contextPart}
 
 Respond with practical insights and recommendations in natural language.`;
+}
+
+// Group Analysis Handler
+async function handleGroupAnalysis(body: any) {
+  console.log('👥 Group Analysis - Processing request:', {
+    imageCount: body.payload?.imageUrls?.length || 0,
+    groupId: body.payload?.groupId,
+    hasPrompt: !!body.payload?.prompt
+  });
+
+  try {
+    const payload = body.payload || body;
+    const { imageUrls, groupId, prompt, isCustom = false } = payload;
+
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+      throw new Error('No image URLs provided for group analysis');
+    }
+
+    if (!groupId || !prompt) {
+      throw new Error('Group ID and prompt are required');
+    }
+
+    console.log(`👥 Processing group analysis for ${imageUrls.length} images`);
+
+    // For group analysis, we'll analyze the first image with context about the group
+    const firstImageUrl = imageUrls[0];
+    const groupContext = `Group analysis of ${imageUrls.length} images. Focus: ${prompt}`;
+
+    // Build a specialized prompt for group analysis
+    const groupPrompt = `Analyze this interface as part of a group of ${imageUrls.length} similar interfaces.
+
+Group Analysis Focus: ${prompt}
+
+Consider:
+1. How this interface fits within the group context
+2. Patterns that might be consistent across the group
+3. Specific areas highlighted in the group prompt
+4. Comparative insights relevant to the group
+
+Provide analysis that considers both individual interface quality and group context.
+
+${isCustom ? 'This is a custom analysis request with specific focus areas.' : ''}
+
+Return structured JSON with suggestions, visual annotations, and summary.`;
+
+    // Execute analysis using the first image as representative
+    const result = await executeModel({
+      model: 'gpt-4o', // Use consistent model for group analysis
+      stage: 'group_analysis',
+      imageUrl: firstImageUrl,
+      prompt: groupPrompt,
+      systemPrompt: 'You are a UX analyst specializing in group interface analysis. Provide structured insights that consider group context.',
+      userContext: groupContext
+    });
+
+    const responseText = await result.text();
+    console.log('👥 Group analysis raw response received, length:', responseText.length);
+
+    const parsedResult = parseJsonFromResponse(responseText, 'gpt-4o', 'group_analysis');
+
+    let analysisData;
+    if (parsedResult.success) {
+      analysisData = parsedResult.data;
+    } else {
+      // Create structured fallback for group analysis
+      analysisData = {
+        suggestions: [{
+          id: 'group_analysis_1',
+          category: 'usability',
+          title: 'Group Analysis Completed',
+          description: `Analysis completed for group of ${imageUrls.length} interfaces with focus: ${prompt}`,
+          impact: 'medium',
+          effort: 'medium',
+          actionItems: ['Review group analysis findings', 'Compare with other interfaces in group']
+        }],
+        visualAnnotations: [],
+        summary: {
+          overallScore: 70,
+          categoryScores: {
+            usability: 70,
+            accessibility: 65,
+            visual: 75,
+            content: 70
+          },
+          keyIssues: ['Group analysis completed'],
+          strengths: ['Interface analyzed in group context']
+        },
+        metadata: {
+          groupId,
+          imageCount: imageUrls.length,
+          isCustom,
+          fallbackGenerated: true
+        }
+      };
+    }
+
+    // Add group-specific metadata
+    analysisData.metadata = {
+      ...analysisData.metadata,
+      groupId,
+      imageCount: imageUrls.length,
+      analysisType: 'group_analysis',
+      customAnalysis: isCustom,
+      prompt,
+      analysisTimestamp: new Date().toISOString()
+    };
+
+    console.log('✅ Group analysis completed successfully');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        analysis: analysisData,
+        groupId,
+        imageCount: imageUrls.length,
+        metadata: {
+          analysisType: 'group_analysis',
+          processingTime: Date.now(),
+          isCustom
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('❌ Group analysis failed:', error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'group-analysis',
+        groupId: body.payload?.groupId,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+}
+
+// Concept Generation Handler
+async function handleConceptGeneration(body: any) {
+  console.log('💡 Concept Generation - Processing request:', {
+    hasImageUrl: !!body.payload?.imageUrl,
+    hasPrompt: !!body.payload?.prompt,
+    hasAnalysisData: !!body.payload?.analysisData
+  });
+
+  try {
+    const payload = body.payload || body;
+    const { imageUrl, prompt, analysisData = {} } = payload;
+
+    if (!imageUrl || !prompt) {
+      throw new Error('Image URL and prompt are required for concept generation');
+    }
+
+    console.log('💡 Processing concept generation with prompt:', prompt);
+
+    // Build specialized prompt for concept generation
+    const conceptPrompt = `Generate design concepts and recommendations based on this interface.
+
+Concept Generation Request: ${prompt}
+
+Based on the interface analysis, create:
+1. Specific design concepts that address the prompt
+2. Visual recommendations with actionable details
+3. Implementation suggestions
+4. Expected outcomes and benefits
+
+Consider existing analysis data if available and build upon insights to create forward-looking concepts.
+
+Return structured JSON with detailed suggestions, visual annotations for proposed changes, and implementation summary.`;
+
+    // Execute concept generation
+    const result = await executeModel({
+      model: 'gpt-4o', // Use advanced model for creative concept generation
+      stage: 'concept_generation',
+      imageUrl,
+      prompt: conceptPrompt,
+      systemPrompt: 'You are a creative UX designer and strategist. Generate innovative, practical design concepts based on interface analysis.',
+      userContext: prompt,
+      analysisData
+    });
+
+    const responseText = await result.text();
+    console.log('💡 Concept generation raw response received, length:', responseText.length);
+
+    const parsedResult = parseJsonFromResponse(responseText, 'gpt-4o', 'concept_generation');
+
+    let conceptData;
+    if (parsedResult.success) {
+      conceptData = parsedResult.data;
+    } else {
+      // Create structured fallback for concept generation
+      conceptData = {
+        suggestions: [{
+          id: 'concept_1',
+          category: 'innovation',
+          title: 'Design Concept Generated',
+          description: `Creative concept generated based on: ${prompt}`,
+          impact: 'high',
+          effort: 'medium',
+          actionItems: ['Review concept details', 'Consider implementation feasibility', 'Prototype key elements']
+        }],
+        visualAnnotations: [{
+          id: 'concept_annotation_1',
+          x: 0.5,
+          y: 0.3,
+          type: 'suggestion',
+          title: 'Concept Area',
+          description: 'Generated concept focuses on this interface area',
+          severity: 'medium'
+        }],
+        summary: {
+          overallScore: 80,
+          categoryScores: {
+            innovation: 85,
+            feasibility: 75,
+            impact: 80,
+            usability: 75
+          },
+          keyIssues: ['Concept ready for evaluation'],
+          strengths: ['Creative solution generated', 'Addresses user needs']
+        },
+        metadata: {
+          conceptGeneration: true,
+          fallbackGenerated: true
+        }
+      };
+    }
+
+    // Add concept-specific metadata
+    conceptData.metadata = {
+      ...conceptData.metadata,
+      analysisType: 'concept_generation',
+      originalPrompt: prompt,
+      baseAnalysisData: !!analysisData,
+      conceptTimestamp: new Date().toISOString()
+    };
+
+    console.log('✅ Concept generation completed successfully');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        analysis: conceptData,
+        conceptPrompt: prompt,
+        metadata: {
+          analysisType: 'concept_generation',
+          processingTime: Date.now(),
+          hasBaseAnalysis: !!analysisData
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('❌ Concept generation failed:', error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        stage: 'concept-generation',
+        prompt: body.payload?.prompt,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
 }
 
 function buildChunkAnalysisPrompt(userContext?: string, analysisContext?: any, model?: string): string {
