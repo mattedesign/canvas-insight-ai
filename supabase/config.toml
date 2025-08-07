@@ -3,6 +3,9 @@ project_id = "sdcmbfdtafkzpimwjpij"
 [functions.ux-analysis]
 verify_jwt = true
 
+[functions.group-ux-analysis]
+verify_jwt = true
+
 [functions.google-vision-metadata]
 verify_jwt = false
 

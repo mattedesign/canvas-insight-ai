@@ -19,7 +19,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
-import { useOptimizedAnalysis } from '@/hooks/useOptimizedAnalysis';
+import { useSimpleGroupAnalysis } from '@/hooks/useSimpleGroupAnalysis';
 import type { ImageGroup, UploadedImage } from '@/types/ux-analysis';
 
 interface GroupAnalysisWorkflowProps {
@@ -109,7 +109,7 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
   const [currentStage, setCurrentStage] = useState(0);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const { toast } = useFilteredToast();
-  const { analyzeGroup, progress } = useOptimizedAnalysis();
+  const { analyzeGroup, progress, isLoading } = useSimpleGroupAnalysis();
 
   const initializeAnalysisStages = useCallback((template: GroupAnalysisTemplate) => {
     const stages: AnalysisStage[] = template.prompts.map((prompt, index) => ({
@@ -237,7 +237,13 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
         firstImageUrl: imageUrls[0]?.substring(0, 50) + '...'
       });
 
-      const result = await analyzeGroup(imageUrls, analysisPayload);
+      const result = await analyzeGroup(
+        imageUrls, 
+        primaryPrompt, 
+        'Group UX analysis',
+        group.id,
+        group.name
+      );
 
       // Update stage completion
       setAnalysisStages(prev => prev.map((stage, index) => 
@@ -246,20 +252,28 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
               ...stage, 
               status: 'completed', 
               progress: 100, 
-              result: result,
+              result: result.groupAnalysis,
               duration: 2000 // approximate
             }
           : stage
       ));
 
-      // For now, use just the first analysis result
+      // Use the new simplified result format
       const finalAnalysis = {
         groupId: group.id,
         template: selectedTemplate?.name || 'Custom',
-        stageResults: [{ stage: 0, prompt: primaryPrompt, result, duration: 2000 }],
-        synthesis: result,
+        stageResults: [{ 
+          stage: 0, 
+          prompt: primaryPrompt, 
+          result: result.groupAnalysis?.groupInsights || 'Group analysis completed',
+          duration: 2000 
+        }],
+        synthesis: { 
+          result: result.groupAnalysis?.groupInsights || 'Group analysis completed'
+        },
         metadata: {
-          imageCount: images.length,
+          imageCount: result.metadata?.totalImages || images.length,
+          successfulAnalyses: result.metadata?.successfulAnalyses || 0,
           analysisDate: new Date().toISOString(),
           focusAreas: selectedTemplate?.focusAreas || ['Custom']
         }
