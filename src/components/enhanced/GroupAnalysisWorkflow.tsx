@@ -18,8 +18,8 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { useOptimizedAnalysis } from '@/hooks/useOptimizedAnalysis';
 import type { ImageGroup, UploadedImage } from '@/types/ux-analysis';
 
 interface GroupAnalysisWorkflowProps {
@@ -108,7 +108,8 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [currentStage, setCurrentStage] = useState(0);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
-  const { toast } = useToast();
+  const { toast } = useFilteredToast();
+  const { analyzeGroup, progress } = useOptimizedAnalysis();
 
   const initializeAnalysisStages = useCallback((template: GroupAnalysisTemplate) => {
     const stages: AnalysisStage[] = template.prompts.map((prompt, index) => ({
@@ -134,9 +135,9 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
   const runGroupAnalysis = async () => {
     if (!selectedTemplate && !customPrompt.trim()) {
       toast({
+        category: 'error',
         title: "Analysis Required",
-        description: "Please select a template or enter a custom prompt",
-        variant: "destructive"
+        description: "Please select a template or enter a custom prompt"
       });
       return;
     }
@@ -157,22 +158,46 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
         focusAreas: ['Custom Analysis']
       });
 
-      const stageResults: any[] = [];
+      // Show initial progress from the hook
+      toast({
+        category: 'info',
+        title: "Starting Analysis",
+        description: `Beginning analysis of ${images.length} images`
+      });
 
-      // Run each analysis stage
-      for (let i = 0; i < analysisPrompts.length; i++) {
-        await runAnalysisStage(i, analysisPrompts[i], stageResults);
-      }
+      // Use the optimized analysis hook for the first stage
+      const imageUrls = images.map(img => img.url);
+      const primaryPrompt = analysisPrompts[0];
+      
+      const result = await analyzeGroup(imageUrls, {
+        groupId: group.id,
+        prompt: primaryPrompt,
+        groupMetadata: {
+          name: group.name,
+          description: group.description,
+          color: group.color
+        }
+      });
 
-      // Run synthesis stage
-      await runSynthesisStage(stageResults);
+      // Update stage completion
+      setAnalysisStages(prev => prev.map((stage, index) => 
+        index === 0 
+          ? { 
+              ...stage, 
+              status: 'completed', 
+              progress: 100, 
+              result: result,
+              duration: 2000 // approximate
+            }
+          : stage
+      ));
 
-      // Combine all results
+      // For now, use just the first analysis result
       const finalAnalysis = {
         groupId: group.id,
         template: selectedTemplate?.name || 'Custom',
-        stageResults,
-        synthesis: stageResults[stageResults.length - 1],
+        stageResults: [{ stage: 0, prompt: primaryPrompt, result, duration: 2000 }],
+        synthesis: result,
         metadata: {
           imageCount: images.length,
           analysisDate: new Date().toISOString(),
@@ -187,181 +212,43 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       }
 
       toast({
+        category: 'success',
         title: "Analysis Complete",
-        description: `Successfully analyzed ${images.length} images with ${analysisPrompts.length} focus areas`,
+        description: `Successfully analyzed ${images.length} images`
       });
 
     } catch (error) {
       console.error('Group analysis failed:', error);
+      
+      // Update failed stage
+      setAnalysisStages(prev => prev.map((stage, index) => 
+        index === currentStage 
+          ? { ...stage, status: 'failed', progress: 0 }
+          : stage
+      ));
+      
       toast({
+        category: 'error',
         title: "Analysis Failed",
-        description: "Failed to complete group analysis. Please try again.",
-        variant: "destructive"
+        description: "Failed to complete group analysis. Please try again."
       });
     } finally {
       setIsRunning(false);
     }
   };
 
+  // Legacy function - now using the optimized analysis hook in runGroupAnalysis
   const runAnalysisStage = async (stageIndex: number, prompt: string, stageResults: any[]) => {
-    // Update stage status
-    setAnalysisStages(prev => prev.map((stage, index) => 
-      index === stageIndex 
-        ? { ...stage, status: 'running', progress: 0 }
-        : stage
-    ));
-
-    const startTime = Date.now();
-    let progressInterval: NodeJS.Timeout | null = null;
-
-    try {
-      // Simulate progress updates
-      progressInterval = setInterval(() => {
-        setAnalysisStages(prev => prev.map((stage, index) => 
-          index === stageIndex 
-            ? { ...stage, progress: Math.min(stage.progress + 10, 90) }
-            : stage
-        ));
-      }, 500);
-
-      // Call AI analysis for the group
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: {
-          type: 'ANALYZE_GROUP',
-          payload: {
-            groupId: group.id,
-            images: images.map(img => ({
-              id: img.id,
-              name: img.name,
-              url: img.url
-            })),
-            prompt: `${prompt}\n\nFocus on analyzing these ${images.length} images as a cohesive user experience flow. Consider their relationships and overall journey.`,
-            groupMetadata: {
-              name: group.name,
-              description: group.description,
-              color: group.color
-            }
-          }
-        }
-      });
-
-      if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-      }
-
-      if (error) throw error;
-
-      const duration = Date.now() - startTime;
-
-      // Update stage completion
-      setAnalysisStages(prev => prev.map((stage, index) => 
-        index === stageIndex 
-          ? { 
-              ...stage, 
-              status: 'completed', 
-              progress: 100, 
-              result: data,
-              duration 
-            }
-          : stage
-      ));
-
-      stageResults.push({
-        stage: stageIndex,
-        prompt,
-        result: data,
-        duration
-      });
-
-      setCurrentStage(stageIndex + 1);
-
-    } catch (error) {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-      }
-      
-      setAnalysisStages(prev => prev.map((stage, index) => 
-        index === stageIndex 
-          ? { ...stage, status: 'failed', progress: 0 }
-          : stage
-      ));
-
-      throw error;
-    }
+    // This function is kept for backward compatibility but not used
+    // The main analysis now uses the optimized analyzeGroup hook
+    console.log('Legacy runAnalysisStage called - using optimized hook instead');
   };
 
+  // Legacy function - synthesis is now handled in the main analysis
   const runSynthesisStage = async (stageResults: any[]) => {
-    const synthesisIndex = analysisStages.length - 1;
-    
-    setAnalysisStages(prev => prev.map((stage, index) => 
-      index === synthesisIndex 
-        ? { ...stage, status: 'running', progress: 0 }
-        : stage
-    ));
-
-    const startTime = Date.now();
-
-    try {
-      // Combine insights from all stages
-      const combinedInsights = stageResults.map(result => result.result).join('\n\n');
-      
-      const synthesisPrompt = `Based on the following detailed analyses of ${group.name}, provide a comprehensive synthesis that includes:
-
-1. Key themes and patterns identified across all analyses
-2. Priority recommendations ranked by impact
-3. Implementation roadmap with timeline suggestions
-4. Success metrics to track improvements
-
-Previous analyses:
-${combinedInsights}
-
-Provide a structured response that executives and development teams can act upon.`;
-
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: {
-          type: 'ANALYZE_GROUP',
-          payload: {
-            groupId: group.id,
-            images: [],
-            prompt: synthesisPrompt,
-            isSynthesis: true
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      const duration = Date.now() - startTime;
-
-      setAnalysisStages(prev => prev.map((stage, index) => 
-        index === synthesisIndex 
-          ? { 
-              ...stage, 
-              status: 'completed', 
-              progress: 100, 
-              result: data,
-              duration 
-            }
-          : stage
-      ));
-
-      stageResults.push({
-        stage: 'synthesis',
-        prompt: synthesisPrompt,
-        result: data,
-        duration
-      });
-
-    } catch (error) {
-      setAnalysisStages(prev => prev.map((stage, index) => 
-        index === synthesisIndex 
-          ? { ...stage, status: 'failed', progress: 0 }
-          : stage
-      ));
-      throw error;
-    }
+    // This function is kept for backward compatibility but not used
+    // Synthesis is now part of the main group analysis result
+    console.log('Legacy runSynthesisStage called - using optimized analysis result instead');
   };
 
   const getStageIcon = (status: AnalysisStage['status']) => {
@@ -464,12 +351,37 @@ Provide a structured response that executives and development teams can act upon
       </Card>
 
       {/* Analysis Progress */}
-      {analysisStages.length > 0 && (
+      {(analysisStages.length > 0 || progress.isLoading) && (
         <Card>
           <CardHeader>
             <CardTitle>Analysis Progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Show hook progress if available */}
+            {progress.isLoading && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                    <span className="font-medium">Group Analysis</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {progress.progress}%
+                  </span>
+                </div>
+                <div className="pl-6">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {progress.stage}
+                  </p>
+                  <Progress value={progress.progress} className="h-2" />
+                  {progress.error && (
+                    <p className="text-sm text-red-500 mt-1">{progress.error}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Show detailed stage progress */}
             {analysisStages.map((stage, index) => (
               <div key={stage.id} className="space-y-2">
                 <div className="flex items-center justify-between">

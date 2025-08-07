@@ -143,8 +143,21 @@ export class ProgressiveAnalysisLoader {
       await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for UX
 
       onProgress?.('Preparing request...', 30);
+      
+      // Build correct request type based on analysis type
+      let requestType: string;
+      if (analysisType === 'image') {
+        requestType = 'IMAGE';
+      } else if (analysisType === 'group') {
+        requestType = 'ANALYZE_GROUP';
+      } else if (analysisType === 'concept') {
+        requestType = 'GENERATE_CONCEPT';
+      } else {
+        requestType = 'IMAGE'; // fallback
+      }
+      
       const requestPayload = {
-        type: analysisType.toUpperCase() + (analysisType === 'image' ? '' : analysisType === 'group' ? '_GROUP' : '_CONCEPT') as any,
+        type: requestType,
         payload
       };
 
@@ -160,15 +173,22 @@ export class ProgressiveAnalysisLoader {
 
       onProgress?.('Processing AI response...', 70);
       
+      // Extract analysis data from response if it's wrapped
+      let analysisData = data;
+      if (data && typeof data === 'object' && 'analysis' in data) {
+        analysisData = data.analysis;
+        console.log('📦 Extracted analysis from wrapped response');
+      }
+      
       onProgress?.('Caching results...', 90);
       
       // Cache the result
-      if (data) {
-        AnalysisCache.set(imageUrl, analysisType, data, payload.userContext || payload.prompt);
+      if (analysisData) {
+        AnalysisCache.set(imageUrl, analysisType, analysisData, payload.userContext || payload.prompt);
       }
 
       onProgress?.('Complete!', 100);
-      return data;
+      return analysisData;
 
     } catch (error) {
       if (error.name === 'AbortError') {

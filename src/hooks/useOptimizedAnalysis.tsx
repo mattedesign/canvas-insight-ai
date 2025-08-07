@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProgressiveAnalysisLoader, AnalysisCache, PerformanceOptimizer } from '@/services/AnalysisOptimizationService';
 import { naturalAnalysisPipeline } from '@/services/NaturalAnalysisPipeline';
 import { AnalysisContext } from '@/types/contextTypes';
+import { useFilteredToast } from '@/hooks/use-filtered-toast';
 
 console.log('🔍 BUILD DEBUG: useOptimizedAnalysis hook loading...');
 
@@ -25,6 +26,7 @@ export const useOptimizedAnalysis = () => {
     isLoading: false
   });
   
+  const { toast } = useFilteredToast();
   const currentRequestRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(0);
 
@@ -187,6 +189,16 @@ export const useOptimizedAnalysis = () => {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Group analysis failed';
+      
+      // Show user-friendly error notification
+      toast({
+        category: 'error',
+        title: 'Group Analysis Failed',
+        description: errorMessage.includes('validation') 
+          ? 'Analysis completed but results could not be processed. Please try again.'
+          : 'Network error or AI service unavailable. Please check your connection and try again.'
+      });
+      
       setProgress({
         stage: 'Error',
         progress: 0,
@@ -195,7 +207,7 @@ export const useOptimizedAnalysis = () => {
       });
       throw error;
     }
-  }, [updateProgress]);
+  }, [updateProgress, toast]);
 
   const generateConcept = useCallback(async (imageUrl: string, analysisData: any) => {
     const optimizedImageUrl = PerformanceOptimizer.optimizeImageForAnalysis(imageUrl);
