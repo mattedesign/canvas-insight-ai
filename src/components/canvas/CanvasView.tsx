@@ -289,7 +289,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       }
 
       // Create loading node positioned to the right of prompt collection node
-      const promptNodeId = `group-prompt-collection-${groupId}`;
+      const promptNodeId = `group-prompt-${groupId}`;
       const promptNode = nodes.find(n => n.id === promptNodeId);
       const loadingPosition = promptNode 
         ? { x: promptNode.position.x + 400, y: promptNode.position.y }
