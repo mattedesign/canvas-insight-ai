@@ -11,6 +11,7 @@ import { MessageSquare, Sparkles, Target, Users, Zap } from 'lucide-react';
 interface GroupPromptCollectionNodeData {
   group: ImageGroup;
   onSubmitPrompt?: (groupId: string, prompt: string, isCustom: boolean) => void;
+  onAnalyzeGroup?: (groupId: string) => void;
   isLoading?: boolean;
 }
 
@@ -46,18 +47,28 @@ const predefinedPrompts = [
 ];
 
 export const GroupPromptCollectionNode: React.FC<NodeProps> = ({ data }) => {
-  const { group, onSubmitPrompt, isLoading } = data as unknown as GroupPromptCollectionNodeData;
+  const { group, onSubmitPrompt, onAnalyzeGroup, isLoading } = data as unknown as GroupPromptCollectionNodeData;
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
 
   const handlePredefinedPromptSubmit = (prompt: string) => {
-    onSubmitPrompt?.(group.id, prompt, false);
+    if (onSubmitPrompt) {
+      onSubmitPrompt(group.id, prompt, false);
+    } else if (onAnalyzeGroup) {
+      // Fallback to direct group analysis
+      onAnalyzeGroup(group.id);
+    }
   };
 
   const handleCustomPromptSubmit = () => {
     if (customPrompt.trim()) {
-      onSubmitPrompt?.(group.id, customPrompt.trim(), true);
+      if (onSubmitPrompt) {
+        onSubmitPrompt(group.id, customPrompt.trim(), true);
+      } else if (onAnalyzeGroup) {
+        // Fallback to direct group analysis
+        onAnalyzeGroup(group.id);
+      }
       setCustomPrompt('');
       setShowCustomInput(false);
     }

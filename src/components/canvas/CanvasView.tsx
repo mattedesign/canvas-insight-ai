@@ -87,7 +87,7 @@ export interface CanvasViewProps {
   onUngroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
   onEditGroup?: (groupId: string) => void;
-  onAnalyzeGroup?: (groupId: string) => void;
+  onAnalyzeGroup?: (groupId: string, imageIds?: string[]) => void;
   onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
   onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
   onEditGroupPrompt?: (sessionId: string) => void;
@@ -139,8 +139,13 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
   
+  
   // Group analysis progress management
   const groupAnalysisProgress = useGroupAnalysisProgress();
+  
+  // Canvas nodes and edges state for dynamic updates
+  const [dynamicNodes, setDynamicNodes] = useState<Node[]>([]);
+  const [dynamicEdges, setDynamicEdges] = useState<Edge[]>([]);
   
   // Convert uploaded images to canvas items for context menu
   const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
@@ -432,8 +437,24 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const groupId = existingGroup?.id || `temp-group-${Date.now()}`;
     const groupName = existingGroup?.name || `Analysis Group (${imagesToAnalyze.length} images)`;
 
+    // Create loading node on canvas
+    const loadingNodePosition = { x: 400, y: 200 }; // Position to the right of group prompt
+    const loadingNode = groupAnalysisProgress.getLoadingNode(
+      groupId, 
+      loadingNodePosition,
+      (cancelGroupId) => {
+        console.log('Canceling group analysis:', cancelGroupId);
+        groupAnalysisProgress.cancelAnalysis(cancelGroupId);
+        // Remove loading node from canvas
+        setDynamicNodes(prev => prev.filter(node => node.id !== `group-analysis-loading-${cancelGroupId}`));
+      }
+    );
+
+    if (loadingNode) {
+      setDynamicNodes(prev => [...prev, loadingNode]);
+    }
+
     try {
-      // Start group analysis with progress tracking
       const imageUrls = imagesToAnalyze.map(img => img.url);
       const payload = {
         groupId,
@@ -448,25 +469,41 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         payload
       );
 
-      // Handle successful group analysis
+      // Remove loading node and add results node
+      setDynamicNodes(prev => prev.filter(node => node.id !== `group-analysis-loading-${groupId}`));
+      
+      const resultsNode = groupAnalysisProgress.getResultsNode(
+        groupId,
+        result,
+        { x: loadingNodePosition.x + 400, y: loadingNodePosition.y }, // Position to the right of loading
+        {
+          onEditPrompt: onEditGroupPrompt,
+          onCreateFork: onCreateFork,
+          onViewDetails: (analysisId) => onOpenAnalysisPanel?.(analysisId)
+        }
+      );
+      
+      setDynamicNodes(prev => [...prev, resultsNode]);
+
       toast({
         title: "Group Analysis Complete",
         description: `Successfully analyzed ${imagesToAnalyze.length} images as a group`,
         category: "success",
       });
 
-      // You can handle the result here - e.g., store it or display it
-      console.log('Group analysis result:', result);
-
     } catch (error) {
       console.error('Group analysis failed:', error);
+      
+      // Remove loading node on error
+      setDynamicNodes(prev => prev.filter(node => node.id !== `group-analysis-loading-${groupId}`));
+      
       toast({
         title: "Group Analysis Failed",
         description: error instanceof Error ? error.message : "Failed to analyze group",
         category: "error",
       });
     }
-  }, [uploadedImages, imageGroups, groupAnalysisProgress, toast]);
+  }, [uploadedImages, imageGroups, groupAnalysisProgress, toast, onEditGroupPrompt, onCreateFork, onOpenAnalysisPanel]);
 
   const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
     const image = (uploadedImages || []).find(img => img.id === imageId);
@@ -899,7 +936,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           onUngroup,
           onDeleteGroup,
           onEdit: onEditGroup,
-          onAnalyzeGroup,
+          onAnalyzeGroup: (groupId: string) => {
+            const group = imageGroups?.find(g => g.id === groupId);
+            if (group) {
+              handleGroupAnalysis(group.imageIds);
+            }
+          },
           onDisplayModeChange: onGroupDisplayModeChange,
         },
       };
@@ -1324,6 +1366,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           data: {
             group,
             onSubmitPrompt: onSubmitGroupPrompt,
+            onAnalyzeGroup: (groupId: string) => {
+              const group = imageGroups?.find(g => g.id === groupId);
+              if (group) {
+                handleGroupAnalysis(group.imageIds);
+              }
+            },
             isLoading: false,
           },
         };
@@ -1358,6 +1406,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             data: {
               group,
               onSubmitPrompt: onSubmitGroupPrompt,
+              onAnalyzeGroup: (groupId: string) => {
+                const group = imageGroups?.find(g => g.id === groupId);
+                if (group) {
+                  handleGroupAnalysis(group.imageIds);
+                }
+              },
               isLoading: false,
             },
           };
@@ -1385,6 +1439,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             data: {
               group,
               onSubmitPrompt: onSubmitGroupPrompt,
+              onAnalyzeGroup: (groupId: string) => {
+                const group = imageGroups?.find(g => g.id === groupId);
+                if (group) {
+                  handleGroupAnalysis(group.imageIds);
+                }
+              },
               isLoading: true,
             },
           };
@@ -1527,6 +1587,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       edges.push(requestEdge);
     });
 
+    // Add dynamic nodes (loading/results nodes from group analysis)
+    nodes.push(...dynamicNodes);
+    edges.push(...dynamicEdges);
 
     return { nodes, edges };
   }, [
@@ -1543,7 +1606,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     analysisRequests.size,
     currentTool, 
     isGeneratingConcept,
-    analysisRequests
+    dynamicNodes,
+    dynamicEdges
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
