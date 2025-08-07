@@ -918,23 +918,23 @@ serve(async (req) => {
           console.log('🧠 Processing MEMORY_OPTIMIZED_CHUNK request')
           return await handleMemoryOptimizedChunk(body)
         
+        // DEPRECATED: Old group analysis handlers have been removed
+        // Group analysis is now handled by the dedicated group-ux-analysis edge function
         case 'ANALYZE_GROUP':
-          // Handle group analysis - redirect to enhanced version
-          console.log('👥 Processing ANALYZE_GROUP request (redirecting to enhanced)')
-          const { handleEnhancedGroupAnalysis: handleGroupAnalysisEnhanced } = await import('./enhanced-group-handlers.ts')
-          return await handleGroupAnalysisEnhanced(body)
-        
         case 'ENHANCED_GROUP_ANALYSIS':
-          // Handle enhanced multi-image group analysis
-          console.log('👥 Processing ENHANCED_GROUP_ANALYSIS request')
-          const { handleEnhancedGroupAnalysis } = await import('./enhanced-group-handlers.ts')
-          return await handleEnhancedGroupAnalysis(body)
-        
         case 'CROSS_IMAGE_ANALYSIS':
-          // Handle cross-image pattern analysis
-          console.log('🔍 Processing CROSS_IMAGE_ANALYSIS request')
-          const { handleCrossImageAnalysis } = await import('./enhanced-group-handlers.ts')
-          return await handleCrossImageAnalysis(body)
+          console.log(`⚠️ DEPRECATED: ${actionType} - Use group-ux-analysis edge function instead`)
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `${actionType} has been moved to group-ux-analysis edge function`,
+              deprecated: true 
+            }),
+            { 
+              status: 410, // Gone
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
         
         case 'GENERATE_CONCEPT':
           // Handle concept generation
