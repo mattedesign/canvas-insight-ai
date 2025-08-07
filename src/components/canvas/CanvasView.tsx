@@ -1511,7 +1511,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
                 handleGroupAnalysis(group.imageIds);
               }
             },
-            isLoading: false,
+            isLoading: activeGroupAnalyses.has(group.id),
           },
         };
         nodes.push(promptCollectionNode);

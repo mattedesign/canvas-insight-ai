@@ -27,7 +27,10 @@ interface GroupAnalysisResultsNodeData {
 }
 
 export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
-  const { analysis, groupName, onEditPrompt, onCreateFork, onViewDetails } = data as unknown as GroupAnalysisResultsNodeData;
+  const anyData = data as any;
+  const analysis = anyData?.analysis ?? anyData?.analysisResults;
+  const groupName = anyData?.groupName;
+  const { onEditPrompt, onCreateFork, onViewDetails } = anyData;
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const getScoreColor = (score: number) => {
@@ -57,7 +60,7 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Badge variant="outline">{groupName}</Badge>
             <span>•</span>
-            <span>{new Date(analysis.createdAt).toLocaleDateString()}</span>
+            <span>{analysis?.createdAt ? new Date(analysis.createdAt).toLocaleDateString() : 'Recent'}</span>
           </div>
         </CardHeader>
 
