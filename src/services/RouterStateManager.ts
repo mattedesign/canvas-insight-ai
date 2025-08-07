@@ -64,6 +64,7 @@ export class RouterStateManager {
     failedNavigations: 0,
     guardsTriggered: 0
   };
+  private subscribers: Set<() => void> = new Set();
 
   private constructor() {
     this.state = {
@@ -317,6 +318,30 @@ export class RouterStateManager {
   }
 
   /**
+   * Apply external navigation changes (e.g., browser back/forward, Link clicks)
+   */
+  applyExternalNavigation(path: string, params: Record<string, string> = {}): void {
+    if (this.state.currentRoute === path) {
+      // Already in sync; update params if changed
+      if (JSON.stringify(this.state.routeParams) !== JSON.stringify(params)) {
+        this.updateState({ routeParams: params });
+      }
+      return;
+    }
+
+    const previousRoute = this.state.currentRoute;
+    this.updateState({
+      previousRoute,
+      currentRoute: path,
+      routeParams: params,
+      pendingNavigation: null
+    });
+
+    // Record in history with zero-duration as it already happened externally
+    this.addToHistory(path, params, Date.now());
+  }
+
+  /**
    * ✅ PHASE 4.1: Clear navigation history
    */
   clearHistory(): void {
@@ -335,6 +360,27 @@ export class RouterStateManager {
    */
   private updateState(updates: Partial<NavigationState>): void {
     this.state = { ...this.state, ...updates };
+    this.notifySubscribers();
+  }
+
+  /**
+   * Subscribe to state changes
+   */
+  subscribe(listener: () => void): () => void {
+    this.subscribers.add(listener);
+    return () => {
+      this.subscribers.delete(listener);
+    };
+  }
+
+  private notifySubscribers() {
+    for (const listener of this.subscribers) {
+      try {
+        listener();
+      } catch (err) {
+        console.error('[RouterStateManager] Subscriber error:', err);
+      }
+    }
   }
 
   /**
@@ -459,14 +505,18 @@ export function useRouterStateManager() {
     router.initialize(location.pathname, params);
   }, []);
 
-  // Update state when router state changes
+  // Subscribe to router state changes
   useEffect(() => {
-    const interval = setInterval(() => {
+    const unsubscribe = router.subscribe(() => {
       setState(router.getState());
-    }, 100);
-
-    return () => clearInterval(interval);
+    });
+    return unsubscribe;
   }, [router]);
+
+  // Sync router state when React Router location changes
+  useEffect(() => {
+    router.applyExternalNavigation(location.pathname, params as any);
+  }, [location.pathname, params, router]);
 
   // Enhanced navigate function
   const enhancedNavigate = useCallback(async (

@@ -70,7 +70,14 @@ export const useDashboardMetrics = (projectId?: string | null, aggregatedView = 
   }, [loadMetrics]);
 
   useEffect(() => {
-    loadMetrics();
+    let canceled = false;
+    const run = () => { if (!canceled) loadMetrics(); };
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      (window as any).requestIdleCallback(run, { timeout: 2000 });
+    } else {
+      setTimeout(run, 0);
+    }
+    return () => { canceled = true; };
   }, [loadMetrics]);
 
   // Listen for project changes

@@ -55,11 +55,19 @@ export interface DashboardMetrics {
 }
 
 export class DashboardService {
+  private static cache = new Map<string, { data: DashboardMetrics | null; ts: number }>();
+  private static readonly CACHE_TTL = 60_000; // 60s
   /**
    * Get comprehensive dashboard metrics for a project with trend analysis
    */
   static async getDashboardMetrics(projectId: string): Promise<DashboardMetrics | null> {
     try {
+      // Serve from cache when fresh
+      const cached = this.cache.get(projectId);
+      if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
+        return cached.data;
+      }
+
       // First get image IDs for this project
       const { data: projectImages } = await supabase
         .from('images')
@@ -69,13 +77,15 @@ export class DashboardService {
       const imageIds = projectImages?.map(img => img.id) || [];
       
       if (imageIds.length === 0) {
-        return this.getEmptyMetrics();
+        const empty = this.getEmptyMetrics();
+        this.cache.set(projectId, { data: empty, ts: Date.now() });
+        return empty;
       }
       
       // Get all analyses for these images
       const { data: analyses, error: analysesError } = await supabase
         .from('ux_analyses')
-        .select('*')
+        .select('image_id, suggestions, summary, created_at, status, metadata')
         .in('image_id', imageIds);
 
       if (analysesError) {
@@ -174,7 +184,7 @@ export class DashboardService {
       // Get analysis quality metrics
       const analysisQuality = await this.getAnalysisQuality(projectId);
 
-      return {
+      const result: DashboardMetrics = {
         totalAnalyses,
         totalImages,
         averageScore,
@@ -188,6 +198,9 @@ export class DashboardService {
         trends,
         analysisQuality
       };
+
+      this.cache.set(projectId, { data: result, ts: Date.now() });
+      return result;
 
     } catch (error) {
       console.error('Error calculating dashboard metrics:', error);
