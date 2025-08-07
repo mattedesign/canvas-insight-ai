@@ -54,7 +54,7 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   // Use virtualized view for large datasets
   if (shouldVirtualize) {
     return (
-      <div className="performant-canvas-virtualized enhanced-canvas-container dot-grid">
+      <div className="performant-canvas-virtualized enhanced-canvas-container dot-grid w-full h-full">
         <VirtualizedCanvasContainer
           uploadedImages={uploadedImages}
           analyses={analyses}
@@ -70,7 +70,7 @@ export const PerformantCanvasView: React.FC<CanvasViewProps> = (props) => {
   
   // Use standard ReactFlow for smaller datasets (preserves all features)
   return (
-    <div className="performant-canvas-standard enhanced-canvas-container dot-grid">
+    <div className="performant-canvas-standard enhanced-canvas-container dot-grid w-full h-full">
       <CanvasView {...restProps} uploadedImages={uploadedImages} imageGroups={imageGroups} analyses={analyses} />
     </div>
   );

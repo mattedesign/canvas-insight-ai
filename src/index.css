@@ -369,7 +369,7 @@ All colors MUST be HSL.
   position: absolute;
   inset: 0;
   --size: 45px;
-  --line: hsl(var(--muted-foreground) / 0.22);
+  --line: hsl(var(--muted-foreground) / 0.28);
   background:
     linear-gradient(90deg, var(--line) 1px, transparent 1px var(--size)) calc(var(--size) * 0.36) 50% / var(--size) var(--size),
     linear-gradient(var(--line) 1px, transparent 1px var(--size)) 0% calc(var(--size) * 0.32) / var(--size) var(--size);
@@ -382,4 +382,9 @@ All colors MUST be HSL.
 .dot-grid > * {
   position: relative;
   z-index: 1;
+}
+
+/* Ensure React Flow is transparent when inside a dot-grid container */
+.dot-grid .react-flow {
+  background-color: transparent !important;
 }

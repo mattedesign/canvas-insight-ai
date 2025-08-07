@@ -490,7 +490,7 @@ const SimplifiedCanvas = () => {
           projectName={currentProjectName}
         />
         
-        <div className="flex-1 relative w-full h-full">
+        <div className="flex-1 relative w-full h-full dot-grid">
           <PerformantCanvasViewWithErrorBoundary
             uploadedImages={Array.isArray(uploadedImages) ? uploadedImages : []}
             analyses={Array.isArray(analyses) ? analyses : []}
