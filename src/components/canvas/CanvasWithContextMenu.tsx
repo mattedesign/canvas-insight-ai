@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
+import { ReactFlow, Background, BackgroundVariant, Controls, MiniMap } from '@xyflow/react';
 import { useCanvasContextMenu, CanvasItem, CanvasContextMenuHandlers } from '@/hooks/useCanvasContextMenu';
 import { EnhancedCanvasNode } from './EnhancedCanvasNode';
 import { toast } from 'sonner';
@@ -153,7 +153,12 @@ export const CanvasWithContextMenu: React.FC = () => {
         fitView
         className="bg-background"
       >
-        <Background />
+        <Background 
+          variant={BackgroundVariant.Dots}
+          color="hsl(var(--muted-foreground) / 0.2)"
+          size={1}
+          gap={20}
+        />
         <Controls />
         <MiniMap />
       </ReactFlow>

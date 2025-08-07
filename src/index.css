@@ -357,3 +357,11 @@ All colors MUST be HSL.
     stroke-dashoffset: -10;
   }
 }
+
+/* Subtle dot grid background for canvas pages */
+.dot-grid {
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
