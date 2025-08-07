@@ -89,7 +89,7 @@ export interface CanvasViewProps {
   onEditGroup?: (groupId: string) => void;
   onAnalyzeGroup?: (groupId: string, imageIds?: string[]) => void;
   onGroupDisplayModeChange?: (groupId: string, mode: 'standard' | 'stacked') => void;
-  onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean) => Promise<void>;
+  onSubmitGroupPrompt?: (groupId: string, prompt: string, isCustom: boolean, existingResult?: any) => Promise<void>;
   onEditGroupPrompt?: (sessionId: string) => void;
   onCreateFork?: (sessionId: string) => void;
   onOpenAnalysisPanel?: (analysisId: string) => void;
@@ -295,15 +295,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         ? { x: promptNode.position.x + 400, y: promptNode.position.y }
         : { x: 500, y: 200 };
 
-      // Start progress tracking with actual image URLs
-      const progressData = await groupAnalysisProgress.analyzeGroup(
+      // Kick off analysis (this synchronously registers progress tracking)
+      const analysisPromise = groupAnalysisProgress.analyzeGroup(
         groupId,
         group.name,
-        imageUrls, // Pass the actual image URLs
+        imageUrls,
         { groupId, prompt, isCustom }
       );
 
-      // Get loading node from progress service
+      // Immediately show loading node and connection
       const loadingNode = groupAnalysisProgress.getLoadingNode(
         groupId,
         loadingPosition,
@@ -319,8 +319,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
       if (loadingNode) {
         setDynamicNodes(prev => [...prev, loadingNode]);
-        
-        // Create edge from prompt node to loading node
         const connectionEdge: Edge = {
           id: `prompt-to-loading-${groupId}`,
           source: promptNodeId,
@@ -332,16 +330,19 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setDynamicEdges(prev => [...prev, connectionEdge]);
       }
 
-      // Call the original handler
+      // Await result
+      const progressResult = await analysisPromise;
+
+      // Persist using existing handler without re-triggering analysis
       if (onSubmitGroupPrompt) {
-        await onSubmitGroupPrompt(groupId, prompt, isCustom);
+        await onSubmitGroupPrompt(groupId, prompt, isCustom, progressResult);
       }
 
-      // On completion, replace loading node with results node
-      if (progressData) {
+      // Replace loading node with results node
+      if (progressResult) {
         const resultsNode = groupAnalysisProgress.getResultsNode(
           groupId,
-          progressData,
+          progressResult,
           loadingPosition,
           {
             onEditPrompt: onEditGroupPrompt,
@@ -350,11 +351,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           }
         );
 
-        // Remove loading node and add results node
         setDynamicNodes(prev => prev.filter(n => n.id !== `group-analysis-loading-${groupId}`));
         setDynamicNodes(prev => [...prev, resultsNode]);
-        
-        // Update edge to connect to results node
+
         setDynamicEdges(prev => prev.map(edge => 
           edge.id === `prompt-to-loading-${groupId}`
             ? { ...edge, target: resultsNode.id, animated: false }

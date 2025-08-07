@@ -185,24 +185,28 @@ export class GroupAnalysisProgressService {
     const progressData = this.progressData.get(groupId);
     
     // Standardize the analysis results format for consistent display
+    const source = (analysisResults && (analysisResults.groupAnalysis || analysisResults.analysis))
+      ? (analysisResults.groupAnalysis || analysisResults.analysis)
+      : analysisResults;
+
     const standardizedResults = {
-      id: analysisResults?.id || `group_${groupId}_${Date.now()}`,
-      sessionId: analysisResults?.sessionId || `session_${groupId}`,
+      id: source?.id || `group_${groupId}_${Date.now()}`,
+      sessionId: source?.sessionId || `session_${groupId}`,
       summary: {
-        overallScore: analysisResults?.summary?.overallScore || 0,
-        consistency: analysisResults?.summary?.consistency || 0,
-        thematicCoherence: analysisResults?.summary?.thematicCoherence || 0,
-        userFlowContinuity: analysisResults?.summary?.userFlowContinuity || 0
+        overallScore: source?.summary?.overallScore || 0,
+        consistency: source?.summary?.consistency || 0,
+        thematicCoherence: source?.summary?.thematicCoherence || 0,
+        userFlowContinuity: source?.summary?.userFlowContinuity || 0
       },
-      insights: analysisResults?.insights || [],
-      recommendations: analysisResults?.recommendations || [],
+      insights: source?.insights || [],
+      recommendations: source?.recommendations || [],
       patterns: {
-        commonElements: analysisResults?.patterns?.commonElements || [],
-        designInconsistencies: analysisResults?.patterns?.designInconsistencies || [],
-        userJourneyGaps: analysisResults?.patterns?.userJourneyGaps || []
+        commonElements: source?.patterns?.commonElements || [],
+        designInconsistencies: source?.patterns?.designInconsistencies || [],
+        userJourneyGaps: source?.patterns?.userJourneyGaps || []
       },
-      analysis: analysisResults?.analysis || {},
-      createdAt: analysisResults?.createdAt || new Date()
+      analysis: source?.analysis || {},
+      createdAt: source?.createdAt || new Date()
     };
     
     return {

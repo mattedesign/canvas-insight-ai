@@ -312,7 +312,7 @@ const Canvas = () => {
     console.log('Change group display mode:', groupId, mode);
   }, []);
 
-  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean, existingResult?: any) => {
     console.log('Submit group prompt:', groupId, prompt, isCustom);
     
     try {
@@ -339,61 +339,73 @@ const Canvas = () => {
 
       const imageUrls = groupImages.map(img => img.url);
 
-      // Perform the group analysis
-      const response = await analysisService.analyzeGroup({
-        imageUrls,
-        groupId,
-        prompt,
-        isCustom
-      });
+      let analysisData: any | null = null;
 
-      if (!response.success) {
-        throw new Error(response.error || 'Group analysis failed');
-      }
-
-      if (response.analysis) {
-        // Extract the expected data structure from the response
-        const analysisData = response.analysis as any;
-        
-        // Create group analysis object with the expected structure
-        const groupAnalysis = {
-          id: crypto.randomUUID(),
-          sessionId: crypto.randomUUID(),
+      if (existingResult) {
+        // Use provided result (from progress flow) to avoid duplicate API call
+        const data = existingResult;
+        if (!data.success) {
+          throw new Error(data.error || 'Group analysis failed');
+        }
+        analysisData = data.groupAnalysis || data.analysis || null;
+      } else {
+        // Perform the group analysis
+        const response = await analysisService.analyzeGroup({
+          imageUrls,
           groupId,
           prompt,
-          isCustom,
-          summary: {
-            overallScore: analysisData.summary?.overallScore || 0,
-            consistency: analysisData.summary?.consistency || 0,
-            thematicCoherence: analysisData.summary?.thematicCoherence || 0,
-            userFlowContinuity: analysisData.summary?.userFlowContinuity || 0
-          },
-          insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
-          recommendations: Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [],
-          patterns: {
-            commonElements: analysisData.patterns?.commonElements || [],
-            designInconsistencies: analysisData.patterns?.designInconsistencies || [],
-            userJourneyGaps: analysisData.patterns?.userJourneyGaps || []
-          },
-          analysis: analysisData.analysis,
-          createdAt: new Date()
-        };
-
-        // Store in database
-        await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(groupAnalysis);
-
-        // Update app state
-        dispatch({
-          type: 'ADD_GROUP_ANALYSIS',
-          payload: groupAnalysis
+          isCustom
         });
 
-        toast({
-          category: 'success',
-          title: "Group Analysis Complete",
-          description: "Analysis results have been generated and saved.",
-        });
+        if (!response.success) {
+          throw new Error(response.error || 'Group analysis failed');
+        }
+
+        analysisData = (response as any).analysis || null;
       }
+
+      if (!analysisData) {
+        throw new Error('No analysis data returned');
+      }
+
+      // Create group analysis object with the expected structure
+      const groupAnalysis = {
+        id: crypto.randomUUID(),
+        sessionId: crypto.randomUUID(),
+        groupId,
+        prompt,
+        isCustom,
+        summary: {
+          overallScore: analysisData.summary?.overallScore || 0,
+          consistency: analysisData.summary?.consistency || 0,
+          thematicCoherence: analysisData.summary?.thematicCoherence || 0,
+          userFlowContinuity: analysisData.summary?.userFlowContinuity || 0
+        },
+        insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
+        recommendations: Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [],
+        patterns: {
+          commonElements: analysisData.patterns?.commonElements || [],
+          designInconsistencies: analysisData.patterns?.designInconsistencies || [],
+          userJourneyGaps: analysisData.patterns?.userJourneyGaps || []
+        },
+        analysis: analysisData.analysis,
+        createdAt: new Date()
+      };
+
+      // Store in database
+      await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(groupAnalysis);
+
+      // Update app state
+      dispatch({
+        type: 'ADD_GROUP_ANALYSIS',
+        payload: groupAnalysis
+      });
+
+      toast({
+        category: 'success',
+        title: "Group Analysis Complete",
+        description: "Analysis results have been generated and saved.",
+      });
 
     } catch (error) {
       console.error('Group analysis error:', error);
