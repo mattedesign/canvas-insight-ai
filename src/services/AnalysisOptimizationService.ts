@@ -261,16 +261,37 @@ export class PerformanceOptimizer {
    * Optimize image loading for analysis
    */
   static optimizeImageForAnalysis(imageUrl: string): string {
-    // Add optimization parameters for faster loading
-    const url = new URL(imageUrl);
-    
-    // For Supabase storage URLs, add transformation parameters
-    if (url.hostname.includes('supabase')) {
-      url.searchParams.set('width', '1024'); // Limit width for analysis
-      url.searchParams.set('quality', '85'); // Reduce quality slightly for speed
+    if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
+      console.error('Invalid imageUrl provided to optimizeImageForAnalysis:', imageUrl);
+      return imageUrl; // Return as-is to prevent total failure
     }
-    
-    return url.toString();
+
+    try {
+      // Add optimization parameters for faster loading
+      const url = new URL(imageUrl);
+      
+      // For Supabase storage URLs, add transformation parameters
+      if (url.hostname.includes('supabase')) {
+        url.searchParams.set('width', '1024'); // Limit width for analysis
+        url.searchParams.set('quality', '85'); // Reduce quality slightly for speed
+      }
+      
+      const optimizedUrl = url.toString();
+      console.log('Image URL optimization:', {
+        original: imageUrl.substring(0, 100) + '...',
+        optimized: optimizedUrl.substring(0, 100) + '...',
+        isValid: !!optimizedUrl
+      });
+      
+      return optimizedUrl;
+    } catch (error) {
+      console.error('Failed to optimize image URL:', {
+        error: error.message,
+        originalUrl: imageUrl.substring(0, 100) + '...'
+      });
+      // Return original URL if optimization fails
+      return imageUrl;
+    }
   }
 
   /**

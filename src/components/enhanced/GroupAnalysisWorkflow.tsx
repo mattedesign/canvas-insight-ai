@@ -152,21 +152,39 @@ export const GroupAnalysisWorkflow: React.FC<GroupAnalysisWorkflowProps> = ({
       return;
     }
 
-    // Validate image URLs
+    // Validate image URLs with detailed logging
+    console.log('GroupAnalysisWorkflow - Raw images received:', {
+      totalImages: images.length,
+      imagesStructure: images.map(img => ({
+        id: img.id,
+        hasUrl: !!img.url,
+        urlType: typeof img.url,
+        urlLength: img.url?.length || 0,
+        urlPreview: img.url ? `${img.url.substring(0, 50)}...` : 'MISSING_URL',
+        fullStructure: Object.keys(img)
+      }))
+    });
+
     const imageUrls = images
-      .filter(img => img?.url && typeof img.url === 'string' && img.url.trim() !== '')
+      .filter(img => {
+        const isValid = img?.url && typeof img.url === 'string' && img.url.trim() !== '';
+        if (!isValid) {
+          console.warn('Invalid image found:', {
+            id: img.id,
+            url: img.url,
+            urlType: typeof img.url,
+            hasUrl: !!img.url
+          });
+        }
+        return isValid;
+      })
       .map(img => img.url);
 
-    console.log('GroupAnalysisWorkflow - Image validation:', {
+    console.log('GroupAnalysisWorkflow - Image validation results:', {
       totalImages: images.length,
       validUrls: imageUrls.length,
       sampleUrls: imageUrls.slice(0, 3).map(url => url.substring(0, 50) + '...'),
-      allImages: images.map(img => ({
-        id: img.id,
-        hasUrl: !!img.url,
-        urlLength: img.url?.length || 0,
-        urlStart: img.url?.substring(0, 30) || 'NO_URL'
-      }))
+      firstFullUrl: imageUrls[0] || 'NO_VALID_URLS'
     });
 
     if (imageUrls.length === 0) {
