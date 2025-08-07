@@ -358,7 +358,7 @@ export class OptimizedGroupAnalysisMigrationService extends GroupAnalysisMigrati
   }
 
   static async getGroupAnalysisCount(projectId: string): Promise<number> {
-    // First get all group IDs for the project
+    // First get all group IDs for the project to satisfy RLS
     const { data: groups } = await supabase
       .from('image_groups')
       .select('id')
@@ -368,12 +368,16 @@ export class OptimizedGroupAnalysisMigrationService extends GroupAnalysisMigrati
 
     const groupIds = groups.map(group => group.id);
     
+    // Now count analyses using the group IDs - this satisfies RLS
     const { count, error } = await supabase
       .from('group_analyses')
-      .select('id', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .in('group_id', groupIds);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error counting group analyses:', error);
+      return 0;
+    }
     return count || 0;
   }
 }
