@@ -271,6 +271,23 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         throw new Error('Group not found');
       }
 
+      // Get image URLs from the group's images
+      const groupImages = uploadedImages.filter(img => group.imageIds.includes(img.id));
+      const imageUrls = groupImages
+        .filter(img => img.url && typeof img.url === 'string' && img.url.trim() !== '')
+        .map(img => img.url);
+
+      console.log('[CanvasView] Group analysis - found images:', {
+        groupId,
+        totalImages: group.imageIds.length,
+        validUrls: imageUrls.length,
+        firstUrl: imageUrls[0]?.substring(0, 50) + '...'
+      });
+
+      if (imageUrls.length === 0) {
+        throw new Error('No valid image URLs found in group');
+      }
+
       // Create loading node positioned to the right of prompt collection node
       const promptNodeId = `group-prompt-collection-${groupId}`;
       const promptNode = nodes.find(n => n.id === promptNodeId);
@@ -278,11 +295,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         ? { x: promptNode.position.x + 400, y: promptNode.position.y }
         : { x: 500, y: 200 };
 
-      // Start progress tracking
+      // Start progress tracking with actual image URLs
       const progressData = await groupAnalysisProgress.analyzeGroup(
         groupId,
         group.name,
-        [], // Image URLs will be handled by the service
+        imageUrls, // Pass the actual image URLs
         { groupId, prompt, isCustom }
       );
 

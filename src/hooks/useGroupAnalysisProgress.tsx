@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { useOptimizedAnalysis } from './useOptimizedAnalysis';
+import { useSimpleGroupAnalysis } from './useSimpleGroupAnalysis';
 import { groupAnalysisProgressService, GroupAnalysisProgressData } from '@/services/GroupAnalysisProgressService';
 import { Node } from '@xyflow/react';
 
@@ -30,7 +30,7 @@ export interface GroupAnalysisHookReturn {
 }
 
 export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
-  const { analyzeGroup: baseAnalyzeGroup } = useOptimizedAnalysis();
+  const { analyzeGroup: baseAnalyzeGroup } = useSimpleGroupAnalysis();
   const [activeAnalyses, setActiveAnalyses] = useState<Set<string>>(new Set());
   const progressCallbacksRef = useRef<Map<string, (data: GroupAnalysisProgressData) => void>>(new Map());
 
@@ -66,8 +66,14 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
         }
       );
 
-      // Execute the analysis with progress updates
-      const result = await baseAnalyzeGroup(imageUrls, payload, onProgressUpdate);
+      // Execute the analysis with the simplified approach
+      const result = await baseAnalyzeGroup(
+        imageUrls, 
+        payload.prompt || 'Analyze this group of interfaces',
+        'Group UX analysis',
+        payload.groupId || groupId,
+        groupName
+      );
 
       // Mark as completed
       groupAnalysisProgressService.completeGroupAnalysis(groupId, result);
