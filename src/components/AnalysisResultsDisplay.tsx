@@ -8,6 +8,7 @@ import { ScreenTypeDetectionDisplay } from './ScreenTypeDetectionDisplay';
 import { AnalysisContextDisplay } from './AnalysisContextDisplay';
 import { NaturalAnalysisDisplay } from './NaturalAnalysisDisplay';
 import { StrategicInsightsPanel } from './StrategicInsightsPanel';
+import { VisualSuggestionsPanel } from './VisualSuggestionsPanel';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { AnalysisContext } from '@/types/contextTypes';
 
@@ -17,6 +18,10 @@ interface AnalysisResultsDisplayProps {
   isOpen?: boolean;
   onClose?: () => void;
   analysisContext?: AnalysisContext;
+  visualSuggestions?: any[];
+  generatedImages?: any[];
+  onGenerateMockup?: (suggestion: any) => Promise<void>;
+  onRegenerateImage?: (imageId: string) => Promise<void>;
 }
 
 export function AnalysisResultsDisplay({
@@ -24,7 +29,11 @@ export function AnalysisResultsDisplay({
   image,
   isOpen = true,
   onClose = () => {},
-  analysisContext
+  analysisContext,
+  visualSuggestions = [],
+  generatedImages = [],
+  onGenerateMockup,
+  onRegenerateImage
 }: AnalysisResultsDisplayProps) {
   
   // Only render if we have valid analysis data
@@ -56,6 +65,16 @@ export function AnalysisResultsDisplay({
       {/* Strategic Business Insights */}
       {strategicInsights && (
         <StrategicInsightsPanel insights={strategicInsights} />
+      )}
+      
+      {/* Visual Suggestions Panel */}
+      {(visualSuggestions.length > 0 || generatedImages.length > 0) && (
+        <VisualSuggestionsPanel
+          suggestions={visualSuggestions}
+          generatedImages={generatedImages}
+          onGenerateMockup={onGenerateMockup}
+          onRegenerateImage={onRegenerateImage}
+        />
       )}
       
       {/* Natural Analysis Display (for new pipeline) */}

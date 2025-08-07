@@ -74,5 +74,47 @@ export const MODEL_REGISTRY = {
       realTimeData: true,
       conversationalFlow: true
     }
+  },
+  'stable-diffusion-xl': {
+    name: 'Stable Diffusion XL',
+    category: 'visual-generation',
+    capabilities: ['image-generation', 'style-transfer', 'concept-visualization'],
+    provider: 'stability',
+    costPerRequest: 0.004,
+    contextWindow: 77,
+    features: {
+      imageGeneration: true,
+      styleTransfer: true,
+      highResolution: true,
+      fastGeneration: false
+    }
+  },
+  'stable-diffusion-3': {
+    name: 'Stable Diffusion 3',
+    category: 'visual-generation',
+    capabilities: ['image-generation', 'text-to-image', 'concept-visualization', 'inpainting'],
+    provider: 'stability',
+    costPerRequest: 0.006,
+    contextWindow: 77,
+    features: {
+      imageGeneration: true,
+      textToImage: true,
+      inpainting: true,
+      maskEditing: true,
+      highQuality: true
+    }
+  },
+  'stable-video-diffusion': {
+    name: 'Stable Video Diffusion',
+    category: 'visual-generation',
+    capabilities: ['video-generation', 'motion-synthesis', 'animation'],
+    provider: 'stability',
+    costPerRequest: 0.12,
+    contextWindow: 25,
+    features: {
+      videoGeneration: true,
+      motionSynthesis: true,
+      shortClips: true
+    }
   }
 };

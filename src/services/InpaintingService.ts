@@ -5,99 +5,118 @@ export interface ImageMask {
   y: number;
   width: number;
   height: number;
-  toBase64(): string;
+  toBase64(): Promise<string>;
 }
 
 export interface UXSuggestion {
-  id: string;
-  title: string;
-  description: string;
-  inpaintingPrompt: string;
-  maskArea: ImageMask;
+  prompt: string;
+  masks: ImageMask[];
 }
 
 export class InpaintingService {
-  private readonly STABILITY_API_KEY = import.meta.env.VITE_STABILITY_API_KEY;
-  
-  async generateInpaintingSuggestion(
+  private static readonly CACHE_TTL = 1000 * 60 * 60; // 1 hour
+  private static cache = new Map<string, { url: string; timestamp: number }>();
+
+  /**
+   * Generates an inpainted image using the inpainting-service edge function
+   */
+  static async generateInpaintingSuggestion(
     imageUrl: string,
     mask: ImageMask,
     suggestion: UXSuggestion
   ): Promise<string> {
-    if (!this.STABILITY_API_KEY) {
-      throw new Error('Stability API key not configured');
-    }
-
     try {
-      // Convert image URL to base64
-      const imageResponse = await fetch(imageUrl);
-      const imageBlob = await imageResponse.blob();
-      const imageBase64 = await this.blobToBase64(imageBlob);
-
-      // Call Stability AI inpainting API
-      const response = await fetch(
-        'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image/masking',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.STABILITY_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            init_image: imageBase64,
-            mask_image: mask.toBase64(),
-            text_prompts: [{
-              text: suggestion.inpaintingPrompt,
-              weight: 1
-            }],
-            cfg_scale: 7,
-            samples: 1,
-            steps: 30
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Stability API error: ${response.statusText}`);
+      // Check cache first
+      const cacheKey = `${imageUrl}-${mask.x}-${mask.y}-${suggestion.prompt}`;
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.url;
       }
 
-      const data = await response.json();
-      
-      // Upload to Supabase storage
-      const inpaintedImage = data.artifacts[0].base64;
-      const fileName = `inpainted_${suggestion.id}_${Date.now()}.png`;
-      
-      const { data: uploadData, error } = await supabase.storage
-        .from('analysis-results')
-        .upload(fileName, this.base64ToBlob(inpaintedImage), {
-          contentType: 'image/png'
-        });
+      // Convert mask to base64
+      const maskBase64 = await mask.toBase64();
 
-      if (error) throw error;
+      // Use the inpainting-service edge function
+      const { data, error } = await supabase.functions.invoke('inpainting-service', {
+        body: {
+          imageUrl,
+          maskData: maskBase64,
+          prompt: suggestion.prompt,
+          userId: (await supabase.auth.getUser()).data.user?.id
+        }
+      });
 
-      // Return public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('analysis-results')
-        .getPublicUrl(fileName);
+      if (error) {
+        throw new Error(`Inpainting service error: ${error.message}`);
+      }
 
-      return publicUrl;
+      const resultUrl = data.imageUrl;
+
+      // Cache the result
+      this.cache.set(cacheKey, { url: resultUrl, timestamp: Date.now() });
+
+      return resultUrl;
     } catch (error) {
-      console.error('Inpainting generation failed:', error);
+      console.error('Error generating inpainting suggestion:', error);
       throw error;
     }
   }
 
-  private async blobToBase64(blob: Blob): Promise<string> {
+  /**
+   * Generates multiple inpainting variations
+   */
+  static async generateInpaintingVariations(
+    imageUrl: string,
+    mask: ImageMask,
+    basePrompt: string,
+    variations: string[] = ['modern', 'minimalist', 'colorful']
+  ): Promise<Array<{ variation: string; imageUrl: string }>> {
+    const results = await Promise.allSettled(
+      variations.map(async (variation) => {
+        const suggestion: UXSuggestion = {
+          prompt: `${basePrompt}, ${variation} style`,
+          masks: [mask]
+        };
+        const resultUrl = await this.generateInpaintingSuggestion(imageUrl, mask, suggestion);
+        return { variation, imageUrl: resultUrl };
+      })
+    );
+
+    return results
+      .filter((result): result is PromiseFulfilledResult<{ variation: string; imageUrl: string }> => 
+        result.status === 'fulfilled'
+      )
+      .map(result => result.value);
+  }
+
+  /**
+   * Clears the inpainting cache
+   */
+  static clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Gets cache statistics
+   */
+  static getCacheStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+
+  private static async blobToBase64(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
   }
 
-  private base64ToBlob(base64: string): Blob {
-    const byteString = atob(base64);
+  private static base64ToBlob(base64: string): Blob {
+    const byteString = atob(base64.split(',')[1]);
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
     
