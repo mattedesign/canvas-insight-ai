@@ -75,6 +75,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const showAnalyticsTab = false;
   
   // Add this ref after state declarations
   const projectsLoadedRef = useRef(false);
@@ -283,9 +284,9 @@ const Dashboard = () => {
 
             {/* Tabbed Content */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className={`grid w-full ${showAnalyticsTab ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="insights">Analytics</TabsTrigger>
+                {showAnalyticsTab && (<TabsTrigger value="insights">Analytics</TabsTrigger>)}
               </TabsList>
               
               <TabsContent value="overview" className="space-y-6">
@@ -350,16 +351,18 @@ const Dashboard = () => {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="insights" className="space-y-6">
-                <SummaryDashboard 
-                  analyses={analyses}
-                  metrics={null}
-                  aggregatedMetrics={aggregatedMetrics}
-                  loading={metricsLoading}
-                  error={metricsError}
-                  onRefresh={refreshMetrics}
-                />
-              </TabsContent>
+              {showAnalyticsTab && (
+                <TabsContent value="insights" className="space-y-6">
+                  <SummaryDashboard 
+                    analyses={analyses}
+                    metrics={null}
+                    aggregatedMetrics={aggregatedMetrics}
+                    loading={metricsLoading}
+                    error={metricsError}
+                    onRefresh={refreshMetrics}
+                  />
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
