@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Plus, BarChart3, Images, Lightbulb, Users, Activity } from 'lucide-react';
 import { ProjectService } from '@/services/DataMigrationService';
 import { CanvasStateService } from '@/services/CanvasStateService';
@@ -74,8 +74,6 @@ const Dashboard = () => {
   const [analyses, setAnalyses] = useState<UXAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('overview');
-  const showAnalyticsTab = false;
   
   // Add this ref after state declarations
   const projectsLoadedRef = useRef(false);
@@ -282,88 +280,68 @@ const Dashboard = () => {
 
 
 
-            {/* Tabbed Content */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className={`grid w-full ${showAnalyticsTab ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                {showAnalyticsTab && (<TabsTrigger value="insights">Analytics</TabsTrigger>)}
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {aggregatedMetrics ? (
-                    <>
-                      <StatsCard
-                        title="Total Projects"
-                        value={aggregatedMetrics.totalProjects}
-                        icon={BarChart3}
-                      />
-                      <StatsCard
-                        title="Total Images"
-                        value={aggregatedMetrics.totalImages}
-                        icon={Images}
-                      />
-                      <StatsCard
-                        title="Total Analyses"
-                        value={aggregatedMetrics.totalAnalyses}
-                        icon={Lightbulb}
-                      />
-                      <StatsCard
-                        title="Active Projects"
-                        value={aggregatedMetrics.activeProjects}
-                        icon={Activity}
-                      />
-                    </>
+            {/* Main Content */}
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {aggregatedMetrics ? (
+                  <>
+                    <StatsCard
+                      title="Total Projects"
+                      value={aggregatedMetrics.totalProjects}
+                      icon={BarChart3}
+                    />
+                    <StatsCard
+                      title="Total Images"
+                      value={aggregatedMetrics.totalImages}
+                      icon={Images}
+                    />
+                    <StatsCard
+                      title="Total Analyses"
+                      value={aggregatedMetrics.totalAnalyses}
+                      icon={Lightbulb}
+                    />
+                    <StatsCard
+                      title="Active Projects"
+                      value={aggregatedMetrics.activeProjects}
+                      icon={Activity}
+                    />
+                  </>
+                ) : (
+                  <div className="col-span-4 text-center py-8">
+                    <p className="text-muted-foreground">No data available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Projects */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Projects</CardTitle>
+                  <CardDescription>Your most recently updated projects</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {stats?.recentProjects.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-4">No projects yet</p>
+                      <Button onClick={handleCreateProject}>
+                        Create Your First Project
+                      </Button>
+                    </div>
                   ) : (
-                    <div className="col-span-4 text-center py-8">
-                      <p className="text-muted-foreground">No data available</p>
+                    <div className="space-y-4">
+                      {stats?.recentProjects.map((project) => (
+                        <RecentProjectItem
+                          key={project.id}
+                          project={project}
+                          onOpen={(projectId) => navigate(`/canvas/${projectId}`)}
+                        />
+                      ))}
                     </div>
                   )}
-                </div>
-
-                {/* Recent Projects */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Projects</CardTitle>
-                    <CardDescription>Your most recently updated projects</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {stats?.recentProjects.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground mb-4">No projects yet</p>
-                        <Button onClick={handleCreateProject}>
-                          Create Your First Project
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {stats?.recentProjects.map((project) => (
-                          <RecentProjectItem
-                            key={project.id}
-                            project={project}
-                            onOpen={(projectId) => navigate(`/canvas/${projectId}`)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {showAnalyticsTab && (
-                <TabsContent value="insights" className="space-y-6">
-                  <SummaryDashboard 
-                    analyses={analyses}
-                    metrics={null}
-                    aggregatedMetrics={aggregatedMetrics}
-                    loading={metricsLoading}
-                    error={metricsError}
-                    onRefresh={refreshMetrics}
-                  />
-                </TabsContent>
-              )}
-            </Tabs>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
