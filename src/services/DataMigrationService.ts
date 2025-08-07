@@ -704,7 +704,6 @@ export class GroupAnalysisMigrationService {
       .insert({
         id: analysis.id,
         group_id: analysis.groupId,
-        user_id: user.id,
         prompt: analysis.prompt,
         is_custom: analysis.prompt !== 'default',
         summary: analysis.summary as any,
