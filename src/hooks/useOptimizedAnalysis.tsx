@@ -175,12 +175,25 @@ export const useOptimizedAnalysis = () => {
         return cached;
       }
 
-      const result = await ProgressiveAnalysisLoader.loadAnalysis(
-        cacheKey,
-        'group',
-        { ...payload, imageUrls: optimizedUrls },
-        updateProgress
-      );
+      // Use enhanced group analysis pipeline
+      const response = await supabase.functions.invoke('ux-analysis', {
+        body: {
+          type: 'ENHANCED_GROUP_ANALYSIS',
+          payload: {
+            imageUrls: optimizedUrls,
+            groupId: payload.groupId,
+            prompt: payload.prompt || 'Analyze this group of interfaces',
+            isCustom: payload.isCustom || false,
+            enableMultiModel: true
+          }
+        }
+      });
+
+      if (response.error) {
+        throw new Error(`Enhanced group analysis failed: ${response.error.message}`);
+      }
+
+      const result = response.data?.analysis || response.data;
 
       const duration = Date.now() - startTimeRef.current;
       PerformanceOptimizer.trackAnalysis(duration, false);

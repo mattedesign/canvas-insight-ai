@@ -923,6 +923,18 @@ serve(async (req) => {
           console.log('👥 Processing ANALYZE_GROUP request')
           return await handleGroupAnalysis(body)
         
+        case 'ENHANCED_GROUP_ANALYSIS':
+          // Handle enhanced multi-image group analysis
+          console.log('👥 Processing ENHANCED_GROUP_ANALYSIS request')
+          const { handleEnhancedGroupAnalysis } = await import('./enhanced-group-handlers.ts')
+          return await handleEnhancedGroupAnalysis(body)
+        
+        case 'CROSS_IMAGE_ANALYSIS':
+          // Handle cross-image pattern analysis
+          console.log('🔍 Processing CROSS_IMAGE_ANALYSIS request')
+          const { handleCrossImageAnalysis } = await import('./enhanced-group-handlers.ts')
+          return await handleCrossImageAnalysis(body)
+        
         case 'GENERATE_CONCEPT':
           // Handle concept generation
           console.log('💡 Processing GENERATE_CONCEPT request')
