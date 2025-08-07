@@ -155,9 +155,9 @@ export const CanvasWithContextMenu: React.FC = () => {
       >
         <Background 
           variant={BackgroundVariant.Dots}
-          color="hsl(var(--muted-foreground) / 0.2)"
-          size={1}
-          gap={20}
+          color="hsl(var(--muted-foreground) / 0.35)"
+          size={2}
+          gap={18}
         />
         <Controls />
         <MiniMap />

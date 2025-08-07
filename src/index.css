@@ -361,7 +361,7 @@ All colors MUST be HSL.
 /* Subtle dot grid background for canvas pages */
 .dot-grid {
   background-color: hsl(var(--background));
-  background-image: radial-gradient(hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(hsl(var(--muted-foreground) / 0.3) 1.5px, transparent 1.5px);
+  background-size: 18px 18px;
   background-position: 0 0;
 }
