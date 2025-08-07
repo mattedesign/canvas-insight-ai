@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useFinalAppContext } from '@/context/FinalAppContext';
 import { ProjectService, GroupMigrationService, GroupAnalysisMigrationService } from '@/services/DataMigrationService';
 import { analysisService } from '@/services/TypeSafeAnalysisService';
-import { PerformantCanvasView } from '@/components/canvas/PerformantCanvasView';
+import { PerformantCanvasViewWithErrorBoundary } from '@/components/canvas/PerformantCanvasViewWithErrorBoundary';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
@@ -270,100 +270,156 @@ const SimplifiedCanvas = () => {
   }, [dispatch, imageGroups.length, toast]);
 
   // Group analysis functionality with canvas integration
-  const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
-    console.log('[SimplifiedCanvas] Submit group prompt:', groupId, prompt, isCustom);
-    
-    try {
-      // Get the group and its images
-      const group = imageGroups.find(g => g.id === groupId);
-      if (!group) {
-        throw new Error('Group not found');
-      }
-
-      // Get image URLs from the group
-      const groupImages = uploadedImages.filter(img => 
-        group.imageIds.includes(img.id)
-      );
-
-      if (groupImages.length === 0) {
-        throw new Error('No images found in this group');
-      }
-
-      const imageUrls = groupImages.map(img => img.url);
-
-      // Start progress tracking and create loading node
-      toast({
-        category: 'info',
-        title: "Starting Group Analysis",
-        description: "Analyzing group patterns and relationships...",
+  const handleSubmitGroupPrompt = useCallback(
+    async (
+      groupId: string,
+      prompt: string,
+      isCustom: boolean,
+      existingResult?: any
+    ) => {
+      console.log('[SimplifiedCanvas] Submit group prompt:', groupId, prompt, isCustom, {
+        hasExistingResult: !!existingResult,
       });
 
-      // Perform the group analysis with integrated progress tracking
-      const response = await analysisService.analyzeGroup({
-        imageUrls,
-        groupId,
-        prompt,
-        isCustom
-      });
+      try {
+        // Validate group exists
+        const group = imageGroups.find((g) => g.id === groupId);
+        if (!group) {
+          throw new Error('Group not found');
+        }
 
-      if (!response.success) {
-        throw new Error(response.error || 'Group analysis failed');
-      }
+        // If we already have a result from the canvas progress pipeline, just persist it
+        if (existingResult) {
+          if (!existingResult.success) {
+            throw new Error(existingResult.error || 'Group analysis failed');
+          }
 
-      if (response.analysis) {
-        // Extract the expected data structure from the response
-        const analysisData = response.analysis as any;
-        
-        // Create group analysis object with the expected structure
-        const groupAnalysis = {
-          id: crypto.randomUUID(),
-          sessionId: crypto.randomUUID(),
+          const source =
+            existingResult.groupAnalysis || existingResult.analysis || existingResult;
+
+          const groupAnalysis = {
+            id: crypto.randomUUID(),
+            sessionId: source?.sessionId || crypto.randomUUID(),
+            groupId,
+            prompt,
+            isCustom,
+            summary: {
+              overallScore: source?.summary?.overallScore || 0,
+              consistency: source?.summary?.consistency || 0,
+              thematicCoherence: source?.summary?.thematicCoherence || 0,
+              userFlowContinuity: source?.summary?.userFlowContinuity || 0,
+            },
+            insights: Array.isArray(source?.insights) ? source.insights : [],
+            recommendations: Array.isArray(source?.recommendations)
+              ? source.recommendations
+              : [],
+            patterns: {
+              commonElements: source?.patterns?.commonElements || [],
+              designInconsistencies: source?.patterns?.designInconsistencies || [],
+              userJourneyGaps: source?.patterns?.userJourneyGaps || [],
+            },
+            analysis: source?.analysis,
+            createdAt: source?.createdAt ? new Date(source.createdAt) : new Date(),
+          } as const;
+
+          await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(
+            groupAnalysis
+          );
+
+          dispatch({
+            type: 'ADD_GROUP_ANALYSIS',
+            payload: groupAnalysis,
+          });
+
+          toast({
+            category: 'success',
+            title: 'Group Analysis Complete',
+            description: 'Analysis results have been generated and saved.',
+          });
+
+          return; // Important: do not re-run analysis
+        }
+
+        // If no existing result provided, perform the analysis (direct path)
+        const groupImages = uploadedImages.filter((img) => group.imageIds.includes(img.id));
+        if (groupImages.length === 0) {
+          throw new Error('No images found in this group');
+        }
+
+        const imageUrls = groupImages.map((img) => img.url);
+
+        toast({
+          category: 'info',
+          title: 'Starting Group Analysis',
+          description: 'Analyzing group patterns and relationships...',
+        });
+
+        const response = await analysisService.analyzeGroup({
+          imageUrls,
           groupId,
           prompt,
           isCustom,
-          summary: {
-            overallScore: analysisData.summary?.overallScore || 0,
-            consistency: analysisData.summary?.consistency || 0,
-            thematicCoherence: analysisData.summary?.thematicCoherence || 0,
-            userFlowContinuity: analysisData.summary?.userFlowContinuity || 0
-          },
-          insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
-          recommendations: Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [],
-          patterns: {
-            commonElements: analysisData.patterns?.commonElements || [],
-            designInconsistencies: analysisData.patterns?.designInconsistencies || [],
-            userJourneyGaps: analysisData.patterns?.userJourneyGaps || []
-          },
-          analysis: analysisData.analysis,
-          createdAt: new Date()
-        };
-
-        // Store in database
-        await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(groupAnalysis);
-
-        // Update app state
-        dispatch({
-          type: 'ADD_GROUP_ANALYSIS',
-          payload: groupAnalysis
         });
 
+        if (!response.success) {
+          throw new Error(response.error || 'Group analysis failed');
+        }
+
+        if (response.analysis) {
+          const analysisData = response.analysis as any;
+          const groupAnalysis = {
+            id: crypto.randomUUID(),
+            sessionId: crypto.randomUUID(),
+            groupId,
+            prompt,
+            isCustom,
+            summary: {
+              overallScore: analysisData.summary?.overallScore || 0,
+              consistency: analysisData.summary?.consistency || 0,
+              thematicCoherence: analysisData.summary?.thematicCoherence || 0,
+              userFlowContinuity: analysisData.summary?.userFlowContinuity || 0,
+            },
+            insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
+            recommendations: Array.isArray(analysisData.recommendations)
+              ? analysisData.recommendations
+              : [],
+            patterns: {
+              commonElements: analysisData.patterns?.commonElements || [],
+              designInconsistencies: analysisData.patterns?.designInconsistencies || [],
+              userJourneyGaps: analysisData.patterns?.userJourneyGaps || [],
+            },
+            analysis: analysisData.analysis,
+            createdAt: new Date(),
+          };
+
+          await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(
+            groupAnalysis
+          );
+
+          dispatch({
+            type: 'ADD_GROUP_ANALYSIS',
+            payload: groupAnalysis,
+          });
+
+          toast({
+            category: 'success',
+            title: 'Group Analysis Complete',
+            description: 'Analysis results have been generated and saved.',
+          });
+        }
+      } catch (error) {
+        console.error('[SimplifiedCanvas] Group analysis error:', error);
         toast({
-          category: 'success',
-          title: "Group Analysis Complete",
-          description: "Analysis results have been generated and saved.",
+          category: 'error',
+          title: 'Group Analysis Failed',
+          description:
+            error instanceof Error ? error.message : 'An unexpected error occurred',
+          variant: 'destructive',
         });
       }
-
-    } catch (error) {
-      console.error('[SimplifiedCanvas] Group analysis error:', error);
-      toast({
-        category: 'error',
-        title: "Group Analysis Failed",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: "destructive",
-      });
-    }
-  }, [imageGroups, uploadedImages, dispatch, toast]);
+    },
+    [imageGroups, uploadedImages, dispatch, toast]
+  );
 
   const handleAnalyzeGroup = useCallback(async (groupId: string) => {
     console.log('[SimplifiedCanvas] handleAnalyzeGroup called with groupId:', groupId);
@@ -435,7 +491,7 @@ const SimplifiedCanvas = () => {
         />
         
         <div className="flex-1 relative w-full h-full">
-          <PerformantCanvasView
+          <PerformantCanvasViewWithErrorBoundary
             uploadedImages={Array.isArray(uploadedImages) ? uploadedImages : []}
             analyses={Array.isArray(analyses) ? analyses : []}
             generatedConcepts={Array.isArray(generatedConcepts) ? generatedConcepts : []}
