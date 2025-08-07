@@ -269,17 +269,11 @@ const SimplifiedCanvas = () => {
     }
   }, [dispatch, imageGroups.length, toast]);
 
-  // Group analysis functionality
+  // Group analysis functionality with canvas integration
   const handleSubmitGroupPrompt = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
     console.log('[SimplifiedCanvas] Submit group prompt:', groupId, prompt, isCustom);
     
     try {
-      toast({
-        category: 'info',
-        title: "Starting Group Analysis",
-        description: "Analyzing group patterns and relationships...",
-      });
-
       // Get the group and its images
       const group = imageGroups.find(g => g.id === groupId);
       if (!group) {
@@ -297,7 +291,14 @@ const SimplifiedCanvas = () => {
 
       const imageUrls = groupImages.map(img => img.url);
 
-      // Perform the group analysis
+      // Start progress tracking and create loading node
+      toast({
+        category: 'info',
+        title: "Starting Group Analysis",
+        description: "Analyzing group patterns and relationships...",
+      });
+
+      // Perform the group analysis with integrated progress tracking
       const response = await analysisService.analyzeGroup({
         imageUrls,
         groupId,

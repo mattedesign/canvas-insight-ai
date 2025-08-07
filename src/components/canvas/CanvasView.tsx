@@ -147,6 +147,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [dynamicNodes, setDynamicNodes] = useState<Node[]>([]);
   const [dynamicEdges, setDynamicEdges] = useState<Edge[]>([]);
   
+  // Progress tracking state
+  const [activeGroupAnalyses, setActiveGroupAnalyses] = useState<Set<string>>(new Set());
+  
   // Convert uploaded images to canvas items for context menu
   const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
     id: image.id,
@@ -253,6 +256,124 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       // Remove informational group view toast
     }
   }, [groups, multiSelection.selectMultiple, toast]);
+
+  // Group analysis progress handlers
+  const handleGroupPromptSubmit = useCallback(async (groupId: string, prompt: string, isCustom: boolean) => {
+    console.log('[CanvasView] Starting group analysis with progress tracking:', groupId);
+    
+    // Track active analysis
+    setActiveGroupAnalyses(prev => new Set(prev).add(groupId));
+    
+    try {
+      // Find the group
+      const group = imageGroups?.find(g => g.id === groupId);
+      if (!group) {
+        throw new Error('Group not found');
+      }
+
+      // Create loading node positioned to the right of prompt collection node
+      const promptNodeId = `group-prompt-collection-${groupId}`;
+      const promptNode = nodes.find(n => n.id === promptNodeId);
+      const loadingPosition = promptNode 
+        ? { x: promptNode.position.x + 400, y: promptNode.position.y }
+        : { x: 500, y: 200 };
+
+      // Start progress tracking
+      const progressData = await groupAnalysisProgress.analyzeGroup(
+        groupId,
+        group.name,
+        [], // Image URLs will be handled by the service
+        { groupId, prompt, isCustom }
+      );
+
+      // Get loading node from progress service
+      const loadingNode = groupAnalysisProgress.getLoadingNode(
+        groupId,
+        loadingPosition,
+        (cancelGroupId: string) => {
+          setActiveGroupAnalyses(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(cancelGroupId);
+            return newSet;
+          });
+          groupAnalysisProgress.cancelAnalysis(cancelGroupId);
+        }
+      );
+
+      if (loadingNode) {
+        setDynamicNodes(prev => [...prev, loadingNode]);
+        
+        // Create edge from prompt node to loading node
+        const connectionEdge: Edge = {
+          id: `prompt-to-loading-${groupId}`,
+          source: promptNodeId,
+          target: loadingNode.id,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#3b82f6' }
+        };
+        setDynamicEdges(prev => [...prev, connectionEdge]);
+      }
+
+      // Call the original handler
+      if (onSubmitGroupPrompt) {
+        await onSubmitGroupPrompt(groupId, prompt, isCustom);
+      }
+
+      // On completion, replace loading node with results node
+      if (progressData) {
+        const resultsNode = groupAnalysisProgress.getResultsNode(
+          groupId,
+          progressData,
+          loadingPosition,
+          {
+            onEditPrompt: onEditGroupPrompt,
+            onCreateFork: onCreateFork,
+            onViewDetails: onOpenAnalysisPanel
+          }
+        );
+
+        // Remove loading node and add results node
+        setDynamicNodes(prev => prev.filter(n => n.id !== `group-analysis-loading-${groupId}`));
+        setDynamicNodes(prev => [...prev, resultsNode]);
+        
+        // Update edge to connect to results node
+        setDynamicEdges(prev => prev.map(edge => 
+          edge.id === `prompt-to-loading-${groupId}`
+            ? { ...edge, target: resultsNode.id, animated: false }
+            : edge
+        ));
+      }
+
+    } catch (error) {
+      console.error('[CanvasView] Group analysis failed:', error);
+      
+      // Remove loading nodes and edges on error
+      setDynamicNodes(prev => prev.filter(n => n.id !== `group-analysis-loading-${groupId}`));
+      setDynamicEdges(prev => prev.filter(e => e.id !== `prompt-to-loading-${groupId}`));
+      
+      toast({
+        category: 'error',
+        title: "Group Analysis Failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      });
+    } finally {
+      setActiveGroupAnalyses(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(groupId);
+        return newSet;
+      });
+    }
+  }, [
+    imageGroups, 
+    groupAnalysisProgress,
+    onSubmitGroupPrompt, 
+    onEditGroupPrompt, 
+    onCreateFork, 
+    onOpenAnalysisPanel,
+    toast
+  ]);
 
   // Remove local handleAnalyzeGroup - use the prop onAnalyzeGroup instead
 
@@ -1363,12 +1484,14 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           id: `group-prompt-${group.id}`,
           type: 'groupPromptCollection',
           position: { x: rightmostXPosition, y: yOffset },
-          data: {
-            group,
-            onSubmitPrompt: onSubmitGroupPrompt,
-            onAnalyzeGroup: (groupId: string) => {
-              const group = imageGroups?.find(g => g.id === groupId);
-              if (group) {
+        data: {
+          group,
+          onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
+            handleGroupPromptSubmit(groupId, prompt, isCustom);
+          },
+          onAnalyzeGroup: (groupId: string) => {
+            const group = imageGroups?.find(g => g.id === groupId);
+            if (group) {
                 handleGroupAnalysis(group.imageIds);
               }
             },
@@ -1405,7 +1528,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             position: { x: rightmostXPosition, y: yOffset + (index * 120) },
             data: {
               group,
-              onSubmitPrompt: onSubmitGroupPrompt,
+              onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
+                handleGroupPromptSubmit(groupId, prompt, isCustom);
+              },
               onAnalyzeGroup: (groupId: string) => {
                 const group = imageGroups?.find(g => g.id === groupId);
                 if (group) {
@@ -1436,12 +1561,14 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             id: `group-prompt-processing-${session.id}`,
             type: 'groupPromptCollection',
             position: { x: rightmostXPosition + 420, y: yOffset + (index * 120) },
-            data: {
-              group,
-              onSubmitPrompt: onSubmitGroupPrompt,
-              onAnalyzeGroup: (groupId: string) => {
-                const group = imageGroups?.find(g => g.id === groupId);
-                if (group) {
+          data: {
+            group,
+            onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
+              handleGroupPromptSubmit(groupId, prompt, isCustom);
+            },
+            onAnalyzeGroup: (groupId: string) => {
+              const group = imageGroups?.find(g => g.id === groupId);
+              if (group) {
                   handleGroupAnalysis(group.imageIds);
                 }
               },
