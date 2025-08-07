@@ -43,12 +43,14 @@ import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 import { SelectionDebugger } from '../SelectionDebugger';
+import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
 
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
 
 import { AnnotationNode } from './AnnotationNode';
+import { GroupAnalysisLoadingNode } from './GroupAnalysisLoadingNode';
 
 const nodeTypes = {
   image: ImageNode,
@@ -61,6 +63,7 @@ const nodeTypes = {
   groupPromptCollection: GroupPromptCollectionNode,
   groupAnalysisResults: GroupAnalysisResultsNode,
   enhancedGroupAnalysis: EnhancedGroupAnalysisNode,
+  groupAnalysisLoading: GroupAnalysisLoadingNode,
   imageLoading: ImageLoadingNode,
   analysisLoading: AnalysisLoadingNode,
   annotation: AnnotationNode,
@@ -135,6 +138,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
+  
+  // Group analysis progress management
+  const groupAnalysisProgress = useGroupAnalysisProgress();
   
   // Convert uploaded images to canvas items for context menu
   const canvasItems: CanvasItem[] = uploadedImages.map(image => ({
@@ -408,30 +414,59 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const handleGroupAnalysis = useCallback(async (imageIds: string[]) => {
     const imagesToAnalyze = (uploadedImages || []).filter(img => imageIds.includes(img.id));
     
-    // COMMENTED OUT: Repetitive group analysis start toast
-    // toast({
-    //   title: "Group Analysis Started",
-    //   description: `Analyzing patterns across ${imagesToAnalyze.length} images...`,
-    //   category: "success",
-    // });
-
-    // For now, this does individual analysis. In the future, this could call a group-specific analysis endpoint
-    for (const image of imagesToAnalyze) {
-      try {
-        const analysis = await analyzeImageWithAI(image.id, image.url, image.name, 'Group analysis context');
-        onAnalysisComplete?.(image.id, analysis);
-      } catch (error) {
-        console.error(`Group analysis failed for ${image.name}:`, error);
-      }
+    if (imagesToAnalyze.length === 0) {
+      toast({
+        title: "No Images Selected",
+        description: "Please select images to analyze as a group.",
+        category: "error",
+      });
+      return;
     }
 
-    // COMMENTED OUT: Repetitive group analysis completion toast
-    // toast({
-    //   title: "Group Analysis Complete",
-    //   description: `Completed group analysis for ${imagesToAnalyze.length} images`,
-    //   category: "success",
-    // });
-  }, [uploadedImages, analyzeImageWithAI, onAnalysisComplete, toast]);
+    // Find or create a group for these images
+    const existingGroup = imageGroups?.find(group => 
+      group.imageIds.every(id => imageIds.includes(id)) && 
+      imageIds.every(id => group.imageIds.includes(id))
+    );
+
+    const groupId = existingGroup?.id || `temp-group-${Date.now()}`;
+    const groupName = existingGroup?.name || `Analysis Group (${imagesToAnalyze.length} images)`;
+
+    try {
+      // Start group analysis with progress tracking
+      const imageUrls = imagesToAnalyze.map(img => img.url);
+      const payload = {
+        groupId,
+        prompt: 'Analyze the design consistency across these screens. Focus on typography, color usage, spacing patterns, component styles, and overall visual harmony. Identify inconsistencies and provide recommendations for a unified design system.',
+        isCustom: false
+      };
+
+      const result = await groupAnalysisProgress.analyzeGroup(
+        groupId,
+        groupName,
+        imageUrls,
+        payload
+      );
+
+      // Handle successful group analysis
+      toast({
+        title: "Group Analysis Complete",
+        description: `Successfully analyzed ${imagesToAnalyze.length} images as a group`,
+        category: "success",
+      });
+
+      // You can handle the result here - e.g., store it or display it
+      console.log('Group analysis result:', result);
+
+    } catch (error) {
+      console.error('Group analysis failed:', error);
+      toast({
+        title: "Group Analysis Failed",
+        description: error instanceof Error ? error.message : "Failed to analyze group",
+        category: "error",
+      });
+    }
+  }, [uploadedImages, imageGroups, groupAnalysisProgress, toast]);
 
   const handleEnhancedAnalysisRequest = useCallback(async (imageId: string) => {
     const image = (uploadedImages || []).find(img => img.id === imageId);

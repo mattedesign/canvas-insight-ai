@@ -148,16 +148,18 @@ export const useOptimizedAnalysis = () => {
     }
   }, [updateProgress]);
 
-  const analyzeGroup = useCallback(async (imageUrls: string[], payload: any) => {
+  const analyzeGroup = useCallback(async (imageUrls: string[], payload: any, onProgressUpdate?: (stage: string, progress: number, message?: string) => void) => {
     const optimizedUrls = imageUrls.map(url => PerformanceOptimizer.optimizeImageForAnalysis(url));
     startTimeRef.current = Date.now();
     
     try {
       setProgress({
-        stage: 'Starting group analysis...',
+        stage: 'starting',
         progress: 0,
         isLoading: true
       });
+      
+      onProgressUpdate?.('starting', 0, 'Initializing group analysis...');
 
       // Check cache for group analysis
       const cacheKey = optimizedUrls.join(',');
@@ -167,13 +169,30 @@ export const useOptimizedAnalysis = () => {
         PerformanceOptimizer.trackAnalysis(duration, true);
         
         setProgress({
-          stage: 'Loaded from cache',
+          stage: 'complete',
           progress: 100,
           isLoading: false
         });
         
+        onProgressUpdate?.('complete', 100, 'Loaded from cache');
         return cached;
       }
+
+      // Progress: Context detection
+      onProgressUpdate?.('context-detection', 10, 'Analyzing group context...');
+      setProgress({
+        stage: 'context-detection',
+        progress: 10,
+        isLoading: true
+      });
+
+      // Progress: Individual analysis
+      onProgressUpdate?.('individual-analysis', 25, `Processing ${optimizedUrls.length} images...`);
+      setProgress({
+        stage: 'individual-analysis',
+        progress: 25,
+        isLoading: true
+      });
 
       // Use enhanced group analysis pipeline
       const response = await supabase.functions.invoke('ux-analysis', {
@@ -193,10 +212,39 @@ export const useOptimizedAnalysis = () => {
         throw new Error(`Enhanced group analysis failed: ${response.error.message}`);
       }
 
+      // Progress: Cross-image analysis
+      onProgressUpdate?.('cross-image-analysis', 70, 'Identifying patterns and inconsistencies...');
+      setProgress({
+        stage: 'cross-image-analysis',
+        progress: 70,
+        isLoading: true
+      });
+
+      // Progress: Synthesizing
+      onProgressUpdate?.('synthesizing', 85, 'Generating insights and recommendations...');
+      setProgress({
+        stage: 'synthesizing',
+        progress: 85,
+        isLoading: true
+      });
+
       const result = response.data?.analysis || response.data;
+
+      // Cache the result
+      if (result) {
+        AnalysisCache.set(cacheKey, 'group', result, payload.prompt);
+      }
 
       const duration = Date.now() - startTimeRef.current;
       PerformanceOptimizer.trackAnalysis(duration, false);
+
+      setProgress({
+        stage: 'complete',
+        progress: 100,
+        isLoading: false
+      });
+      
+      onProgressUpdate?.('complete', 100, 'Group analysis completed');
 
       return result;
 
@@ -213,11 +261,13 @@ export const useOptimizedAnalysis = () => {
       });
       
       setProgress({
-        stage: 'Error',
+        stage: 'error',
         progress: 0,
         isLoading: false,
         error: errorMessage
       });
+      
+      onProgressUpdate?.('error', 0, errorMessage);
       throw error;
     }
   }, [updateProgress, toast]);

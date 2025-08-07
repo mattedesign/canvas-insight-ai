@@ -9,7 +9,8 @@ export async function handleEnhancedGroupAnalysis(body: any) {
     imageCount: body.payload?.imageUrls?.length || 0,
     groupId: body.payload?.groupId,
     hasPrompt: !!body.payload?.prompt,
-    enableMultiModel: body.payload?.enableMultiModel
+    enableMultiModel: body.payload?.enableMultiModel,
+    imageUrls: body.payload?.imageUrls?.map((url: string) => url.substring(0, 50) + '...') || []
   });
 
   try {
@@ -121,6 +122,9 @@ Return comprehensive JSON with detailed suggestions, visual annotations, and sum
         );
         individualAnalyses.push(singleResult);
       }
+      
+      // Log progress for this image
+      console.log(`✅ Completed analysis for image ${i + 1}/${imageUrls.length}`);
     }
 
     // Phase 2: Cross-Image Pattern Analysis

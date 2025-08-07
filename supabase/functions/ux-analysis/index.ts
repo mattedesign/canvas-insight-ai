@@ -919,9 +919,10 @@ serve(async (req) => {
           return await handleMemoryOptimizedChunk(body)
         
         case 'ANALYZE_GROUP':
-          // Handle group analysis
-          console.log('👥 Processing ANALYZE_GROUP request')
-          return await handleGroupAnalysis(body)
+          // Handle group analysis - redirect to enhanced version
+          console.log('👥 Processing ANALYZE_GROUP request (redirecting to enhanced)')
+          const { handleEnhancedGroupAnalysis: handleGroupAnalysisEnhanced } = await import('./enhanced-group-handlers.ts')
+          return await handleGroupAnalysisEnhanced(body)
         
         case 'ENHANCED_GROUP_ANALYSIS':
           // Handle enhanced multi-image group analysis
