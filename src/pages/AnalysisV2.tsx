@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnalysisStatusPipeline } from "@/components/AnalysisStatusPipeline";
 import { AnalysisJobProgress } from "@/components/AnalysisJobProgress";
 import { useAnalysisJob } from "@/hooks/useAnalysisJob";
+import { supabase } from "@/integrations/supabase/client";
 
 // Simple SEO helpers per page requirements
 const usePageSEO = () => {
@@ -35,14 +36,59 @@ export default function AnalysisV2() {
   const jobId = params.get("jobId");
   const { job } = useAnalysisJob(jobId);
 
+  const [events, setEvents] = useState<any[]>([]);
+  const [eventsLoading, setEventsLoading] = useState<boolean>(!!jobId);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jobId) {
+      setEvents([]);
+      setEventsLoading(false);
+      setEventsError(null);
+      return;
+    }
+
+    let channel: any;
+    let mounted = true;
+
+    const load = async () => {
+      setEventsLoading(true);
+      setEventsError(null);
+      const { data, error } = await supabase
+        .from('analysis_events')
+        .select('id, event_name, status, progress, message, metadata, created_at')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: true });
+      if (!mounted) return;
+      if (error) setEventsError(error.message);
+      setEvents(Array.isArray(data) ? data : []);
+      setEventsLoading(false);
+    };
+
+    const subscribe = async () => {
+      channel = supabase
+        .channel(`analysis-events-${jobId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'analysis_events', filter: `job_id=eq.${jobId}` }, () => {
+          load();
+        })
+        .subscribe();
+    };
+
+    load();
+    subscribe();
+
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [jobId]);
   const stages = useMemo(() => {
-    // Derive simple stage statuses from current job state
     const base = [
-      { id: "context-detection", name: "Context detection", status: "pending" as const },
-      { id: "vision-analysis", name: "Vision analysis", status: "pending" as const },
-      { id: "ai-analysis", name: "AI analysis", status: "pending" as const },
+      { id: "context", name: "Context detection", status: "pending" as const },
+      { id: "vision", name: "Vision analysis", status: "pending" as const },
+      { id: "ai", name: "AI analysis", status: "pending" as const },
       { id: "synthesis", name: "Synthesis", status: "pending" as const },
-      { id: "finalization", name: "Finalization", status: "pending" as const },
+      { id: "completed", name: "Finalization", status: "pending" as const },
     ];
 
     if (!job) return base;
@@ -51,7 +97,6 @@ export default function AnalysisV2() {
       return base.map((s) => ({ ...s, status: "completed" as const }));
     }
     if (job.status === "failed") {
-      // Mark current stage as error, previous as completed
       const idx = base.findIndex((s) => job.current_stage?.includes(s.id));
       return base.map((s, i) => {
         if (i < idx) return { ...s, status: "completed" as const };
@@ -60,7 +105,6 @@ export default function AnalysisV2() {
       });
     }
 
-    // Processing/running case
     const idx = base.findIndex((s) => job.current_stage?.includes(s.id));
     return base.map((s, i) => {
       if (i < idx) return { ...s, status: "completed" as const };
@@ -100,6 +144,35 @@ export default function AnalysisV2() {
           />
 
           <AnalysisJobProgress job={job ?? null} />
+
+          <section className="rounded border p-4">
+            <h2 className="text-sm font-medium mb-2">Stage events</h2>
+            {eventsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading events…</p>
+            ) : eventsError ? (
+              <p className="text-sm text-destructive">Failed to load events: {eventsError}</p>
+            ) : events.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No events yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {events.map((ev) => (
+                  <li key={ev.id} className="text-sm">
+                    <span className="font-mono">{new Date(ev.created_at).toLocaleTimeString()}</span>
+                    {" · "}<span>{ev.event_name}</span>
+                    {ev.status ? <> · <span className="uppercase text-muted-foreground">{ev.status}</span></> : null}
+                    {typeof ev.progress === 'number' ? <> · <span>{ev.progress}%</span></> : null}
+                    {ev.message ? <> · <span className="text-muted-foreground">{ev.message}</span></> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {isComplete && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Analysis completed. Final results are stored securely; UI retrieval depends on data access policies.
+              </p>
+            )}
+          </section>
         </section>
       )}
     </main>

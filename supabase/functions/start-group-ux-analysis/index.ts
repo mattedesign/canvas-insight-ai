@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 function buildInngestEndpoint(eventKey: string): string {
-  return `https://inn.gs/${eventKey}`;
+  return `https://inn.gs/e/${eventKey}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
         group_id: groupId ?? null,
         project_id: projectId,
         image_urls: imageUrls,
-        status: 'pending',
+        status: 'processing',
         progress: 0,
         current_stage: 'queued',
         error: null,
@@ -128,14 +128,27 @@ Deno.serve(async (req: Request) => {
     if (!inngestRes.ok) {
       const text = await inngestRes.text();
       console.error('[start-group-ux-analysis] Inngest dispatch failed:', text);
-      // Mark job as failed
-      await supabase
-        .from('group_analysis_jobs')
-        .update({ status: 'failed', error: 'Failed to dispatch Inngest event' })
-        .eq('id', jobId);
 
-      return new Response(JSON.stringify({ error: 'Failed to dispatch background job' }), {
-        status: 500,
+      // Fallback: invoke legacy group-ux-analysis pipeline directly as orchestrator
+      const { error: fallbackErr } = await supabase.functions.invoke('group-ux-analysis', {
+        body: { jobId }
+      });
+
+      if (fallbackErr) {
+        // Mark job as failed if fallback also fails
+        await supabase
+          .from('group_analysis_jobs')
+          .update({ status: 'failed', error: `Dispatch failed; fallback error: ${fallbackErr.message ?? 'unknown'}` })
+          .eq('id', jobId);
+
+        return new Response(JSON.stringify({ error: 'Failed to dispatch Inngest event and fallback orchestrator', response: text }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+
+      return new Response(JSON.stringify({ jobId, fallback: 'group-ux-analysis' }), {
+        status: 202,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }

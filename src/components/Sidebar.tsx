@@ -51,11 +51,13 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   const isOnDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   const isOnProjects = location.pathname === '/projects';
   const isOnSubscription = location.pathname === '/subscription';
+  const isOnAnalysisV2 = location.pathname === '/analysis-v2';
   
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Folder, label: 'Previous', active: isOnProjects },
+    { icon: Brain, label: 'Analysis V2', active: isOnAnalysisV2 },
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: isOnSubscription },
     { icon: User, label: 'Profile', active: false },
@@ -80,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
             onClick={
               item.label === 'Dashboard' ? () => enhancedNavigate('/dashboard') :
               item.label === 'Previous' ? () => enhancedNavigate('/projects') :
+              item.label === 'Analysis V2' ? () => enhancedNavigate('/analysis-v2') :
               item.label === 'Subscription' ? () => enhancedNavigate('/subscription') :
               undefined
             }
@@ -93,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
             title={
               item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Previous' ? 'Previous Analyses' :
+              item.label === 'Analysis V2' ? 'Event-driven Analysis' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :
               item.label === 'Profile' ? 'Profile' :
