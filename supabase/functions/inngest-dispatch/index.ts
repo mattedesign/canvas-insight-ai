@@ -12,10 +12,28 @@ const INNGEST_SHORT_BASE = "https://inn.gs/e";
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"
   data?: Record<string, unknown>;
-  user?: string; // user id (uuid) if applicable
-  ts?: string; // ISO timestamp
-  id?: string; // optional idempotency key
-  environment?: string; // optional; helpful for filtering
+  user?: string;
+  ts?: string;
+  id?: string;
+  environment?: string;
+}
+
+// Map legacy -> standardized event names
+function normalizeEventName(name: string): string {
+  const trimmed = name.trim();
+  const mappings: Array<[RegExp, string]> = [
+    [/^ux-analysis\/pipeline\.started$/i, 'analysis/context.started'],
+    [/^group-ux-analysis\/pipeline\.started$/i, 'group-analysis/context.started'],
+    [/^ux-analysis\/vision\.started$/i, 'analysis/vision.started'],
+    [/^ux-analysis\/vision\.completed$/i, 'analysis/vision.completed'],
+    [/^ux-analysis\/ai\.started$/i, 'analysis/ai.started'],
+    [/^ux-analysis\/synthesis\.started$/i, 'analysis/synthesis.started'],
+    [/^ux-analysis\/completed$/i, 'analysis/completed'],
+  ];
+  for (const [rx, out] of mappings) {
+    if (rx.test(trimmed)) return out;
+  }
+  return trimmed; // already standardized
 }
 
 serve(async (req: Request) => {
@@ -60,12 +78,12 @@ serve(async (req: Request) => {
       }
     }
 
-    // Build payload matching your dev server format: { name, data }
-    const wireEvents = events.map((ev) => ({
-      name: ev.name,
-      data: ev.data ?? {},
-    }));
-    const payload = wireEvents.length === 1 ? wireEvents[0] : wireEvents;
+// Build payload with normalized names
+const wireEvents = events.map((ev) => ({
+  name: normalizeEventName(ev.name),
+  data: ev.data ?? {},
+}));
+const payload = wireEvents.length === 1 ? wireEvents[0] : wireEvents;
 
     const endpoint = `${INNGEST_SHORT_BASE}/${eventKey}`;
 
