@@ -78,9 +78,9 @@ serve(async (req: Request) => {
         image_url: imageUrl,
         project_id: projectId ?? null,
         user_context: userContext ?? null,
-        status: "pending",
+        status: "processing",
         progress: 0,
-        current_stage: null,
+        current_stage: "queued",
         metadata: {},
       })
       .select("id")
@@ -116,15 +116,27 @@ serve(async (req: Request) => {
 
     if (!res.ok) {
       const text = await res.text();
-      // Mark job as failed if dispatch fails
-      await supabase
-        .from("analysis_jobs")
-        .update({ status: "failed", error: `Inngest dispatch failed: ${res.status} ${res.statusText}` })
-        .eq("id", jobId);
+      // Fallback: start lightweight orchestrator instead of failing the job
+      const { error: orchErr } = await supabase.functions.invoke('ux-orchestrator', {
+        body: { jobId }
+      });
+
+      if (orchErr) {
+        // If orchestrator also fails, mark job failed transparently
+        await supabase
+          .from("analysis_jobs")
+          .update({ status: "failed", error: `Inngest dispatch failed: ${res.status} ${res.statusText}; Orchestrator error: ${orchErr.message ?? 'unknown'}` })
+          .eq("id", jobId);
+
+        return Response.json(
+          { success: false, error: "Failed to dispatch Inngest and orchestrator", response: text, endpoint },
+          { status: 502, headers: corsHeaders },
+        );
+      }
 
       return Response.json(
-        { success: false, error: "Failed to dispatch Inngest event", response: text, endpoint },
-        { status: 502, headers: corsHeaders },
+        { success: true, jobId, fallback: "orchestrator" },
+        { status: 202, headers: corsHeaders },
       );
     }
 

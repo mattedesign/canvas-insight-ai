@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.ux-synthesis]
 verify_jwt = true
+
+[functions.ux-orchestrator]
+verify_jwt = true
