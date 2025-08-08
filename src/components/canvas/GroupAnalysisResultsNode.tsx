@@ -69,9 +69,13 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
           <div className="p-3 bg-muted/30 rounded-lg border">
             <h4 className="text-xs font-medium text-muted-foreground mb-2">ANALYSIS PROMPT</h4>
             <p className="text-sm text-foreground leading-relaxed">
-              {analysis.prompt.length > 120 
-                ? `${analysis.prompt.substring(0, 120)}...` 
-                : analysis.prompt}
+              {analysis?.prompt ? (
+                analysis.prompt.length > 120 
+                  ? `${analysis.prompt.substring(0, 120)}...` 
+                  : analysis.prompt
+              ) : (
+                <span className="text-muted-foreground">Prompt not available</span>
+              )}
             </p>
           </div>
 

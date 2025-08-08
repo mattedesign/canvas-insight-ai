@@ -388,3 +388,10 @@ All colors MUST be HSL.
 .dot-grid .react-flow {
   background-color: transparent !important;
 }
+
+/* Make canvas wrappers transparent within dot-grid */
+.dot-grid .canvas-root,
+.dot-grid .canvas-virtualized-container,
+.dot-grid .enhanced-canvas-container {
+  background-color: transparent !important;
+}

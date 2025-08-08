@@ -90,7 +90,7 @@ export const VirtualizedCanvasView: React.FC<VirtualizedCanvasViewProps> = ({
   return (
     <div 
       ref={setContainerRef}
-      className="canvas-virtualized-container bg-background"
+      className="canvas-virtualized-container bg-transparent"
       style={{ 
         height: '100%',
         overflow: 'auto',

@@ -192,6 +192,7 @@ export class GroupAnalysisProgressService {
     const standardizedResults = {
       id: source?.id || `group_${groupId}_${Date.now()}`,
       sessionId: source?.sessionId || `session_${groupId}`,
+      prompt: source?.originalPrompt ?? source?.prompt,
       summary: {
         overallScore: source?.summary?.overallScore || 0,
         consistency: source?.summary?.consistency || 0,
@@ -206,7 +207,7 @@ export class GroupAnalysisProgressService {
         userJourneyGaps: source?.patterns?.userJourneyGaps || []
       },
       analysis: source?.analysis || {},
-      createdAt: source?.createdAt || new Date()
+      createdAt: source?.createdAt || source?.timestamp || new Date()
     };
     
     return {
