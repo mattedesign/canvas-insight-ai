@@ -146,25 +146,32 @@ serve(async (req: Request) => {
 
     const visionPrompt = "Extract concise visual cues: main components, dominant layout regions, obvious affordances. Return JSON with keys: components[], textBlocks[], layoutSummary.";
 
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'user', content: [
-            { type: 'text', text: visionPrompt },
-            { type: 'image_url', image_url: { url: job.image_url } }
-          ]}
-        ],
-        max_tokens: 800,
-        temperature: 0.2,
-        response_format: { type: 'json_object' }
-      })
-    });
+    let resp: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'user', content: [
+                { type: 'text', text: visionPrompt },
+                { type: 'image_url', image_url: { url: job.image_url } }
+              ]}
+            ],
+            max_tokens: 800,
+            temperature: 0.2,
+            response_format: { type: 'json_object' }
+          })
+        });
+        if (resp.ok) break;
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+    }
 
     if (!resp.ok) {
       const msg = `OpenAI API error: ${resp.status}`;

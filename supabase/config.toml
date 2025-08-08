@@ -59,3 +59,24 @@ verify_jwt = true
 
 [functions.ux-orchestrator]
 verify_jwt = true
+
+[functions.start-ux-analysis]
+verify_jwt = true
+
+[functions.start-group-ux-analysis]
+verify_jwt = true
+
+[functions.group-ux-orchestrator]
+verify_jwt = true
+
+[functions.group-vision-openai]
+verify_jwt = true
+
+[functions.group-vision-google]
+verify_jwt = true
+
+[functions.group-ai-analysis]
+verify_jwt = true
+
+[functions.group-synthesis]
+verify_jwt = true

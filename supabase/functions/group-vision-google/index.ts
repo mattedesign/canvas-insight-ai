@@ -118,7 +118,13 @@ serve(async (req: Request) => {
 
     const results: Array<{ url: string; result: Json | null; error?: string }> = [];
     for (const url of job.image_urls) {
-      const { data, error } = await supabase.functions.invoke('google-vision-metadata', { body: { imageUrl: url } });
+      let data: any = null; let error: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await supabase.functions.invoke('google-vision-metadata', { body: { imageUrl: url } });
+        data = (res as any).data; error = (res as any).error;
+        if (!error) break;
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+      }
       if (error) {
         results.push({ url, result: null, error: (error as any)?.message ?? 'Google Vision failed' });
       } else {

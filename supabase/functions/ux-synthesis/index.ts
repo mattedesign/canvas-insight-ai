@@ -141,7 +141,7 @@ serve(async (req: Request) => {
     const summary = (ai as any)?.summary ?? {};
     const suggestions = Array.isArray((ai as any)?.suggestions) ? (ai as any).suggestions : [];
     const visual_annotations = Array.isArray((ai as any)?.visualAnnotations) ? (ai as any).visualAnnotations : [];
-    const metadata: Json = { context, synthesisAt: new Date().toISOString() };
+    const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id };
 
     // Persist final UX analysis
     const { error: insErr } = await supabase

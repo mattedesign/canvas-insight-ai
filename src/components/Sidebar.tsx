@@ -53,12 +53,13 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   const isOnProjects = location.pathname === '/projects';
   const isOnSubscription = location.pathname === '/subscription';
   const isOnAnalysisV2 = location.pathname === '/analysis-v2';
+  const isOnGroupAnalysisV2 = location.pathname === '/group-analysis-v2';
   const showAnalysisV2 = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id ?? undefined, user?.email ?? undefined);
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Folder, label: 'Previous', active: isOnProjects },
-    ...(showAnalysisV2 ? ([{ icon: Brain, label: 'Analysis V2', active: isOnAnalysisV2 }] as const) : []),
+    ...(showAnalysisV2 ? ([{ icon: Brain, label: 'Analysis V2', active: isOnAnalysisV2 }, { icon: Brain, label: 'Group V2', active: isOnGroupAnalysisV2 }] as const) : []),
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: isOnSubscription },
     { icon: User, label: 'Profile', active: false },
@@ -84,6 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
               item.label === 'Dashboard' ? () => enhancedNavigate('/dashboard') :
               item.label === 'Previous' ? () => enhancedNavigate('/projects') :
               item.label === 'Analysis V2' ? () => enhancedNavigate('/analysis-v2') :
+              item.label === 'Group V2' ? () => enhancedNavigate('/group-analysis-v2') :
               item.label === 'Subscription' ? () => enhancedNavigate('/subscription') :
               undefined
             }
@@ -98,6 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
               item.label === 'Dashboard' ? 'Dashboard' :
               item.label === 'Previous' ? 'Previous Analyses' :
               item.label === 'Analysis V2' ? 'Event-driven Analysis' :
+              item.label === 'Group V2' ? 'Group Analysis V2' :
               item.label === 'Notifications' ? 'Notifications' :
               item.label === 'Subscription' ? 'Subscription' :
               item.label === 'Profile' ? 'Profile' :

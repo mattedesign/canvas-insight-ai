@@ -33,6 +33,7 @@ const UploadPipelineTests = lazy(() => import("./pages/UploadPipelineTests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const GroupAnalysisTestingPage = lazy(() => import("./pages/GroupAnalysisTestingPage"));
 const AnalysisV2 = lazy(() => import("./pages/AnalysisV2"));
+const GroupAnalysisV2 = lazy(() => import("./pages/GroupAnalysisV2"));
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,13 @@ const App = () => {
   <RouteErrorBoundary routeName="AnalysisV2" fallbackRoute="/dashboard">
     <ProtectedRoute>
       <AnalysisV2 />
+    </ProtectedRoute>
+  </RouteErrorBoundary>
+} />
+<Route path="/group-analysis-v2" element={
+  <RouteErrorBoundary routeName="GroupAnalysisV2" fallbackRoute="/dashboard">
+    <ProtectedRoute>
+      <GroupAnalysisV2 />
     </ProtectedRoute>
   </RouteErrorBoundary>
 } />

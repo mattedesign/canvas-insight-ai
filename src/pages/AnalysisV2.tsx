@@ -99,14 +99,12 @@ export default function AnalysisV2() {
       setFinalLoading(true);
       setFinalError(null);
       setFinalResult(null);
-      const query = supabase
+      const { data, error } = await supabase
         .from('ux_analyses')
         .select('id, summary, suggestions, visual_annotations, metadata, created_at')
-        .eq('user_id', job.user_id)
-        .eq('project_id', job.project_id)
+        .contains('metadata', { jobId: jobId })
         .order('created_at', { ascending: false })
         .limit(1);
-      const { data, error } = await query;
       if (!mounted) return;
       if (error) {
         setFinalError(error.message);

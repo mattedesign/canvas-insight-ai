@@ -138,9 +138,14 @@ serve(async (req: Request) => {
     await insertEvent({ event_name: "analysis/vision.started", status: "processing", progress: startedProgress, metadata: { provider: "google" } });
 
     // Call existing google-vision-metadata function
-    const { data: gData, error: gErr } = await supabase.functions.invoke('google-vision-metadata', {
-      body: { imageUrl: job.image_url }
-    });
+    let gData: any = null;
+    let gErr: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error } = await supabase.functions.invoke('google-vision-metadata', { body: { imageUrl: job.image_url } });
+      gData = data; gErr = error;
+      if (!gErr) break;
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+    }
 
     if (gErr) {
       await insertEvent({ event_name: "analysis/vision.failed", status: "failed", progress: startedProgress, message: gErr.message ?? 'Google Vision failed', metadata: { provider: 'google' } });

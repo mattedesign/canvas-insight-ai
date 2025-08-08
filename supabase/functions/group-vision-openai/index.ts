@@ -129,17 +129,24 @@ serve(async (req: Request) => {
       content.push({ type: 'image_url', image_url: { url } });
     }
 
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [ { role: 'user', content } ],
-        max_tokens: 1200,
-        temperature: 0.2,
-        response_format: { type: 'json_object' }
-      })
-    });
+    let resp: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [ { role: 'user', content } ],
+            max_tokens: 1200,
+            temperature: 0.2,
+            response_format: { type: 'json_object' }
+          })
+        });
+        if (resp.ok) break;
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+    }
 
     if (!resp.ok) {
       const msg = `OpenAI API error: ${resp.status}`;
