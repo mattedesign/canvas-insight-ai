@@ -10,6 +10,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { AIProvider } from "./context/AIContext";
 // Performance monitoring disabled for production
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import { useInngestJobEmitter } from "./hooks/useInngestJobEmitter";
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -37,7 +38,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   console.log('App component rendering...');
-  
+  useInngestJobEmitter();
   try {
     return (
       <QueryClientProvider client={queryClient}>
