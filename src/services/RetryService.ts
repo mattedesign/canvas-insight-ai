@@ -90,6 +90,19 @@ export class RetryService {
           error: errorMessage
         });
 
+        // If error is non-retryable, abort immediately
+        if (!this.isRetryableError(error)) {
+          if (onProgress) {
+            onProgress({
+              attempts,
+              isRetrying: false,
+              canRetry: false,
+              config: finalConfig
+            });
+          }
+          throw error;
+        }
+
         // If this was the last attempt, throw the error
         if (attempt === finalConfig.maxRetries) {
           if (onProgress) {
