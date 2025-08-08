@@ -119,6 +119,48 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          group_job_id: string | null
+          id: string
+          job_id: string | null
+          message: string | null
+          metadata: Json
+          progress: number
+          stage: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          group_job_id?: string | null
+          id?: string
+          job_id?: string | null
+          message?: string | null
+          metadata?: Json
+          progress?: number
+          stage?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          group_job_id?: string | null
+          id?: string
+          job_id?: string | null
+          message?: string | null
+          metadata?: Json
+          progress?: number
+          stage?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       analysis_insights: {
         Row: {
           created_at: string | null

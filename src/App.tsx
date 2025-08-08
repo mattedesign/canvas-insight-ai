@@ -32,6 +32,7 @@ const VerificationTests = lazy(() => import("./pages/VerificationTests"));
 const UploadPipelineTests = lazy(() => import("./pages/UploadPipelineTests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const GroupAnalysisTestingPage = lazy(() => import("./pages/GroupAnalysisTestingPage"));
+const AnalysisV2 = lazy(() => import("./pages/AnalysisV2"));
 
 const queryClient = new QueryClient();
 
@@ -127,14 +128,21 @@ const App = () => {
                          </ProtectedRoute>
                        </RouteErrorBoundary>
                      } />
-                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                     <Route path="/dev/group-analysis-test" element={
-                       <RouteErrorBoundary routeName="GroupAnalysisTest" fallbackRoute="/dashboard">
-                         <ProtectedRoute>
-                           <GroupAnalysisTestingPage />
-                         </ProtectedRoute>
-                       </RouteErrorBoundary>
-                     } />
+{/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+<Route path="/analysis-v2" element={
+  <RouteErrorBoundary routeName="AnalysisV2" fallbackRoute="/dashboard">
+    <ProtectedRoute>
+      <AnalysisV2 />
+    </ProtectedRoute>
+  </RouteErrorBoundary>
+} />
+<Route path="/dev/group-analysis-test" element={
+  <RouteErrorBoundary routeName="GroupAnalysisTest" fallbackRoute="/dashboard">
+    <ProtectedRoute>
+      <GroupAnalysisTestingPage />
+    </ProtectedRoute>
+  </RouteErrorBoundary>
+} />
                      <Route path="*" element={
                       <RouteErrorBoundary routeName="NotFound" fallbackRoute="/">
                         <NotFound />
