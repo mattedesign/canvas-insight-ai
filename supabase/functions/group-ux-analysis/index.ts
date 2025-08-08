@@ -98,9 +98,52 @@ serve(async (req) => {
       body.groupName
     );
 
+    // Try to convert AI response into structured JSON for UI
+    const stripCodeFences = (input: string) =>
+      (input || '')
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+
+    let structuredAnalysis: any = null;
+    try {
+      const raw = (groupAnalysis as any)?.groupInsights as string;
+      structuredAnalysis = JSON.parse(stripCodeFences(raw));
+    } catch (e) {
+      console.error('Failed to parse structured group analysis JSON');
+      throw new Error('AI did not return valid JSON for group analysis synthesis');
+    }
+
+    const toScore = (v: any) => {
+      const n = Math.round(Number(v));
+      if (Number.isNaN(n)) return 0;
+      return Math.max(0, Math.min(100, n));
+    };
+
+    const normalizedGroupAnalysis = {
+      sessionId: body.groupId || 'session_group',
+      groupId: body.groupId || 'group',
+      prompt: body.prompt,
+      summary: {
+        overallScore: toScore(structuredAnalysis?.summary?.overallScore),
+        consistency: toScore(structuredAnalysis?.summary?.consistency),
+        thematicCoherence: toScore(structuredAnalysis?.summary?.thematicCoherence),
+        userFlowContinuity: toScore(structuredAnalysis?.summary?.userFlowContinuity),
+      },
+      insights: Array.isArray(structuredAnalysis?.insights) ? structuredAnalysis.insights : [],
+      recommendations: Array.isArray(structuredAnalysis?.recommendations) ? structuredAnalysis.recommendations : [],
+      patterns: {
+        commonElements: Array.isArray(structuredAnalysis?.patterns?.commonElements) ? structuredAnalysis.patterns.commonElements : [],
+        designInconsistencies: Array.isArray(structuredAnalysis?.patterns?.designInconsistencies) ? structuredAnalysis.patterns.designInconsistencies : [],
+        userJourneyGaps: Array.isArray(structuredAnalysis?.patterns?.userJourneyGaps) ? structuredAnalysis.patterns.userJourneyGaps : [],
+      },
+      createdAt: new Date().toISOString(),
+    };
+
     const result = {
       success: true,
-      groupAnalysis,
+      groupAnalysis: normalizedGroupAnalysis,
       individualAnalyses: individualAnalyses.map(result => ({
         url: result.url,
         hasAnalysis: !!result.analysis,

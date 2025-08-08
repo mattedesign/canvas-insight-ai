@@ -234,18 +234,18 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onViewDetails?.(analysis.id)}
-              className="flex-1"
-              disabled={!onViewDetails}
-              aria-disabled={!onViewDetails}
-              title={!onViewDetails ? 'Details view not available' : undefined}
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              View Details
-            </Button>
+            {onViewDetails && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onViewDetails?.(analysis.id)}
+                className="flex-1"
+                title="View group analysis details"
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                View Details
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

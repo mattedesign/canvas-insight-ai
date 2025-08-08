@@ -286,13 +286,41 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         throw new Error('No valid image URLs found in group');
       }
 
-      // Create loading node positioned to the right of prompt collection node
+      // Create loading node positioned near the most relevant anchor
       const promptNodeId = `group-prompt-${groupId}`;
       const promptNode = nodes.find(n => n.id === promptNodeId);
-      const loadingPosition = promptNode 
-        ? { x: promptNode.position.x + 400, y: promptNode.position.y }
-        : { x: 500, y: 200 };
 
+      const computeLoadingPosition = (): { x: number; y: number } => {
+        // 1) Prefer the prompt node (place to the right)
+        if (promptNode) {
+          return { x: promptNode.position.x + 400, y: promptNode.position.y };
+        }
+        // 2) Try the group container (place to the right)
+        const groupContainer = nodes.find(n => n.id === `group-container-${groupId}`);
+        if (groupContainer) {
+          return { x: groupContainer.position.x + 600, y: groupContainer.position.y };
+        }
+        // 3) Compute from the group's image nodes centroid
+        const groupImageNodes = group.imageIds
+          .map(imgId => nodes.find(n => n.id === `image-${imgId}`))
+          .filter(Boolean) as Node[];
+        if (groupImageNodes.length > 0) {
+          const avg = groupImageNodes.reduce(
+            (acc, n) => ({ x: acc.x + n.position.x, y: acc.y + n.position.y }),
+            { x: 0, y: 0 }
+          );
+          const cx = avg.x / groupImageNodes.length;
+          const cy = avg.y / groupImageNodes.length;
+          return { x: cx + 400, y: cy };
+        }
+        // 4) Fallback: viewport-ish center offset
+        const defaultX = 600;
+        const defaultY = 300;
+        return { x: defaultX, y: defaultY };
+      };
+
+      const loadingPosition = computeLoadingPosition();
+      
       // Define updater so loading node reflects progress
       const updateLoadingNode = (progressData: any) => {
         setDynamicNodes(prev => prev.map(n => 
