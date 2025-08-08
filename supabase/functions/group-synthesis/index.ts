@@ -127,7 +127,8 @@ serve(async (req: Request) => {
     }
 
     // Compose final structures from AI output (no placeholders)
-    const summary = (ai as any)?.summary ?? {};
+    const summaryRaw = (ai as any)?.summary ?? {};
+    const summary = { ...summaryRaw, groupJobId: job.id };
     const insights = Array.isArray((ai as any)?.insights) ? (ai as any).insights : [];
     const recommendations = Array.isArray((ai as any)?.recommendations) ? (ai as any).recommendations : [];
     const patterns = (ai as any)?.patterns ?? {};
