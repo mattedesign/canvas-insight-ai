@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
-import { useSimpleGroupAnalysis } from './useSimpleGroupAnalysis';
 import { groupAnalysisProgressService, GroupAnalysisProgressData } from '@/services/GroupAnalysisProgressService';
 import { Node } from '@xyflow/react';
+import { startGroupUxAnalysis } from '@/services/StartGroupUxAnalysis';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchLatestGroupAnalysis } from '@/services/fetchLatestGroupAnalysis';
 
 export interface GroupAnalysisHookReturn {
   analyzeGroup: (
@@ -30,7 +32,6 @@ export interface GroupAnalysisHookReturn {
 }
 
 export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
-  const { analyzeGroup: baseAnalyzeGroup } = useSimpleGroupAnalysis();
   const [activeAnalyses, setActiveAnalyses] = useState<Set<string>>(new Set());
   const progressCallbacksRef = useRef<Map<string, (data: GroupAnalysisProgressData) => void>>(new Map());
 
@@ -40,7 +41,6 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
     imageUrls: string[],
     payload: any
   ): Promise<any> => {
-    // Prevent duplicate analyses
     if (activeAnalyses.has(groupId)) {
       throw new Error('Group analysis already in progress');
     }
@@ -48,59 +48,76 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
     setActiveAnalyses(prev => new Set(prev).add(groupId));
 
     try {
-      // Set up progress tracking
-      const onProgressUpdate = (stage: string, progress: number, message?: string) => {
-        groupAnalysisProgressService.updateProgress(groupId, stage, progress, message);
-      };
-
-      // Allow canvas to react to progress updates for this group
+      // Initialize progress tracking
       if (payload?.onProgressNodeUpdate) {
         progressCallbacksRef.current.set(groupId, payload.onProgressNodeUpdate);
       }
-
-      // Register progress callback with service
       groupAnalysisProgressService.startGroupAnalysis(
         groupId,
         groupName,
         imageUrls.length,
         (progressData: GroupAnalysisProgressData) => {
           const callback = progressCallbacksRef.current.get(groupId);
-          if (callback) {
-            callback(progressData);
-          }
+          if (callback) callback(progressData);
         }
       );
 
-      // Execute the analysis with the simplified approach
-      const result = await baseAnalyzeGroup(
-        imageUrls, 
-        payload.prompt || 'Analyze this group of interfaces',
-        'Group UX analysis',
-        payload.groupId || groupId,
+      // Start background job
+      const { jobId } = await startGroupUxAnalysis({
+        groupId,
+        imageUrls,
         groupName,
-        onProgressUpdate
-      );
+        projectId: payload?.projectId || null,
+        userContext: payload?.prompt || payload?.userContext || null,
+      });
 
-      // Mark as completed
-      groupAnalysisProgressService.completeGroupAnalysis(groupId, result);
+      // Subscribe to realtime job updates
+      await new Promise<void>((resolve, reject) => {
+        const channel = supabase
+          .channel(`group-analysis-job-${jobId}`)
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'group_analysis_jobs',
+            filter: `id=eq.${jobId}`,
+          }, async (payload: any) => {
+            const j = payload.new as { status: string; progress: number | null; current_stage: string | null; error?: string | null };
+            groupAnalysisProgressService.updateProgress(groupId, j.current_stage || 'processing', j.progress || 0);
 
-      return result;
+            if (j.status === 'completed') {
+              try {
+                const latest = await fetchLatestGroupAnalysis(groupId);
+                groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                supabase.removeChannel(channel);
+                resolve();
+              } catch (e) {
+                supabase.removeChannel(channel);
+                reject(e);
+              }
+            }
 
+            if (j.status === 'failed') {
+              groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
+              supabase.removeChannel(channel);
+              reject(new Error(j.error || 'Group analysis failed'));
+            }
+          })
+          .subscribe();
+      });
+
+      return fetchLatestGroupAnalysis(groupId);
     } catch (error) {
-      // Mark as failed
       const errorMessage = error instanceof Error ? error.message : 'Group analysis failed';
       groupAnalysisProgressService.failGroupAnalysis(groupId, errorMessage);
       throw error;
-
     } finally {
-      // Clean up active analysis tracking
       setActiveAnalyses(prev => {
         const newSet = new Set(prev);
         newSet.delete(groupId);
         return newSet;
       });
     }
-  }, [baseAnalyzeGroup, activeAnalyses]);
+  }, [activeAnalyses]);
 
   const getLoadingNode = useCallback((
     groupId: string,
