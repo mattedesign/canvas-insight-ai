@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.stability-mockup-generator]
 verify_jwt = true
+
+[functions.inngest-dispatch]
+verify_jwt = true
