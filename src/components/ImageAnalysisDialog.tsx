@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Brain, Wand2, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { AnalysisDataMapper } from '@/services/AnalysisDataMapper';
+import { startUxAnalysis } from '@/services/StartUxAnalysis';
+import { useAnalysisJob } from '@/hooks/useAnalysisJob';
+import { AnalysisJobProgress } from '@/components/AnalysisJobProgress';
+import { fetchLatestAnalysis } from '@/services/fetchLatestAnalysis';
 
 interface ImageAnalysisDialogProps {
   imageId: string;
@@ -27,49 +29,55 @@ export function ImageAnalysisDialog({
   const [userContext, setUserContext] = useState('');
   const [selectedAIModel, setSelectedAIModel] = useState<'claude' | 'openai'>('claude');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const { job } = useAnalysisJob(jobId);
 
   const handleAnalyze = async () => {
-    if (isAnalyzing) return;
+    if (isAnalyzing || jobId) return;
 
     setIsAnalyzing(true);
-    
     try {
       toast.info('Starting AI analysis...');
 
-      const { data, error } = await supabase.functions.invoke('ux-analysis', {
-        body: {
-          type: 'ANALYZE_IMAGE',
-          payload: {
-            imageId,
-            imageUrl,
-            imageName,
-            userContext: userContext || ''
-          },
-          aiModel: selectedAIModel
-        }
+      const { jobId: newJobId } = await startUxAnalysis({
+        imageId,
+        imageUrl,
+        projectId: undefined,
+        userContext: userContext || null,
       });
 
-      if (error) {
-        throw error;
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Analysis failed');
-      }
-
-      // Apply field mapping for consistent data structure
-      const mappedData = AnalysisDataMapper.mapBackendToFrontend(data.data);
-      // COMMENTED OUT: Repetitive analysis completion toast
-      // toast.success('AI analysis completed successfully!');
-      onAnalysisComplete(mappedData);
-      onClose();
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      toast.error(error.message || 'Analysis failed. Please try again.');
-    } finally {
+      setJobId(newJobId);
+    } catch (error: any) {
+      console.error('Analysis start failed:', error);
+      toast.error(error?.message || 'Failed to start analysis');
       setIsAnalyzing(false);
     }
   };
+
+  useEffect(() => {
+    if (!jobId || !job) return;
+
+    if (job.status === 'completed') {
+      (async () => {
+        try {
+          const latest = await fetchLatestAnalysis(imageId);
+          toast.success('AI analysis completed successfully!');
+          onAnalysisComplete(latest);
+          onClose();
+        } catch (e: any) {
+          toast.error(e?.message || 'Failed to load analysis results');
+        } finally {
+          setJobId(null);
+          setIsAnalyzing(false);
+        }
+      })();
+    } else if (job.status === 'failed') {
+      const msg = job.error || 'Analysis failed';
+      toast.error(msg);
+      setJobId(null);
+      setIsAnalyzing(false);
+    }
+  }, [jobId, job]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

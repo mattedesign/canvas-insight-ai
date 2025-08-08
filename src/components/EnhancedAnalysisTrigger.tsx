@@ -3,7 +3,7 @@
  * Provides UI to trigger both traditional and natural AI analysis
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +17,13 @@ import {
   Sparkles,
   Target
 } from 'lucide-react';
-import { useOptimizedAnalysis } from '@/hooks/useOptimizedAnalysis';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { AnalysisContext } from '@/types/contextTypes';
-import { EnhancedAnalysisProgress } from './EnhancedAnalysisProgress';
+import { startUxAnalysis } from '@/services/StartUxAnalysis';
+import { useAnalysisJob } from '@/hooks/useAnalysisJob';
+import { AnalysisJobProgress } from './AnalysisJobProgress';
+import { fetchLatestAnalysis } from '@/services/fetchLatestAnalysis';
+import { toast } from 'sonner';
 
 interface EnhancedAnalysisTriggerProps {
   image: UploadedImage;
@@ -43,58 +46,65 @@ export function EnhancedAnalysisTrigger({
 }: EnhancedAnalysisTriggerProps) {
   const [useNaturalPipeline, setUseNaturalPipeline] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const { progress, analyzeImage } = useOptimizedAnalysis();
+  const [jobId, setJobId] = useState<string | null>(null);
+  const { job } = useAnalysisJob(jobId);
 
   const handleAnalyze = async () => {
-    if (!image.url || isAnalyzing) return;
+    if (!image.url || isAnalyzing || jobId) return;
 
     setIsAnalyzing(true);
 
     try {
-      console.log('🚀 Starting analysis:', {
+      console.log('🚀 Starting analysis job:', {
         useNaturalPipeline,
         hasAnalysisContext: !!analysisContext,
         imageUrl: image.url.substring(0, 50) + '...'
       });
 
-      const analysis = await analyzeImage(
-        image.url,
-        {
-          userContext: userContext || '',
-          imageName: image.name,
-          imageId: image.id
-        },
-        {
-          useNaturalPipeline,
-          analysisContext
-        }
-      );
+      const { jobId: newJobId } = await startUxAnalysis({
+        imageId: image.id,
+        imageUrl: image.url,
+        projectId: undefined,
+        userContext: userContext || null,
+      });
 
-      if (analysis) {
-        // Ensure the analysis has the correct image information
-        const enhancedAnalysis: UXAnalysis = {
-          ...analysis,
-          imageId: image.id,
-          imageName: image.name,
-          imageUrl: image.url
-        };
-
-        console.log('✅ Analysis completed:', {
-          pipeline: useNaturalPipeline ? 'natural' : 'traditional',
-          hasNaturalMetadata: !!analysis.metadata.naturalAnalysisMetadata,
-          insightCount: analysis.suggestions?.length || 0
-        });
-
-        onAnalysisComplete?.(enhancedAnalysis);
-      }
-    } catch (error) {
-      console.error('❌ Analysis failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
-      onAnalysisError?.(errorMessage);
-    } finally {
+      setJobId(newJobId);
+      toast.info('Analysis started. Tracking progress...');
+    } catch (error: any) {
+      console.error('❌ Failed to start analysis:', error);
+      const message = error?.message || 'Failed to start analysis';
+      toast.error(message);
+      onAnalysisError?.(message);
       setIsAnalyzing(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!jobId || !job) return;
+
+    if (job.status === 'completed') {
+      (async () => {
+        try {
+          const latest = await fetchLatestAnalysis(image.id);
+          onAnalysisComplete?.(latest as UXAnalysis);
+          toast.success('Analysis complete');
+        } catch (e: any) {
+          const msg = e?.message || 'Failed to fetch analysis results';
+          toast.error(msg);
+          onAnalysisError?.(msg);
+        } finally {
+          setJobId(null);
+          setIsAnalyzing(false);
+        }
+      })();
+    } else if (job.status === 'failed') {
+      const msg = job.error || 'Analysis failed';
+      toast.error(msg);
+      onAnalysisError?.(msg);
+      setJobId(null);
+      setIsAnalyzing(false);
+    }
+  }, [jobId, job]);
 
   return (
     <Card className={className}>
@@ -169,28 +179,16 @@ export function EnhancedAnalysisTrigger({
         )}
 
         {/* Progress Display */}
-        {isAnalyzing && (
+        {jobId && (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>{progress.stage}</span>
-              <span>{progress.progress}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{ width: `${progress.progress}%` }}
-              />
-            </div>
-            {progress.error && (
-              <div className="text-sm text-destructive">{progress.error}</div>
-            )}
+            <AnalysisJobProgress job={job} />
           </div>
         )}
 
         {/* Action Button */}
         <Button
           onClick={handleAnalyze}
-          disabled={disabled || isAnalyzing || !image.url}
+          disabled={disabled || isAnalyzing || !!jobId || !image.url}
           className="w-full"
           size="lg"
         >
