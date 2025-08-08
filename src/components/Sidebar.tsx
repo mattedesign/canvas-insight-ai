@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { UXAnalysis, UploadedImage } from '@/types/ux-analysis';
 import { useAuth } from '@/context/AuthContext';
+import { FeatureFlagService } from '@/services/FeatureFlagService';
 
 interface SidebarProps {
   onClearCanvas: () => void;
@@ -52,12 +53,12 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
   const isOnProjects = location.pathname === '/projects';
   const isOnSubscription = location.pathname === '/subscription';
   const isOnAnalysisV2 = location.pathname === '/analysis-v2';
-  
+  const showAnalysisV2 = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id ?? undefined, user?.email ?? undefined);
   
   const sidebarIcons = [
     { icon: BarChart3, label: 'Dashboard', active: isOnDashboard },
     { icon: Folder, label: 'Previous', active: isOnProjects },
-    { icon: Brain, label: 'Analysis V2', active: isOnAnalysisV2 },
+    ...(showAnalysisV2 ? ([{ icon: Brain, label: 'Analysis V2', active: isOnAnalysisV2 }] as const) : []),
     { icon: Bell, label: 'Notifications', active: false },
     { icon: Crown, label: 'Subscription', active: isOnSubscription },
     { icon: User, label: 'Profile', active: false },

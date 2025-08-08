@@ -60,15 +60,55 @@ serve(async (req: Request) => {
     }
 
     const insertEvent = async (fields: Partial<{ event_name: string; status: string; progress: number; message: string; metadata: Json }>) => {
+      const nowISO = new Date().toISOString();
+      const eventName = fields.event_name ?? "analysis/vision.event";
+      const stage = (eventName.split('/')[1] || '').split('.')[0] || 'vision';
+      const provider = (fields.metadata as any)?.provider;
+      let started_at: string | null = null;
+      let ended_at: string | null = null;
+      let duration_ms: number | null = null;
+
+      if (eventName.endsWith('.started') || fields.status === 'processing') {
+        started_at = nowISO;
+      }
+      if (
+        eventName.endsWith('.completed') ||
+        eventName.endsWith('.failed') ||
+        fields.status === 'completed' ||
+        fields.status === 'failed'
+      ) {
+        ended_at = nowISO;
+        let query: any = supabase
+          .from('analysis_events')
+          .select('id, started_at, created_at')
+          .eq('job_id', job.id)
+          .eq('event_name', `analysis/${stage}.started`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (provider) {
+          query = query.contains('metadata', { provider });
+        }
+        const { data: startRows } = await query;
+        const startAt = startRows?.[0]?.started_at || startRows?.[0]?.created_at || null;
+        if (startAt) {
+          started_at = started_at ?? startAt;
+          duration_ms = new Date(ended_at).getTime() - new Date(startAt).getTime();
+        }
+      }
+
       const payload: any = {
         id: crypto.randomUUID(),
         job_id: job.id,
         user_id: job.user_id,
-        event_name: fields.event_name ?? "analysis/vision.event",
+        event_name: eventName,
+        stage,
         status: fields.status ?? null,
         progress: fields.progress ?? 0,
         message: fields.message ?? null,
         metadata: fields.metadata ?? {},
+        started_at,
+        ended_at,
+        duration_ms,
       };
       const { error } = await supabase.from("analysis_events").insert(payload);
       if (error) console.error("Failed to insert analysis_event", error, payload);

@@ -122,6 +122,8 @@ export type Database = {
       analysis_events: {
         Row: {
           created_at: string
+          duration_ms: number | null
+          ended_at: string | null
           event_name: string
           group_job_id: string | null
           id: string
@@ -130,11 +132,14 @@ export type Database = {
           metadata: Json
           progress: number
           stage: string | null
+          started_at: string | null
           status: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          duration_ms?: number | null
+          ended_at?: string | null
           event_name: string
           group_job_id?: string | null
           id?: string
@@ -143,11 +148,14 @@ export type Database = {
           metadata?: Json
           progress?: number
           stage?: string | null
+          started_at?: string | null
           status?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          duration_ms?: number | null
+          ended_at?: string | null
           event_name?: string
           group_job_id?: string | null
           id?: string
@@ -156,6 +164,7 @@ export type Database = {
           metadata?: Json
           progress?: number
           stage?: string | null
+          started_at?: string | null
           status?: string | null
           user_id?: string | null
         }

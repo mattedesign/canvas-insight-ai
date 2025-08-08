@@ -92,62 +92,44 @@ serve(async (req) => {
 
       userId = (updatedJob as any)?.user_id ?? null;
 
+      const eventName = eventName ?? stage ?? status ?? "progress";
+      let started_at: string | null = null;
+      let ended_at: string | null = null;
+      let duration_ms: number | null = null;
+      const nowISO = new Date().toISOString();
+
+      if (status === 'processing' || (typeof eventName === 'string' && eventName.endsWith('.started'))) {
+        started_at = nowISO;
+      }
+      if (status === 'completed' || status === 'failed' || (typeof eventName === 'string' && (eventName.endsWith('.completed') || eventName.endsWith('.failed')))) {
+        ended_at = nowISO;
+        const { data: startRows } = await supabase
+          .from('analysis_events')
+          .select('id, started_at, created_at')
+          .eq('job_id', jobId)
+          .eq('stage', stage ?? null)
+          .eq('status', 'processing')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const startAt = startRows?.[0]?.started_at || startRows?.[0]?.created_at || null;
+        if (startAt) {
+          started_at = started_at ?? startAt;
+          duration_ms = new Date(ended_at).getTime() - new Date(startAt).getTime();
+        }
+      }
+
       const { error: insertEvtErr } = await supabase.from("analysis_events").insert({
         job_id: jobId,
         user_id: userId,
-        event_name: eventName ?? stage ?? status ?? "progress",
+        event_name: eventName,
         stage: stage ?? null,
         status: status ?? null,
         progress: safeProgress,
         message: message ?? null,
         metadata: metadata ?? {},
-      });
-
-      if (insertEvtErr) {
-        console.error("Failed inserting analysis_event:", insertEvtErr);
-        // Don't fail the whole request on event insert; just log
-      }
-    }
-
-    if (groupJobId) {
-      // Update group_analysis_jobs
-      const update: Record<string, unknown> = {
-        current_stage: stage ?? null,
-        status: status ?? null,
-        progress: safeProgress,
-        error: error ?? null,
-        updated_at: new Date().toISOString(),
-      };
-      if (status === "completed" || status === "failed") {
-        update.completed_at = new Date().toISOString();
-      }
-
-      const { data: updatedJob, error: updateErr } = await supabase
-        .from("group_analysis_jobs")
-        .update(update)
-        .eq("id", groupJobId)
-        .select("id,user_id")
-        .maybeSingle();
-
-      if (updateErr) {
-        console.error("Failed updating group_analysis_jobs:", updateErr);
-        return new Response(JSON.stringify({ error: updateErr.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      userId = (updatedJob as any)?.user_id ?? null;
-
-      const { error: insertEvtErr } = await supabase.from("analysis_events").insert({
-        group_job_id: groupJobId,
-        user_id: userId,
-        event_name: eventName ?? stage ?? status ?? "progress",
-        stage: stage ?? null,
-        status: status ?? null,
-        progress: safeProgress,
-        message: message ?? null,
-        metadata: metadata ?? {},
+        started_at,
+        ended_at,
+        duration_ms,
       });
 
       if (insertEvtErr) {

@@ -4,6 +4,8 @@ import { AnalysisStatusPipeline } from "@/components/AnalysisStatusPipeline";
 import { AnalysisJobProgress } from "@/components/AnalysisJobProgress";
 import { useAnalysisJob } from "@/hooks/useAnalysisJob";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { FeatureFlagService } from "@/services/FeatureFlagService";
 
 // Simple SEO helpers per page requirements
 const usePageSEO = () => {
@@ -35,6 +37,9 @@ export default function AnalysisV2() {
   const [params] = useSearchParams();
   const jobId = params.get("jobId");
   const { job } = useAnalysisJob(jobId);
+  const { user } = useAuth();
+  FeatureFlagService.initialize();
+  const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user?.email);
 
   const [events, setEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState<boolean>(!!jobId);
@@ -153,6 +158,17 @@ export default function AnalysisV2() {
 
   const isComplete = job?.status === "completed";
   const hasError = job?.status === "failed";
+
+  if (!uiEnabled) {
+    return (
+      <main className="container mx-auto max-w-5xl px-4 py-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight">Event-driven UX Analysis (Analysis V2)</h1>
+          <p className="text-sm text-muted-foreground">This feature is not enabled for your account.</p>
+        </header>
+      </main>
+    );
+  }
 
   return (
     <main className="container mx-auto max-w-5xl px-4 py-8">

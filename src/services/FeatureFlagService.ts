@@ -86,6 +86,15 @@ export class FeatureFlagService {
         rolloutPercentage: 100,
         createdAt: new Date(),
         updatedAt: new Date()
+      },
+      {
+        id: 'new_pipeline_ui',
+        name: 'New Pipeline UI',
+        description: 'Enable event-driven Analysis V2 pipeline UI',
+        enabled: true,
+        rolloutPercentage: 100,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
 
