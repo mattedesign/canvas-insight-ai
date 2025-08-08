@@ -161,40 +161,49 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string | null
+          current_stage: string | null
           error: string | null
           id: string
           image_id: string
           image_url: string
           metadata: Json | null
           progress: number | null
+          project_id: string | null
           status: string | null
           updated_at: string | null
+          user_context: string | null
           user_id: string | null
         }
         Insert: {
           completed_at?: string | null
           created_at?: string | null
+          current_stage?: string | null
           error?: string | null
           id?: string
           image_id: string
           image_url: string
           metadata?: Json | null
           progress?: number | null
+          project_id?: string | null
           status?: string | null
           updated_at?: string | null
+          user_context?: string | null
           user_id?: string | null
         }
         Update: {
           completed_at?: string | null
           created_at?: string | null
+          current_stage?: string | null
           error?: string | null
           id?: string
           image_id?: string
           image_url?: string
           metadata?: Json | null
           progress?: number | null
+          project_id?: string | null
           status?: string | null
           updated_at?: string | null
+          user_context?: string | null
           user_id?: string | null
         }
         Relationships: []
