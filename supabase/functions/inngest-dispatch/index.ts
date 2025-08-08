@@ -7,7 +7,7 @@ const corsHeaders: HeadersInit = {
 };
 
 // Inngest Events API endpoint (v2)
-const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v2/events/send";
+const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v1/events";
 
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"

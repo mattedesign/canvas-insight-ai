@@ -10,8 +10,9 @@ export default function InngestTestTrigger() {
   const fired = useRef(false);
 
   useEffect(() => {
+    const force = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("forceInngest") === "1";
     const already = localStorage.getItem("inngestTestFired");
-    if (fired.current || already === "1") return;
+    if (fired.current || (already === "1" && !force)) return;
 
     fired.current = true;
 
