@@ -1416,6 +1416,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_analysis_events: {
+        Args: { p_retention_days?: number }
+        Returns: number
+      }
       cleanup_monitoring_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
