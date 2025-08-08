@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { edgeFunctionLogger } from '@/services/EdgeFunctionLogger';
-import { EnhancedAnalysisPipeline, AnalysisProgress, EnhancedAnalysisResult } from '@/services/EnhancedAnalysisPipeline';
+import type { AnalysisProgress } from '@/services/EnhancedAnalysisPipeline';
 import { AnalysisContext } from '@/types/contextTypes';
+import { startUxAnalysis } from '@/services/StartUxAnalysis';
+import { fetchLatestAnalysis } from '@/services/fetchLatestAnalysis';
 
 interface AIContextType {
   selectedAIModel: 'auto' | 'claude-opus-4-20250514' | 'stability-ai' | 'gpt-4o';
@@ -76,154 +77,77 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setRequiresClarification(false);
     setClarificationQuestions([]);
     setAnalysisContext(null);
-    
-    // Store current analysis parameters for potential clarification
     setCurrentAnalysisParams({ imageId, imageUrl, imageName, userContext });
-    
-    const modelName = selectedAIModel === 'auto' ? 'Smart Selection' : 
-                     selectedAIModel === 'claude-opus-4-20250514' ? 'Claude Opus 4' :
-                     selectedAIModel === 'stability-ai' ? 'Stability AI' : 'GPT 4o';
 
     toast({
-      title: "Enhanced AI Analysis Started",
-      description: `${modelName} is analyzing your interface with context awareness...`,
+      title: "AI Analysis Started",
+      description: `Analyzing ${imageName}...`,
     });
 
     try {
-      console.log('Starting enhanced AI analysis for:', { imageId, imageName });
-      
-      // Create enhanced analysis pipeline with progress tracking
-      const pipeline = new EnhancedAnalysisPipeline((progress: AnalysisProgress) => {
-        setAnalysisProgress(progress);
-        console.log('Analysis progress:', progress);
-      });
-
-      // PHASE 2: Use enhanced image data handling
-      const imageData = await getValidImageData({ id: imageId, url: imageUrl, name: imageName });
-      
-      const result: EnhancedAnalysisResult = await pipeline.executeContextAwareAnalysis(
+      const { jobId } = await startUxAnalysis({
         imageId,
-        imageData.url,
-        imageName,
-        userContext
-      );
-
-      if (result.requiresClarification) {
-        // Handle clarification needed
-        setRequiresClarification(true);
-        setClarificationQuestions(result.clarificationQuestions || []);
-        setAnalysisContext(result.analysisContext || null);
-        
-        toast({
-          title: "Additional Context Needed",
-          description: "Please provide some details to optimize the analysis for your needs.",
-        });
-        
-        return result; // Return partial result for clarification
-      }
-
-      if (!result.success) {
-        throw new Error(result.error || 'Enhanced analysis failed');
-      }
-
-      console.log('Enhanced AI analysis completed successfully');
-      
-      const interfaceType = result.analysisContext?.image.primaryType || 'interface';
-      const confidence = result.analysisContext?.confidence || 0;
-      
-      toast({
-        title: "Enhanced Analysis Complete",
-        description: `${interfaceType} analysis completed with ${Math.round(confidence * 100)}% confidence`,
+        imageUrl,
+        userContext: userContext || null,
       });
 
-      // Clear progress and clarification state on success
+      const result = await new Promise<any>((resolve, reject) => {
+        const channel = supabase
+          .channel(`analysis-job-${jobId}`)
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'analysis_jobs',
+            filter: `id=eq.${jobId}`,
+          }, async (payload: any) => {
+            const j = payload.new as { status: string; progress: number | null; current_stage: string | null; error?: string | null };
+            setAnalysisProgress({ stage: j.current_stage || 'processing', progress: j.progress || 0 } as AnalysisProgress);
+
+            if (j.status === 'completed') {
+              try {
+                const latest = await fetchLatestAnalysis(imageId);
+                supabase.removeChannel(channel);
+                resolve(latest);
+              } catch (e: any) {
+                supabase.removeChannel(channel);
+                reject(new Error(e?.message || 'Failed to fetch analysis results'));
+              } finally {
+                setIsAnalyzing(false);
+                setCurrentAnalysisParams(null);
+              }
+            }
+
+            if (j.status === 'failed') {
+              supabase.removeChannel(channel);
+              setIsAnalyzing(false);
+              setCurrentAnalysisParams(null);
+              reject(new Error(j.error || 'Analysis failed'));
+            }
+          })
+          .subscribe();
+      });
+
+      toast({ title: 'Analysis Complete', description: `${imageName} analyzed successfully` });
       setAnalysisProgress(null);
-      setRequiresClarification(false);
-      setCurrentAnalysisParams(null);
-
-      return result.data;
-
+      return result;
     } catch (error) {
-      console.error('Enhanced AI analysis failed:', error);
-      
-      toast({
-        title: "Enhanced Analysis Failed",
-        description: `Context-aware analysis failed. Please try again.`,
-        variant: "destructive",
-      });
-      
+      console.error('Job-based analysis failed:', error);
+      toast({ title: 'Analysis Failed', description: 'Failed to analyze image.', variant: 'destructive' });
       setAnalysisProgress(null);
-      setRequiresClarification(false);
-      setCurrentAnalysisParams(null);
-      
       throw error;
     } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedAIModel, toast]);
+  }, [toast]);
 
-  const provideClarificationAndContinue = useCallback(async (responses: Record<string, string>) => {
-    if (!currentAnalysisParams || !analysisContext) {
-      throw new Error('No analysis in progress');
-    }
-
-    setIsAnalyzing(true);
-    setRequiresClarification(false);
-    
+  const provideClarificationAndContinue = useCallback(async (_responses: Record<string, string>) => {
     toast({
-      title: "Continuing Analysis",
-      description: "Processing your feedback to provide optimized insights...",
+      title: 'Clarification Not Supported',
+      description: 'The job-based pipeline currently does not support interactive clarification.',
+      variant: 'destructive',
     });
-
-    try {
-      const pipeline = new EnhancedAnalysisPipeline((progress: AnalysisProgress) => {
-        setAnalysisProgress(progress);
-      });
-
-      const result = await pipeline.processClarificationAndContinue(
-        currentAnalysisParams.imageId,
-        currentAnalysisParams.imageUrl,
-        currentAnalysisParams.imageName,
-        analysisContext,
-        responses,
-        currentAnalysisParams.userContext
-      );
-
-      if (!result.success) {
-        throw new Error(result.error || 'Enhanced analysis with clarification failed');
-      }
-
-      const interfaceType = result.analysisContext?.image.primaryType || 'interface';
-      const confidence = (result.analysisContext as any)?.enhancedConfidence || result.analysisContext?.confidence || 0;
-      
-      toast({
-        title: "Enhanced Analysis Complete",
-        description: `${interfaceType} analysis completed with ${Math.round(confidence * 100)}% confidence`,
-      });
-
-      // Clear all state
-      setAnalysisProgress(null);
-      setRequiresClarification(false);
-      setClarificationQuestions([]);
-      setAnalysisContext(null);
-      setCurrentAnalysisParams(null);
-
-      return result.data;
-
-    } catch (error) {
-      console.error('Enhanced analysis with clarification failed:', error);
-      
-      toast({
-        title: "Enhanced Analysis Failed",
-        description: "Failed to complete analysis with provided context.",
-        variant: "destructive",
-      });
-      
-      throw error;
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [currentAnalysisParams, analysisContext, toast]);
+    throw new Error('Clarification flow not supported in job-based pipeline');
+  }, [toast]);
 
   const cancelAnalysis = useCallback(() => {
     setIsAnalyzing(false);
