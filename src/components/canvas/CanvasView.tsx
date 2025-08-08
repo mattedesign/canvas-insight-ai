@@ -293,12 +293,21 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         ? { x: promptNode.position.x + 400, y: promptNode.position.y }
         : { x: 500, y: 200 };
 
+      // Define updater so loading node reflects progress
+      const updateLoadingNode = (progressData: any) => {
+        setDynamicNodes(prev => prev.map(n => 
+          n.id === `group-analysis-loading-${groupId}`
+            ? { ...n, data: { ...(n as any).data, ...progressData } }
+            : n
+        ));
+      };
+
       // Kick off analysis (this synchronously registers progress tracking)
       const analysisPromise = groupAnalysisProgress.analyzeGroup(
         groupId,
         group.name,
         imageUrls,
-        { groupId, prompt, isCustom }
+        { groupId, prompt, isCustom, onProgressNodeUpdate: updateLoadingNode }
       );
 
       // Immediately show loading node and connection
@@ -342,11 +351,10 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           groupId,
           progressResult,
           loadingPosition,
-          {
-            onEditPrompt: onEditGroupPrompt,
-            onCreateFork: onCreateFork,
-            onViewDetails: onOpenAnalysisPanel
-          }
+            {
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: onCreateFork
+            }
         );
 
         setDynamicNodes(prev => prev.filter(n => n.id !== `group-analysis-loading-${groupId}`));
@@ -591,10 +599,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
     try {
       const imageUrls = imagesToAnalyze.map(img => img.url);
+      const updateLoadingNode = (progressData: any) => {
+        setDynamicNodes(prev => prev.map(node => 
+          node.id === `group-analysis-loading-${groupId}`
+            ? { ...node, data: { ...(node as any).data, ...progressData } }
+            : node
+        ));
+      };
       const payload = {
         groupId,
         prompt: 'Analyze the design consistency across these screens. Focus on typography, color usage, spacing patterns, component styles, and overall visual harmony. Identify inconsistencies and provide recommendations for a unified design system.',
-        isCustom: false
+        isCustom: false,
+        onProgressNodeUpdate: updateLoadingNode
       };
 
       const result = await groupAnalysisProgress.analyzeGroup(
@@ -613,8 +629,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         { x: loadingNodePosition.x + 400, y: loadingNodePosition.y }, // Position to the right of loading
         {
           onEditPrompt: onEditGroupPrompt,
-          onCreateFork: onCreateFork,
-          onViewDetails: (analysisId) => onOpenAnalysisPanel?.(analysisId)
+          onCreateFork: onCreateFork
         }
       );
       

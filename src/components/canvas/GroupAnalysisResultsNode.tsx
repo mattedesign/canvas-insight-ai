@@ -239,6 +239,9 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
               size="sm"
               onClick={() => onViewDetails?.(analysis.id)}
               className="flex-1"
+              disabled={!onViewDetails}
+              aria-disabled={!onViewDetails}
+              title={!onViewDetails ? 'Details view not available' : undefined}
             >
               <Eye className="w-3 h-3 mr-1" />
               View Details

@@ -53,6 +53,11 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
         groupAnalysisProgressService.updateProgress(groupId, stage, progress, message);
       };
 
+      // Allow canvas to react to progress updates for this group
+      if (payload?.onProgressNodeUpdate) {
+        progressCallbacksRef.current.set(groupId, payload.onProgressNodeUpdate);
+      }
+
       // Register progress callback with service
       groupAnalysisProgressService.startGroupAnalysis(
         groupId,
@@ -72,7 +77,8 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
         payload.prompt || 'Analyze this group of interfaces',
         'Group UX analysis',
         payload.groupId || groupId,
-        groupName
+        groupName,
+        onProgressUpdate
       );
 
       // Mark as completed

@@ -38,7 +38,8 @@ export const useSimpleGroupAnalysis = () => {
     prompt: string,
     userContext?: string,
     groupId?: string,
-    groupName?: string
+    groupName?: string,
+    onProgress?: (stage: string, progress: number, message?: string) => void
   ): Promise<SimpleGroupAnalysisResult> => {
     console.log('useSimpleGroupAnalysis - Starting group analysis:', {
       imageUrlsCount: imageUrls.length,
@@ -74,19 +75,14 @@ export const useSimpleGroupAnalysis = () => {
     console.log('Valid URLs for analysis:', validUrls.length);
 
     try {
-      setProgress({
-        stage: 'initializing',
-        progress: 10,
-        message: `Preparing to analyze ${validUrls.length} images`,
-        isLoading: true
-      });
+      // helper to emit progress both to local state and external listener
+      const emit = (stage: string, pct: number, msg?: string, isLoading = true) => {
+        setProgress({ stage, progress: pct, message: msg, isLoading });
+        try { onProgress?.(stage, pct, msg); } catch (e) { console.warn('onProgress callback error', e); }
+      };
 
-      setProgress({
-        stage: 'processing',
-        progress: 30,
-        message: 'Analyzing individual images...',
-        isLoading: true
-      });
+      emit('starting', 5, `Preparing to analyze ${validUrls.length} images`);
+      emit('individual-analysis', 30, 'Analyzing individual images...');
 
       // Call the new simplified edge function
       const { data, error } = await supabase.functions.invoke('group-ux-analysis', {
@@ -109,12 +105,18 @@ export const useSimpleGroupAnalysis = () => {
         throw new Error(`Analysis failed: ${data?.error || 'Unknown error'}`);
       }
 
+      // Advance progress through synthesis/finalization phases
+      emit('synthesizing', 80, 'Synthesizing group insights...', true);
+      emit('finalizing', 95, 'Finalizing results...', true);
+
       setProgress({
         stage: 'completed',
         progress: 100,
         message: 'Group analysis completed successfully',
         isLoading: false
       });
+      try { onProgress?.('complete', 100, 'Group analysis completed successfully'); } catch {}
+
 
       console.log('Group analysis completed:', {
         totalImages: data.metadata?.totalImages,
@@ -139,6 +141,8 @@ export const useSimpleGroupAnalysis = () => {
         isLoading: false,
         error: errorMessage
       });
+
+      try { onProgress?.('error', 0, errorMessage); } catch {}
 
       // Show error toast
       toast.error(`Group analysis failed: ${errorMessage}`);
