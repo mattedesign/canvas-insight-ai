@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { FeatureFlagService } from "@/services/FeatureFlagService";
 import { AnalysisStatusPipeline } from "@/components/AnalysisStatusPipeline";
+import { useGroupAnalysisJob } from "@/hooks/useGroupAnalysisJob";
 
 const usePageSEO = () => {
   useEffect(() => {
@@ -25,7 +26,9 @@ export default function GroupAnalysisV2() {
   const groupJobId = params.get("groupJobId");
   const { user } = useAuth();
   FeatureFlagService.initialize();
-  const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user?.email);
+const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user?.email);
+
+  const { job } = useGroupAnalysisJob(groupJobId);
 
   const [events, setEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState<boolean>(!!groupJobId);
@@ -63,17 +66,8 @@ export default function GroupAnalysisV2() {
   useEffect(() => {
     let mounted = true;
     const loadFinal = async () => {
-      if (!groupJobId) return;
+      if (!groupJobId || !job || job.status !== 'completed' || !job.group_id) return;
       setFinalLoading(true); setFinalError(null); setFinalResult(null);
-      // Load group_id from the job
-      const { data: job, error: jobErr } = await supabase
-        .from('group_analysis_jobs')
-        .select('group_id, status')
-        .eq('id', groupJobId)
-        .maybeSingle();
-      if (!mounted) return;
-      if (jobErr || !job) { setFinalError(jobErr?.message || 'Job not found'); setFinalLoading(false); return; }
-      if (job.status !== 'completed') { setFinalLoading(false); return; }
       const { data, error } = await supabase
         .from('group_analyses')
         .select('id, summary, insights, recommendations, patterns, created_at')
@@ -86,15 +80,41 @@ export default function GroupAnalysisV2() {
     };
     loadFinal();
     return () => { mounted = false };
-  }, [groupJobId]);
+  }, [groupJobId, job]);
 
-  const stages = useMemo(() => ([
-    { id: 'context', name: 'Context detection', status: 'pending' as const },
-    { id: 'vision', name: 'Vision analysis', status: 'pending' as const },
-    { id: 'ai', name: 'AI analysis', status: 'pending' as const },
-    { id: 'synthesis', name: 'Synthesis', status: 'pending' as const },
-    { id: 'completed', name: 'Finalization', status: 'pending' as const },
-  ]), []);
+  const stages = useMemo(() => {
+    const base = [
+      { id: 'context', name: 'Context detection', status: 'pending' as const },
+      { id: 'vision', name: 'Vision analysis', status: 'pending' as const },
+      { id: 'ai', name: 'AI analysis', status: 'pending' as const },
+      { id: 'synthesis', name: 'Synthesis', status: 'pending' as const },
+      { id: 'completed', name: 'Finalization', status: 'pending' as const },
+    ];
+    if (!job) return base;
+    if (job.status === 'completed') return base.map((s) => ({ ...s, status: 'completed' as const }));
+    if (job.status === 'failed') {
+      const idx = base.findIndex((s) => job.current_stage?.includes(s.id));
+      return base.map((s, i) => {
+        if (i < idx) return { ...s, status: 'completed' as const };
+        if (i === idx) return { ...s, status: 'error' as const };
+        return s;
+      });
+    }
+    const idx = base.findIndex((s) => job.current_stage?.includes(s.id));
+    return base.map((s, i) => {
+      if (i < idx) return { ...s, status: 'completed' as const };
+      if (i === idx) return { ...s, status: 'running' as const, progress: job.progress ?? 0 };
+      return s;
+    });
+  }, [job]);
+
+  const overall = useMemo(() => {
+    if (!job?.progress) return 0;
+    return Math.max(0, Math.min(100, job.progress));
+  }, [job?.progress]);
+
+  const isComplete = job?.status === 'completed';
+  const hasError = job?.status === 'failed';
 
   if (!uiEnabled) {
     return (
@@ -118,7 +138,7 @@ export default function GroupAnalysisV2() {
         <section className="rounded border p-4"><p className="text-sm">No job selected.</p></section>
       ) : (
         <section className="space-y-6">
-          <AnalysisStatusPipeline stages={stages as any} overallProgress={0} isComplete={false} hasError={false} />
+          <AnalysisStatusPipeline stages={stages as any} overallProgress={overall} isComplete={!!isComplete} hasError={!!hasError} />
 
           <section className="rounded border p-4">
             <h2 className="text-sm font-medium mb-2">Stage events</h2>
