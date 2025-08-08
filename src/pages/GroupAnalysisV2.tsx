@@ -72,6 +72,7 @@ const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user
         .from('group_analyses')
         .select('id, summary, insights, recommendations, patterns, created_at')
         .eq('group_id', job.group_id)
+        .contains('summary', { groupJobId })
         .order('created_at', { ascending: false })
         .limit(1);
       if (!mounted) return;
