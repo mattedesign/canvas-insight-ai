@@ -7,7 +7,7 @@ const corsHeaders: HeadersInit = {
 };
 
 // Inngest Events API endpoint (v2)
-const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v2/events";
+const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v2/events/send";
 
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"
@@ -60,16 +60,15 @@ serve(async (req: Request) => {
       }
     }
 
-    // Build payload for Inngest v2 API
-    const payload = {
-      events: events.map((ev) => ({
-        name: ev.name,
-        data: ev.data ?? {},
-        user: ev.user,
-        ts: ev.ts ?? new Date().toISOString(),
-        id: ev.id,
-      })),
-    };
+    // Build payload for Inngest v2 API (send single object or an array)
+    const transformed = events.map((ev) => ({
+      name: ev.name,
+      data: ev.data ?? {},
+      user: ev.user,
+      ts: ev.ts ?? new Date().toISOString(),
+      id: ev.id,
+    }));
+    const payload = transformed.length === 1 ? transformed[0] : transformed;
 
     const res = await fetch(INNGEST_EVENTS_ENDPOINT, {
       method: "POST",
