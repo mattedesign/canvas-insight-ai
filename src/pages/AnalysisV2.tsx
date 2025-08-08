@@ -40,6 +40,10 @@ export default function AnalysisV2() {
   const [eventsLoading, setEventsLoading] = useState<boolean>(!!jobId);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
+  const [finalResult, setFinalResult] = useState<any | null>(null);
+  const [finalLoading, setFinalLoading] = useState<boolean>(false);
+  const [finalError, setFinalError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!jobId) {
       setEvents([]);
@@ -82,6 +86,35 @@ export default function AnalysisV2() {
       if (channel) supabase.removeChannel(channel);
     };
   }, [jobId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadFinal = async () => {
+      if (!jobId || !job || job.status !== 'completed') return;
+      setFinalLoading(true);
+      setFinalError(null);
+      setFinalResult(null);
+      const query = supabase
+        .from('ux_analyses')
+        .select('id, summary, suggestions, visual_annotations, metadata, created_at')
+        .eq('user_id', job.user_id)
+        .eq('project_id', job.project_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const { data, error } = await query;
+      if (!mounted) return;
+      if (error) {
+        setFinalError(error.message);
+      } else {
+        setFinalResult(Array.isArray(data) && data.length > 0 ? data[0] : null);
+      }
+      setFinalLoading(false);
+    };
+
+    loadFinal();
+    return () => { mounted = false };
+  }, [job, jobId]);
+
   const stages = useMemo(() => {
     const base = [
       { id: "context", name: "Context detection", status: "pending" as const },
@@ -171,6 +204,34 @@ export default function AnalysisV2() {
               <p className="mt-3 text-xs text-muted-foreground">
                 Analysis completed. Final results are stored securely; UI retrieval depends on data access policies.
               </p>
+            )}
+          </section>
+
+          <section className="rounded border p-4">
+            <h2 className="text-sm font-medium mb-2">Final results</h2>
+            {!isComplete ? (
+              <p className="text-sm text-muted-foreground">Pipeline not completed yet.</p>
+            ) : finalLoading ? (
+              <p className="text-sm text-muted-foreground">Loading final results…</p>
+            ) : finalError ? (
+              <p className="text-sm text-destructive">Failed to load results: {finalError}</p>
+            ) : !finalResult ? (
+              <p className="text-sm text-muted-foreground">No final analysis found.</p>
+            ) : (
+              <article className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-medium">Summary</h3>
+                  <pre className="mt-1 rounded bg-muted p-2 text-xs overflow-auto">{JSON.stringify(finalResult.summary ?? {}, null, 2)}</pre>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium">Suggestions ({Array.isArray(finalResult.suggestions) ? finalResult.suggestions.length : 0})</h3>
+                  <ul className="list-disc pl-5 text-sm">
+                    {Array.isArray(finalResult.suggestions) && finalResult.suggestions.slice(0, 10).map((s: any, i: number) => (
+                      <li key={i}>{s?.title || s?.id || 'Suggestion'}</li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
             )}
           </section>
         </section>
