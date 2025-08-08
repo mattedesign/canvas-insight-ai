@@ -6,8 +6,9 @@ const corsHeaders: HeadersInit = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Inngest Events API endpoint (v2)
-const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v2/events";
+// Inngest Events API endpoints
+const INNGEST_EVENTS_ENDPOINT_V2 = "https://api.inngest.com/v2/events";
+const INNGEST_EVENTS_ENDPOINT_V1 = "https://api.inngest.com/v1/events";
 
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"
@@ -60,25 +61,36 @@ serve(async (req: Request) => {
       }
     }
 
-    // Build payload for Inngest v2 API (send single object or an array)
-    const transformed = events.map((ev) => ({
+    // Build payload matching your local working shape
+    const wireEvents = events.map((ev) => ({
       name: ev.name,
       data: ev.data ?? {},
-      user: typeof ev.user === "string" ? { external_id: ev.user } : ev.user,
-      ts: ev.ts ?? new Date().toISOString(),
       id: ev.id,
+      ts: ev.ts ? new Date(ev.ts).getTime() : Date.now(),
+      v: null as unknown as null,
     }));
-    const payload = transformed.length === 1 ? transformed[0] : transformed;
+    const payload = wireEvents.length === 1 ? wireEvents[0] : wireEvents;
 
-    const res = await fetch(INNGEST_EVENTS_ENDPOINT, {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${eventKey}`,
+      "X-Inngest-Event-Key": eventKey,
+    };
+
+    // Try v2 first; if 404, fall back to v1
+    let res = await fetch(INNGEST_EVENTS_ENDPOINT_V2, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${eventKey}`,
-        "X-Inngest-Event-Key": eventKey,
-      },
+      headers,
       body: JSON.stringify(payload),
     });
+
+    if (res.status === 404) {
+      res = await fetch(INNGEST_EVENTS_ENDPOINT_V1, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    }
 
     const text = await res.text();
     const maybeJson = (() => {
