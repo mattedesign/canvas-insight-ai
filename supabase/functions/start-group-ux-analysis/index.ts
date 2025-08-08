@@ -130,8 +130,8 @@ Deno.serve(async (req: Request) => {
       console.error('[start-group-ux-analysis] Inngest dispatch failed:', text);
 
       // Fallback: invoke legacy group-ux-analysis pipeline directly as orchestrator
-      const { error: fallbackErr } = await supabase.functions.invoke('group-ux-analysis', {
-        body: { jobId }
+      const { error: fallbackErr } = await supabase.functions.invoke('inngest-dispatch', {
+        body: { name: 'group-ux-analysis/pipeline.started', data: { jobId } }
       });
 
       if (fallbackErr) {
@@ -141,14 +141,15 @@ Deno.serve(async (req: Request) => {
           .update({ status: 'failed', error: `Dispatch failed; fallback error: ${fallbackErr.message ?? 'unknown'}` })
           .eq('id', jobId);
 
-        return new Response(JSON.stringify({ error: 'Failed to dispatch Inngest event and fallback orchestrator', response: text }), {
+        return new Response(JSON.stringify({ error: 'Failed to dispatch Inngest event and fallback dispatcher', response: text }), {
           status: 502,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
 
-      return new Response(JSON.stringify({ jobId, fallback: 'group-ux-analysis' }), {
+      return new Response(JSON.stringify({ jobId, fallback: 'inngest-dispatch' }), {
         status: 202,
+
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
