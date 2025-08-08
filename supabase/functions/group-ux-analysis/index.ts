@@ -275,6 +275,22 @@ async function synthesizeGroupInsights(
     analysis: result.analysis.content
   }));
 
+  const structureSpec = {
+    summary: {
+      overallScore: '0-100 integer',
+      consistency: '0-100 integer',
+      thematicCoherence: '0-100 integer',
+      userFlowContinuity: '0-100 integer'
+    },
+    insights: ['string'],
+    recommendations: ['string'],
+    patterns: {
+      commonElements: ['string'],
+      designInconsistencies: ['string'],
+      userJourneyGaps: ['string']
+    }
+  };
+
   const synthesisPrompt = `You are a senior UX researcher analyzing multiple interface designs as a group. You have individual analyses of ${successfulAnalyses.length} images from the same project/collection.
 
 Group Context:
@@ -283,65 +299,84 @@ Group Context:
 - User Context: ${userContext || 'General UX analysis'}
 
 Individual Analyses:
-${analysisSummaries.map(summary => `
-Image ${summary.imageNumber} (${summary.url}):
-${summary.analysis}
-`).join('\n---\n')}
+${analysisSummaries.map(summary => `Image ${summary.imageNumber} (${summary.url}):\n${summary.analysis}`).join('\n---\n')}
 
-Please provide a comprehensive group analysis that:
+Return a SINGLE valid JSON object only (no commentary, no code fences) matching this shape:
+{
+  "summary": { "overallScore": number, "consistency": number, "thematicCoherence": number, "userFlowContinuity": number },
+  "insights": string[],
+  "recommendations": string[],
+  "patterns": { "commonElements": string[], "designInconsistencies": string[], "userJourneyGaps": string[] }
+}
 
-1. **Cross-Image Patterns**: Identify consistent design patterns, themes, and approaches across the interfaces
-2. **Consistency Analysis**: Evaluate design consistency, brand coherence, and user experience continuity
-3. **Comparative Insights**: Highlight differences in approaches and their effectiveness
-4. **Group-Level Recommendations**: Provide strategic recommendations that apply to the entire collection
-5. **Priority Actions**: Suggest the most impactful improvements for the group as a whole
+Rules:
+- All scores are integers 0-100.
+- Use concise, actionable phrasing for arrays.
+- Do NOT include any markdown fences or prose.`;
 
-Structure your response as a comprehensive UX analysis report with:
-- Executive Summary
-- Key Patterns & Findings
-- Consistency Assessment  
-- Strategic Recommendations
-- Priority Action Items
-
-Focus on insights that emerge from analyzing these interfaces as a cohesive group rather than individual pieces.`;
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
+  const callOpenAI = async (temp: number) => {
+    const payload = {
+      model: 'gpt-4.1-2025-04-14',
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content: 'You are a senior UX researcher and design strategist specializing in comprehensive interface analysis and design system evaluation.'
+          content: 'You are a senior UX researcher. Output strict JSON only. Never include code fences.'
         },
         {
           role: 'user',
           content: synthesisPrompt
         }
       ],
-      max_tokens: 3000,
-      temperature: 0.3
-    }),
-  });
+      max_tokens: 2000,
+      temperature: temp
+    } as const;
 
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`OpenAI synthesis API error: ${response.status} - ${errorData}`);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`OpenAI synthesis API error: ${res.status} - ${t}`);
+    }
+
+    const data = await res.json();
+    const content: string = data.choices?.[0]?.message?.content ?? '';
+    const cleaned = content.trim().replace(/^```json\s*/i, '').replace(/^```/i, '').replace(/```\s*$/i, '').trim();
+
+    // Validate JSON
+    try {
+      const parsed = JSON.parse(cleaned);
+      return JSON.stringify(parsed);
+    } catch (_) {
+      throw new Error('Non-JSON content from model');
+    }
+  };
+
+  // First attempt (low temp)
+  let jsonString: string | null = null;
+  try {
+    jsonString = await callOpenAI(0.2);
+  } catch (e) {
+    console.warn('Synthesis attempt 1 failed, retrying once with stricter prompt...', e?.message || e);
+    // One retry with even lower temperature
+    jsonString = await callOpenAI(0.1);
   }
 
-  const data = await response.json();
-  
   return {
-    groupInsights: data.choices[0]?.message?.content || 'No group insights generated',
+    groupInsights: jsonString!,
     analysisCount: successfulAnalyses.length,
     totalRequested: individualAnalyses.length,
-    synthesisModel: 'gpt-4o',
+    synthesisModel: 'gpt-4.1-2025-04-14',
     timestamp: new Date().toISOString(),
     groupName: groupName || 'Interface Collection',
-    originalPrompt
+    originalPrompt,
+    structure: structureSpec
   };
 }
