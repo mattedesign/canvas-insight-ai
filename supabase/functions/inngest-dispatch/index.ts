@@ -6,9 +6,8 @@ const corsHeaders: HeadersInit = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Inngest Events API endpoints
-const INNGEST_EVENTS_ENDPOINT_V2 = "https://api.inngest.com/v2/events";
-const INNGEST_EVENTS_ENDPOINT_V1 = "https://api.inngest.com/v1/events";
+// Inngest short ingest endpoint base (Event Key in path)
+const INNGEST_SHORT_BASE = "https://inn.gs/e";
 
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"
@@ -61,36 +60,22 @@ serve(async (req: Request) => {
       }
     }
 
-    // Build payload matching your local working shape
+    // Build payload matching your dev server format: { name, data }
     const wireEvents = events.map((ev) => ({
       name: ev.name,
       data: ev.data ?? {},
-      id: ev.id,
-      ts: ev.ts ? new Date(ev.ts).getTime() : Date.now(),
-      v: null as unknown as null,
     }));
     const payload = wireEvents.length === 1 ? wireEvents[0] : wireEvents;
 
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${eventKey}`,
-      "X-Inngest-Event-Key": eventKey,
-    };
+    const endpoint = `${INNGEST_SHORT_BASE}/${eventKey}`;
 
-    // Try v2 first; if 404, fall back to v1
-    let res = await fetch(INNGEST_EVENTS_ENDPOINT_V2, {
+    const res = await fetch(endpoint, {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     });
-
-    if (res.status === 404) {
-      res = await fetch(INNGEST_EVENTS_ENDPOINT_V1, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-    }
 
     const text = await res.text();
     const maybeJson = (() => {
@@ -108,13 +93,14 @@ serve(async (req: Request) => {
           status: res.status,
           statusText: res.statusText,
           response: maybeJson,
+          endpoint,
         },
         { status: res.status, headers: corsHeaders },
       );
     }
 
     return Response.json(
-      { success: true, response: maybeJson },
+      { success: true, response: maybeJson, endpoint },
       { status: 200, headers: corsHeaders },
     );
   } catch (err) {
