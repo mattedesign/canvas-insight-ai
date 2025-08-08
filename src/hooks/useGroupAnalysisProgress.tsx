@@ -73,7 +73,17 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
 
       // Subscribe to realtime job updates
       await new Promise<void>((resolve, reject) => {
-        const channel = supabase
+        let resolved = false;
+        let channel: any;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            if (channel) supabase.removeChannel(channel);
+            groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 60s.');
+            reject(new Error('No job progress detected within 60s. Please check background workers.'));
+          }
+        }, 60000);
+
+        channel = supabase
           .channel(`group-analysis-job-${jobId}`)
           .on('postgres_changes', {
             event: 'UPDATE',
@@ -85,6 +95,8 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
             groupAnalysisProgressService.updateProgress(groupId, j.current_stage || 'processing', j.progress || 0);
 
             if (j.status === 'completed') {
+              resolved = true;
+              clearTimeout(timeout);
               try {
                 const latest = await fetchLatestGroupAnalysis(groupId);
                 groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
@@ -97,6 +109,8 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
             }
 
             if (j.status === 'failed') {
+              resolved = true;
+              clearTimeout(timeout);
               groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
               supabase.removeChannel(channel);
               reject(new Error(j.error || 'Group analysis failed'));

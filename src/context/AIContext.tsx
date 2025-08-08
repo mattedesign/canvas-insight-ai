@@ -92,7 +92,19 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       });
 
       const result = await new Promise<any>((resolve, reject) => {
-        const channel = supabase
+        let resolved = false;
+        let channel: any;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            if (channel) supabase.removeChannel(channel);
+            setAnalysisProgress(null);
+            setIsAnalyzing(false);
+            setCurrentAnalysisParams(null);
+            reject(new Error('No job progress detected within 60s. Please check background workers.'));
+          }
+        }, 60000);
+
+        channel = supabase
           .channel(`analysis-job-${jobId}`)
           .on('postgres_changes', {
             event: 'UPDATE',
@@ -104,6 +116,8 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             setAnalysisProgress({ stage: j.current_stage || 'processing', progress: j.progress || 0 } as AnalysisProgress);
 
             if (j.status === 'completed') {
+              resolved = true;
+              clearTimeout(timeout);
               try {
                 const latest = await fetchLatestAnalysis(imageId);
                 supabase.removeChannel(channel);
@@ -118,6 +132,8 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             }
 
             if (j.status === 'failed') {
+              resolved = true;
+              clearTimeout(timeout);
               supabase.removeChannel(channel);
               setIsAnalyzing(false);
               setCurrentAnalysisParams(null);
