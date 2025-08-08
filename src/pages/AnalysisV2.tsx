@@ -65,7 +65,7 @@ export default function AnalysisV2() {
       setEventsError(null);
       const { data, error } = await supabase
         .from('analysis_events')
-        .select('id, event_name, status, progress, message, metadata, created_at')
+        .select('id, event_name, status, progress, message, metadata, created_at, started_at, ended_at, duration_ms')
         .eq('job_id', jobId)
         .order('created_at', { ascending: true });
       if (!mounted) return;
@@ -210,6 +210,7 @@ export default function AnalysisV2() {
                     {" · "}<span>{ev.event_name}</span>
                     {ev.status ? <> · <span className="uppercase text-muted-foreground">{ev.status}</span></> : null}
                     {typeof ev.progress === 'number' ? <> · <span>{ev.progress}%</span></> : null}
+                    {typeof ev.duration_ms === 'number' ? <> · <span>{(ev.duration_ms / 1000).toFixed(2)}s</span></> : null}
                     {ev.message ? <> · <span className="text-muted-foreground">{ev.message}</span></> : null}
                   </li>
                 ))}
