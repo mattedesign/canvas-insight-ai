@@ -1,0 +1,168 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders: HeadersInit = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+type Json = Record<string, unknown>;
+
+type Job = {
+  id: string;
+  user_id: string | null;
+  image_url: string;
+  status: string | null;
+  progress: number | null;
+  current_stage: string | null;
+};
+
+function getAdminClient() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) {
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Edge Function secrets");
+  }
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
+}
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    if (req.method !== "POST") {
+      return Response.json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+    }
+
+    const supabase = getAdminClient();
+    const body = await req.json().catch(() => ({} as any));
+    const jobId: string | undefined = body.jobId || body.job_id;
+
+    if (!jobId) {
+      return Response.json({ error: "jobId is required" }, { status: 400, headers: corsHeaders });
+    }
+
+    // Load job
+    const { data: job, error: jobErr } = await supabase
+      .from("analysis_jobs")
+      .select("id,user_id,image_url,status,progress,current_stage")
+      .eq("id", jobId)
+      .maybeSingle<Job>();
+
+    if (jobErr) {
+      console.error("Failed to load job", jobErr);
+      return Response.json({ error: jobErr.message }, { status: 500, headers: corsHeaders });
+    }
+    if (!job) {
+      return Response.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
+    }
+
+    const insertEvent = async (fields: Partial<{ event_name: string; status: string; progress: number; message: string; metadata: Json }>) => {
+      const payload: any = {
+        id: crypto.randomUUID(),
+        job_id: job.id,
+        user_id: job.user_id,
+        event_name: fields.event_name ?? "analysis/vision.event",
+        status: fields.status ?? null,
+        progress: fields.progress ?? 0,
+        message: fields.message ?? null,
+        metadata: fields.metadata ?? {},
+      };
+      const { error } = await supabase.from("analysis_events").insert(payload);
+      if (error) console.error("Failed to insert analysis_event", error, payload);
+    };
+
+    const markProviderDone = async (provider: string) => {
+      const { data, error } = await supabase
+        .from("analysis_events")
+        .select("id")
+        .eq("job_id", job.id)
+        .in("event_name", ["analysis/vision.completed", "analysis/vision.failed"]) 
+        .contains("metadata", { provider }) as any;
+      if (error) {
+        console.warn("check provider done error", error);
+        return false;
+      }
+      return Array.isArray(data) && data.length > 0;
+    };
+
+    // Start event and stage
+    const startedProgress = Math.max(30, job.progress ?? 0);
+    await supabase
+      .from("analysis_jobs")
+      .update({ current_stage: "vision", status: job.status === "pending" ? "processing" : job.status, progress: startedProgress })
+      .eq("id", job.id);
+
+    await insertEvent({ event_name: "analysis/vision.started", status: "processing", progress: startedProgress, metadata: { provider: "openai" } });
+
+    // Call OpenAI vision via Chat Completions with image
+    const openAiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAiKey) {
+      await insertEvent({ event_name: "analysis/vision.failed", status: "failed", progress: startedProgress, message: "OPENAI_API_KEY not configured", metadata: { provider: "openai" } });
+      return Response.json({ error: "OPENAI_API_KEY not configured" }, { status: 500, headers: corsHeaders });
+    }
+
+    const visionPrompt = "Extract concise visual cues: main components, dominant layout regions, obvious affordances. Return JSON with keys: components[], textBlocks[], layoutSummary.";
+
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'user', content: [
+            { type: 'text', text: visionPrompt },
+            { type: 'image_url', image_url: { url: job.image_url } }
+          ]}
+        ],
+        max_tokens: 800,
+        temperature: 0.2,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!resp.ok) {
+      const msg = `OpenAI API error: ${resp.status}`;
+      await insertEvent({ event_name: "analysis/vision.failed", status: "failed", progress: startedProgress, message: msg, metadata: { provider: "openai" } });
+      return Response.json({ error: msg }, { status: 502, headers: corsHeaders });
+    }
+
+    const data = await resp.json();
+    let parsed: Json | null = null;
+    try {
+      parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+    } catch (e) {
+      await insertEvent({ event_name: "analysis/vision.failed", status: "failed", progress: startedProgress, message: "Failed to parse OpenAI response", metadata: { provider: "openai" } });
+      return Response.json({ error: 'Failed to parse OpenAI response' }, { status: 500, headers: corsHeaders });
+    }
+
+    const completedProgress = Math.max(45, startedProgress);
+    await insertEvent({ event_name: "analysis/vision.completed", status: "completed", progress: completedProgress, metadata: { provider: "openai", result: parsed } });
+
+    // If both providers done (completed or failed), move to AI stage and dispatch
+    const openaiDone = await markProviderDone('openai');
+    const googleDone = await markProviderDone('google');
+
+    if (openaiDone && googleDone) {
+      await supabase.from('analysis_jobs').update({ current_stage: 'ai', progress: Math.max(completedProgress, 60) }).eq('id', job.id);
+      const { data: dispatchData, error: dispatchErr } = await supabase.functions.invoke('inngest-dispatch', {
+        body: { name: 'analysis/ai.started', data: { jobId: job.id } }
+      });
+      if (dispatchErr) {
+        await insertEvent({ event_name: 'analysis/ai.dispatch_failed', status: 'warning', progress: completedProgress, message: dispatchErr.message ?? 'Dispatch failed' });
+      } else {
+        await insertEvent({ event_name: 'analysis/ai.dispatched', status: 'queued', progress: completedProgress, metadata: { response: dispatchData ?? null } });
+      }
+    }
+
+    return Response.json({ ok: true, jobId: job.id }, { status: 200, headers: corsHeaders });
+  } catch (err) {
+    console.error("ux-vision-openai fatal", err);
+    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500, headers: corsHeaders });
+  }
+});

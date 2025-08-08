@@ -41,3 +41,12 @@ verify_jwt = true
 
 [functions.analysis-progress]
 verify_jwt = false
+
+[functions.ux-context-detection]
+verify_jwt = true
+
+[functions.ux-vision-openai]
+verify_jwt = true
+
+[functions.ux-vision-google]
+verify_jwt = true
