@@ -7,7 +7,7 @@ const corsHeaders: HeadersInit = {
 };
 
 // Inngest Events API endpoint (v2)
-const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v1/events";
+const INNGEST_EVENTS_ENDPOINT = "https://api.inngest.com/v2/events";
 
 interface EmitEventRequest {
   name: string; // e.g. "analysis/job.created"
@@ -64,7 +64,7 @@ serve(async (req: Request) => {
     const transformed = events.map((ev) => ({
       name: ev.name,
       data: ev.data ?? {},
-      user: ev.user,
+      user: typeof ev.user === "string" ? { external_id: ev.user } : ev.user,
       ts: ev.ts ?? new Date().toISOString(),
       id: ev.id,
     }));
@@ -75,6 +75,7 @@ serve(async (req: Request) => {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${eventKey}`,
+        "X-Inngest-Event-Key": eventKey,
       },
       body: JSON.stringify(payload),
     });

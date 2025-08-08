@@ -10,9 +10,8 @@ export default function InngestTestTrigger() {
   const fired = useRef(false);
 
   useEffect(() => {
-    const force = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("forceInngest") === "1";
-    const already = localStorage.getItem("inngestTestFired");
-    if (fired.current || (already === "1" && !force)) return;
+    if (fired.current) return;
+
 
     fired.current = true;
 
@@ -49,7 +48,7 @@ export default function InngestTestTrigger() {
         toast.success("Inngest test event sent", {
           description: "Check the inngest-dispatch logs in Supabase.",
         });
-        localStorage.setItem("inngestTestFired", "1");
+        // intentionally not persisting to localStorage to allow re-tests
       } catch (err) {
         console.error("[InngestTest] Unexpected error:", err);
         toast.error("Inngest test encountered an error", {
