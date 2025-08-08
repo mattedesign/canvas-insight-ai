@@ -11,6 +11,7 @@ import { AIProvider } from "./context/AIContext";
 // Performance monitoring disabled for production
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useInngestJobEmitter } from "./hooks/useInngestJobEmitter";
+import InngestTestTrigger from "./components/dev/InngestTestTrigger";
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -45,6 +46,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <InngestTestTrigger />
           <BrowserRouter>
           <AuthProvider>
             <AIProvider>
