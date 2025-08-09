@@ -3,7 +3,7 @@ import { AnalysisDataMapper } from '@/services/AnalysisDataMapper';
 import type { UXAnalysis } from '@/types/ux-analysis';
 
 export async function fetchLatestAnalysis(imageId: string): Promise<Partial<UXAnalysis>> {
-  const maxAttempts = 15; // ~15s total
+  const maxAttempts = 45; // ~45s total
   const delayMs = 1000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

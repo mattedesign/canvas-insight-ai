@@ -220,12 +220,6 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         setTimeout(() => { saveCurrentCanvasState(); }, 100);
       }
     }, [dispatch, toast, saveCurrentCanvasState]),
-      toast({
-        title: "Delete Feature",
-        description: `Delete functionality for ${itemIds.length} image(s) will be implemented`,
-        category: "action-required",
-      });
-    }, [toast]),
   };
   
   // Initialize context menu system

@@ -121,8 +121,32 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
     const rawContent = data.choices?.[0]?.message?.content ?? '';
     console.log('[context-detection] raw model content:', rawContent);
 
+    const tryParse = (text: string) => {
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        // Strip code fences if present
+        const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (fenced && fenced[1]) {
+          try {
+            return JSON.parse(fenced[1]);
+          } catch (_) {}
+        }
+        // Fallback: extract the largest JSON object substring
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          const candidate = text.substring(start, end + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch (_) {}
+        }
+        throw new Error('Unable to parse JSON from model content');
+      }
+    };
+
     try {
-      contextData = JSON.parse(rawContent || '{}');
+      contextData = tryParse(rawContent || '{}');
     } catch (parseError) {
       console.error('[context-detection] Failed to parse model JSON:', parseError);
       return new Response(
