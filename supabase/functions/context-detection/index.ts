@@ -39,7 +39,7 @@ serve(async (req) => {
 
     // Optimize for metadata mode with faster processing
     const optimizedModel = useMetadataMode ? 'gpt-4o-mini' : model;
-    const optimizedTemperature = useMetadataMode ? 0.1 : 0.3;
+    const optimizedTemperature = 0.0;
     const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
     
     console.log(`Using ${useMetadataMode ? 'optimized metadata' : 'full vision'} mode with model ${optimizedModel}`);
@@ -106,7 +106,27 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
         messages: contextMessages,
         max_tokens: optimizedMaxTokens,
         temperature: optimizedTemperature,
-        response_format: { type: 'json_object' }
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'ContextDetection',
+            schema: {
+              type: 'object',
+              properties: {
+                primaryType: { type: 'string', minLength: 2 },
+                domain: { type: 'string', minLength: 2 },
+                targetAudience: { type: 'string' },
+                platform: { type: 'string' },
+                designSystem: { type: 'string' },
+                complexity: { type: 'string' },
+                confidence: { type: 'number', minimum: 0, maximum: 1 }
+              },
+              required: ['primaryType', 'domain'],
+              additionalProperties: true
+            },
+            strict: true
+          }
+        }
       })
     });
 
