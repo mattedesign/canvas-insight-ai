@@ -208,15 +208,7 @@ Only return valid JSON.`;
       .update({ current_stage: "synthesis", progress: completedProgress })
       .eq("id", job.id);
 
-    // Dispatch synthesis
-    const { data: dispatchData, error: dispatchErr } = await supabase.functions.invoke('inngest-dispatch', {
-      body: { name: 'analysis/synthesis.started', data: { jobId: job.id } }
-    });
-    if (dispatchErr) {
-      await insertEvent({ event_name: 'analysis/synthesis.dispatch_failed', status: 'warning', progress: completedProgress, message: dispatchErr.message ?? 'Dispatch failed' });
-    } else {
-      await insertEvent({ event_name: 'analysis/synthesis.dispatched', status: 'queued', progress: completedProgress, metadata: { response: dispatchData ?? null } });
-    }
+    // Orchestration continues via ux-orchestrator; avoid duplicate triggers (no Inngest dispatch here).
 
     return Response.json({ ok: true, jobId: job.id }, { status: 200, headers: corsHeaders });
   } catch (err) {

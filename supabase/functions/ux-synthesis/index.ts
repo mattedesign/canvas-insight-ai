@@ -12,6 +12,7 @@ type Job = {
   id: string;
   user_id: string | null;
   project_id: string | null;
+  image_id: string | null;
   image_url: string;
   status: string | null;
   progress: number | null;
@@ -48,7 +49,7 @@ serve(async (req: Request) => {
     // Load job
     const { data: job, error: jobErr } = await supabase
       .from("analysis_jobs")
-      .select("id,user_id,project_id,image_url,status,progress,current_stage")
+      .select("id,user_id,project_id,image_id,image_url,status,progress,current_stage")
       .eq("id", jobId)
       .maybeSingle<Job>();
 
@@ -143,13 +144,35 @@ serve(async (req: Request) => {
     const visual_annotations = Array.isArray((ai as any)?.visualAnnotations) ? (ai as any).visualAnnotations : [];
     const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id };
 
+    // Resolve image_id: prefer job.image_id; fallback to parsing storage_path from public URL
+    let imageId: string | null = (job as any)?.image_id ?? null;
+    if (!imageId && job.image_url) {
+      try {
+        const url = new URL(job.image_url);
+        const path = url.pathname; // /storage/v1/object/public/images/<storage_path>
+        const marker = '/object/public/images/';
+        const idx = path.indexOf(marker);
+        if (idx !== -1) {
+          const storagePath = decodeURIComponent(path.substring(idx + marker.length));
+          const { data: imgRow } = await supabase
+            .from('images')
+            .select('id')
+            .eq('storage_path', storagePath)
+            .maybeSingle();
+          if (imgRow?.id) imageId = imgRow.id as string;
+        }
+      } catch (_) {
+        // ignore parse errors; imageId remains null
+      }
+    }
+
     // Persist final UX analysis
     const { error: insErr } = await supabase
       .from('ux_analyses')
       .insert({
         user_id: job.user_id,
         project_id: job.project_id,
-        image_id: null,
+        image_id: imageId,
         summary,
         suggestions,
         visual_annotations,
