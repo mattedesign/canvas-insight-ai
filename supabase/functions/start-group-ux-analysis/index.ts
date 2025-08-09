@@ -127,6 +127,16 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ jobId, dispatch: 'direct' }), { status: 202, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
+    // Fallback: If Inngest key is missing, run orchestrator directly
+    if (!INNGEST_EVENT_KEY) {
+      const { error: orkErr } = await supabase.functions.invoke('group-ux-orchestrator', { body: { groupJobId: jobId } });
+      if (orkErr) {
+        await supabase.from('group_analysis_jobs').update({ status: 'failed', error: `Direct orchestrator error (fallback): ${orkErr.message ?? 'unknown'}` }).eq('id', jobId);
+        return new Response(JSON.stringify({ error: 'Missing INNGEST_EVENT_KEY and direct orchestrator failed' }), { status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      }
+      return new Response(JSON.stringify({ jobId, dispatch: 'direct' }), { status: 202, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
     const eventEndpoint = buildInngestEndpoint(INNGEST_EVENT_KEY!);
     const inngestPayload = {
       name: 'group-ux-analysis/pipeline.started',

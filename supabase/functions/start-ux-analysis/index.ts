@@ -115,8 +115,13 @@ serve(async (req: Request) => {
     }
 
     if (dispatchMode !== 'direct' && !eventKey) {
-      await supabase.from('analysis_jobs').update({ status: 'failed', error: 'Missing INNGEST_EVENT_KEY for Inngest dispatch' }).eq('id', jobId);
-      return Response.json({ success: false, error: 'Missing INNGEST_EVENT_KEY' }, { status: 500, headers: corsHeaders });
+      // Fallback: if Inngest event key is not configured, invoke orchestrator directly
+      const { error: orkErr } = await supabase.functions.invoke('ux-orchestrator', { body: { jobId } });
+      if (orkErr) {
+        await supabase.from('analysis_jobs').update({ status: 'failed', error: `Direct orchestrator error (fallback): ${orkErr.message ?? 'unknown'}` }).eq('id', jobId);
+        return Response.json({ success: false, error: 'Missing INNGEST_EVENT_KEY and direct orchestrator failed' }, { status: 502, headers: corsHeaders });
+      }
+      return Response.json({ success: true, jobId, dispatch: 'direct' }, { status: 202, headers: corsHeaders });
     }
 
     const endpoint = buildInngestEndpoint(eventKey!);
