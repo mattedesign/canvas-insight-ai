@@ -45,6 +45,7 @@ export function useAnalysisJob(jobId: string | null) {
       if (!mounted) return;
       if (error) setError(error.message);
       setJob((data as AnalysisJob) ?? null);
+      console.debug('[useAnalysisJob] initial load', { jobId, status: (data as any)?.status, stage: (data as any)?.current_stage });
       setLoading(false);
     };
 
@@ -58,6 +59,7 @@ export function useAnalysisJob(jobId: string | null) {
           filter: `id=eq.${jobId}`,
         }, (payload: any) => {
           const updated = payload.new as AnalysisJob;
+          console.debug('[useAnalysisJob] update', { jobId, status: updated.status, stage: updated.current_stage, progress: updated.progress });
           setJob(updated);
         })
         .subscribe();

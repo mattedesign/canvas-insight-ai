@@ -69,6 +69,7 @@ export function EnhancedAnalysisTrigger({
         userContext: userContext || null,
       });
 
+      console.log('✅ startUxAnalysis returned jobId:', newJobId);
       setJobId(newJobId);
       toast.info('Analysis started. Tracking progress...');
     } catch (error: any) {

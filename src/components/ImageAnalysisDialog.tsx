@@ -39,6 +39,7 @@ export function ImageAnalysisDialog({
     setIsAnalyzing(true);
     try {
       toast.info('Starting AI analysis...');
+      console.log('[ImageAnalysisDialog] invoking startUxAnalysis', { imageId, hasUrl: !!imageUrl, isBlob: imageUrl?.startsWith('blob:') });
 
       const { jobId: newJobId } = await startUxAnalysis({
         imageId,
@@ -47,6 +48,7 @@ export function ImageAnalysisDialog({
         userContext: userContext || null,
       });
 
+      console.log('[ImageAnalysisDialog] startUxAnalysis returned jobId:', newJobId);
       setJobId(newJobId);
     } catch (error: any) {
       console.error('Analysis start failed:', error);
