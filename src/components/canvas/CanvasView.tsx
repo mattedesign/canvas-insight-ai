@@ -40,7 +40,7 @@ import { useCanvasContextMenu, CanvasItem, CanvasContextMenuHandlers } from '@/h
 import { useAI } from '@/context/AIContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
-import { SelectionDebugger } from '../SelectionDebugger';
+
 import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
 
 import { useAuth } from '@/context/AuthContext';
@@ -2291,8 +2291,6 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         />
       </ReactFlow>
       
-      {/* Selection Debugger for Development */}
-      <SelectionDebugger multiSelection={multiSelection} />
       
       {/* Context Menu and Delete Dialog */}
       {ContextMenu && <ContextMenu />}
