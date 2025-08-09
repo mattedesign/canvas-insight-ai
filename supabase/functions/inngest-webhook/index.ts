@@ -92,9 +92,15 @@ serve(async (req: Request) => {
     const results = await Promise.all(
       events.map(async (ev) => {
         const target = extractTargets(ev);
+        const isUuid = (s?: string) =>
+          typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
         try {
           if (target.kind === "group") {
             if (!target.groupJobId) throw new Error("groupJobId not found in event payload");
+            if (!isUuid(target.groupJobId)) {
+              console.warn("[inngest-webhook] Invalid groupJobId (not UUID)", { groupJobId: target.groupJobId, event: ev?.name });
+              return { event: ev.name, kind: target.kind, ok: false, error: "Invalid groupJobId: must be a UUID" };
+            }
             const { data, error } = await supabase.functions.invoke("group-ux-orchestrator", {
               body: { groupJobId: target.groupJobId },
             });
@@ -102,6 +108,10 @@ serve(async (req: Request) => {
             return { event: ev.name, kind: target.kind, invoked: "group-ux-orchestrator", ok: true, data };
           } else {
             if (!target.jobId) throw new Error("jobId not found in event payload");
+            if (!isUuid(target.jobId)) {
+              console.warn("[inngest-webhook] Invalid jobId (not UUID)", { jobId: target.jobId, event: ev?.name });
+              return { event: ev.name, kind: target.kind, ok: false, error: "Invalid jobId: must be a UUID" };
+            }
             const { data, error } = await supabase.functions.invoke("ux-orchestrator", {
               body: { jobId: target.jobId },
             });
