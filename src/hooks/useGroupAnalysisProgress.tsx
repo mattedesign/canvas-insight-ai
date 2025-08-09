@@ -78,20 +78,27 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
       await new Promise<void>((resolve, reject) => {
         let resolved = false;
         let channel: any;
+        const requestStartedAt = new Date();
         const timeout = setTimeout(async () => {
           if (!resolved) {
             if (channel) supabase.removeChannel(channel);
             try {
               const latest = await fetchLatestGroupAnalysis(groupId);
-              groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
-              resolved = true;
-              resolve();
+              const latestCreatedAt = latest?.created_at ? new Date(latest.created_at) : null;
+              if (latestCreatedAt && latestCreatedAt > requestStartedAt) {
+                groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                resolved = true;
+                resolve();
+              } else {
+                groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 3 minutes.');
+                reject(new Error('No job progress detected within 3 minutes. Please check background workers.'));
+              }
             } catch (e) {
-              groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 60s.');
-              reject(new Error('No job progress detected within 60s. Please check background workers.'));
+              groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 3 minutes.');
+              reject(new Error('No job progress detected within 3 minutes. Please check background workers.'));
             }
           }
-        }, 60000);
+        }, 180000);
 
         channel = supabase
           .channel(`group-analysis-job-${jobId}`)
