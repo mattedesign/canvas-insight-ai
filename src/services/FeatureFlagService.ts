@@ -95,6 +95,15 @@ export class FeatureFlagService {
         rolloutPercentage: 100,
         createdAt: new Date(),
         updatedAt: new Date()
+      },
+      {
+        id: 'group_progress_canvas',
+        name: 'Group Progress on Canvas',
+        description: 'Enable real-time group analysis progress and results nodes on canvas',
+        enabled: true,
+        rolloutPercentage: 100,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
 

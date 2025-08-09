@@ -42,7 +42,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 import { SelectionDebugger } from '../SelectionDebugger';
 import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
-
+import { FeatureFlagService } from '@/services/FeatureFlagService';
+import { useAuth } from '@/context/AuthContext';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
@@ -136,7 +137,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
-  
+  const { user } = useAuth();
+  FeatureFlagService.initialize();
+  const enableGroupProgressFlow = FeatureFlagService.isEnabled('group_progress_canvas', user?.id, user?.email);
   
   // Group analysis progress management
   const groupAnalysisProgress = useGroupAnalysisProgress();
@@ -1544,7 +1547,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         data: {
           group,
           onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
-            handleGroupPromptSubmit(groupId, prompt, isCustom);
+            if (enableGroupProgressFlow) {
+              handleGroupPromptSubmit(groupId, prompt, isCustom);
+            } else {
+              onSubmitGroupPrompt?.(groupId, prompt, isCustom);
+            }
           },
           onAnalyzeGroup: (groupId: string) => {
             const group = imageGroups?.find(g => g.id === groupId);
@@ -1586,7 +1593,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
             data: {
               group,
               onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
-                handleGroupPromptSubmit(groupId, prompt, isCustom);
+                if (enableGroupProgressFlow) {
+                  handleGroupPromptSubmit(groupId, prompt, isCustom);
+                } else {
+                  onSubmitGroupPrompt?.(groupId, prompt, isCustom);
+                }
               },
               onAnalyzeGroup: (groupId: string) => {
                 const group = imageGroups?.find(g => g.id === groupId);
@@ -1621,7 +1632,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           data: {
             group,
             onSubmitPrompt: (groupId: string, prompt: string, isCustom: boolean) => {
-              handleGroupPromptSubmit(groupId, prompt, isCustom);
+              if (enableGroupProgressFlow) {
+                handleGroupPromptSubmit(groupId, prompt, isCustom);
+              } else {
+                onSubmitGroupPrompt?.(groupId, prompt, isCustom);
+              }
             },
             onAnalyzeGroup: (groupId: string) => {
               const group = imageGroups?.find(g => g.id === groupId);
