@@ -42,7 +42,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 import { SelectionDebugger } from '../SelectionDebugger';
 import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
-import { FeatureFlagService } from '@/services/FeatureFlagService';
+
 import { useAuth } from '@/context/AuthContext';
 
 import { Button } from '@/components/ui/button';
@@ -138,9 +138,9 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const multiSelection = useMultiSelection(allImageIds);
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  FeatureFlagService.initialize();
-  const enableGroupProgressFlow = FeatureFlagService.isEnabled('group_progress_canvas', user?.id, user?.email);
+  const enableGroupProgressFlow = true;
   
+
   // Group analysis progress management
   const groupAnalysisProgress = useGroupAnalysisProgress();
   

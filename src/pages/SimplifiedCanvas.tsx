@@ -17,6 +17,19 @@ const SimplifiedCanvas = () => {
   const { user } = useAuth();
   const { state, dispatch } = useFinalAppContext();
   
+  // SEO
+  useEffect(() => {
+    const title = "UX Canvas – Projects & Analyses";
+    document.title = title;
+    const desc = "Upload, group, and analyze UX screens per project with real-time AI.";
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) { meta = document.createElement("meta"); meta.setAttribute("name", "description"); document.head.appendChild(meta); }
+    meta.setAttribute("content", desc);
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
+    canonical.href = window.location.href;
+  }, []);
+  
   // Direct state access - no selectors, maximum performance
   const {
     uploadedImages = [],

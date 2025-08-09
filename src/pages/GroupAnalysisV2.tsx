@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { FeatureFlagService } from "@/services/FeatureFlagService";
+
 import { AnalysisStatusPipeline } from "@/components/AnalysisStatusPipeline";
 import { useGroupAnalysisJob } from "@/hooks/useGroupAnalysisJob";
 
@@ -25,8 +25,7 @@ export default function GroupAnalysisV2() {
   const [params] = useSearchParams();
   const groupJobId = params.get("groupJobId");
   const { user } = useAuth();
-  FeatureFlagService.initialize();
-const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user?.email);
+const uiEnabled = true;
 
   const { job } = useGroupAnalysisJob(groupJobId);
 
