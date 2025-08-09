@@ -82,11 +82,21 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
 
     console.log(`Context detection with ${enhancedContextMode ? 'enhanced' : useMetadataMode ? 'metadata' : 'standard'} mode`);
 
+    // Ensure OpenAI API key is configured
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      console.error('[context-detection] Missing OPENAI_API_KEY secret');
+      return new Response(
+        JSON.stringify({ error: 'Missing OpenAI API key', solution: 'Add OPENAI_API_KEY in Supabase Edge Functions settings' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Context detection using OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
