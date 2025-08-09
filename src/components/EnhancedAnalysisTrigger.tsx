@@ -24,6 +24,7 @@ import { useAnalysisJob } from '@/hooks/useAnalysisJob';
 import { AnalysisJobProgress } from './AnalysisJobProgress';
 import { fetchLatestAnalysis } from '@/services/fetchLatestAnalysis';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface EnhancedAnalysisTriggerProps {
   image: UploadedImage;
@@ -180,9 +181,14 @@ export function EnhancedAnalysisTrigger({
 
         {/* Progress Display */}
         {jobId && (
-          <div className="space-y-2">
-            <AnalysisJobProgress job={job} />
-          </div>
+<div className="space-y-2">
+  <AnalysisJobProgress job={job} />
+  {jobId && (
+    <Button asChild variant="outline" className="w-full">
+      <Link to={`/job/${jobId}`}>View Live Status</Link>
+    </Button>
+  )}
+</div>
         )}
 
         {/* Action Button */}
