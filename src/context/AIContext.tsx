@@ -91,6 +91,13 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         userContext: userContext || null,
       });
 
+      // Fire-and-forget safety: ensure orchestrator runs even if Inngest routing is delayed
+      try {
+        supabase.functions.invoke('ux-orchestrator', { body: { jobId } });
+      } catch (e) {
+        console.warn('[AIContext] Fallback orchestrator invoke failed:', e);
+      }
+
       const result = await new Promise<any>((resolve, reject) => {
         let resolved = false;
         let channel: any;
