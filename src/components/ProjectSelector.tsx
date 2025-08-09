@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProjectSelection, ProjectOption } from '@/hooks/useProjectSelection';
-
+import { useNavigate } from 'react-router-dom';
 interface ProjectSelectorProps {
   className?: string;
 }
@@ -24,6 +24,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className }) =
     switchProject,
     toggleAggregatedView
   } = useProjectSelection();
+  const navigate = useNavigate();
 
   const currentProject = projects.find(p => p.id === currentProjectId);
   const activeProjects = projects.filter(p => p.isActive);
@@ -69,7 +70,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className }) =
       <DropdownMenuContent align="start" className="w-[300px]">
         {/* Aggregated View Option */}
         <DropdownMenuItem
-          onClick={toggleAggregatedView}
+          onClick={async () => { toggleAggregatedView(); navigate('/canvas'); }}
           className="flex items-center justify-between"
         >
           <div className="flex items-center gap-2">
@@ -95,7 +96,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className }) =
             {activeProjects.map((project) => (
               <DropdownMenuItem
                 key={project.id}
-                onClick={() => switchProject(project.id)}
+                onClick={async () => { await switchProject(project.id); navigate(`/canvas/${project.slug}`); }}
                 className="flex items-center justify-between"
               >
                 <div className="flex items-center gap-2">
@@ -132,7 +133,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className }) =
             {inactiveProjects.map((project) => (
               <DropdownMenuItem
                 key={project.id}
-                onClick={() => switchProject(project.id)}
+                onClick={async () => { await switchProject(project.id); navigate(`/canvas/${project.slug}`); }}
                 className="flex items-center justify-between opacity-60"
               >
                 <div className="flex items-center gap-2">

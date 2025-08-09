@@ -87,6 +87,22 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
     };
   }, [analysis]);
 
+  const conciseSummary = useMemo(() => {
+    const score = safeAnalysis.summary?.overallScore;
+    const strengths = safeAnalysis.summary?.strengths?.slice(0, 2) || [];
+    const issues = safeAnalysis.summary?.keyIssues?.slice(0, 2) || [];
+    const primaryConcern = safeAnalysis.strategicInsights?.primaryConcern ||
+      safeAnalysis.metadata?.strategic_summary?.primaryConcern;
+
+    const parts: string[] = [];
+    if (typeof score === 'number') parts.push(`Score ${score}/100`);
+    if (strengths.length) parts.push(`Strengths: ${strengths.join(', ')}`);
+    if (issues.length) parts.push(`Focus: ${issues.join(', ')}`);
+    if (primaryConcern) parts.push(`Business: ${primaryConcern}`);
+
+    return parts.join(' • ');
+  }, [safeAnalysis]);
+
   // ✅ FIXED: Removed console.log from render function to prevent infinite loops
 
   const handleViewFullAnalysis = useCallback(() => {
@@ -184,6 +200,13 @@ export const AnalysisCardNode: React.FC<AnalysisCardNodeProps> = ({ data }) => {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Concise Summary */}
+        {conciseSummary && (
+          <div className="space-y-2">
+            <h4 className="font-medium text-foreground text-sm">Summary</h4>
+            <div className="text-sm text-muted-foreground">{conciseSummary}</div>
+          </div>
+        )}
         {/* Category Scores */}
         <div className="space-y-3">
           <h4 className="font-medium text-foreground text-sm">Category Scores</h4>

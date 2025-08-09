@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export interface ProjectOption {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   imageCount: number;
@@ -42,6 +43,7 @@ export const useProjectSelection = () => {
       
       const projectOptions: ProjectOption[] = allProjects.map(project => ({
         id: project.id,
+        slug: project.slug,
         name: project.name,
         description: project.description,
         imageCount: project.images[0]?.count || 0,
