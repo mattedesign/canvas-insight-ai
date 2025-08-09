@@ -681,6 +681,7 @@ export type Database = {
           id: string
           insights: Json
           is_custom: boolean | null
+          metadata: Json
           parent_analysis_id: string | null
           patterns: Json
           prompt: string
@@ -693,6 +694,7 @@ export type Database = {
           id?: string
           insights?: Json
           is_custom?: boolean | null
+          metadata?: Json
           parent_analysis_id?: string | null
           patterns?: Json
           prompt: string
@@ -705,6 +707,7 @@ export type Database = {
           id?: string
           insights?: Json
           is_custom?: boolean | null
+          metadata?: Json
           parent_analysis_id?: string | null
           patterns?: Json
           prompt?: string

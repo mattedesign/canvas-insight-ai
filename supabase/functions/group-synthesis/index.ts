@@ -146,6 +146,7 @@ serve(async (req: Request) => {
         recommendations,
         patterns,
         parent_analysis_id: null,
+        metadata: { groupJobId: job.id },
       });
 
     if (insErr) {
