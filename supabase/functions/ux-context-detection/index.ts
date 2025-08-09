@@ -130,7 +130,7 @@ serve(async (req: Request) => {
         prompt: job.user_context ?? "Detect interface context",
         model: 'gpt-4o-mini',
         useMetadataMode: true,
-        enhancedContextMode: false,
+        enhancedContextMode: true,
       },
     });
 

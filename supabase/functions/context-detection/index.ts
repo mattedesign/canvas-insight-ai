@@ -131,7 +131,17 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
       );
     }
 
-    // Strict validation: require primaryType and domain, no fallbacks
+    // Strict validation with synonym mapping (no invented values)
+    // Map common synonyms returned by different prompts/models
+    if (!contextData.primaryType) {
+      const pt = contextData.interfaceType || contextData.interface_type || contextData.screenType || contextData.screen_type || contextData.type;
+      if (pt) contextData.primaryType = pt;
+    }
+    if (!contextData.domain) {
+      const dm = contextData.detectedDomain || contextData.industry || contextData.category || contextData.sector;
+      if (dm) contextData.domain = dm;
+    }
+
     if (!contextData || typeof contextData !== 'object' || !contextData.primaryType || !contextData.domain) {
       console.error('[context-detection] Missing required fields in context data', { contextData });
       return new Response(
