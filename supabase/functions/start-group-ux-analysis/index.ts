@@ -153,7 +153,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    return new Response(JSON.stringify({ jobId }), {
+    // Fire-and-forget direct orchestrator as safety net (parallel to Inngest)
+    // This ensures progress updates even if Inngest is not configured in this environment
+    supabase.functions
+      .invoke('group-ux-orchestrator', { body: { jobId } })
+      .then(() => console.log('[start-group-ux-analysis] Orchestrator invoked in parallel'))
+      .catch((err) => console.error('[start-group-ux-analysis] Orchestrator parallel invoke error:', err));
+
+    return new Response(JSON.stringify({ jobId, dispatch: 'inngest+direct' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
