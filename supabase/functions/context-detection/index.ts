@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     // Optimize for metadata mode with faster processing
-    const optimizedModel = 'gpt-4o-mini';
+    const optimizedModel = 'gpt-4.1-2025-04-14';
     const optimizedTemperature = 0.0;
     const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
     
@@ -105,7 +105,27 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
         messages: contextMessages,
         max_tokens: optimizedMaxTokens,
         temperature: optimizedTemperature,
-        response_format: { type: 'json_object' }
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'ContextDetection',
+            schema: {
+              type: 'object',
+              properties: {
+                primaryType: { type: 'string', minLength: 2 },
+                domain: { type: 'string', minLength: 2 },
+                targetAudience: { type: 'string' },
+                platform: { type: 'string' },
+                designSystem: { type: 'string' },
+                complexity: { type: 'string' },
+                confidence: { type: 'number', minimum: 0, maximum: 1 }
+              },
+              required: ['primaryType', 'domain'],
+              additionalProperties: true
+            },
+            strict: true
+          }
+        }
       })
     });
 
@@ -118,8 +138,11 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
     const data = await response.json();
     let contextData;
 
+    const rawContent = data.choices?.[0]?.message?.content ?? '';
+    console.log('[context-detection] raw model content:', rawContent);
+
     try {
-      contextData = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+      contextData = JSON.parse(rawContent || '{}');
     } catch (parseError) {
       console.error('[context-detection] Failed to parse model JSON:', parseError);
       return new Response(
