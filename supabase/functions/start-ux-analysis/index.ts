@@ -140,8 +140,15 @@ serve(async (req: Request) => {
       );
     }
 
+    // Fire-and-forget direct orchestrator as safety net (parallel to Inngest)
+    // This ensures progress updates even if Inngest is not configured in this environment
+    supabase.functions
+      .invoke('ux-orchestrator', { body: { jobId } })
+      .then(() => console.log('[start-ux-analysis] Orchestrator invoked in parallel'))
+      .catch((err) => console.error('[start-ux-analysis] Orchestrator parallel invoke error:', err));
+
     return Response.json(
-      { success: true, jobId },
+      { success: true, jobId, dispatch: 'inngest+direct' },
       { status: 202, headers: corsHeaders },
     );
   } catch (err) {
