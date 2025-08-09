@@ -11,6 +11,7 @@ import { AIProvider } from "./context/AIContext";
 // Performance monitoring disabled for production
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useInngestJobEmitter } from "./hooks/useInngestJobEmitter";
+import { PerformanceToggle } from "./components/PerformanceToggle";
 
 
 import { LoadingSpinner } from "./components/LoadingSpinner";
@@ -49,6 +50,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          {import.meta.env.DEV && <PerformanceToggle />}
           
           <BrowserRouter>
           <AuthProvider>
