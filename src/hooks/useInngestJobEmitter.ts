@@ -12,32 +12,28 @@ export function useInngestJobEmitter() {
 
     const subscribe = async () => {
       try {
-        channel = supabase
-          .channel('analysis-jobs-changes')
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'analysis_jobs' },
-            async (payload) => {
-              if (!mounted) return;
-              const job = payload.new as any;
-              console.log('[Inngest] Emitting analysis/job.created', job?.id);
-              try {
-                const { data, error } = await supabase.functions.invoke('inngest-dispatch', {
-                  body: {
-                    name: 'analysis/job.created',
-                    data: job,
-                    user: job?.user_id || undefined,
-                    id: job?.id,
-                  },
-                });
-                if (error) console.error('[Inngest] dispatch error (created):', error);
-                else console.log('[Inngest] dispatch ok (created):', data);
-              } catch (err) {
-                console.error('[Inngest] dispatch threw (created):', err);
-              }
+        const emitUpdates = typeof localStorage !== 'undefined' && localStorage.getItem('INNGEST_EMIT_UPDATES') === 'true';
+        channel = supabase.channel('analysis-jobs-changes');
+        channel.on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'analysis_jobs' },
+          async (payload) => {
+            if (!mounted) return;
+            const job = payload.new as any;
+            console.log('[Inngest] Emitting analysis/job.created', job?.id);
+            try {
+              const { data, error } = await supabase.functions.invoke('inngest-dispatch', {
+                body: { name: 'analysis/job.created', data: job, user: job?.user_id || undefined, id: job?.id },
+              });
+              if (error) console.error('[Inngest] dispatch error (created):', error);
+              else console.log('[Inngest] dispatch ok (created):', data);
+            } catch (err) {
+              console.error('[Inngest] dispatch threw (created):', err);
             }
-          )
-          .on(
+          }
+        );
+        if (emitUpdates) {
+          channel.on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'analysis_jobs' },
             async (payload) => {
@@ -46,12 +42,7 @@ export function useInngestJobEmitter() {
               console.log('[Inngest] Emitting analysis/job.updated', job?.id, job?.status, job?.current_stage);
               try {
                 const { data, error } = await supabase.functions.invoke('inngest-dispatch', {
-                  body: {
-                    name: 'analysis/job.updated',
-                    data: job,
-                    user: job?.user_id || undefined,
-                    id: job?.id,
-                  },
+                  body: { name: 'analysis/job.updated', data: job, user: job?.user_id || undefined, id: job?.id },
                 });
                 if (error) console.error('[Inngest] dispatch error (updated):', error);
                 else console.log('[Inngest] dispatch ok (updated):', data);
@@ -60,7 +51,7 @@ export function useInngestJobEmitter() {
               }
             }
           );
-
+        }
         await channel.subscribe();
         console.log('[Inngest] Subscribed to analysis_jobs changes');
       } catch (e) {

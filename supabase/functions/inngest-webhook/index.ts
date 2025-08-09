@@ -56,16 +56,14 @@ function extractTargets(ev: InngestEvent) {
     (data["groupId"] as string);
 
   if (/^group-ux-analysis\/pipeline\.started$/i.test(name)) {
-    return { kind: "group" as const, groupJobId: explicitJobId || explicitGroupJobId };
+    return { kind: 'group' as const, groupJobId: explicitJobId || explicitGroupJobId };
   }
-  if (/^ux-analysis\/pipeline\.started$/i.test(name) || /^analysis\/job\.created$/i.test(name) || /^analysis\/job\.updated$/i.test(name)) {
-    // analysis/job.created or job.updated carries job fields under data
+  if (/^ux-analysis\/pipeline\.started$/i.test(name)) {
     const jobId = explicitJobId;
-    return { kind: "single" as const, jobId };
+    return { kind: 'single' as const, jobId };
   }
-  // Fallback: if we only have groupJobId provided, treat as group
-  if (explicitGroupJobId) return { kind: "group" as const, groupJobId: explicitGroupJobId };
-  return { kind: "single" as const, jobId: explicitJobId };
+  // Ignore other events (e.g., analysis/job.updated, analysis/job.created)
+  return null as unknown as { kind: 'single' | 'group'; jobId?: string; groupJobId?: string };
 }
 
 serve(async (req: Request) => {
@@ -115,34 +113,37 @@ serve(async (req: Request) => {
     const results = await Promise.all(
       events.map(async (ev) => {
         const target = extractTargets(ev);
+        if (!target) {
+          return { event: ev.name, ok: true, skipped: true };
+        }
         const isUuid = (s?: string) =>
-          typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+          typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
         try {
-          if (target.kind === "group") {
-            if (!target.groupJobId) throw new Error("groupJobId not found in event payload");
+          if (target.kind === 'group') {
+            if (!target.groupJobId) throw new Error('groupJobId not found in event payload');
             if (!isUuid(target.groupJobId)) {
-              console.warn("[inngest-webhook] Invalid groupJobId (not UUID)", { groupJobId: target.groupJobId, event: ev?.name });
-              return { event: ev.name, kind: target.kind, ok: false, error: "Invalid groupJobId: must be a UUID" };
+              console.warn('[inngest-webhook] Invalid groupJobId (not UUID)', { groupJobId: target.groupJobId, event: ev?.name });
+              return { event: ev.name, kind: target.kind, ok: false, error: 'Invalid groupJobId: must be a UUID' };
             }
-            const { data, error } = await supabase.functions.invoke("group-ux-orchestrator", {
+            const { data, error } = await supabase.functions.invoke('group-ux-orchestrator', {
               body: { groupJobId: target.groupJobId },
             });
             if (error) throw error as unknown as Error;
-            return { event: ev.name, kind: target.kind, invoked: "group-ux-orchestrator", ok: true, data };
+            return { event: ev.name, kind: target.kind, invoked: 'group-ux-orchestrator', ok: true, data };
           } else {
-            if (!target.jobId) throw new Error("jobId not found in event payload");
+            if (!target.jobId) throw new Error('jobId not found in event payload');
             if (!isUuid(target.jobId)) {
-              console.warn("[inngest-webhook] Invalid jobId (not UUID)", { jobId: target.jobId, event: ev?.name });
-              return { event: ev.name, kind: target.kind, ok: false, error: "Invalid jobId: must be a UUID" };
+              console.warn('[inngest-webhook] Invalid jobId (not UUID)', { jobId: target.jobId, event: ev?.name });
+              return { event: ev.name, kind: target.kind, ok: false, error: 'Invalid jobId: must be a UUID' };
             }
-            const { data, error } = await supabase.functions.invoke("ux-orchestrator", {
+            const { data, error } = await supabase.functions.invoke('ux-orchestrator', {
               body: { jobId: target.jobId },
             });
             if (error) throw error as unknown as Error;
-            return { event: ev.name, kind: target.kind, invoked: "ux-orchestrator", ok: true, data };
+            return { event: ev.name, kind: target.kind, invoked: 'ux-orchestrator', ok: true, data };
           }
         } catch (e) {
-          console.error("[inngest-webhook] invoke error", { event: ev?.name, err: e });
+          console.error('[inngest-webhook] invoke error', { event: ev?.name, err: e });
           return { event: ev.name, ok: false, error: e instanceof Error ? e.message : String(e) };
         }
       }),

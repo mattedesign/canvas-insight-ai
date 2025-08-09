@@ -63,20 +63,15 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
       );
 
       // Start background job
+      const dispatchMode = (localStorage.getItem('DISPATCH_MODE') as 'inngest' | 'direct' | 'both') || 'inngest';
       const { jobId } = await startGroupUxAnalysis({
         groupId,
         imageUrls,
         groupName,
         projectId: payload?.projectId || null,
         userContext: payload?.prompt || payload?.userContext || null,
+        dispatchMode,
       });
-
-      // Fire-and-forget: ensure orchestrator runs even if event routing is delayed
-      try {
-        supabase.functions.invoke('group-ux-orchestrator', { body: { groupJobId: jobId } });
-      } catch (e) {
-        console.warn('[GroupAnalysisProgress] Fallback orchestrator invoke failed:', e);
-      }
 
 
       // Subscribe to realtime job updates

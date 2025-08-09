@@ -27,13 +27,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!INNGEST_EVENT_KEY) {
-      return new Response(JSON.stringify({ error: 'Missing INNGEST_EVENT_KEY' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -54,7 +47,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { groupId, imageUrls, groupName, projectId = null, userContext = null } = body || {};
+    const { groupId, imageUrls, groupName, projectId = null, userContext = null, dispatchMode: rawDispatchMode } = body || {};
+    const dispatchMode = (typeof rawDispatchMode === 'string' && ['inngest','direct','both'].includes(rawDispatchMode))
+      ? (rawDispatchMode as 'inngest' | 'direct' | 'both')
+      : 'inngest';
+
+    if (dispatchMode !== 'direct' && !INNGEST_EVENT_KEY) {
+      return new Response(JSON.stringify({ error: 'Missing INNGEST_EVENT_KEY' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
       return new Response(JSON.stringify({ error: 'imageUrls array is required' }), {
@@ -99,7 +102,7 @@ Deno.serve(async (req: Request) => {
         progress: 0,
         current_stage: 'queued',
         error: null,
-        metadata: { groupName, userContext },
+        metadata: { groupName, userContext, dispatchMode },
       })
       .select('id')
       .single();
@@ -114,19 +117,20 @@ Deno.serve(async (req: Request) => {
 
     const jobId = jobInsert.id as string;
 
-    // Dispatch Inngest event
-    const eventEndpoint = buildInngestEndpoint(INNGEST_EVENT_KEY);
+    // Dispatch according to dispatchMode
+    if (dispatchMode === 'direct') {
+      const { error: orkErr } = await supabase.functions.invoke('group-ux-orchestrator', { body: { groupJobId: jobId } });
+      if (orkErr) {
+        await supabase.from('group_analysis_jobs').update({ status: 'failed', error: `Direct orchestrator error: ${orkErr.message ?? 'unknown'}` }).eq('id', jobId);
+        return new Response(JSON.stringify({ error: 'Direct orchestrator failed' }), { status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      }
+      return new Response(JSON.stringify({ jobId, dispatch: 'direct' }), { status: 202, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
+    const eventEndpoint = buildInngestEndpoint(INNGEST_EVENT_KEY!);
     const inngestPayload = {
       name: 'group-ux-analysis/pipeline.started',
-      data: {
-        jobId,
-        userId: user.id,
-        groupId: groupId || null,
-        projectId,
-        imageUrls,
-        userContext,
-        groupName: groupName || null,
-      },
+      data: { jobId, userId: user.id, groupId: groupId || null, projectId, imageUrls, userContext, groupName: groupName || null, dispatchMode },
       id: jobId,
       ts: Date.now(),
     };
@@ -139,43 +143,19 @@ Deno.serve(async (req: Request) => {
 
     if (!inngestRes.ok) {
       const text = await inngestRes.text();
-      console.error('[start-group-ux-analysis] Inngest dispatch failed:', text);
-
-      // Fallback: invoke group-ux-orchestrator directly
-      const { error: fallbackErr } = await supabase.functions.invoke('group-ux-orchestrator', {
-        body: { jobId }
-      });
-
-      if (fallbackErr) {
-        // Mark job as failed if fallback also fails
-        await supabase
-          .from('group_analysis_jobs')
-          .update({ status: 'failed', error: `Dispatch failed; fallback error: ${fallbackErr.message ?? 'unknown'}` })
-          .eq('id', jobId);
-
-        return new Response(JSON.stringify({ error: 'Failed to dispatch Inngest event and group orchestrator fallback', response: text }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-
-      return new Response(JSON.stringify({ jobId, fallback: 'group-ux-orchestrator' }), {
-        status: 202,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      await supabase.from('group_analysis_jobs').update({ status: 'failed', error: `Inngest dispatch failed: ${inngestRes.status} ${inngestRes.statusText}` }).eq('id', jobId);
+      return new Response(JSON.stringify({ error: 'Failed to dispatch Inngest', response: text }), { status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    // Fire-and-forget direct orchestrator as safety net (parallel to Inngest)
-    // This ensures progress updates even if Inngest is not configured in this environment
-    supabase.functions
-      .invoke('group-ux-orchestrator', { body: { jobId } })
-      .then(() => console.log('[start-group-ux-analysis] Orchestrator invoked in parallel'))
-      .catch((err) => console.error('[start-group-ux-analysis] Orchestrator parallel invoke error:', err));
+    if (dispatchMode === 'both') {
+      supabase.functions
+        .invoke('group-ux-orchestrator', { body: { groupJobId: jobId } })
+        .then(() => console.log('[start-group-ux-analysis] Orchestrator invoked (both mode)'))
+        .catch((err) => console.error('[start-group-ux-analysis] Orchestrator invoke error (both mode):', err));
+      return new Response(JSON.stringify({ jobId, dispatch: 'inngest+direct' }), { status: 202, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
 
-    return new Response(JSON.stringify({ jobId, dispatch: 'inngest+direct' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return new Response(JSON.stringify({ jobId, dispatch: 'inngest' }), { status: 202, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   } catch (e: any) {
     console.error('[start-group-ux-analysis] Unexpected error:', e);
     return new Response(JSON.stringify({ error: e?.message || 'Unexpected error' }), {

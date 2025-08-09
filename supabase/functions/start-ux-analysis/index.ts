@@ -27,12 +27,6 @@ serve(async (req: Request) => {
     );
   }
 
-  if (!eventKey) {
-    return Response.json(
-      { success: false, error: "INNGEST_EVENT_KEY is not configured in Supabase Edge Function secrets." },
-      { status: 500, headers: corsHeaders },
-    );
-  }
 
   try {
     if (req.method !== "POST") {
@@ -60,7 +54,10 @@ serve(async (req: Request) => {
     }
     const userId = userData.user.id;
 
-    const { imageId, imageUrl, projectId, userContext } = await req.json();
+    const { imageId, imageUrl, projectId, userContext, dispatchMode: rawDispatchMode } = await req.json();
+    const dispatchMode = (typeof rawDispatchMode === 'string' && ['inngest','direct','both'].includes(rawDispatchMode))
+      ? (rawDispatchMode as 'inngest' | 'direct' | 'both')
+      : 'inngest';
 
     if (!imageId || !imageUrl) {
       return Response.json(
@@ -93,7 +90,7 @@ serve(async (req: Request) => {
         status: "processing",
         progress: 0,
         current_stage: "queued",
-        metadata: {},
+        metadata: { dispatchMode },
       })
       .select("id")
       .single();
@@ -107,62 +104,45 @@ serve(async (req: Request) => {
 
     const jobId = jobInsert.id as string;
 
-    // Emit pipeline started event directly to Inngest
+    // Dispatch according to dispatchMode
+    if (dispatchMode === 'direct') {
+      const { data: orkData, error: orkErr } = await supabase.functions.invoke('ux-orchestrator', { body: { jobId } });
+      if (orkErr) {
+        await supabase.from('analysis_jobs').update({ status: 'failed', error: `Direct orchestrator error: ${orkErr.message ?? 'unknown'}` }).eq('id', jobId);
+        return Response.json({ success: false, error: 'Direct orchestrator failed' }, { status: 502, headers: corsHeaders });
+      }
+      return Response.json({ success: true, jobId, dispatch: 'direct' }, { status: 202, headers: corsHeaders });
+    }
+
     const endpoint = buildInngestEndpoint(eventKey);
     const eventPayload = {
-      name: "ux-analysis/pipeline.started",
-      data: {
-        jobId,
-        imageId,
-        imageUrl,
-        projectId: projectId ?? null,
-        userId,
-      },
+      name: 'ux-analysis/pipeline.started',
+      data: { jobId, imageId, imageUrl, projectId: projectId ?? null, userId, dispatchMode },
+      id: jobId,
+      ts: Date.now(),
     };
 
     const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(eventPayload),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      // Fallback: start lightweight orchestrator instead of failing the job
-      const { error: orchErr } = await supabase.functions.invoke('ux-orchestrator', {
-        body: { jobId }
-      });
-
-      if (orchErr) {
-        // If orchestrator also fails, mark job failed transparently
-        await supabase
-          .from("analysis_jobs")
-          .update({ status: "failed", error: `Inngest dispatch failed: ${res.status} ${res.statusText}; Orchestrator error: ${orchErr.message ?? 'unknown'}` })
-          .eq("id", jobId);
-
-        return Response.json(
-          { success: false, error: "Failed to dispatch Inngest and orchestrator", response: text, endpoint },
-          { status: 502, headers: corsHeaders },
-        );
-      }
-
-      return Response.json(
-        { success: true, jobId, fallback: "orchestrator" },
-        { status: 202, headers: corsHeaders },
-      );
+      await supabase.from('analysis_jobs').update({ status: 'failed', error: `Inngest dispatch failed: ${res.status} ${res.statusText}` }).eq('id', jobId);
+      return Response.json({ success: false, error: 'Failed to dispatch Inngest', response: text }, { status: 502, headers: corsHeaders });
     }
 
-    // Fire-and-forget direct orchestrator as safety net (parallel to Inngest)
-    // This ensures progress updates even if Inngest is not configured in this environment
-    supabase.functions
-      .invoke('ux-orchestrator', { body: { jobId } })
-      .then(() => console.log('[start-ux-analysis] Orchestrator invoked in parallel'))
-      .catch((err) => console.error('[start-ux-analysis] Orchestrator parallel invoke error:', err));
+    if (dispatchMode === 'both') {
+      supabase.functions
+        .invoke('ux-orchestrator', { body: { jobId } })
+        .then(() => console.log('[start-ux-analysis] Orchestrator invoked (both mode)'))
+        .catch((err) => console.error('[start-ux-analysis] Orchestrator invoke error (both mode):', err));
+      return Response.json({ success: true, jobId, dispatch: 'inngest+direct' }, { status: 202, headers: corsHeaders });
+    }
 
-    return Response.json(
-      { success: true, jobId, dispatch: 'inngest+direct' },
-      { status: 202, headers: corsHeaders },
-    );
+    return Response.json({ success: true, jobId, dispatch: 'inngest' }, { status: 202, headers: corsHeaders });
   } catch (err) {
     console.error("start-ux-analysis error", err);
     return Response.json(

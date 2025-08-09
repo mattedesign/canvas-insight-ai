@@ -85,18 +85,13 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     });
 
     try {
+      const dispatchMode = (localStorage.getItem('DISPATCH_MODE') as 'inngest' | 'direct' | 'both') || 'inngest';
       const { jobId } = await startUxAnalysis({
         imageId,
         imageUrl,
         userContext: userContext || null,
+        dispatchMode,
       });
-
-      // Fire-and-forget safety: ensure orchestrator runs even if Inngest routing is delayed
-      try {
-        supabase.functions.invoke('ux-orchestrator', { body: { jobId } });
-      } catch (e) {
-        console.warn('[AIContext] Fallback orchestrator invoke failed:', e);
-      }
 
       const result = await new Promise<any>((resolve, reject) => {
         let resolved = false;

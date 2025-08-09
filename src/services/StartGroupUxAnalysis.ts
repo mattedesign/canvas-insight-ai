@@ -7,6 +7,7 @@ export async function startGroupUxAnalysis(params: {
   groupName?: string | null;
   projectId?: string | null;
   userContext?: string | null;
+  dispatchMode?: 'inngest' | 'direct' | 'both';
 }): Promise<{ jobId: string }> {
   const { retryAnalysis } = retryService.createAnalysisRetryWrapper();
 
@@ -18,6 +19,7 @@ export async function startGroupUxAnalysis(params: {
         groupName: params.groupName ?? null,
         projectId: params.projectId ?? null,
         userContext: params.userContext ?? null,
+        dispatchMode: params.dispatchMode ?? (localStorage.getItem('DISPATCH_MODE') as any) ?? 'inngest',
       },
     });
 
