@@ -28,11 +28,7 @@ export const uxSingle = inngest.createFunction(
     });
 
     if (error) throw error as unknown as Error;
-      await step.waitForEvent("completed-or-failed", {
-        event: "analysis/completed", // optional: if you later emit completion events
-        if: (e) => (e.data as any)?.jobId === jobId,
-        timeout: "5m",
-      });
+      // Optional completion wait removed to avoid type issues; orchestrator invoked asynchronously
     return { ok: true, invoked: "ux-orchestrator", jobId, data };
   }
 );
@@ -51,11 +47,7 @@ export const uxGroup = inngest.createFunction(
     });
 
     if (error) throw error as unknown as Error;
-      await step.waitForEvent("group-completed-or-failed", {
-        event: "group-analysis/completed", // optional future event
-        if: (e) => (e.data as any)?.jobId === jobId,
-        timeout: "15m",
-      });
+      // Optional group completion wait removed to avoid type issues; orchestrator invoked asynchronously
     return { ok: true, invoked: "group-ux-orchestrator", jobId, data };
   }
 );
