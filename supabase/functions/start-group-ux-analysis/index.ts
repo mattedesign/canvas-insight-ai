@@ -52,12 +52,7 @@ Deno.serve(async (req: Request) => {
       ? (rawDispatchMode as 'inngest' | 'direct' | 'both')
       : 'inngest';
 
-    if (dispatchMode !== 'direct' && !INNGEST_EVENT_KEY) {
-      return new Response(JSON.stringify({ error: 'Missing INNGEST_EVENT_KEY' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
+    // Note: If INNGEST_EVENT_KEY is missing, we will fallback to direct orchestrator AFTER job insertion.
 
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
       return new Response(JSON.stringify({ error: 'imageUrls array is required' }), {
