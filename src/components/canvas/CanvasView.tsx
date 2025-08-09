@@ -42,6 +42,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AnalysisDebugger, AnalysisLifecycle } from '@/utils/analysisDebugging';
 
 import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
+import { fetchLatestGroupAnalysis } from '@/services/fetchLatestGroupAnalysis';
 
 import { useAuth } from '@/context/AuthContext';
 import { useFinalAppContext } from '@/context/FinalAppContext';
@@ -360,7 +361,11 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
           );
           const cx = avg.x / groupImageNodes.length;
           const cy = avg.y / groupImageNodes.length;
-          return { x: cx + 400, y: cy };
+          // If images are inside a group container, their positions are relative.
+          // Add the container's absolute offset to get the correct canvas coordinates.
+          const baseX = groupContainer ? groupContainer.position.x : 0;
+          const baseY = groupContainer ? groupContainer.position.y : 0;
+          return { x: baseX + cx + 400, y: baseY + cy };
         }
         // 4) Fallback: viewport-ish center offset
         const defaultX = 600;
@@ -451,11 +456,39 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       setDynamicNodes(prev => prev.filter(n => n.id !== `group-analysis-loading-${groupId}`));
       setDynamicEdges(prev => prev.filter(e => e.id !== `prompt-to-loading-${groupId}`));
       
+      // Check if results actually exist; if so, render them and avoid error toast
+      try {
+        const latest = await fetchLatestGroupAnalysis(groupId);
+        if (latest) {
+          const containerForGroup = nodes.find(n => n.id === `group-container-${groupId}`);
+          const fallbackPos = containerForGroup ? { x: containerForGroup.position.x + 600, y: containerForGroup.position.y } : { x: 600, y: 300 };
+          const resultsNode = groupAnalysisProgress.getResultsNode(
+            groupId,
+            latest,
+            fallbackPos,
+            {
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: onCreateFork
+            }
+          );
+
+          setDynamicNodes(prev => [...prev, resultsNode]);
+          setDynamicEdges(prev => prev.map(edge => 
+            edge.id === `prompt-to-loading-${groupId}`
+              ? { ...edge, target: resultsNode.id, animated: false }
+              : edge
+          ));
+
+          toast({ category: 'success', title: 'Group Analysis Complete', description: 'Results are ready.' });
+          return;
+        }
+      } catch {}
+      
       toast({
         category: 'error',
-        title: "Group Analysis Failed",
+        title: 'Group Analysis Failed',
         description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setActiveGroupAnalyses(prev => {
@@ -657,8 +690,39 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     const groupId = existingGroup?.id || `temp-group-${Date.now()}`;
     const groupName = existingGroup?.name || `Analysis Group (${imagesToAnalyze.length} images)`;
 
-    // Create loading node on canvas
-    const loadingNodePosition = { x: 400, y: 200 }; // Position to the right of group prompt
+    // Compute loading node anchor near group container or centroid
+    const computeLoadingNodePosition = (): { x: number; y: number } => {
+      if (existingGroup) {
+        const container = nodes.find(n => n.id === `group-container-${existingGroup.id}`);
+        if (container) {
+          return { x: container.position.x + 600, y: container.position.y };
+        }
+      }
+
+      const imageNodes = imagesToAnalyze
+        .map(img => nodes.find(n => n.id === `image-${img.id}`))
+        .filter(Boolean) as Node[];
+
+      if (imageNodes.length > 0) {
+        const avg = imageNodes.reduce(
+          (acc, n) => ({ x: acc.x + n.position.x, y: acc.y + n.position.y }),
+          { x: 0, y: 0 }
+        );
+        const cx = avg.x / imageNodes.length;
+        const cy = avg.y / imageNodes.length;
+        // If these image nodes are within a container, add its offset
+        const parentId = (imageNodes[0] as any).parentId as string | undefined;
+        const parentContainer = parentId ? nodes.find(n => n.id === parentId) : null;
+        const baseX = parentContainer ? parentContainer.position.x : 0;
+        const baseY = parentContainer ? parentContainer.position.y : 0;
+        return { x: baseX + cx + 400, y: baseY + cy };
+      }
+
+      // Default fallback
+      return { x: 600, y: 300 };
+    };
+
+    const loadingNodePosition = computeLoadingNodePosition();
     const loadingNode = groupAnalysisProgress.getLoadingNode(
       groupId, 
       loadingNodePosition,
@@ -723,6 +787,29 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       
       // Remove loading node on error
       setDynamicNodes(prev => prev.filter(node => node.id !== `group-analysis-loading-${groupId}`));
+      
+      // Check if results actually exist; if so, render them and avoid error toast
+      try {
+        const latest = await fetchLatestGroupAnalysis(groupId);
+        if (latest) {
+          const resultsNode = groupAnalysisProgress.getResultsNode(
+            groupId,
+            latest,
+            { x: loadingNodePosition.x + 400, y: loadingNodePosition.y },
+            {
+              onEditPrompt: onEditGroupPrompt,
+              onCreateFork: onCreateFork
+            }
+          );
+          setDynamicNodes(prev => [...prev, resultsNode]);
+          toast({
+            title: 'Group Analysis Complete',
+            description: `Successfully analyzed ${imagesToAnalyze.length} images as a group`,
+            category: 'success',
+          });
+          return;
+        }
+      } catch {}
       
       toast({
         title: "Group Analysis Failed",
