@@ -3,7 +3,7 @@ import { serve } from "inngest/next";
 import { createClient } from "@supabase/supabase-js";
 
 // Inngest client
-export const inngest = new Inngest({ name: "UX Analysis Orchestrator" });
+export const inngest = new Inngest({ id: "figmant-ai" });
 
 function getAdminClient() {
   const url = process.env.SUPABASE_URL;
@@ -28,11 +28,11 @@ export const uxSingle = inngest.createFunction(
     });
 
     if (error) throw error as unknown as Error;
-    await step.waitFor("completed-or-failed", {
-      event: "analysis/completed", // optional: if you later emit completion events
-      if: (e) => (e.data as any)?.jobId === jobId,
-      timeout: "5m",
-    });
+      await step.waitForEvent("completed-or-failed", {
+        event: "analysis/completed", // optional: if you later emit completion events
+        if: (e) => (e.data as any)?.jobId === jobId,
+        timeout: "5m",
+      });
     return { ok: true, invoked: "ux-orchestrator", jobId, data };
   }
 );
@@ -51,11 +51,11 @@ export const uxGroup = inngest.createFunction(
     });
 
     if (error) throw error as unknown as Error;
-    await step.waitFor("group-completed-or-failed", {
-      event: "group-analysis/completed", // optional future event
-      if: (e) => (e.data as any)?.jobId === jobId,
-      timeout: "15m",
-    });
+      await step.waitForEvent("group-completed-or-failed", {
+        event: "group-analysis/completed", // optional future event
+        if: (e) => (e.data as any)?.jobId === jobId,
+        timeout: "15m",
+      });
     return { ok: true, invoked: "group-ux-orchestrator", jobId, data };
   }
 );
