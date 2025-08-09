@@ -26,17 +26,40 @@ function getAdminClient() {
   return createClient(url, key);
 }
 
+function normalizeEventName(name: string) {
+  let n = (name || "").trim();
+  if (!n) return "";
+  // Normalize separators and variants
+  n = n.replace(/\./g, "/"); // dots to slashes
+  n = n.replace(/_/g, "-");   // underscores to hyphens
+  // Canonicalize common suffixes
+  n = n.replace(/pipeline-?started$/i, "pipeline.started");
+  n = n.replace(/\/job-?created$/i, "/job.created");
+  n = n.replace(/\/job-?updated$/i, "/job.updated");
+  return n.toLowerCase();
+}
+
 function extractTargets(ev: InngestEvent) {
-  const name = (ev.name || "").trim();
+  const nameRaw = ev.name || "";
+  const name = normalizeEventName(nameRaw);
   const data = (ev.data || {}) as Record<string, unknown>;
-  const explicitJobId = (ev.jobId as string) || (data["jobId"] as string) || (data["id"] as string) || (ev.id as string);
-  const explicitGroupJobId = (ev.groupJobId as string) || (data["groupJobId"] as string);
+  const explicitJobId =
+    (ev.jobId as string) ||
+    (data["jobId"] as string) ||
+    (data["job_id"] as string) ||
+    (data["id"] as string) ||
+    (ev.id as string);
+  const explicitGroupJobId =
+    (ev.groupJobId as string) ||
+    (data["groupJobId"] as string) ||
+    (data["group_job_id"] as string) ||
+    (data["groupId"] as string);
 
   if (/^group-ux-analysis\/pipeline\.started$/i.test(name)) {
     return { kind: "group" as const, groupJobId: explicitJobId || explicitGroupJobId };
   }
-  if (/^ux-analysis\/pipeline\.started$/i.test(name) || /^analysis\/job\.created$/i.test(name)) {
-    // analysis/job.created carries job fields under data
+  if (/^ux-analysis\/pipeline\.started$/i.test(name) || /^analysis\/job\.created$/i.test(name) || /^analysis\/job\.updated$/i.test(name)) {
+    // analysis/job.created or job.updated carries job fields under data
     const jobId = explicitJobId;
     return { kind: "single" as const, jobId };
   }
