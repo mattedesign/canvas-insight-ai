@@ -71,6 +71,14 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
         userContext: payload?.prompt || payload?.userContext || null,
       });
 
+      // Fire-and-forget: ensure orchestrator runs even if event routing is delayed
+      try {
+        supabase.functions.invoke('group-ux-orchestrator', { body: { groupJobId: jobId } });
+      } catch (e) {
+        console.warn('[GroupAnalysisProgress] Fallback orchestrator invoke failed:', e);
+      }
+
+
       // Subscribe to realtime job updates
       await new Promise<void>((resolve, reject) => {
         let resolved = false;
