@@ -103,11 +103,11 @@ const SuggestionCard: React.FC<{ suggestion: Suggestion }> = ({ suggestion }) =>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-3">{suggestion.description}</p>
-        {suggestion.actionItems.length > 0 && (
+        {Array.isArray(suggestion.actionItems) && suggestion.actionItems.length > 0 && (
           <div>
             <h5 className="text-xs font-semibold mb-1">Action Items:</h5>
             <ul className="text-xs text-muted-foreground space-y-1">
-              {suggestion.actionItems.map((item, index) => (
+              {(Array.isArray(suggestion.actionItems) ? suggestion.actionItems : []).map((item, index) => (
                 <li key={index} className="flex items-start gap-1">
                   <span className="text-primary">•</span>
                   <span>{item}</span>

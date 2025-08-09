@@ -328,11 +328,11 @@ export const AnalysisPanel: React.FC<AnalysisPanelProps> = memo(({
                       
                       <p className="text-sm text-muted-foreground">{suggestion.description}</p>
                       
-                      {suggestion.actionItems.length > 0 && (
+                      {Array.isArray(suggestion.actionItems) && suggestion.actionItems.length > 0 && (
                         <div className="space-y-2">
                           <h5 className="text-sm font-medium text-foreground">Action Items:</h5>
                           <ul className="space-y-1">
-                            {suggestion.actionItems.map((item, itemIndex) => (
+                            {(Array.isArray(suggestion.actionItems) ? suggestion.actionItems : []).map((item, itemIndex) => (
                               <li key={itemIndex} className="text-sm text-muted-foreground flex items-start gap-2">
                                 <span className="text-primary mt-1">•</span>
                                 <span>{item}</span>

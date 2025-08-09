@@ -183,13 +183,13 @@ export function NaturalAnalysisDisplay({ analysis, className = "" }: NaturalAnal
                     {suggestion.description}
                   </p>
                   
-                  {suggestion.actionItems.length > 0 && (
+                  {Array.isArray(suggestion.actionItems) && suggestion.actionItems.length > 0 && (
                     <div>
                       <h5 className="font-medium text-xs text-muted-foreground mb-2">
                         Recommended Actions:
                       </h5>
                       <ul className="space-y-1">
-                        {suggestion.actionItems.slice(0, 3).map((action, index) => (
+                        {(Array.isArray(suggestion.actionItems) ? suggestion.actionItems.slice(0, 3) : []).map((action, index) => (
                           <li key={index} className="text-xs text-muted-foreground flex items-start gap-2">
                             <div className="w-1 h-1 rounded-full bg-muted-foreground mt-1.5 flex-shrink-0" />
                             {action}

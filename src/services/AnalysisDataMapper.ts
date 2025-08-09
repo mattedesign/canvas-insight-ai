@@ -33,7 +33,13 @@ export class AnalysisDataMapper {
       imageUrl: sourceData.image_url || sourceData.imageUrl || '',
       userContext: sourceData.user_context || sourceData.userContext || '',
       visualAnnotations: sourceData.visual_annotations || sourceData.visualAnnotations || [],
-      suggestions: sourceData.suggestions || [],
+      suggestions: Array.isArray(sourceData.suggestions)
+        ? sourceData.suggestions.map((s: any) => ({
+            ...s,
+            actionItems: Array.isArray(s?.actionItems) ? s.actionItems : [],
+            relatedAnnotations: Array.isArray(s?.relatedAnnotations) ? s.relatedAnnotations : [],
+          }))
+        : [],
       summary: this.mapSummary(sourceData.summary),
       metadata: this.mapMetadata(sourceData.metadata),
       createdAt: new Date(sourceData.created_at || sourceData.createdAt || Date.now()),

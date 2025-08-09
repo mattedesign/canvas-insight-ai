@@ -62,7 +62,12 @@ function extractTargets(ev: InngestEvent) {
     const jobId = explicitJobId;
     return { kind: 'single' as const, jobId };
   }
-  // Ignore other events (e.g., analysis/job.updated, analysis/job.created)
+  // Handle Inngest created job events
+  if (/^analysis\/job\.created$/i.test(name)) {
+    const jobId = explicitJobId;
+    return { kind: 'single' as const, jobId };
+  }
+  // Ignore other events (e.g., analysis/job.updated, analysis/job.created without jobId)
   return null as unknown as { kind: 'single' | 'group'; jobId?: string; groupJobId?: string };
 }
 

@@ -78,11 +78,18 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
       await new Promise<void>((resolve, reject) => {
         let resolved = false;
         let channel: any;
-        const timeout = setTimeout(() => {
+        const timeout = setTimeout(async () => {
           if (!resolved) {
             if (channel) supabase.removeChannel(channel);
-            groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 60s.');
-            reject(new Error('No job progress detected within 60s. Please check background workers.'));
+            try {
+              const latest = await fetchLatestGroupAnalysis(groupId);
+              groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+              resolved = true;
+              resolve();
+            } catch (e) {
+              groupAnalysisProgressService.failGroupAnalysis(groupId, 'No job progress detected within 60s.');
+              reject(new Error('No job progress detected within 60s. Please check background workers.'));
+            }
           }
         }, 60000);
 

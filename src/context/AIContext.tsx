@@ -96,13 +96,22 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       const result = await new Promise<any>((resolve, reject) => {
         let resolved = false;
         let channel: any;
-        const timeout = setTimeout(() => {
+        const timeout = setTimeout(async () => {
           if (!resolved) {
             if (channel) supabase.removeChannel(channel);
-            setAnalysisProgress(null);
-            setIsAnalyzing(false);
-            setCurrentAnalysisParams(null);
-            reject(new Error('No job progress detected within 60s. Please check background workers.'));
+            try {
+              const latest = await fetchLatestAnalysis(imageId);
+              resolved = true;
+              setAnalysisProgress(null);
+              setIsAnalyzing(false);
+              setCurrentAnalysisParams(null);
+              resolve(latest);
+            } catch (e) {
+              setAnalysisProgress(null);
+              setIsAnalyzing(false);
+              setCurrentAnalysisParams(null);
+              reject(new Error('No job progress detected within 60s. Please check background workers.'));
+            }
           }
         }, 60000);
 
