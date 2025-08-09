@@ -10,6 +10,7 @@ import { startUxAnalysis } from '@/services/StartUxAnalysis';
 import { useAnalysisJob } from '@/hooks/useAnalysisJob';
 import { AnalysisJobProgress } from '@/components/AnalysisJobProgress';
 import { fetchLatestAnalysis } from '@/services/fetchLatestAnalysis';
+import { Link } from 'react-router-dom';
 
 interface ImageAnalysisDialogProps {
   imageId: string;
@@ -134,9 +135,18 @@ export function ImageAnalysisDialog({
               onChange={(e) => setUserContext(e.target.value)}
               rows={3}
             />
-          </div>
-          
-          {/* Action Buttons */}
+</div>
+
+{jobId && (
+  <div className="space-y-2">
+    <AnalysisJobProgress job={job} />
+    <Button asChild variant="outline">
+      <Link to={`/job/${jobId}`}>View Live Status</Link>
+    </Button>
+  </div>
+)}
+
+{/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button 
               variant="outline" 
