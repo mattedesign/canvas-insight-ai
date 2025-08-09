@@ -24,7 +24,7 @@ serve(async (req) => {
 
     const safePrompt = (typeof prompt === 'string' && prompt.trim().length > 0)
       ? prompt
-      : 'Analyze the interface image and return JSON with required fields: primaryType and domain. Include optional targetAudience, platform, designSystem, complexity, and confidence (0-1).';
+      : 'Analyze the interface image and return STRICTLY a minimal JSON object with required fields: primaryType and domain, and optional confidence (0-1). No extra keys, no prose.';
 
     // Handle image data - prioritize base64 from frontend over URL fetching
     let processedImageUrl = null;
@@ -45,7 +45,7 @@ serve(async (req) => {
     // Optimize for metadata mode with faster processing
     const optimizedModel = model || 'gpt-4.1-2025-04-14';
     const optimizedTemperature = 0.0;
-    const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
+    const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 600) : maxTokens;
     
     console.log(`Using ${useMetadataMode ? 'optimized metadata' : 'full vision'} mode with model ${optimizedModel}`);
 
@@ -58,8 +58,10 @@ serve(async (req) => {
 3. User Experience Maturity: Assess design sophistication and feature completeness
 4. Design System Analysis: Evaluate consistency in spacing, colors, typography
 
-CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clarity and pattern recognition certainty.` :
-      'You are a fast UI analyzer. Return only the requested JSON fields with no explanation.';
+CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clarity and pattern recognition certainty.
+
+OUTPUT FORMAT: Return strictly a JSON object with only these keys: primaryType (string), domain (string), confidence (number between 0 and 1). No additional keys, no prose.` :
+      'You are a fast UI analyzer. Return strictly a JSON object with only keys: primaryType (string), domain (string), confidence (number between 0 and 1). No additional keys, no prose.';
 
     const contextMessages = [
       {
@@ -149,10 +151,25 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
       contextData = tryParse(rawContent || '{}');
     } catch (parseError) {
       console.error('[context-detection] Failed to parse model JSON:', parseError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON returned by model', details: String(parseError) }),
-        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Attempt minimal extraction of required fields from partial content (no invented values)
+      const extract = (keys: string[]) => {
+        for (const k of keys) {
+          const re = new RegExp(`"${k}"\\s*:\\s*"([^"]+)"`, 'i');
+          const m = rawContent.match(re);
+          if (m && m[1]) return m[1];
+        }
+        return undefined;
+      };
+      const primary = extract(['primaryType','interfaceType','interface_type','screenType','screen_type','type']);
+      const domainVal = extract(['domain','detectedDomain','industry','category','sector']);
+      if (primary && domainVal) {
+        contextData = { primaryType: primary, domain: domainVal };
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON returned by model', details: String(parseError), rawPreview: rawContent?.slice(0, 400) ?? null }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Strict validation with synonym mapping (no invented values)
