@@ -28,6 +28,86 @@ function getAdminClient() {
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
 
+// --- Normalization helpers for AI-driven outputs (Option A)
+function tryParseJson(text: string): any | null {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function extractJsonSubstring(text: string): string | null {
+  // Heuristic: find first '{' and last '}'
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    return text.slice(start, end + 1);
+  }
+  return null;
+}
+
+function normalizeAIGroupOutput(raw: unknown): {
+  ok: boolean;
+  summary: Record<string, unknown>;
+  insights: unknown[];
+  recommendations: unknown[];
+  patterns: Record<string, unknown>;
+  warnings: string[];
+  ai_raw: unknown;
+} {
+  const warnings: string[] = [];
+  let obj: any = null;
+
+  if (raw && typeof raw === 'object') {
+    obj = raw as any;
+  } else if (typeof raw === 'string') {
+    const direct = tryParseJson(raw);
+    if (direct) {
+      obj = direct;
+    } else {
+      const sub = extractJsonSubstring(raw);
+      const parsed = sub ? tryParseJson(sub) : null;
+      if (parsed) {
+        obj = parsed;
+        warnings.push('Parsed JSON from unstructured text');
+      } else {
+        warnings.push('Could not parse JSON from text content');
+      }
+    }
+  }
+
+  if (!obj || typeof obj !== 'object') {
+    return { ok: false, summary: {}, insights: [], recommendations: [], patterns: {}, warnings, ai_raw: raw };
+  }
+
+  // Accept several shapes: obj, obj.analysis, obj.data, obj.result
+  const candidate = (obj.analysis ?? obj.data ?? obj.result ?? obj) as any;
+
+  const summary = (candidate.summary && typeof candidate.summary === 'object') ? { ...candidate.summary } : {};
+  const insights = Array.isArray(candidate.insights) ? candidate.insights : [];
+  const recommendations = Array.isArray(candidate.recommendations) ? candidate.recommendations : [];
+  const patterns = (candidate.patterns && typeof candidate.patterns === 'object') ? candidate.patterns : {};
+
+  // Type coercions for common fields (no fake defaults)
+  if (summary.overallScore != null) {
+    const n = Number(summary.overallScore);
+    if (Number.isFinite(n)) {
+      summary.overallScore = Math.max(0, Math.min(100, n));
+    } else {
+      warnings.push('summary.overallScore was not numeric');
+      delete (summary as any).overallScore;
+    }
+  }
+
+  if (summary.categoryScores && typeof summary.categoryScores === 'object') {
+    const cs: any = summary.categoryScores;
+    for (const k of Object.keys(cs)) {
+      const n = Number(cs[k]);
+      if (Number.isFinite(n)) cs[k] = n; else warnings.push(`categoryScores.${k} was not numeric`);
+    }
+  }
+
+  const ok = Object.keys(summary).length > 0 || insights.length > 0 || recommendations.length > 0 || Object.keys(patterns).length > 0;
+  return { ok, summary, insights, recommendations, patterns, warnings, ai_raw: raw };
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -111,30 +191,38 @@ serve(async (req: Request) => {
 
     await insertEvent({ event_name: 'group-analysis/synthesis.started', status: 'processing', progress: startedProgress });
 
-    // Fetch AI results
+    // Fetch AI results (lenient) and normalize
     const { data: aiRows } = await supabase
       .from('analysis_events')
       .select('metadata, created_at')
       .eq('group_job_id', job.id)
-      .eq('event_name', 'group-analysis/ai.completed')
+      .like('event_name', 'group-analysis/ai.%')
       .order('created_at', { ascending: false })
       .limit(1);
-    const ai = aiRows?.[0]?.metadata?.analysis ?? null;
 
-    if (!ai) {
-      await insertEvent({ event_name: 'group-analysis/synthesis.failed', status: 'failed', progress: startedProgress, message: 'Missing AI analysis results' });
-      return Response.json({ error: 'Missing AI analysis results' }, { status: 400, headers: corsHeaders });
+    const aiMeta: any = aiRows?.[0]?.metadata ?? null;
+    const rawCandidate = aiMeta?.analysis ?? aiMeta?.raw ?? aiMeta?.content ?? aiMeta?.response ?? aiMeta ?? null;
+
+    const norm = normalizeAIGroupOutput(rawCandidate);
+    if (!norm.ok) {
+      await insertEvent({
+        event_name: 'group-analysis/synthesis.failed',
+        status: 'failed',
+        progress: startedProgress,
+        message: 'AI output could not be normalized',
+        metadata: { reason: 'normalization_failed', had_ai_event: !!aiMeta, ai_preview: typeof rawCandidate === 'string' ? (rawCandidate as string).slice(0, 500) : (rawCandidate ? 'object' : null) }
+      });
+      return Response.json({ error: 'AI output could not be normalized' }, { status: 400, headers: corsHeaders });
     }
 
-    // Compose final structures from AI output (no placeholders)
-    const summaryRaw = (ai as any)?.summary ?? {};
-    const summary = { ...summaryRaw, groupJobId: job.id };
-    const insights = Array.isArray((ai as any)?.insights) ? (ai as any).insights : [];
-    const recommendations = Array.isArray((ai as any)?.recommendations) ? (ai as any).recommendations : [];
-    const patterns = (ai as any)?.patterns ?? {};
+    // Compose final structures from normalized output (no fabricated values)
+    const summary = { ...(norm.summary || {}), groupJobId: job.id } as Record<string, unknown>;
+    const insights = Array.isArray(norm.insights) ? norm.insights : [];
+    const recommendations = Array.isArray(norm.recommendations) ? norm.recommendations : [];
+    const patterns = (norm.patterns && typeof norm.patterns === 'object') ? norm.patterns : {};
     const prompt = ((job.metadata as any)?.userContext as string | undefined) ?? '';
 
-    // Persist group analysis
+    // Persist group analysis with raw + warnings for auditability
     const { error: insErr } = await supabase
       .from('group_analyses')
       .insert({
@@ -146,7 +234,7 @@ serve(async (req: Request) => {
         recommendations,
         patterns,
         parent_analysis_id: null,
-        metadata: { groupJobId: job.id },
+        metadata: { groupJobId: job.id, normalization: { warnings: norm.warnings }, ai_raw_output: norm.ai_raw },
       });
 
     if (insErr) {
