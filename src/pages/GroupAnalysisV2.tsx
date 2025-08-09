@@ -133,6 +133,14 @@ const uiEnabled = FeatureFlagService.isEnabled('new_pipeline_ui', user?.id, user
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Group Analysis V2</h1>
         <p className="text-sm text-muted-foreground">Append ?groupJobId=&lt;uuid&gt; to the URL.</p>
+        <nav className="mt-2 text-xs text-muted-foreground flex flex-wrap gap-3">
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/group-vision-openai/logs" target="_blank" rel="noreferrer">Group Vision (OpenAI)</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/group-vision-google/logs" target="_blank" rel="noreferrer">Group Vision (Google)</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/group-ai-analysis/logs" target="_blank" rel="noreferrer">Group AI logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/group-synthesis/logs" target="_blank" rel="noreferrer">Group Synthesis logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/group-ux-orchestrator/logs" target="_blank" rel="noreferrer">Group Orchestrator logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/start-group-ux-analysis/logs" target="_blank" rel="noreferrer">Start Group Analysis</a>
+        </nav>
       </header>
 
       {!groupJobId ? (

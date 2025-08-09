@@ -15,7 +15,6 @@ interface PipelineMetrics {
   failedRequests: number;
   averageResponseTime: number;
   timeoutRate: number;
-  deduplicationRate: number;
 }
 
 export const PipelineMonitoringDashboard: React.FC = () => {
@@ -24,8 +23,7 @@ export const PipelineMonitoringDashboard: React.FC = () => {
     completedRequests: 0,
     failedRequests: 0,
     averageResponseTime: 0,
-    timeoutRate: 0,
-    deduplicationRate: 0
+    timeoutRate: 0
   });
   
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
@@ -66,8 +64,7 @@ export const PipelineMonitoringDashboard: React.FC = () => {
         averageResponseTime: avgResponseTime,
         timeoutRate: performance.length > 0 
           ? (performance.reduce((sum, p) => sum + (1 - (p.successRate || 0)), 0) / performance.length) * 100
-          : 0,
-        deduplicationRate: 15 // Placeholder - would need actual tracking
+          : 0
       });
       
       // Generate warnings
@@ -171,15 +168,6 @@ export const PipelineMonitoringDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{metrics.timeoutRate.toFixed(1)}%</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Deduplication</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{metrics.deduplicationRate}%</div>
           </CardContent>
         </Card>
       </div>

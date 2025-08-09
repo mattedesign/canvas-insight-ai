@@ -175,6 +175,14 @@ export default function AnalysisV2() {
         <p className="text-sm text-muted-foreground">
           View real-time pipeline status. Provide a jobId query param to monitor a specific job.
         </p>
+        <nav className="mt-2 text-xs text-muted-foreground flex flex-wrap gap-3">
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-context-detection/logs" target="_blank" rel="noreferrer">Context logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-vision-openai/logs" target="_blank" rel="noreferrer">Vision OpenAI logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-vision-google/logs" target="_blank" rel="noreferrer">Vision Google logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-ai-analysis/logs" target="_blank" rel="noreferrer">AI logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-synthesis/logs" target="_blank" rel="noreferrer">Synthesis logs</a>
+          <a href="https://supabase.com/dashboard/project/sdcmbfdtafkzpimwjpij/functions/ux-orchestrator/logs" target="_blank" rel="noreferrer">Orchestrator logs</a>
+        </nav>
       </header>
 
       {!jobId ? (
