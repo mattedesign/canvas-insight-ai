@@ -9,7 +9,6 @@ import {
   Connection,
   Edge,
   Node,
-  useReactFlow,
 } from '@xyflow/react';
 import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
@@ -139,15 +138,15 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   
   const { toast } = useFilteredToast();
   const { dispatch } = useFinalAppContext();
-  const { getViewport, getNodes, getEdges } = useReactFlow();
+  const rfInstanceRef = useRef<any>(null);
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
 
   const saveCurrentCanvasState = useCallback(async () => {
     try {
-      const vp = getViewport?.() || { x: 0, y: 0, zoom: 1 } as any;
-      const nodesToSave = typeof getNodes === 'function' ? getNodes() : [];
-      const edgesToSave = typeof getEdges === 'function' ? getEdges() : [];
+      const vp = rfInstanceRef.current?.getViewport?.() || ({ x: 0, y: 0, zoom: 1 } as any);
+      const nodesToSave = rfInstanceRef.current?.getNodes?.() || [];
+      const edgesToSave = rfInstanceRef.current?.getEdges?.() || [];
 
       await CanvasStateService.saveCanvasState({
         nodes: nodesToSave,
@@ -163,11 +162,14 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     } catch (e) {
       console.error('[CanvasView] Auto-save after delete failed:', e);
     }
-  }, [getViewport, getNodes, getEdges, showAnnotations, currentTool, groupDisplayModes, multiSelection.state.selectedIds]);
+  }, [showAnnotations, currentTool, groupDisplayModes, multiSelection.state.selectedIds]);
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const enableGroupProgressFlow = true;
   
+  const handleFlowInit = useCallback((instance: any) => {
+    rfInstanceRef.current = instance;
+  }, []);
 
   // Group analysis progress management
   const groupAnalysisProgress = useGroupAnalysisProgress();
@@ -2267,6 +2269,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         zoomActivationKeyCode={['Meta', 'Control']}
         minZoom={0.1}
         maxZoom={4}
+        onInit={handleFlowInit}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         
