@@ -110,28 +110,44 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
           }, async (payload: any) => {
             const j = payload.new as { status: string; progress: number | null; current_stage: string | null; error?: string | null };
             groupAnalysisProgressService.updateProgress(groupId, j.current_stage || 'processing', j.progress || 0);
-
-            if (j.status === 'completed') {
-              resolved = true;
-              clearTimeout(timeout);
-              try {
-                const latest = await fetchLatestGroupAnalysis(groupId);
-                groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
-                supabase.removeChannel(channel);
-                resolve();
-              } catch (e) {
-                supabase.removeChannel(channel);
-                reject(e);
-              }
-            }
-
-            if (j.status === 'failed') {
-              resolved = true;
-              clearTimeout(timeout);
-              groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
-              supabase.removeChannel(channel);
-              reject(new Error(j.error || 'Group analysis failed'));
-            }
+ 
+             if (j.status === 'completed') {
+               resolved = true;
+               clearTimeout(timeout);
+               try {
+                 const latest = await fetchLatestGroupAnalysis(groupId);
+                 groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                 supabase.removeChannel(channel);
+                 resolve();
+               } catch (e) {
+                 supabase.removeChannel(channel);
+                 reject(e);
+               }
+             }
+ 
+             if (j.status === 'failed') {
+               // Before treating as terminal failure, check if results were actually written
+               try {
+                 const latest = await fetchLatestGroupAnalysis(groupId);
+                 const latestCreatedAt = latest?.created_at ? new Date(latest.created_at) : null;
+                 if (latestCreatedAt && latestCreatedAt > requestStartedAt) {
+                   console.warn('[useGroupAnalysisProgress] Job reported failed but results exist; treating as completed', { groupId, jobId, latestCreatedAt, requestStartedAt });
+                   resolved = true;
+                   clearTimeout(timeout);
+                   groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                   supabase.removeChannel(channel);
+                   resolve();
+                   return;
+                 }
+               } catch {
+                 // No results found; proceed to mark as failure
+               }
+               resolved = true;
+               clearTimeout(timeout);
+               groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
+               supabase.removeChannel(channel);
+               reject(new Error(j.error || 'Group analysis failed'));
+             }
           })
           .subscribe();
       });
