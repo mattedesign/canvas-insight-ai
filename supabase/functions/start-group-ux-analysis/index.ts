@@ -75,6 +75,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Server-side rate-limit/permission gate to prevent abuse
+    const { data: permitted, error: permErr } = await supabase.rpc('validate_user_permission', {
+      operation: 'ai_analysis',
+      resource_id: projectId ?? null,
+    });
+    if (permErr || permitted !== true) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded or permission denied' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     // Insert job
     const { data: jobInsert, error: insertError } = await supabase
       .from('group_analysis_jobs')

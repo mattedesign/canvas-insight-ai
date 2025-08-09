@@ -69,6 +69,18 @@ serve(async (req: Request) => {
       );
     }
 
+    // Server-side permission and rate limit check (blocks overuse)
+    const { data: permitted, error: permErr } = await supabase.rpc('validate_user_permission', {
+      operation: 'ai_analysis',
+      resource_id: projectId ?? null,
+    });
+    if (permErr || permitted !== true) {
+      return Response.json(
+        { success: false, error: 'Rate limit exceeded or permission denied' },
+        { status: 429, headers: corsHeaders },
+      );
+    }
+
     // Insert job (RLS requires auth.uid() = user_id)
     const { data: jobInsert, error: insertErr } = await supabase
       .from("analysis_jobs")
