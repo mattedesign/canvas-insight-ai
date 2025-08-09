@@ -21,17 +21,15 @@ export const PerformanceToggle: React.FC = () => {
           <BarChart3 className="h-4 w-4" />
         </Button>
         
-        {import.meta.env.DEV && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowLoggingControls(!showLoggingControls)}
-            className="shadow-lg"
-            title="Toggle Logging Controls"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowLoggingControls(!showLoggingControls)}
+          className="shadow-lg"
+          title="Toggle Logging Controls"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
       </div>
       
       <PerformanceDashboard 

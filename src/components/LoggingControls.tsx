@@ -13,10 +13,6 @@ export const LoggingControls: React.FC = () => {
     return (['inngest','direct','both'].includes(v) ? (v as 'inngest'|'direct'|'both') : 'inngest');
   });
 
-  // Only show in development
-  if (!import.meta.env.DEV) {
-    return null;
-  }
 
   const toggleCategory = (category: LogCategory) => {
     const newCategories = new Set(categories);

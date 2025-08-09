@@ -50,7 +50,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          {import.meta.env.DEV && <PerformanceToggle />}
+          <PerformanceToggle />
           
           <BrowserRouter>
           <AuthProvider>
