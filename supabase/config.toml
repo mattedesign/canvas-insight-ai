@@ -83,3 +83,6 @@ verify_jwt = true
 
 [functions.inngest-webhook]
 verify_jwt = false
+
+[functions.cleanup-analysis-events]
+verify_jwt = true
