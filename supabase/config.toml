@@ -80,3 +80,6 @@ verify_jwt = true
 
 [functions.group-synthesis]
 verify_jwt = true
+
+[functions.inngest-webhook]
+verify_jwt = false
