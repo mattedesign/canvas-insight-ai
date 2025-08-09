@@ -20,7 +20,14 @@ function getAdminClient() {
 async function runPipeline(jobId: string) {
   const supabase = getAdminClient();
 
-  // Kick off context stage
+  // 1) Google Vision first (extract real metadata)
+  try {
+    await supabase.functions.invoke('ux-vision-google', { body: { jobId } });
+  } catch (e) {
+    console.warn('[ux-orchestrator] ux-vision-google failed; continuing to context detection', e);
+  }
+
+  // 2) Context detection (uses metadata if available; worker handles its own errors)
   const ctxRes = await supabase.functions.invoke('ux-context-detection', {
     body: { jobId },
   });
@@ -29,13 +36,7 @@ async function runPipeline(jobId: string) {
     return;
   }
 
-  // Run both vision providers in parallel (continue even if one fails)
-  const [openaiRes, googleRes] = await Promise.all([
-    supabase.functions.invoke('ux-vision-openai', { body: { jobId } }).catch((e) => ({ error: e })),
-    supabase.functions.invoke('ux-vision-google', { body: { jobId } }).catch((e) => ({ error: e })),
-  ]);
-
-  // Proceed to AI stage regardless (the AI worker reads whatever vision results exist)
+  // 3) AI analysis (multi-model parallelism handled inside the worker)
   const aiRes = await supabase.functions.invoke('ux-ai-analysis', {
     body: { jobId },
   });
@@ -44,7 +45,7 @@ async function runPipeline(jobId: string) {
     return;
   }
 
-  // Final synthesis stage
+  // 4) Final synthesis (OpenAI consolidates all prior outputs)
   await supabase.functions.invoke('ux-synthesis', {
     body: { jobId },
   });

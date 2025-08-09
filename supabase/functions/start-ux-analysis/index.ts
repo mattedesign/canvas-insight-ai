@@ -114,7 +114,12 @@ serve(async (req: Request) => {
       return Response.json({ success: true, jobId, dispatch: 'direct' }, { status: 202, headers: corsHeaders });
     }
 
-    const endpoint = buildInngestEndpoint(eventKey);
+    if (dispatchMode !== 'direct' && !eventKey) {
+      await supabase.from('analysis_jobs').update({ status: 'failed', error: 'Missing INNGEST_EVENT_KEY for Inngest dispatch' }).eq('id', jobId);
+      return Response.json({ success: false, error: 'Missing INNGEST_EVENT_KEY' }, { status: 500, headers: corsHeaders });
+    }
+
+    const endpoint = buildInngestEndpoint(eventKey!);
     const eventPayload = {
       name: 'ux-analysis/pipeline.started',
       data: { jobId, imageId, imageUrl, projectId: projectId ?? null, userId, dispatchMode },

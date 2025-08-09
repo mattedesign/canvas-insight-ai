@@ -92,10 +92,21 @@ async function runPipeline(groupJobId: string) {
   if (jobErr) throw new Error(jobErr.message);
   if (!job) throw new Error('Group job not found');
 
-  // Context stage: log metadata only (real, not synthesized)
-  const startedProgress = Math.max(5, job.progress ?? 0);
-  await supabase.from('group_analysis_jobs').update({ current_stage: 'context', status: job.status === 'pending' ? 'processing' : job.status, progress: startedProgress }).eq('id', job.id);
-  await insertEvent(supabase, job, { event_name: 'group-analysis/context.started', status: 'processing', progress: startedProgress });
+  // 1) Vision stage (Google first)
+  const vStart = Math.max(25, job.progress ?? 0);
+  await supabase.from('group_analysis_jobs').update({ current_stage: 'vision', status: job.status === 'pending' ? 'processing' : job.status, progress: vStart }).eq('id', job.id);
+  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.started', status: 'processing', progress: vStart, metadata: { provider: 'google' } });
+
+  await supabase.functions.invoke('group-vision-google', { body: { groupJobId: job.id } }).catch((e: any) => {
+    console.error('[group-ux-orchestrator] group-vision-google failed', e);
+  });
+
+  const vDone = Math.max(55, vStart);
+  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.completed', status: 'completed', progress: vDone, metadata: { provider: 'google' } });
+
+  // 2) Context stage (after metadata available)
+  await supabase.from('group_analysis_jobs').update({ current_stage: 'context', progress: vDone }).eq('id', job.id);
+  await insertEvent(supabase, job, { event_name: 'group-analysis/context.started', status: 'processing', progress: vDone });
 
   const contextMeta = {
     groupName: (job.metadata as any)?.groupName ?? null,
@@ -103,28 +114,15 @@ async function runPipeline(groupJobId: string) {
     imageCount: Array.isArray(job.image_urls) ? job.image_urls.length : 0,
     sample: Array.isArray(job.image_urls) ? job.image_urls.slice(0, 3) : [],
   };
-  const ctxCompleted = Math.max(15, startedProgress);
+  const ctxCompleted = Math.max(60, vDone);
   await insertEvent(supabase, job, { event_name: 'group-analysis/context.completed', status: 'completed', progress: ctxCompleted, metadata: { context: contextMeta } });
-  await supabase.from('group_analysis_jobs').update({ current_stage: 'vision', progress: ctxCompleted }).eq('id', job.id);
+  await supabase.from('group_analysis_jobs').update({ current_stage: 'ai', progress: ctxCompleted }).eq('id', job.id);
 
-  // Vision stage: run providers in parallel
-  const vStart = Math.max(25, ctxCompleted);
-  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.started', status: 'processing', progress: vStart });
-
-  const [openaiRes, googleRes] = await Promise.allSettled([
-    supabase.functions.invoke('group-vision-openai', { body: { groupJobId: job.id } }),
-    supabase.functions.invoke('group-vision-google', { body: { groupJobId: job.id } }),
-  ]);
-
-  const vDone = Math.max(55, vStart);
-  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.completed', status: 'completed', progress: vDone });
-  await supabase.from('group_analysis_jobs').update({ current_stage: 'ai', progress: Math.max(60, vDone) }).eq('id', job.id);
-
-  // AI stage
+  // 3) AI stage
   const aiRes = await supabase.functions.invoke('group-ai-analysis', { body: { groupJobId: job.id } });
   if ((aiRes as any).error) return; // group-ai-analysis logs its own failure
 
-  // Synthesis
+  // 4) Synthesis
   await supabase.functions.invoke('group-synthesis', { body: { groupJobId: job.id } });
 }
 
