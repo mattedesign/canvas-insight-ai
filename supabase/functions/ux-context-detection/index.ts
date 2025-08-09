@@ -16,6 +16,7 @@ type Job = {
   status: string | null;
   progress: number | null;
   current_stage: string | null;
+  metadata: Json | null;
 };
 
 function getAdminClient() {
@@ -45,10 +46,10 @@ serve(async (req: Request) => {
       return Response.json({ error: "jobId is required" }, { status: 400, headers: corsHeaders });
     }
 
-    // Load job
+    // Load job (include metadata for dispatchMode tracing)
     const { data: job, error: jobErr } = await supabase
       .from("analysis_jobs")
-      .select("id,user_id,image_url,user_context,status,progress,current_stage")
+      .select("id,user_id,image_url,user_context,status,progress,current_stage,metadata")
       .eq("id", jobId)
       .maybeSingle<Job>();
 
@@ -103,6 +104,12 @@ serve(async (req: Request) => {
         }
       }
 
+      // Merge dispatchMode from job metadata for traceability
+      const mergedMetadata: Record<string, unknown> = {
+        ...(fields.metadata ?? {}),
+        dispatchMode: (job as any)?.metadata?.dispatchMode ?? null,
+      };
+
       const payload: any = {
         id: crypto.randomUUID(),
         job_id: job.id,
@@ -112,7 +119,7 @@ serve(async (req: Request) => {
         status: fields.status ?? null,
         progress: fields.progress ?? 0,
         message: fields.message ?? null,
-        metadata: fields.metadata ?? {},
+        metadata: mergedMetadata,
         started_at,
         ended_at,
         duration_ms,
