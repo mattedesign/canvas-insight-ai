@@ -2269,7 +2269,7 @@ const CanvasContent: React.FC<CanvasContentProps> = ({
         zoomActivationKeyCode={['Meta', 'Control']}
         minZoom={0.1}
         maxZoom={4}
-        onInit={handleFlowInit}
+        
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         
