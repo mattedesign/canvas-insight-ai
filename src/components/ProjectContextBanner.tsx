@@ -7,12 +7,14 @@ import { useAppState } from '@/hooks/useAppState';
 
 interface ProjectContextBannerProps {
   onCleanupWorkspace?: () => void;
+  onStartAnalysis?: () => void;
   isLoading?: boolean;
   projectName?: string;
 }
 
 export const ProjectContextBanner: React.FC<ProjectContextBannerProps> = ({
   onCleanupWorkspace,
+  onStartAnalysis,
   isLoading = false,
   projectName
 }) => {
@@ -88,6 +90,17 @@ export const ProjectContextBanner: React.FC<ProjectContextBannerProps> = ({
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Clean Up
+            </Button>
+          )}
+
+          {typeof onStartAnalysis === 'function' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onStartAnalysis}
+              className="text-xs"
+            >
+              Start UX Analysis
             </Button>
           )}
           

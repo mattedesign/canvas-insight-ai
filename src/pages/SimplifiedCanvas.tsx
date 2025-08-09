@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { startUxAnalysis } from '@/services/StartUxAnalysis';
 
 const SimplifiedCanvas = () => {
   const navigate = useNavigate();
@@ -143,6 +144,23 @@ const SimplifiedCanvas = () => {
     setSelectedAnalysisId(analysisId);
     setIsAnalysisPanelOpen(true);
   }, []);
+
+  // Start UX Analysis V2 pipeline for the first valid image
+  const handleStartAnalysis = useCallback(async () => {
+    try {
+      const candidate = (Array.isArray(uploadedImages) ? uploadedImages : []).find(img => img.url && !img.url.startsWith('blob:')) || null;
+      if (!candidate) {
+        toast({ category: 'error', title: 'No valid image', description: 'Upload an image (not a temporary blob) before starting analysis.' });
+        return;
+      }
+      toast({ category: 'info', title: 'Starting Analysis', description: 'Creating job and launching pipeline...' });
+      const { jobId } = await startUxAnalysis({ imageId: candidate.id, imageUrl: candidate.url, projectId: null, userContext: null });
+      navigate(`/job/${jobId}`);
+    } catch (err) {
+      console.error('[SimplifiedCanvas] startUxAnalysis failed:', err);
+      toast({ category: 'error', title: 'Failed to start analysis', description: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }, [uploadedImages, navigate, toast]);
 
   const handleAddImages = useCallback((files?: File[]) => {
     console.log('[SimplifiedCanvas] handleAddImages called with files:', files?.length || 'creating input');
@@ -486,6 +504,7 @@ const SimplifiedCanvas = () => {
       <div className="flex-1 flex flex-col">
         <ProjectContextBanner
           onCleanupWorkspace={() => {}}
+          onStartAnalysis={handleStartAnalysis}
           isLoading={typeof isLoading === 'boolean' ? isLoading : false}
           projectName={currentProjectName}
         />
