@@ -38,7 +38,7 @@ serve(async (req) => {
     }
 
     // Optimize for metadata mode with faster processing
-    const optimizedModel = useMetadataMode ? 'gpt-4o-mini' : model;
+    const optimizedModel = 'gpt-4.1-2025-04-14';
     const optimizedTemperature = 0.0;
     const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
     
@@ -56,7 +56,7 @@ serve(async (req) => {
 CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clarity and pattern recognition certainty.` :
       'You are a fast UI analyzer. Return only the requested JSON fields with no explanation.';
 
-    const contextMessages = enhancedContextMode ? [
+    const contextMessages = [
       {
         role: 'system',
         content: systemPrompt
@@ -74,23 +74,7 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
           }
         ]
       }
-    ] : [{
-      role: useMetadataMode ? 'system' : 'user',
-      content: useMetadataMode ? systemPrompt :
-        [
-          {
-            type: 'text',
-            text: prompt
-          },
-          {
-            type: 'image_url',
-            image_url: { url: processedImageUrl }
-          }
-        ]
-    }, ...(useMetadataMode ? [{
-      role: 'user',
-      content: prompt
-    }] : [])];
+    ];
 
     console.log(`Context detection with ${enhancedContextMode ? 'enhanced' : useMetadataMode ? 'metadata' : 'standard'} mode`);
 
