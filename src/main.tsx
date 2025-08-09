@@ -9,6 +9,16 @@ import { OptimizedPerformanceService } from './services/OptimizedPerformanceServ
 MonitoringService.initialize()
 OptimizedPerformanceService.initialize()
 
+// Ensure Inngest is the default dispatch mode
+try {
+  if (localStorage.getItem('DISPATCH_MODE') !== 'inngest') {
+    localStorage.setItem('DISPATCH_MODE', 'inngest');
+    console.info('[App] Default dispatch mode set to "inngest"');
+  }
+} catch (e) {
+  console.warn('[App] Could not set default dispatch mode', e);
+}
+
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   OptimizedPerformanceService.cleanup()
