@@ -194,19 +194,19 @@ export class GroupAnalysisProgressService {
       sessionId: source?.sessionId || `session_${groupId}`,
       prompt: source?.originalPrompt ?? source?.prompt,
       summary: {
-        overallScore: source?.summary?.overallScore || 0,
-        consistency: source?.summary?.consistency || 0,
-        thematicCoherence: source?.summary?.thematicCoherence || 0,
-        userFlowContinuity: source?.summary?.userFlowContinuity || 0
+        overallScore: typeof source?.summary?.overallScore === 'number' && !Number.isNaN(source.summary.overallScore) ? source.summary.overallScore : undefined,
+        consistency: typeof source?.summary?.consistency === 'number' && !Number.isNaN(source.summary.consistency) ? source.summary.consistency : undefined,
+        thematicCoherence: typeof source?.summary?.thematicCoherence === 'number' && !Number.isNaN(source.summary.thematicCoherence) ? source.summary.thematicCoherence : undefined,
+        userFlowContinuity: typeof source?.summary?.userFlowContinuity === 'number' && !Number.isNaN(source.summary.userFlowContinuity) ? source.summary.userFlowContinuity : undefined
       },
-      insights: source?.insights || [],
-      recommendations: source?.recommendations || [],
+      insights: Array.isArray(source?.insights) ? source.insights : [],
+      recommendations: Array.isArray(source?.recommendations) ? source.recommendations : [],
       patterns: {
-        commonElements: source?.patterns?.commonElements || [],
-        designInconsistencies: source?.patterns?.designInconsistencies || [],
-        userJourneyGaps: source?.patterns?.userJourneyGaps || []
+        commonElements: Array.isArray(source?.patterns?.commonElements) ? source.patterns.commonElements : [],
+        designInconsistencies: Array.isArray(source?.patterns?.designInconsistencies) ? source.patterns.designInconsistencies : [],
+        userJourneyGaps: Array.isArray(source?.patterns?.userJourneyGaps) ? source.patterns.userJourneyGaps : []
       },
-      analysis: source?.analysis || {},
+      analysis: source?.analysis || undefined,
       createdAt: source?.createdAt || source?.timestamp || new Date()
     };
     

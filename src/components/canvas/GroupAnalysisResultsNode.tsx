@@ -33,13 +33,15 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
   const { onEditPrompt, onCreateFork, onViewDetails } = anyData;
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score?: number) => {
+    if (typeof score !== 'number') return 'text-muted-foreground';
     if (score >= 80) return 'text-green-600';
     if (score >= 60) return 'text-yellow-600';
     return 'text-red-600';
   };
 
-  const getScoreVariant = (score: number) => {
+  const getScoreVariant = (score?: number) => {
+    if (typeof score !== 'number') return 'outline';
     if (score >= 80) return 'default';
     if (score >= 60) return 'secondary';
     return 'destructive';
@@ -48,6 +50,11 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
+
+  const overall = analysis?.summary?.overallScore as number | undefined;
+  const consistency = analysis?.summary?.consistency as number | undefined;
+  const thematic = analysis?.summary?.thematicCoherence as number | undefined;
+  const flow = analysis?.summary?.userFlowContinuity as number | undefined;
 
   return (
     <div className="w-96">
@@ -85,8 +92,8 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
               <TrendingUp className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Overall Score</span>
             </div>
-            <Badge variant={getScoreVariant(analysis.summary?.overallScore || 0)} className="text-lg px-3 py-1">
-              {analysis.summary?.overallScore || 'N/A'}%
+            <Badge variant={getScoreVariant(overall)} className="text-lg px-3 py-1">
+              {typeof overall === 'number' ? `${overall}%` : 'N/A'}
             </Badge>
           </div>
 
@@ -97,31 +104,37 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Consistency</span>
-                <span className={getScoreColor(analysis.summary.consistency)}>
-                  {analysis.summary.consistency}%
+                <span className={getScoreColor(consistency)}>
+                  {typeof consistency === 'number' ? `${consistency}%` : 'N/A'}
                 </span>
               </div>
-              <Progress value={analysis.summary.consistency} className="h-2" />
+              {typeof consistency === 'number' && (
+                <Progress value={consistency} className="h-2" />
+              )}
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Thematic Coherence</span>
-                <span className={getScoreColor(analysis.summary.thematicCoherence)}>
-                  {analysis.summary.thematicCoherence}%
+                <span className={getScoreColor(thematic)}>
+                  {typeof thematic === 'number' ? `${thematic}%` : 'N/A'}
                 </span>
               </div>
-              <Progress value={analysis.summary.thematicCoherence} className="h-2" />
+              {typeof thematic === 'number' && (
+                <Progress value={thematic} className="h-2" />
+              )}
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">User Flow Continuity</span>
-                <span className={getScoreColor(analysis.summary.userFlowContinuity)}>
-                  {analysis.summary.userFlowContinuity}%
+                <span className={getScoreColor(flow)}>
+                  {typeof flow === 'number' ? `${flow}%` : 'N/A'}
                 </span>
               </div>
-              <Progress value={analysis.summary.userFlowContinuity} className="h-2" />
+              {typeof flow === 'number' && (
+                <Progress value={flow} className="h-2" />
+              )}
             </div>
           </div>
 
@@ -145,12 +158,14 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
               {expandedSection === 'insights' && (
                 <div className="p-3 pt-0 border-t bg-muted/10">
                   <ul className="space-y-2">
-                    {analysis.insights.slice(0, 3).map((insight, index) => (
+                  {Array.isArray(analysis.insights) ? analysis.insights.slice(0, 3).map((insight, index) => (
                       <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
                         <span className="text-primary mt-1">•</span>
                         <span>{insight}</span>
                       </li>
-                    ))}
+                    )) : (
+                      <li className="text-sm text-muted-foreground">No insights available</li>
+                    )}
                   </ul>
                 </div>
               )}
@@ -174,12 +189,14 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
               {expandedSection === 'recommendations' && (
                 <div className="p-3 pt-0 border-t bg-muted/10">
                   <ul className="space-y-2">
-                    {analysis.recommendations.slice(0, 3).map((recommendation, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-primary mt-1">•</span>
-                        <span>{recommendation}</span>
-                      </li>
-                    ))}
+                      {Array.isArray(analysis.recommendations) ? analysis.recommendations.slice(0, 3).map((recommendation, index) => (
+                        <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span>{recommendation}</span>
+                        </li>
+                      )) : (
+                        <li className="text-sm text-muted-foreground">No recommendations available</li>
+                      )}
                   </ul>
                 </div>
               )}
@@ -205,15 +222,18 @@ export const GroupAnalysisResultsNode: React.FC<NodeProps> = ({ data }) => {
                   <div>
                     <h5 className="text-xs font-medium text-muted-foreground mb-2">Common Elements</h5>
                     <div className="flex flex-wrap gap-1">
-                      {analysis.patterns.commonElements.slice(0, 4).map((element, index) => (
+                      {(analysis.patterns?.commonElements ?? []).slice(0, 4).map((element, index) => (
                         <Badge key={index} variant="outline" className="text-xs">
                           {element}
                         </Badge>
                       ))}
+                      {(!analysis.patterns || (analysis.patterns.commonElements ?? []).length === 0) && (
+                        <span className="text-xs text-muted-foreground">No common elements</span>
+                      )}
                     </div>
                   </div>
                   
-                  {analysis.patterns.designInconsistencies.length > 0 && (
+                  {Array.isArray(analysis.patterns?.designInconsistencies) && analysis.patterns.designInconsistencies.length > 0 && (
                     <div>
                       <h5 className="text-xs font-medium text-muted-foreground mb-2">Inconsistencies</h5>
                       <div className="flex flex-wrap gap-1">
