@@ -28,6 +28,70 @@ function getAdminClient() {
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
 
+
+// --- Normalization helpers for AI-driven outputs (Option A)
+function tryParseJson(text: string): any | null {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function extractJsonSubstring(text: string): string | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) return text.slice(start, end + 1);
+  return null;
+}
+
+function normalizeAIUXOutput(raw: unknown): {
+  ok: boolean;
+  summary: Record<string, unknown>;
+  suggestions: unknown[];
+  visual_annotations: unknown[];
+  warnings: string[];
+  ai_raw: unknown;
+} {
+  const warnings: string[] = [];
+  let obj: any = null;
+
+  if (raw && typeof raw === 'object') {
+    obj = raw as any;
+  } else if (typeof raw === 'string') {
+    const direct = tryParseJson(raw);
+    if (direct) obj = direct; else {
+      const sub = extractJsonSubstring(raw);
+      const parsed = sub ? tryParseJson(sub) : null;
+      if (parsed) { obj = parsed; warnings.push('Parsed JSON from unstructured text'); }
+      else warnings.push('Could not parse JSON from text content');
+    }
+  }
+
+  if (!obj || typeof obj !== 'object') {
+    return { ok: false, summary: {}, suggestions: [], visual_annotations: [], warnings, ai_raw: raw };
+  }
+
+  const candidate = (obj.analysis ?? obj.data ?? obj.result ?? obj) as any;
+
+  const summary = (candidate.summary && typeof candidate.summary === 'object') ? { ...candidate.summary } : {};
+  const suggestions = Array.isArray(candidate.suggestions) ? candidate.suggestions : [];
+  const visual_annotations = Array.isArray(candidate.visualAnnotations) ? candidate.visualAnnotations : [];
+
+  // Numeric coercions
+  if (summary.overallScore != null) {
+    const n = Number(summary.overallScore);
+    if (Number.isFinite(n)) summary.overallScore = Math.max(0, Math.min(100, n));
+    else { warnings.push('summary.overallScore was not numeric'); delete (summary as any).overallScore; }
+  }
+  if (summary.categoryScores && typeof summary.categoryScores === 'object') {
+    const cs: any = summary.categoryScores;
+    for (const k of Object.keys(cs)) {
+      const n = Number(cs[k]);
+      if (Number.isFinite(n)) cs[k] = n; else warnings.push(`categoryScores.${k} was not numeric`);
+    }
+  }
+
+  const ok = Object.keys(summary).length > 0 || suggestions.length > 0 || visual_annotations.length > 0;
+  return { ok, summary, suggestions, visual_annotations, warnings, ai_raw: raw };
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -114,15 +178,17 @@ serve(async (req: Request) => {
 
     await insertEvent({ event_name: "analysis/synthesis.started", status: "processing", progress: startedProgress });
 
-    // Fetch AI results + context + vision to consolidate
+    // Fetch AI results + context + vision to consolidate (lenient)
     const { data: aiRows } = await supabase
       .from("analysis_events")
       .select("metadata, created_at")
       .eq("job_id", job.id)
-      .eq("event_name", "analysis/ai.completed")
+      .like("event_name", "analysis/ai.%")
       .order("created_at", { ascending: false })
       .limit(1);
-    const ai = aiRows?.[0]?.metadata?.analysis ?? null;
+
+    const aiMeta: any = aiRows?.[0]?.metadata ?? null;
+    const rawCandidate = aiMeta?.analysis ?? aiMeta?.raw ?? aiMeta?.content ?? aiMeta?.response ?? aiMeta ?? null;
 
     const { data: ctxRows } = await supabase
       .from("analysis_events")
@@ -133,16 +199,23 @@ serve(async (req: Request) => {
       .limit(1);
     const context = ctxRows?.[0]?.metadata?.context ?? null;
 
-    if (!ai) {
-      await insertEvent({ event_name: "analysis/synthesis.failed", status: "failed", progress: startedProgress, message: "Missing AI analysis results" });
-      return Response.json({ error: 'Missing AI analysis results' }, { status: 400, headers: corsHeaders });
+    const norm = normalizeAIUXOutput(rawCandidate);
+    if (!norm.ok) {
+      await insertEvent({
+        event_name: "analysis/synthesis.failed",
+        status: "failed",
+        progress: startedProgress,
+        message: "AI output could not be normalized",
+        metadata: { reason: "normalization_failed", had_ai_event: !!aiMeta, ai_preview: typeof rawCandidate === 'string' ? (rawCandidate as string).slice(0, 500) : (rawCandidate ? 'object' : null) }
+      });
+      return Response.json({ error: 'AI output could not be normalized' }, { status: 400, headers: corsHeaders });
     }
 
-    // Compose final structures from AI output (no placeholders)
-    const summary = (ai as any)?.summary ?? {};
-    const suggestions = Array.isArray((ai as any)?.suggestions) ? (ai as any).suggestions : [];
-    const visual_annotations = Array.isArray((ai as any)?.visualAnnotations) ? (ai as any).visualAnnotations : [];
-    const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id };
+    // Compose final structures from normalized output (no placeholders)
+    const summary = norm.summary || {};
+    const suggestions = Array.isArray(norm.suggestions) ? norm.suggestions : [];
+    const visual_annotations = Array.isArray(norm.visual_annotations) ? norm.visual_annotations : [];
+    const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id, normalization: { warnings: norm.warnings }, ai_raw_output: norm.ai_raw };
 
     // Resolve image_id: prefer job.image_id; fallback to parsing storage_path from public URL
     let imageId: string | null = (job as any)?.image_id ?? null;
