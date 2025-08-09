@@ -138,8 +138,32 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [analysisRequests, setAnalysisRequests] = useState<Map<string, { imageId: string; imageName: string; imageUrl: string }>>(new Map());
   
   const { toast } = useFilteredToast();
+  const { dispatch } = useFinalAppContext();
+  const { getViewport, getNodes, getEdges } = useReactFlow();
   const allImageIds = (uploadedImages || []).map(img => img.id);
   const multiSelection = useMultiSelection(allImageIds);
+
+  const saveCurrentCanvasState = useCallback(async () => {
+    try {
+      const vp = getViewport?.() || { x: 0, y: 0, zoom: 1 } as any;
+      const nodesToSave = typeof getNodes === 'function' ? getNodes() : [];
+      const edgesToSave = typeof getEdges === 'function' ? getEdges() : [];
+
+      await CanvasStateService.saveCanvasState({
+        nodes: nodesToSave,
+        edges: edgesToSave,
+        viewport: { x: vp.x || 0, y: vp.y || 0, zoom: typeof vp.zoom === 'number' ? vp.zoom : 1 },
+        ui_state: {
+          showAnnotations: !!showAnnotations,
+          galleryTool: currentTool,
+          groupDisplayModes: groupDisplayModes || {},
+          selectedNodes: multiSelection.state.selectedIds || []
+        }
+      });
+    } catch (e) {
+      console.error('[CanvasView] Auto-save after delete failed:', e);
+    }
+  }, [getViewport, getNodes, getEdges, showAnnotations, currentTool, groupDisplayModes, multiSelection.state.selectedIds]);
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const enableGroupProgressFlow = true;
@@ -172,8 +196,30 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       handleViewAnalysis(itemId);
     }, []),
     
-    onDelete: useCallback((itemIds: string[]) => {
-      // For now, just show a message - implement actual deletion later
+    onDelete: useCallback(async (itemIds: string[]) => {
+      try {
+        if (!itemIds || itemIds.length === 0) return;
+        toast({ category: 'info', title: 'Deleting...', description: `${itemIds.length} image(s)` });
+
+        await Promise.all(
+          itemIds.map(async (imageId) => {
+            const res = await ImageMigrationService.deleteImageFromDatabase(imageId);
+            if ((res as any)?.success === false) {
+              throw (res as any)?.error || new Error('Delete failed');
+            }
+            dispatch({ type: 'REMOVE_IMAGE', payload: imageId });
+          })
+        );
+
+        toast({ category: 'success', title: 'Deleted', description: `${itemIds.length} image(s) removed` });
+      } catch (err: any) {
+        console.error('[CanvasView] Delete failed:', err);
+        toast({ category: 'error', title: 'Delete failed', description: err?.message || 'Unknown error' });
+      } finally {
+        // Persist updated canvas layout after deletion
+        setTimeout(() => { saveCurrentCanvasState(); }, 100);
+      }
+    }, [dispatch, toast, saveCurrentCanvasState]),
       toast({
         title: "Delete Feature",
         description: `Delete functionality for ${itemIds.length} image(s) will be implemented`,
