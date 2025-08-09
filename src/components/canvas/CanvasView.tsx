@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useCanvasEnhancements, useFocusOverlay } from '@/hooks/useCanvasEnhancements';
 import {
@@ -9,6 +9,7 @@ import {
   Connection,
   Edge,
   Node,
+  useReactFlow,
 } from '@xyflow/react';
 import { EnhancedAnalysisPipeline } from '@/services/EnhancedAnalysisPipeline';
 import '@xyflow/react/dist/style.css';
@@ -44,6 +45,9 @@ import { SelectionDebugger } from '../SelectionDebugger';
 import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
 
 import { useAuth } from '@/context/AuthContext';
+import { useFinalAppContext } from '@/context/FinalAppContext';
+import { ImageMigrationService } from '@/services/DataMigrationService';
+import { CanvasStateService } from '@/services/CanvasStateService';
 
 import { Button } from '@/components/ui/button';
 import { Undo2, Redo2 } from 'lucide-react';
