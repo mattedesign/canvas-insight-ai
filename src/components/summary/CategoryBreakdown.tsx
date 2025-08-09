@@ -9,8 +9,10 @@ interface CategoryBreakdownProps {
 }
 
 export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, metrics }) => {
-  // Early return if no analyses
-  if (!analyses || analyses.length === 0) {
+  const hasAnalyses = Array.isArray(analyses) && analyses.length > 0;
+
+  // If neither analyses nor metrics are available, show empty state
+  if (!hasAnalyses && !metrics) {
     return (
       <div className="bg-card border border-border rounded-lg p-6 shadow-card">
         <div className="space-y-4">
@@ -28,51 +30,51 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, 
     );
   }
 
-  // Calculate average scores by category with safe access
+  // Calculate category data using analyses when available, otherwise fall back to aggregated metrics
   const categoryData = [
     {
       name: 'Usability',
-      score: Math.round(
-        analyses.reduce((sum, analysis) => 
-          sum + (analysis.summary?.categoryScores?.usability || 0), 0
-        ) / analyses.length
-      ),
-      issues: analyses.reduce((sum, analysis) => 
-        sum + (analysis.suggestions?.filter(s => s.category === 'usability').length || 0), 0
-      )
+      score: hasAnalyses
+        ? Math.round(
+            analyses.reduce((sum, analysis) => sum + (analysis.summary?.categoryScores?.usability || 0), 0) / analyses.length
+          )
+        : Math.round(metrics?.categoryScores?.usability || 0),
+      issues: hasAnalyses
+        ? analyses.reduce((sum, analysis) => sum + (analysis.suggestions?.filter(s => s.category === 'usability').length || 0), 0)
+        : undefined
     },
     {
       name: 'Accessibility',
-      score: Math.round(
-        analyses.reduce((sum, analysis) => 
-          sum + (analysis.summary?.categoryScores?.accessibility || 0), 0
-        ) / analyses.length
-      ),
-      issues: analyses.reduce((sum, analysis) => 
-        sum + (analysis.suggestions?.filter(s => s.category === 'accessibility').length || 0), 0
-      )
+      score: hasAnalyses
+        ? Math.round(
+            analyses.reduce((sum, analysis) => sum + (analysis.summary?.categoryScores?.accessibility || 0), 0) / analyses.length
+          )
+        : Math.round(metrics?.categoryScores?.accessibility || 0),
+      issues: hasAnalyses
+        ? analyses.reduce((sum, analysis) => sum + (analysis.suggestions?.filter(s => s.category === 'accessibility').length || 0), 0)
+        : undefined
     },
     {
       name: 'Visual',
-      score: Math.round(
-        analyses.reduce((sum, analysis) => 
-          sum + (analysis.summary?.categoryScores?.visual || 0), 0
-        ) / analyses.length
-      ),
-      issues: analyses.reduce((sum, analysis) => 
-        sum + (analysis.suggestions?.filter(s => s.category === 'visual').length || 0), 0
-      )
+      score: hasAnalyses
+        ? Math.round(
+            analyses.reduce((sum, analysis) => sum + (analysis.summary?.categoryScores?.visual || 0), 0) / analyses.length
+          )
+        : Math.round(metrics?.categoryScores?.visual || 0),
+      issues: hasAnalyses
+        ? analyses.reduce((sum, analysis) => sum + (analysis.suggestions?.filter(s => s.category === 'visual').length || 0), 0)
+        : undefined
     },
     {
       name: 'Content',
-      score: Math.round(
-        analyses.reduce((sum, analysis) => 
-          sum + (analysis.summary?.categoryScores?.content || 0), 0
-        ) / analyses.length
-      ),
-      issues: analyses.reduce((sum, analysis) => 
-        sum + (analysis.suggestions?.filter(s => s.category === 'content').length || 0), 0
-      )
+      score: hasAnalyses
+        ? Math.round(
+            analyses.reduce((sum, analysis) => sum + (analysis.summary?.categoryScores?.content || 0), 0) / analyses.length
+          )
+        : Math.round(metrics?.categoryScores?.content || 0),
+      issues: hasAnalyses
+        ? analyses.reduce((sum, analysis) => sum + (analysis.suggestions?.filter(s => s.category === 'content').length || 0), 0)
+        : undefined
     }
   ];
 
@@ -114,9 +116,11 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, 
                       <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
                         <p className="font-medium">{label}</p>
                         <p className="text-sm">Score: {data.score}/100</p>
-                        <p className="text-sm text-muted-foreground">
-                          {data.issues} issue{data.issues !== 1 ? 's' : ''} found
-                        </p>
+                        {typeof data.issues === 'number' && (
+                          <p className="text-sm text-muted-foreground">
+                            {data.issues} issue{data.issues !== 1 ? 's' : ''} found
+                          </p>
+                        )}
                       </div>
                     );
                   }
@@ -138,9 +142,11 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ analyses, 
               <span className="text-sm font-medium">{category.name}</span>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold">{category.score}/100</span>
-                <span className="text-xs text-muted-foreground">
-                  ({category.issues} issues)
-                </span>
+                {typeof category.issues === 'number' && (
+                  <span className="text-xs text-muted-foreground">
+                    ({category.issues} issues)
+                  </span>
+                )}
               </div>
             </div>
           ))}

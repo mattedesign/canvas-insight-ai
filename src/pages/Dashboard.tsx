@@ -314,6 +314,15 @@ const Dashboard = () => {
                 )}
               </div>
 
+              {/* Portfolio Analytics */}
+              <SummaryDashboard
+                analyses={analyses}
+                aggregatedMetrics={aggregatedMetrics}
+                loading={metricsLoading}
+                error={metricsError || null}
+                onRefresh={refreshMetrics}
+              />
+
               {/* Recent Projects */}
               <Card>
                 <CardHeader>
