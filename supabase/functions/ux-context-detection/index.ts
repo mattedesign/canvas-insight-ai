@@ -128,6 +128,7 @@ serve(async (req: Request) => {
       body: {
         imageUrl: job.image_url,
         prompt: job.user_context ?? "Detect interface context",
+        model: 'gpt-4o-mini',
         useMetadataMode: true,
         enhancedContextMode: false,
       },
@@ -135,6 +136,13 @@ serve(async (req: Request) => {
 
     if (ctxErr) {
       console.error("context-detection failed", ctxErr);
+      let errorBody: string | null = null;
+      try {
+        const resp = (ctxErr as any)?.context as Response | undefined;
+        if (resp) errorBody = await resp.text();
+      } catch (_) {
+        // ignore
+      }
       // Mark job failed and log event — no fallback data
       await supabase
         .from("analysis_jobs")
@@ -145,8 +153,9 @@ serve(async (req: Request) => {
         status: "failed",
         progress: startedProgress,
         message: ctxErr.message ?? "Context detection failed",
+        metadata: { error: ctxErr, errorBody }
       });
-      return Response.json({ error: "Context detection failed" }, { status: 502, headers: corsHeaders });
+      return Response.json({ error: "Context detection failed", details: ctxErr.message, body: errorBody }, { status: 502, headers: corsHeaders });
     }
 
     // Log completion with returned context (lightweight)

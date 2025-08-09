@@ -16,7 +16,7 @@ serve(async (req) => {
       imageUrl, 
       imageBase64, 
       prompt, 
-      model = 'gpt-4.1-2025-04-14', 
+      model = 'gpt-4o-mini', 
       maxTokens = 1000, 
       useMetadataMode = false,
       enhancedContextMode = false 
