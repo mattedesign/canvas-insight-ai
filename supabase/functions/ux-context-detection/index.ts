@@ -128,7 +128,7 @@ serve(async (req: Request) => {
       body: {
         imageUrl: job.image_url,
         prompt: job.user_context ?? "Detect interface context",
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o-mini',
         useMetadataMode: true,
         enhancedContextMode: true,
       },
