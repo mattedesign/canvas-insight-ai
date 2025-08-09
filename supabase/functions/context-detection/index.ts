@@ -16,7 +16,7 @@ serve(async (req) => {
       imageUrl, 
       imageBase64, 
       prompt, 
-      model = 'gpt-4o', 
+      model = 'gpt-4.1-2025-04-14', 
       maxTokens = 1000, 
       useMetadataMode = false,
       enhancedContextMode = false 
@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     // Optimize for metadata mode with faster processing
-    const optimizedModel = 'gpt-4.1-2025-04-14';
+    const optimizedModel = model || 'gpt-4.1-2025-04-14';
     const optimizedTemperature = 0.0;
     const optimizedMaxTokens = useMetadataMode ? Math.min(maxTokens, 300) : maxTokens;
     
@@ -105,27 +105,7 @@ CRITICAL: Always return a confidence score between 0.0-1.0 based on visual clari
         messages: contextMessages,
         max_tokens: optimizedMaxTokens,
         temperature: optimizedTemperature,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'ContextDetection',
-            schema: {
-              type: 'object',
-              properties: {
-                primaryType: { type: 'string', minLength: 2 },
-                domain: { type: 'string', minLength: 2 },
-                targetAudience: { type: 'string' },
-                platform: { type: 'string' },
-                designSystem: { type: 'string' },
-                complexity: { type: 'string' },
-                confidence: { type: 'number', minimum: 0, maximum: 1 }
-              },
-              required: ['primaryType', 'domain'],
-              additionalProperties: true
-            },
-            strict: true
-          }
-        }
+        response_format: { type: 'json_object' }
       })
     });
 
