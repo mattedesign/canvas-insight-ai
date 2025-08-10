@@ -26,13 +26,54 @@ export class AnalysisDataMapper {
       sourceData = backendData.analysis;
     }
 
+    // Compute visual annotations: prefer backend-provided; else derive from Vision metadata.objects
+    let visualAnnotations: any[] | undefined = Array.isArray(sourceData.visual_annotations || sourceData.visualAnnotations)
+      ? (sourceData.visual_annotations || sourceData.visualAnnotations)
+      : undefined;
+
+    if (!visualAnnotations || visualAnnotations.length === 0) {
+      const objects = sourceData.metadata?.objects || sourceData.metadata?.detected_objects;
+      if (Array.isArray(objects) && objects.length > 0) {
+        console.warn('⚠️ No visual_annotations provided by backend. Deriving annotations from Vision metadata.objects.');
+        visualAnnotations = objects
+          .map((obj: any, idx: number) => {
+            const bbox = obj.boundingBox || obj.bounding_box;
+            const hasValidBox =
+              bbox &&
+              ['x', 'y', 'width', 'height'].every((k) => typeof bbox[k] === 'number' && isFinite(bbox[k]));
+            if (!hasValidBox) {
+              console.error('❌ Invalid boundingBox in Vision metadata object; skipping annotation.', obj);
+              return null;
+            }
+            const centerX = bbox.x + bbox.width / 2;
+            const centerY = bbox.y + bbox.height / 2;
+            return {
+              id: `${sourceData.id || 'analysis'}-vision-${idx}`,
+              x: Math.max(0, Math.min(1, centerX)),
+              y: Math.max(0, Math.min(1, centerY)),
+              type: 'suggestion',
+              title: obj.name ? `Detected: ${obj.name}` : 'Detected object',
+              description:
+                typeof obj.confidence === 'number'
+                  ? `Vision detected "${obj.name || 'object'}" (confidence: ${(obj.confidence * 100).toFixed(1)}%).`
+                  : `Vision detected "${obj.name || 'object'}".`,
+              severity: 'low',
+            };
+          })
+          .filter(Boolean) as any[];
+      } else {
+        console.error('❌ visual_annotations missing and no Vision metadata.objects available to derive annotations.');
+        visualAnnotations = [];
+      }
+    }
+
     return {
       id: sourceData.id,
       imageId: sourceData.image_id || sourceData.imageId,
       imageName: sourceData.image_name || sourceData.imageName || 'Untitled Image',
       imageUrl: sourceData.image_url || sourceData.imageUrl || '',
       userContext: sourceData.user_context || sourceData.userContext || '',
-      visualAnnotations: sourceData.visual_annotations || sourceData.visualAnnotations || [],
+      visualAnnotations,
       suggestions: Array.isArray(sourceData.suggestions)
         ? sourceData.suggestions.map((s: any) => ({
             ...s,

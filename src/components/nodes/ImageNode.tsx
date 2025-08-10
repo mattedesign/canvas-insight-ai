@@ -173,13 +173,19 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
         {/* Annotations Overlay */}
         {showAnnotations && (
           <div className="absolute inset-0">
-            {analysis.visualAnnotations.map((annotation, index) => (
-              <AnnotationMarker
-                key={`${annotation.id}-${image.id}-${index}`}
-                annotation={annotation}
-                onClick={() => onAnnotationClick(annotation.id)}
-              />
-            ))}
+            {analysis.visualAnnotations.length === 0 ? (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                No annotations returned by provider
+              </div>
+            ) : (
+              analysis.visualAnnotations.map((annotation, index) => (
+                <AnnotationMarker
+                  key={`${annotation.id}-${image.id}-${index}`}
+                  annotation={annotation}
+                  onClick={() => onAnnotationClick(annotation.id)}
+                />
+              ))
+            )}
           </div>
         )}
 
