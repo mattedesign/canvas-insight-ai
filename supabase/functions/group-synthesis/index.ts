@@ -210,8 +210,13 @@ serve(async (req: Request) => {
         status: 'failed',
         progress: startedProgress,
         message: 'AI output could not be normalized',
-        metadata: { reason: 'normalization_failed', had_ai_event: !!aiMeta, ai_preview: typeof rawCandidate === 'string' ? (rawCandidate as string).slice(0, 500) : (rawCandidate ? 'object' : null) }
+        metadata: {
+          reason: 'normalization_failed',
+          had_ai_event: !!aiMeta,
+          ai_preview: typeof rawCandidate === 'string' ? (rawCandidate as string).slice(0, 500) : (rawCandidate ? 'object' : null)
+        }
       });
+      await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'failed', error: 'AI output could not be normalized' }).eq('id', job.id);
       return Response.json({ error: 'AI output could not be normalized' }, { status: 400, headers: corsHeaders });
     }
 
@@ -239,6 +244,7 @@ serve(async (req: Request) => {
 
     if (insErr) {
       await insertEvent({ event_name: 'group-analysis/synthesis.failed', status: 'failed', progress: startedProgress, message: insErr.message });
+      await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'failed', error: insErr.message }).eq('id', job.id);
       return Response.json({ error: insErr.message }, { status: 500, headers: corsHeaders });
     }
 

@@ -95,14 +95,13 @@ async function runPipeline(groupJobId: string) {
   // 1) Vision stage (Google first)
   const vStart = Math.max(25, job.progress ?? 0);
   await supabase.from('group_analysis_jobs').update({ current_stage: 'vision', status: job.status === 'pending' ? 'processing' : job.status, progress: vStart }).eq('id', job.id);
-  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.started', status: 'processing', progress: vStart, metadata: { provider: 'google' } });
 
+  // Dispatch to vision function; it will emit its own started/completed events
   await supabase.functions.invoke('group-vision-google', { body: { groupJobId: job.id } }).catch((e: any) => {
     console.error('[group-ux-orchestrator] group-vision-google failed', e);
   });
 
   const vDone = Math.max(55, vStart);
-  await insertEvent(supabase, job, { event_name: 'group-analysis/vision.completed', status: 'completed', progress: vDone, metadata: { provider: 'google' } });
 
   // 2) Context stage (after metadata available)
   await supabase.from('group_analysis_jobs').update({ current_stage: 'context', progress: vDone }).eq('id', job.id);
