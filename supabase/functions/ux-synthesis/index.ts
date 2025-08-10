@@ -199,6 +199,19 @@ serve(async (req: Request) => {
       .limit(1);
     const context = ctxRows?.[0]?.metadata?.context ?? null;
 
+    // Fetch latest vision results (Google) and extract objects for metadata
+    const { data: visRows } = await supabase
+      .from("analysis_events")
+      .select("metadata, created_at")
+      .eq("job_id", job.id)
+      .eq("event_name", "analysis/vision.completed")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const visionResult: any = visRows?.[0]?.metadata?.result ?? null;
+    const visionObjects: any[] | undefined = Array.isArray(visionResult?.metadata?.objects)
+      ? visionResult.metadata.objects
+      : (Array.isArray(visionResult?.objects) ? visionResult.objects : undefined);
+
     const norm = normalizeAIUXOutput(rawCandidate);
     if (!norm.ok) {
       await insertEvent({
@@ -215,7 +228,7 @@ serve(async (req: Request) => {
     const summary = norm.summary || {};
     const suggestions = Array.isArray(norm.suggestions) ? norm.suggestions : [];
     const visual_annotations = Array.isArray(norm.visual_annotations) ? norm.visual_annotations : [];
-    const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id, normalization: { warnings: norm.warnings }, ai_raw_output: norm.ai_raw };
+    const metadata: Json = { context, synthesisAt: new Date().toISOString(), jobId: job.id, normalization: { warnings: norm.warnings }, ai_raw_output: norm.ai_raw, ...(visionObjects ? { objects: visionObjects } : {}) };
 
     // Resolve image_id: prefer job.image_id; fallback to parsing storage_path from public URL
     let imageId: string | null = (job as any)?.image_id ?? null;

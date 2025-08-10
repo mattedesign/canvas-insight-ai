@@ -17,7 +17,7 @@ interface VisionMetadata {
   labels?: Array<{ description: string; score: number }>;
   faces?: Array<{ joy: string; sorrow: string; anger: string; surprise: string }>;
   text?: Array<{ description: string; locale?: string }>;
-  objects?: Array<{ name: string; score: number }>;
+  objects?: Array<{ name: string; score: number; boundingBox: { x: number; y: number; width: number; height: number } }>;
   safeSearch?: {
     adult: string;
     spoof: string;
@@ -163,12 +163,30 @@ async function extractGoogleVisionMetadata(
       }));
     }
 
-    if (annotations.localizedObjectAnnotations) {
-      metadata.objects = annotations.localizedObjectAnnotations.map((obj: any) => ({
+if (annotations.localizedObjectAnnotations) {
+  metadata.objects = annotations.localizedObjectAnnotations
+    .map((obj: any) => {
+      const verts = obj.boundingPoly?.normalizedVertices;
+      if (!Array.isArray(verts) || verts.length === 0) {
+        return null; // Skip objects without normalized vertices
+      }
+      const xs = verts.map((v: any) => typeof v.x === 'number' ? v.x : 0);
+      const ys = verts.map((v: any) => typeof v.y === 'number' ? v.y : 0);
+      const minX = Math.max(0, Math.min(1, Math.min(...xs)));
+      const minY = Math.max(0, Math.min(1, Math.min(...ys)));
+      const maxX = Math.max(0, Math.min(1, Math.max(...xs)));
+      const maxY = Math.max(0, Math.min(1, Math.max(...ys)));
+      const width = Math.max(0, maxX - minX);
+      const height = Math.max(0, maxY - minY);
+      if (width === 0 || height === 0) return null; // Invalid box
+      return {
         name: obj.name,
-        score: obj.score
-      }));
-    }
+        score: obj.score,
+        boundingBox: { x: minX, y: minY, width, height }
+      };
+    })
+    .filter(Boolean);
+}
 
     if (annotations.safeSearchAnnotation) {
       metadata.safeSearch = {

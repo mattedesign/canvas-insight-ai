@@ -11,6 +11,7 @@ type Json = Record<string, unknown>;
 type Job = {
   id: string;
   user_id: string | null;
+  image_id: string | null;
   image_url: string;
   status: string | null;
   progress: number | null;
@@ -47,7 +48,7 @@ serve(async (req: Request) => {
     // Load job
     const { data: job, error: jobErr } = await supabase
       .from("analysis_jobs")
-      .select("id,user_id,image_url,status,progress,current_stage")
+      .select("id,user_id,image_id,image_url,status,progress,current_stage")
       .eq("id", jobId)
       .maybeSingle<Job>();
 
@@ -141,7 +142,7 @@ serve(async (req: Request) => {
     let gData: any = null;
     let gErr: any = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const { data, error } = await supabase.functions.invoke('google-vision-metadata', { body: { imageUrl: job.image_url } });
+      const { data, error } = await supabase.functions.invoke('google-vision-metadata', { body: { imageId: job.image_id, imageUrl: job.image_url, features: ['objects', 'text', 'labels'] } });
       gData = data; gErr = error;
       if (!gErr) break;
       await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
