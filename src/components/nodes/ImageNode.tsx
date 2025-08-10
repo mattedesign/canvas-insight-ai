@@ -178,19 +178,29 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
         {/* Annotations Overlay */}
         {showAnnotations && (
           <div className="absolute inset-0">
-            {analysis.visualAnnotations.length === 0 ? (
-              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                No annotations returned by provider
-              </div>
-            ) : (
-              analysis.visualAnnotations.map((annotation, index) => (
+            {(() => {
+              const all = Array.isArray(analysis.visualAnnotations) ? analysis.visualAnnotations : [];
+              const valid = all.filter(a => typeof a?.id === 'string' && typeof a?.x === 'number' && isFinite(a.x) && typeof a?.y === 'number' && isFinite(a.y));
+              const invalidCount = all.length - valid.length;
+              if (all.length === 0) {
+                return (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                    No annotations returned by provider
+                  </div>
+                );
+              }
+              if (invalidCount > 0) {
+                console.error('[nodes/ImageNode] Skipping invalid annotations', { imageId: image.id, invalidCount, samples: all.slice(0, 5) });
+              }
+              return valid.map((annotation, index) => (
                 <AnnotationMarker
                   key={`${annotation.id}-${image.id}-${index}`}
                   annotation={annotation}
                   onClick={() => onAnnotationClick(annotation.id)}
                 />
-              ))
-            )}
+              ));
+            })()}
+
           </div>
         )}
 

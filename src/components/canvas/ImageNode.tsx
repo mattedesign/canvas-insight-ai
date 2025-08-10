@@ -260,33 +260,45 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         />
         
         {/* Annotation Markers */}
-        {analysis && showAnnotations && analysis.visualAnnotations?.map((annotation) => {
-          const isActive = activeAnnotation?.annotation.id === annotation.id;
-          
-          // Debug logging to see actual coordinate values
-          console.log('Canvas annotation positioning:', {
-            id: annotation.id,
-            originalX: annotation.x,
-            originalY: annotation.y,
-            calculatedLeft: `${annotation.x * 100}%`,
-            calculatedTop: `${annotation.y * 100}%`,
-            title: annotation.title
-          });
-          
-          return (
-            <div
-              key={`${annotation.id}-${image.id}`}
-              className={`absolute rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110 z-10 ${getMarkerColor(annotation.type, isActive)}`}
-              style={{
-                left: `${annotation.x * 100}%`,
-                top: `${annotation.y * 100}%`,
-              }}
-              data-annotation-id={annotation.id}
-              title={annotation.title}
-              onClick={(e) => handleAnnotationClick(annotation, e)}
-            />
+        {analysis && showAnnotations && (() => {
+          const all = Array.isArray(analysis.visualAnnotations) ? analysis.visualAnnotations : [];
+          const valid = all.filter((a) =>
+            typeof a?.id === 'string' &&
+            typeof a?.x === 'number' && isFinite(a.x) &&
+            typeof a?.y === 'number' && isFinite(a.y)
           );
-        })}
+          const invalidCount = all.length - valid.length;
+          if (invalidCount > 0) {
+            console.error('[ImageNode] Skipping invalid annotations:', { imageId: image.id, invalidCount, samples: all.slice(0, 5) });
+          }
+          return valid.map((annotation) => {
+            const isActive = activeAnnotation?.annotation.id === annotation.id;
+            
+            // Debug logging to see actual coordinate values
+            console.log('Canvas annotation positioning:', {
+              id: annotation.id,
+              originalX: annotation.x,
+              originalY: annotation.y,
+              calculatedLeft: `${annotation.x * 100}%`,
+              calculatedTop: `${annotation.y * 100}%`,
+              title: annotation.title
+            });
+            
+            return (
+              <div
+                key={`${annotation.id}-${image.id}`}
+                className={`absolute rounded-full border-2 cursor-pointer transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 hover:scale-110 z-10 ${getMarkerColor(annotation.type, isActive)}`}
+                style={{
+                  left: `${annotation.x * 100}%`,
+                  top: `${annotation.y * 100}%`,
+                }}
+                data-annotation-id={annotation.id}
+                title={annotation.title}
+                onClick={(e) => handleAnnotationClick(annotation, e)}
+              />
+            );
+          });
+        })()}
 
         
         {/* AI Analysis Results Overlay */}
