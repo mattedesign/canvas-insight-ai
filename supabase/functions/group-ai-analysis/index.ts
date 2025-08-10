@@ -109,7 +109,7 @@ serve(async (req: Request) => {
 
     await insertEvent({ event_name: 'group-analysis/ai.started', status: 'processing', progress: startedProgress });
 
-    // Fetch latest context and vision results
+    // Fetch latest context and Google Vision results ONLY (no OpenAI vision)
     const fetchLatest = async (eventName: string, provider?: string) => {
       let query: any = supabase
         .from('analysis_events')
@@ -124,77 +124,117 @@ serve(async (req: Request) => {
     };
 
     const contextMeta = await fetchLatest('group-analysis/context.completed');
-    const visionOpenAI = await fetchLatest('group-analysis/vision.completed', 'openai');
     const visionGoogle = await fetchLatest('group-analysis/vision.completed', 'google');
 
-    console.log('[group-ai-analysis] fetched metadata:', {
-      hasContext: !!contextMeta,
-      hasVisionOpenAI: !!visionOpenAI,
-      hasVisionGoogle: !!visionGoogle,
-    });
     const metaSizes = {
       context: JSON.stringify(contextMeta ?? {}).length,
-      visionOpenAI: JSON.stringify(visionOpenAI ?? {}).length,
       visionGoogle: JSON.stringify(visionGoogle ?? {}).length,
     };
-    console.log('[group-ai-analysis] metadata sizes (bytes):', metaSizes);
+
+    // Prepare prompts (text-only; images already distilled by Google Vision)
+    const userPrompt = `You are a senior UX analyst. Using ONLY the provided group context and Google Vision findings (no new vision), produce a structured GROUP UX review as strict JSON with keys: summary(object), insights(string[]), recommendations(string[]), patterns(object).`;
 
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) {
-      const msg = 'OPENAI_API_KEY not configured';
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+
+    if (!openAiKey && !anthropicKey) {
+      const msg = 'OPENAI_API_KEY or ANTHROPIC_API_KEY must be configured for AI stage';
       await insertEvent({ event_name: 'group-analysis/ai.failed', status: 'failed', progress: startedProgress, message: msg });
       await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'ai', error: msg }).eq('id', job.id);
       return Response.json({ error: msg }, { status: 500, headers: corsHeaders });
     }
 
-    const promptUser = `You are a senior UX analyst. Merge the provided group context and vision findings into a structured GROUP UX review.
-Return JSON with keys: summary(object), insights(array of strings), recommendations(array of strings), patterns(object), metadata(object). Only return valid JSON.`;
+    // Execute available models in parallel
+    const tasks: Promise<any>[] = [];
 
-    const messages = [
-      { role: 'system', content: 'You produce precise, actionable GROUP UX analysis as strict JSON.' },
-      { role: 'user', content: [
-        { type: 'text', text: promptUser },
-        { type: 'text', text: `Context:\n${JSON.stringify(contextMeta ?? {})}` },
-        { type: 'text', text: `Vision (OpenAI):\n${JSON.stringify(visionOpenAI ?? {})}` },
-        { type: 'text', text: `Vision (Google):\n${JSON.stringify(visionGoogle ?? {})}` },
-      ]}
-    ];
-
-    let resp: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        resp = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-4o', messages, max_tokens: 1400, temperature: 0.2, response_format: { type: 'json_object' } })
-        });
-        if (resp.ok) break;
-      } catch (_) {}
-      await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+    if (openAiKey) {
+      tasks.push((async () => {
+        try {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                { role: 'system', content: 'You produce precise, actionable GROUP UX analysis as strict JSON.' },
+                { role: 'user', content: [
+                  { type: 'text', text: userPrompt },
+                  { type: 'text', text: `Context:\n${JSON.stringify(contextMeta ?? {})}` },
+                  { type: 'text', text: `Vision (Google):\n${JSON.stringify(visionGoogle ?? {})}` },
+                ] }
+              ],
+              temperature: 0.2,
+              max_tokens: 1400,
+              response_format: { type: 'json_object' }
+            })
+          });
+          const data = await resp.json().catch(() => ({}));
+          const raw = data?.choices?.[0]?.message?.content ?? null;
+          let jsonParsed: any = null;
+          if (typeof raw === 'string') {
+            try { jsonParsed = JSON.parse(raw); } catch { jsonParsed = null; }
+          }
+          return { provider: 'openai', ok: resp.ok, raw, json: jsonParsed, status: resp.status };
+        } catch (e) {
+          return { provider: 'openai', ok: false, error: (e as Error).message };
+        }
+      })());
     }
 
-    if (!resp.ok) {
-      const bodyText = await (async () => { try { return await resp.text(); } catch { return ''; } })();
-      const msg = `OpenAI API error: ${resp.status}`;
-      await insertEvent({ event_name: 'group-analysis/ai.failed', status: 'failed', progress: startedProgress, message: msg, metadata: { ai_preview: bodyText?.slice(0, 500) ?? null } });
-      await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'ai', error: msg }).eq('id', job.id);
-      return Response.json({ error: msg }, { status: 502, headers: corsHeaders });
+    if (anthropicKey) {
+      tasks.push((async () => {
+        try {
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': anthropicKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'claude-3-5-sonnet-20241022',
+              max_tokens: 1400,
+              temperature: 0.2,
+              messages: [
+                { role: 'user', content: [
+                  { type: 'text', text: `${userPrompt}\n\nContext:\n${JSON.stringify(contextMeta ?? {})}\n\nVision (Google):\n${JSON.stringify(visionGoogle ?? {})}` }
+                ] }
+              ]
+            })
+          });
+          const data = await resp.json().catch(() => ({}));
+          const raw = data?.content?.[0]?.text ?? null;
+          let jsonParsed: any = null;
+          if (typeof raw === 'string') {
+            try { jsonParsed = JSON.parse(raw); } catch { jsonParsed = null; }
+          }
+          return { provider: 'anthropic', ok: resp.ok, raw, json: jsonParsed, status: resp.status };
+        } catch (e) {
+          return { provider: 'anthropic', ok: false, error: (e as Error).message };
+        }
+      })());
     }
 
-    const data = await resp.json();
-    let parsed: Json | null = null;
-    try {
-      parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
-    } catch (e) {
-      const aiPreview = data?.choices?.[0]?.message?.content ?? null;
-      await insertEvent({ event_name: 'group-analysis/ai.failed', status: 'failed', progress: startedProgress, message: 'Failed to parse AI response', metadata: { ai_preview: typeof aiPreview === 'string' ? aiPreview.slice(0, 500) : null } });
-      await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'ai', error: 'Failed to parse AI response' }).eq('id', job.id);
-      return Response.json({ error: 'Failed to parse AI response' }, { status: 500, headers: corsHeaders });
+    const settled = await Promise.allSettled(tasks);
+
+    const providers: any = {};
+    for (const s of settled) {
+      if (s.status === 'fulfilled') {
+        const r = s.value;
+        providers[r.provider] = { raw: r.raw ?? null, json: r.json ?? null, ok: !!r.ok, status: r.status ?? null, error: r.error ?? null };
+      } else {
+        // Should not happen often
+        providers.unknown = { ok: false, error: (s.reason as any)?.message ?? 'unknown error' };
+      }
     }
 
     const completedProgress = Math.max(85, startedProgress);
-    await insertEvent({ event_name: 'group-analysis/ai.completed', status: 'completed', progress: completedProgress, metadata: { analysis: parsed, sizes: metaSizes } });
-    console.log('[group-ai-analysis] completed with progress', completedProgress);
+    await insertEvent({
+      event_name: 'group-analysis/ai.completed',
+      status: 'completed',
+      progress: completedProgress,
+      metadata: { providers, sizes: metaSizes }
+    });
 
     await supabase.from('group_analysis_jobs').update({ current_stage: 'synthesis', progress: completedProgress }).eq('id', job.id);
 

@@ -28,18 +28,15 @@ function getAdminClient() {
   return createClient(url, serviceKey, { auth: { persistSession: false } });
 }
 
-// --- Normalization helpers for AI-driven outputs (Option A)
+// --- Normalization helpers (robust JSON recovery)
 function tryParseJson(text: string): any | null {
   try { return JSON.parse(text); } catch { return null; }
 }
 
 function extractJsonSubstring(text: string): string | null {
-  // Heuristic: find first '{' and last '}'
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start >= 0 && end > start) {
-    return text.slice(start, end + 1);
-  }
+  if (start >= 0 && end > start) return text.slice(start, end + 1);
   return null;
 }
 
@@ -77,7 +74,6 @@ function normalizeAIGroupOutput(raw: unknown): {
     return { ok: false, summary: {}, insights: [], recommendations: [], patterns: {}, warnings, ai_raw: raw };
   }
 
-  // Accept several shapes: obj, obj.analysis, obj.data, obj.result
   const candidate = (obj.analysis ?? obj.data ?? obj.result ?? obj) as any;
 
   const summary = (candidate.summary && typeof candidate.summary === 'object') ? { ...candidate.summary } : {};
@@ -85,23 +81,10 @@ function normalizeAIGroupOutput(raw: unknown): {
   const recommendations = Array.isArray(candidate.recommendations) ? candidate.recommendations : [];
   const patterns = (candidate.patterns && typeof candidate.patterns === 'object') ? candidate.patterns : {};
 
-  // Type coercions for common fields (no fake defaults)
-  if (summary.overallScore != null) {
-    const n = Number(summary.overallScore);
-    if (Number.isFinite(n)) {
-      summary.overallScore = Math.max(0, Math.min(100, n));
-    } else {
-      warnings.push('summary.overallScore was not numeric');
-      delete (summary as any).overallScore;
-    }
-  }
-
-  if (summary.categoryScores && typeof summary.categoryScores === 'object') {
-    const cs: any = summary.categoryScores;
-    for (const k of Object.keys(cs)) {
-      const n = Number(cs[k]);
-      if (Number.isFinite(n)) cs[k] = n; else warnings.push(`categoryScores.${k} was not numeric`);
-    }
+  if ((summary as any).overallScore != null) {
+    const n = Number((summary as any).overallScore);
+    if (Number.isFinite(n)) (summary as any).overallScore = Math.max(0, Math.min(100, n));
+    else delete (summary as any).overallScore;
   }
 
   const ok = Object.keys(summary).length > 0 || insights.length > 0 || recommendations.length > 0 || Object.keys(patterns).length > 0;
@@ -188,10 +171,9 @@ serve(async (req: Request) => {
 
     const startedProgress = Math.max(85, job.progress ?? 0);
     await supabase.from('group_analysis_jobs').update({ current_stage: 'synthesis', status: job.status === 'pending' ? 'processing' : job.status, progress: startedProgress }).eq('id', job.id);
-
     await insertEvent({ event_name: 'group-analysis/synthesis.started', status: 'processing', progress: startedProgress });
 
-    // Fetch AI results (lenient) and normalize
+    // Fetch AI results (support parallel providers metadata)
     const { data: aiRows } = await supabase
       .from('analysis_events')
       .select('metadata, created_at')
@@ -201,30 +183,39 @@ serve(async (req: Request) => {
       .limit(1);
 
     const aiMeta: any = aiRows?.[0]?.metadata ?? null;
-    const rawCandidate = aiMeta?.analysis ?? aiMeta?.raw ?? aiMeta?.content ?? aiMeta?.response ?? aiMeta ?? null;
 
-    const norm = normalizeAIGroupOutput(rawCandidate);
-    if (!norm.ok) {
+    // Build candidate list in priority: parsed JSON from OpenAI, parsed JSON from Anthropic, raw OpenAI, raw Anthropic, legacy analysis field
+    const candidates: Array<{ provider: string; payload: any }> = [];
+    if (aiMeta?.providers?.openai?.json) candidates.push({ provider: 'openai.json', payload: aiMeta.providers.openai.json });
+    if (aiMeta?.providers?.anthropic?.json) candidates.push({ provider: 'anthropic.json', payload: aiMeta.providers.anthropic.json });
+    if (aiMeta?.providers?.openai?.raw) candidates.push({ provider: 'openai.raw', payload: aiMeta.providers.openai.raw });
+    if (aiMeta?.providers?.anthropic?.raw) candidates.push({ provider: 'anthropic.raw', payload: aiMeta.providers.anthropic.raw });
+    if (aiMeta?.analysis) candidates.push({ provider: 'legacy.analysis', payload: aiMeta.analysis });
+
+    let normalized: ReturnType<typeof normalizeAIGroupOutput> | null = null;
+    let usedProvider: string | null = null;
+    for (const c of candidates) {
+      const n = normalizeAIGroupOutput(c.payload);
+      if (n.ok) { normalized = n; usedProvider = c.provider; break; }
+    }
+
+    if (!normalized || !normalized.ok) {
       await insertEvent({
         event_name: 'group-analysis/synthesis.failed',
         status: 'failed',
         progress: startedProgress,
         message: 'AI output could not be normalized',
-        metadata: {
-          reason: 'normalization_failed',
-          had_ai_event: !!aiMeta,
-          ai_preview: typeof rawCandidate === 'string' ? (rawCandidate as string).slice(0, 500) : (rawCandidate ? 'object' : null)
-        }
+        metadata: { reason: 'normalization_failed', had_ai_event: !!aiMeta, providers_present: Object.keys(aiMeta?.providers ?? {}) }
       });
       await supabase.from('group_analysis_jobs').update({ status: 'failed', current_stage: 'failed', error: 'AI output could not be normalized' }).eq('id', job.id);
       return Response.json({ error: 'AI output could not be normalized' }, { status: 400, headers: corsHeaders });
     }
 
-    // Compose final structures from normalized output (no fabricated values)
-    const summary = { ...(norm.summary || {}), groupJobId: job.id } as Record<string, unknown>;
-    const insights = Array.isArray(norm.insights) ? norm.insights : [];
-    const recommendations = Array.isArray(norm.recommendations) ? norm.recommendations : [];
-    const patterns = (norm.patterns && typeof norm.patterns === 'object') ? norm.patterns : {};
+    // Compose final structures from normalized output
+    const summary = { ...(normalized.summary || {}), groupJobId: job.id, provider: usedProvider } as Record<string, unknown>;
+    const insights = Array.isArray(normalized.insights) ? normalized.insights : [];
+    const recommendations = Array.isArray(normalized.recommendations) ? normalized.recommendations : [];
+    const patterns = (normalized.patterns && typeof normalized.patterns === 'object') ? normalized.patterns : {};
     const prompt = ((job.metadata as any)?.userContext as string | undefined) ?? '';
 
     // Persist group analysis with raw + warnings for auditability
@@ -239,7 +230,7 @@ serve(async (req: Request) => {
         recommendations,
         patterns,
         parent_analysis_id: null,
-        metadata: { groupJobId: job.id, normalization: { warnings: norm.warnings }, ai_raw_output: norm.ai_raw },
+        metadata: { groupJobId: job.id, normalization: { warnings: normalized.warnings }, ai_raw_output: aiMeta?.providers ?? aiMeta ?? null },
       });
 
     if (insErr) {
