@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,46 @@ export const GroupAnalysisLoadingNode: React.FC<NodeProps> = ({ data }) => {
     startTime,
     onCancel 
   } = data as unknown as GroupAnalysisLoadingNodeData;
+
+  const [failure, setFailure] = useState<{ stage?: string; message?: string; aiPreview?: string } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadFailure() {
+      try {
+        if (status !== 'error') { if (mounted) setFailure(null); return; }
+        // Find latest job for this group, then its latest failed event
+        const { data: jobs, error: jobsErr } = await supabase
+          .from('group_analysis_jobs')
+          .select('id')
+          .eq('group_id', groupId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (jobsErr) { console.error('[GroupAnalysisLoadingNode] jobs query error', jobsErr); return; }
+        const jobId = jobs?.[0]?.id;
+        if (!jobId || !mounted) return;
+        const { data: events, error: evErr } = await supabase
+          .from('analysis_events')
+          .select('stage, status, message, metadata, created_at')
+          .eq('group_job_id', jobId)
+          .eq('status', 'failed')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (evErr) { console.error('[GroupAnalysisLoadingNode] events query error', evErr); return; }
+        const ev = events?.[0];
+        if (!mounted) return;
+        setFailure({
+          stage: ev?.stage as string | undefined,
+          message: (ev?.message as string | undefined) ?? undefined,
+          aiPreview: (ev?.metadata as any)?.ai_preview as string | undefined,
+        });
+      } catch (e) {
+        console.error('[GroupAnalysisLoadingNode] loadFailure exception', e);
+      }
+    }
+    loadFailure();
+    return () => { mounted = false; };
+  }, [status, groupId]);
 
   const getStatusConfig = () => {
     switch (status) {
@@ -173,13 +214,21 @@ export const GroupAnalysisLoadingNode: React.FC<NodeProps> = ({ data }) => {
           )}
 
           {/* Error Message */}
-          {error && status === 'error' && (
+          {status === 'error' && (
             <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950 p-3 rounded-lg border border-red-200 dark:border-red-800">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Analysis failed</p>
-                  <p className="text-xs mt-1 opacity-90">{error}</p>
+                  <p className="font-medium">Analysis failed{failure?.stage ? ` at ${failure.stage}` : ''}</p>
+                  {error && <p className="text-xs mt-1 opacity-90">{error}</p>}
+                  {failure?.message && failure?.message !== error && (
+                    <p className="text-xs mt-1 opacity-90">{failure.message}</p>
+                  )}
+                  {failure?.aiPreview && (
+                    <pre className="text-[10px] mt-2 p-2 rounded bg-background/50 overflow-auto max-h-24">
+                      {failure.aiPreview.slice(0, 400)}
+                    </pre>
+                  )}
                 </div>
               </div>
             </div>
