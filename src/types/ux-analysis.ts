@@ -1,3 +1,5 @@
+import type { AnalysisContext } from '@/types/contextTypes';
+
 export interface AnnotationPoint {
   id: string;
   x: number;
@@ -165,6 +167,7 @@ export interface UXAnalysis {
   modelUsed?: string; // AI model used for analysis
   status?: 'processing' | 'analyzing' | 'completed' | 'error';
   strategicInsights?: StrategicBusinessInsights;
+  analysisContext?: AnalysisContext;
 }
 
 export interface UploadedImage {

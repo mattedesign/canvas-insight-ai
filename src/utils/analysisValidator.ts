@@ -73,7 +73,8 @@ export class AnalysisValidator {
       metadata,
       createdAt: new Date(rawAnalysis.created_at || rawAnalysis.createdAt || Date.now()),
       modelUsed: rawAnalysis.model_used || rawAnalysis.modelUsed || 'unknown',
-      status: rawAnalysis.status || 'completed'
+      status: rawAnalysis.status || 'completed',
+      analysisContext: rawAnalysis.analysis_context || rawAnalysis.analysisContext
     };
 
     return {

@@ -32,32 +32,27 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const [dialogSize, setDialogSize] = useState({ width: 320, height: 400 });
 
-  // Simplified positioning - pin to annotation marker with basic overflow protection
+  // Simplified positioning - pin to annotation marker with viewport overflow protection
   const calculateSimplePosition = () => {
     const dialogWidth = 320; // w-80 = 20rem = 320px
     const offset = 20; // Distance from annotation marker
     const margin = 16; // Minimum margin from edges
+    const viewportWidth = window.innerWidth || 1024;
     
-    let dialogX = position.x + offset;
+    let dialogX = position.x + offset; // position is in viewport coordinates
     let dialogY = position.y;
     let transformX = 'none';
 
-    // Simple right/left positioning based on available space
-    const container = imageContainerRef?.current;
-    if (container) {
-      const containerWidth = container.clientWidth;
-      
-      // If dialog would overflow on the right, position on the left
-      if (dialogX + dialogWidth > containerWidth - margin) {
-        dialogX = position.x - offset;
-        transformX = 'translateX(-100%)';
-      }
+    // If dialog would overflow on the right, position on the left
+    if (dialogX + dialogWidth > viewportWidth - margin) {
+      dialogX = position.x - offset;
+      transformX = 'translateX(-100%)';
+    }
 
-      // Ensure dialog doesn't go below minimum margin
-      if (dialogX < margin) {
-        dialogX = margin;
-        transformX = 'none';
-      }
+    // Ensure dialog doesn't go below minimum margin
+    if (dialogX < margin) {
+      dialogX = margin;
+      transformX = 'none';
     }
 
     return {
@@ -128,7 +123,7 @@ export const AnnotationComment: React.FC<AnnotationCommentProps> = ({
   return (
     <div 
       ref={dialogRef}
-      className="absolute z-[60] animate-scale-in pointer-events-auto annotation-dialog"
+      className="fixed z-[60] animate-scale-in pointer-events-auto annotation-dialog"
       style={{
         left: optimalPosition.dialogX,
         top: optimalPosition.dialogY,
