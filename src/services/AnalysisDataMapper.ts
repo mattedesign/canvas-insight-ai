@@ -111,54 +111,43 @@ export class AnalysisDataMapper {
    */
   private static mapSummary(summaryData: any): any {
     if (!summaryData || typeof summaryData !== 'object') {
-      // Return a valid summary structure with defaults to prevent SUMMARY_MISSING errors
-      return {
-        overallScore: 65,
-        categoryScores: {
-          usability: 65,
-          accessibility: 65,
-          visual: 65,
-          content: 65
-        },
-        keyIssues: [],
-        strengths: [],
-        confidence: 85
-      };
+      // No fabricated defaults per No-Fallback policy
+      return {};
     }
 
-    // Enhanced summary mapping with better fallbacks and debugging
-    const mappedSummary = {
-      overallScore: summaryData.overallScore || summaryData.overall_score || 65,
-      categoryScores: this.mapCategoryScores(summaryData.categoryScores || summaryData.category_scores),
-      keyIssues: summaryData.keyIssues || summaryData.key_issues || [],
-      strengths: summaryData.strengths || [],
-      confidence: summaryData.confidence || 85
-    };
+    const mapped: any = {};
+    if (summaryData.overallScore != null) mapped.overallScore = summaryData.overallScore;
+    if (summaryData.overall_score != null) mapped.overallScore = summaryData.overall_score;
 
-    return mappedSummary;
+    const categorySrc = summaryData.categoryScores || summaryData.category_scores;
+    if (categorySrc && typeof categorySrc === 'object') {
+      mapped.categoryScores = this.mapCategoryScores(categorySrc);
+    }
+
+    if (Array.isArray(summaryData.keyIssues)) mapped.keyIssues = summaryData.keyIssues;
+    else if (Array.isArray(summaryData.key_issues)) mapped.keyIssues = summaryData.key_issues;
+
+    if (Array.isArray(summaryData.strengths)) mapped.strengths = summaryData.strengths;
+
+    if (summaryData.confidence != null) mapped.confidence = summaryData.confidence;
+
+    return mapped;
   }
 
   /**
    * Maps category scores with validation
    */
   private static mapCategoryScores(scores: any): any {
-    const defaultScores = {
-      usability: 75,
-      accessibility: 75,
-      visual: 75,
-      content: 75
-    };
-
     if (!scores || typeof scores !== 'object') {
-      return defaultScores;
+      return {};
     }
 
-    return {
-      usability: this.validateScore(scores.usability, defaultScores.usability),
-      accessibility: this.validateScore(scores.accessibility, defaultScores.accessibility),
-      visual: this.validateScore(scores.visual, defaultScores.visual),
-      content: this.validateScore(scores.content, defaultScores.content)
-    };
+    const result: any = {};
+    if (scores.usability != null) result.usability = this.validateScore(scores.usability, 0);
+    if (scores.accessibility != null) result.accessibility = this.validateScore(scores.accessibility, 0);
+    if (scores.visual != null) result.visual = this.validateScore(scores.visual, 0);
+    if (scores.content != null) result.content = this.validateScore(scores.content, 0);
+    return result;
   }
 
   /**

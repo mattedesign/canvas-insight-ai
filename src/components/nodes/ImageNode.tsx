@@ -147,6 +147,11 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
         <div className="text-xs text-muted-foreground mt-1">
           {image.dimensions.width} × {image.dimensions.height}px
         </div>
+        {Array.isArray((analysis as any)?.metadata?.objects) && (
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Vision: {(analysis as any).metadata.objects.length} objects
+          </div>
+        )}
       </div>
 
       {/* Image Container */}
@@ -216,7 +221,7 @@ export const ImageNode: React.FC<ImageNodeProps> = memo(({ data }) => {
 
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>{analysis.suggestions.length} suggestions</span>
-          <span>{analysis.summary.keyIssues.length} issues</span>
+          <span>{analysis.summary?.keyIssues?.length || 0} issues</span>
         </div>
       </div>
 
