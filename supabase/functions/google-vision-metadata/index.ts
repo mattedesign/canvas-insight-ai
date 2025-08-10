@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
+import { encode as b64encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -64,7 +64,7 @@ async function extractGoogleVisionMetadata(
         throw new Error('Image too large for Google Vision API (max 10MB)');
       }
 
-      base64Content = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+      base64Content = b64encode(new Uint8Array(imageBuffer));
     }
 
     // Prepare Vision API request
