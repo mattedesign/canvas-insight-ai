@@ -63,7 +63,8 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
       );
 
       // Start background job
-      const dispatchMode = (localStorage.getItem('DISPATCH_MODE') as 'inngest' | 'direct' | 'both') || 'inngest';
+      // Prefer both dispatch paths during testing for maximum reliability
+      const dispatchMode = (localStorage.getItem('DISPATCH_MODE') as 'inngest' | 'direct' | 'both') || 'both';
       const { jobId } = await startGroupUxAnalysis({
         groupId,
         imageUrls,
@@ -73,15 +74,21 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
         dispatchMode,
       });
 
-
-      // Subscribe to realtime job updates
+      // Subscribe to realtime job updates and analysis events, with a lightweight polling fallback
       await new Promise<void>((resolve, reject) => {
         let resolved = false;
-        let channel: any;
+        let channelJobs: any;
+        let channelEvents: any;
+        let pollId: any;
         const requestStartedAt = new Date();
+        const cleanup = () => {
+          if (channelJobs) supabase.removeChannel(channelJobs);
+          if (channelEvents) supabase.removeChannel(channelEvents);
+          if (pollId) clearInterval(pollId);
+        };
         const timeout = setTimeout(async () => {
           if (!resolved) {
-            if (channel) supabase.removeChannel(channel);
+            cleanup();
             try {
               const latest = await fetchLatestGroupAnalysis(groupId);
               const latestCreatedAt = latest?.created_at ? new Date(latest.created_at) : null;
@@ -100,7 +107,20 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
           }
         }, 180000);
 
-        channel = supabase
+        // Initial snapshot of the job to reflect queued/vision stages ASAP
+        (async () => {
+          const { data } = await supabase
+            .from('group_analysis_jobs')
+            .select('status, progress, current_stage, error')
+            .eq('id', jobId)
+            .maybeSingle();
+          if (data) {
+            groupAnalysisProgressService.updateProgress(groupId, data.current_stage || 'queued', data.progress || 0);
+          }
+        })();
+
+        // Realtime: job row updates
+        channelJobs = supabase
           .channel(`group-analysis-job-${jobId}`)
           .on('postgres_changes', {
             event: 'UPDATE',
@@ -110,46 +130,107 @@ export const useGroupAnalysisProgress = (): GroupAnalysisHookReturn => {
           }, async (payload: any) => {
             const j = payload.new as { status: string; progress: number | null; current_stage: string | null; error?: string | null };
             groupAnalysisProgressService.updateProgress(groupId, j.current_stage || 'processing', j.progress || 0);
- 
-             if (j.status === 'completed') {
-               resolved = true;
-               clearTimeout(timeout);
-               try {
-                 const latest = await fetchLatestGroupAnalysis(groupId);
-                 groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
-                 supabase.removeChannel(channel);
-                 resolve();
-               } catch (e) {
-                 supabase.removeChannel(channel);
-                 reject(e);
-               }
-             }
- 
-             if (j.status === 'failed') {
-               // Before treating as terminal failure, check if results were actually written
-               try {
-                 const latest = await fetchLatestGroupAnalysis(groupId);
-                 const latestCreatedAt = latest?.created_at ? new Date(latest.created_at) : null;
-                 if (latestCreatedAt && latestCreatedAt > requestStartedAt) {
-                   console.warn('[useGroupAnalysisProgress] Job reported failed but results exist; treating as completed', { groupId, jobId, latestCreatedAt, requestStartedAt });
-                   resolved = true;
-                   clearTimeout(timeout);
-                   groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
-                   supabase.removeChannel(channel);
-                   resolve();
-                   return;
-                 }
-               } catch {
-                 // No results found; proceed to mark as failure
-               }
-               resolved = true;
-               clearTimeout(timeout);
-               groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
-               supabase.removeChannel(channel);
-               reject(new Error(j.error || 'Group analysis failed'));
-             }
+
+            if (j.status === 'completed') {
+              resolved = true;
+              clearTimeout(timeout);
+              try {
+                const latest = await fetchLatestGroupAnalysis(groupId);
+                groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                cleanup();
+                resolve();
+              } catch (e) {
+                cleanup();
+                reject(e);
+              }
+            }
+
+            if (j.status === 'failed') {
+              // Before treating as terminal failure, check if results were actually written
+              try {
+                const latest = await fetchLatestGroupAnalysis(groupId);
+                const latestCreatedAt = latest?.created_at ? new Date(latest.created_at) : null;
+                if (latestCreatedAt && latestCreatedAt > requestStartedAt) {
+                  console.warn('[useGroupAnalysisProgress] Job reported failed but results exist; treating as completed', { groupId, jobId, latestCreatedAt, requestStartedAt });
+                  resolved = true;
+                  clearTimeout(timeout);
+                  groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                  cleanup();
+                  resolve();
+                  return;
+                }
+              } catch {
+                // No results found; proceed to mark as failure
+              }
+              resolved = true;
+              clearTimeout(timeout);
+              groupAnalysisProgressService.failGroupAnalysis(groupId, j.error || 'Group analysis failed');
+              cleanup();
+              reject(new Error(j.error || 'Group analysis failed'));
+            }
           })
           .subscribe();
+
+        // Realtime: analysis_events inserts for granular stage/progress
+        channelEvents = supabase
+          .channel(`group-analysis-events-${jobId}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'analysis_events',
+            filter: `group_job_id=eq.${jobId}`,
+          }, async (payload: any) => {
+            const ev = payload.new as { event_name: string; stage: string; progress: number | null; message?: string | null };
+            const stage = ev.stage || (ev.event_name?.split('/')?.[1]?.split('.')?.[0] ?? 'processing');
+            const progress = typeof ev.progress === 'number' ? ev.progress : 0;
+            groupAnalysisProgressService.updateProgress(groupId, stage, progress, ev.message || undefined);
+
+            // Terminal event from synthesis
+            if (ev.event_name === 'group-analysis/completed') {
+              resolved = true;
+              clearTimeout(timeout);
+              try {
+                const latest = await fetchLatestGroupAnalysis(groupId);
+                groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+                cleanup();
+                resolve();
+              } catch (e) {
+                cleanup();
+                reject(e);
+              }
+            }
+          })
+          .subscribe();
+
+        // Polling fallback in case Realtime is blocked by RLS or network
+        pollId = setInterval(async () => {
+          if (resolved) return;
+          try {
+            const { data } = await supabase
+              .from('group_analysis_jobs')
+              .select('status, progress, current_stage, error')
+              .eq('id', jobId)
+              .maybeSingle();
+            if (!data) return;
+            groupAnalysisProgressService.updateProgress(groupId, data.current_stage || 'processing', data.progress || 0);
+            if (data.status === 'completed') {
+              resolved = true;
+              clearTimeout(timeout);
+              const latest = await fetchLatestGroupAnalysis(groupId);
+              groupAnalysisProgressService.completeGroupAnalysis(groupId, latest);
+              cleanup();
+              resolve();
+            } else if (data.status === 'failed') {
+              resolved = true;
+              clearTimeout(timeout);
+              groupAnalysisProgressService.failGroupAnalysis(groupId, data.error || 'Group analysis failed');
+              cleanup();
+              reject(new Error(data.error || 'Group analysis failed'));
+            }
+          } catch (e) {
+            // ignore transient polling errors
+          }
+        }, 2000);
       });
 
       return fetchLatestGroupAnalysis(groupId);

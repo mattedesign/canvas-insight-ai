@@ -240,16 +240,23 @@ export class GroupAnalysisProgressService {
   private getStatusFromStage(stage: string): GroupAnalysisProgressData['status'] {
     switch (stage) {
       case 'starting':
+      case 'queued':
       case 'context-detection':
+      case 'context':
         return 'analyzing';
+      case 'vision':
       case 'individual-analysis':
+      case 'ai':
       case 'cross-image-analysis':
         return 'processing';
       case 'synthesizing':
+      case 'synthesis':
       case 'finalizing':
         return 'synthesizing';
       case 'complete':
+      case 'completed':
         return 'completed';
+      case 'failed':
       case 'error':
         return 'error';
       default:
