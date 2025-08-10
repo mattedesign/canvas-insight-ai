@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { ProjectContextBanner } from '@/components/ProjectContextBanner';
 import { useFilteredToast } from '@/hooks/use-filtered-toast';
+import { useGroupAnalysisProgress } from '@/hooks/useGroupAnalysisProgress';
 import { startUxAnalysis } from '@/services/StartUxAnalysis';
 
 const SimplifiedCanvas = () => {
@@ -47,8 +48,9 @@ const SimplifiedCanvas = () => {
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   
-  const { toast } = useFilteredToast();
-  const loadedRef = useRef<string | null>(null);
+const { toast } = useFilteredToast();
+const groupAnalysisProgress = useGroupAnalysisProgress();
+const loadedRef = useRef<string | null>(null);
 
   // Stable data loading effect with minimal dependencies
   useEffect(() => {
@@ -371,7 +373,7 @@ const SimplifiedCanvas = () => {
           return; // Important: do not re-run analysis
         }
 
-        // If no existing result provided, perform the analysis (direct path)
+        // If no existing result provided, start the job-based pipeline via Inngest
         const groupImages = uploadedImages.filter((img) => group.imageIds.includes(img.id));
         if (groupImages.length === 0) {
           throw new Error('No images found in this group');
@@ -382,62 +384,22 @@ const SimplifiedCanvas = () => {
         toast({
           category: 'info',
           title: 'Starting Group Analysis',
-          description: 'Analyzing group patterns and relationships...',
+          description: 'Launching Inngest pipeline and subscribing to progress...'
         });
 
-        const response = await analysisService.analyzeGroup({
-          imageUrls,
+        // This will create the job, dispatch via Inngest, and resolve when results are written
+        await groupAnalysisProgress.analyzeGroup(
           groupId,
-          prompt,
-          isCustom,
+          group.name,
+          imageUrls,
+          { projectId: null, prompt }
+        );
+
+        toast({
+          category: 'success',
+          title: 'Group Analysis Complete',
+          description: 'Results saved from Inngest pipeline.'
         });
-
-        if (!response.success) {
-          throw new Error(response.error || 'Group analysis failed');
-        }
-
-        if (response.analysis) {
-          const analysisData = response.analysis as any;
-          const groupAnalysis = {
-            id: crypto.randomUUID(),
-            sessionId: crypto.randomUUID(),
-            groupId,
-            prompt,
-            isCustom,
-            summary: {
-              overallScore: analysisData.summary?.overallScore || 0,
-              consistency: analysisData.summary?.consistency || 0,
-              thematicCoherence: analysisData.summary?.thematicCoherence || 0,
-              userFlowContinuity: analysisData.summary?.userFlowContinuity || 0,
-            },
-            insights: Array.isArray(analysisData.insights) ? analysisData.insights : [],
-            recommendations: Array.isArray(analysisData.recommendations)
-              ? analysisData.recommendations
-              : [],
-            patterns: {
-              commonElements: analysisData.patterns?.commonElements || [],
-              designInconsistencies: analysisData.patterns?.designInconsistencies || [],
-              userJourneyGaps: analysisData.patterns?.userJourneyGaps || [],
-            },
-            analysis: analysisData.analysis,
-            createdAt: new Date(),
-          };
-
-          await GroupAnalysisMigrationService.migrateGroupAnalysisToDatabase(
-            groupAnalysis
-          );
-
-          dispatch({
-            type: 'ADD_GROUP_ANALYSIS',
-            payload: groupAnalysis,
-          });
-
-          toast({
-            category: 'success',
-            title: 'Group Analysis Complete',
-            description: 'Analysis results have been generated and saved.',
-          });
-        }
       } catch (error) {
         console.error('[SimplifiedCanvas] Group analysis error:', error);
         toast({

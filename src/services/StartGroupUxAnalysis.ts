@@ -19,7 +19,7 @@ export async function startGroupUxAnalysis(params: {
         groupName: params.groupName ?? null,
         projectId: params.projectId ?? null,
         userContext: params.userContext ?? null,
-        dispatchMode: params.dispatchMode ?? (localStorage.getItem('DISPATCH_MODE') as any) ?? 'inngest',
+        dispatchMode: params.dispatchMode ?? (localStorage.getItem('DISPATCH_MODE') as any) ?? 'both',
       },
     });
 
