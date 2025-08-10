@@ -1,30 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useReactFlow } from '@xyflow/react';
+import { useReactFlow, useOnViewportChange } from '@xyflow/react';
 
 export const useCanvasZoom = () => {
   const { zoomIn, zoomOut, zoomTo, fitView, getZoom } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState(100);
 
-  // Update zoom level when zoom changes
-  useEffect(() => {
-    const updateZoom = () => {
-      try {
-        const currentZoom = getZoom();
-        if (typeof currentZoom === 'number' && !isNaN(currentZoom) && isFinite(currentZoom)) {
-          setZoomLevel(Math.round(currentZoom * 100));
-        } else {
-          setZoomLevel(100);
-        }
-      } catch (error) {
-        console.error('Error getting zoom level:', error);
-        setZoomLevel(100);
+  // Sync zoom level with viewport changes for responsiveness
+  useOnViewportChange({
+    onChange: (vp) => {
+      if (typeof vp.zoom === 'number' && isFinite(vp.zoom)) {
+        setZoomLevel(Math.round(vp.zoom * 100));
       }
-    };
-    
-    updateZoom();
-    const interval = setInterval(updateZoom, 100);
-    return () => clearInterval(interval);
-  }, [getZoom]);
+    },
+  });
 
   const handleZoomIn = useCallback(() => {
     zoomIn();
@@ -52,7 +40,7 @@ export const useCanvasZoom = () => {
     handleZoomTo100();
   }, [handleZoomTo100]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts and ctrl/cmd + wheel zoom
   useEffect(() => {
     const handleKeyboardShortcuts = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey) {
@@ -82,8 +70,24 @@ export const useCanvasZoom = () => {
       }
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        // prevent browser page zoom
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          handleZoomIn();
+        } else if (e.deltaY > 0) {
+          handleZoomOut();
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyboardShortcuts);
-    return () => window.removeEventListener('keydown', handleKeyboardShortcuts);
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', handleKeyboardShortcuts);
+      window.removeEventListener('wheel', handleWheel as any);
+    };
   }, [handleZoomIn, handleZoomOut, handleZoomTo100, handleFitView, handleZoomTo200]);
 
   return {

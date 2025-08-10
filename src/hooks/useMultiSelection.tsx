@@ -14,17 +14,8 @@ export const useMultiSelection = (allIds: string[] = []) => {
   });
 
   const toggleSelection = useCallback((id: string, modifierKey: 'ctrl' | 'shift' | 'none' = 'none') => {
-    console.log('[useMultiSelection] toggleSelection called:', {
-      id: id.substring(0, 12) + '...',
-      modifierKey
-    });
     
     setState(prev => {
-      console.log('[useMultiSelection] current state:', {
-        selectedIds: prev.selectedIds.map(sid => sid.substring(0, 8) + '...'),
-        isMultiSelectMode: prev.isMultiSelectMode,
-        lastSelectedId: prev.lastSelectedId?.substring(0, 8) + '...'
-      });
       
       let newState;
       
@@ -39,25 +30,39 @@ export const useMultiSelection = (allIds: string[] = []) => {
           isMultiSelectMode: newSelectedIds.length > 1,
           lastSelectedId: id,
         };
-      } else if (modifierKey === 'shift' && prev.lastSelectedId && allIds.length > 0) {
-        // Shift+Click: Range selection
-        const lastIndex = allIds.indexOf(prev.lastSelectedId);
-        const currentIndex = allIds.indexOf(id);
-        
-        if (lastIndex !== -1 && currentIndex !== -1) {
-          const start = Math.min(lastIndex, currentIndex);
-          const end = Math.max(lastIndex, currentIndex);
-          const rangeIds = allIds.slice(start, end + 1);
-          
-          newState = {
-            selectedIds: rangeIds,
-            isMultiSelectMode: rangeIds.length > 1,
-            lastSelectedId: id,
-          };
+      } else if (modifierKey === 'shift') {
+        // Shift+Click: Add range to existing selection (persist selection)
+        if (prev.lastSelectedId && allIds.length > 0) {
+          const lastIndex = allIds.indexOf(prev.lastSelectedId);
+          const currentIndex = allIds.indexOf(id);
+          if (lastIndex !== -1 && currentIndex !== -1) {
+            const start = Math.min(lastIndex, currentIndex);
+            const end = Math.max(lastIndex, currentIndex);
+            const rangeIds = allIds.slice(start, end + 1);
+            const merged = Array.from(new Set([...prev.selectedIds, ...rangeIds]));
+            newState = {
+              selectedIds: merged,
+              isMultiSelectMode: merged.length > 1,
+              lastSelectedId: id,
+            };
+          } else {
+            const merged = prev.selectedIds.includes(id)
+              ? prev.selectedIds
+              : [...prev.selectedIds, id];
+            newState = {
+              selectedIds: merged,
+              isMultiSelectMode: merged.length > 1,
+              lastSelectedId: id,
+            };
+          }
         } else {
+          // No anchor yet: add just the clicked item
+          const merged = prev.selectedIds.includes(id)
+            ? prev.selectedIds
+            : [...prev.selectedIds, id];
           newState = {
-            selectedIds: [id],
-            isMultiSelectMode: false,
+            selectedIds: merged,
+            isMultiSelectMode: merged.length > 1,
             lastSelectedId: id,
           };
         }
@@ -70,11 +75,6 @@ export const useMultiSelection = (allIds: string[] = []) => {
         };
       }
       
-      console.log('[useMultiSelection] new state:', {
-        selectedIds: newState.selectedIds.map(sid => sid.substring(0, 8) + '...'),
-        isMultiSelectMode: newState.isMultiSelectMode,
-        lastSelectedId: newState.lastSelectedId?.substring(0, 8) + '...'
-      });
       
       return newState;
     });
