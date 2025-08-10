@@ -13,7 +13,7 @@ export class AnalysisDataMapper {
    * Maps backend analysis data to frontend format
    * Handles both snake_case (backend) and camelCase (frontend) inputs robustly
    */
-  static mapBackendToFrontend(backendData: any): Partial<UXAnalysis> {
+  static mapBackendToFrontend(backendData: any): Partial<UXAnalysis> & { analysisContext?: any } {
     if (!backendData || typeof backendData !== 'object') {
       return {};
     }
@@ -83,6 +83,7 @@ export class AnalysisDataMapper {
         : [],
       summary: this.mapSummary(sourceData.summary),
       metadata: this.mapMetadata(sourceData.metadata),
+      analysisContext: sourceData.analysis_context || sourceData.analysisContext,
       createdAt: new Date(sourceData.created_at || sourceData.createdAt || Date.now()),
       modelUsed: sourceData.model_used || sourceData.modelUsed || 'unknown',
       status: sourceData.status || 'completed'

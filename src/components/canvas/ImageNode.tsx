@@ -99,7 +99,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({ data, id }) => {
         position: globalPosition,
         relatedSuggestions,
         onRequestAnalysis: handleRequestAnalysis,
-        onGenerateVariation: handleGenerateVariation
+        onGenerateVariation: handleGenerateVariation,
+        imageContainerRef: imageContainerRef
       });
     }
   }, [activeAnnotation, hideAnnotation, calculateGlobalPosition, analysis, showAnnotation, handleRequestAnalysis, handleGenerateVariation]);

@@ -9,6 +9,7 @@ interface AnnotationState {
   relatedSuggestions: Suggestion[];
   onRequestAnalysis: (prompt: string) => void;
   onGenerateVariation: (prompt: string) => void;
+  imageContainerRef?: React.RefObject<HTMLElement>;
 }
 
 interface AnnotationOverlayContextType {
@@ -54,6 +55,7 @@ export const AnnotationOverlayProvider: React.FC<AnnotationOverlayProviderProps>
           onRequestAnalysis={activeAnnotation.onRequestAnalysis}
           onGenerateVariation={activeAnnotation.onGenerateVariation}
           relatedSuggestions={activeAnnotation.relatedSuggestions}
+          imageContainerRef={activeAnnotation.imageContainerRef}
         />,
         document.body
       )}
